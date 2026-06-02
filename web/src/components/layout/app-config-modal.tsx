@@ -1,11 +1,26 @@
 "use client";
 
-import { App, Button, Form, Input, Modal, Segmented } from "antd";
+import { App, Button, Form, Input, Modal, Segmented, Select } from "antd";
 import { useState } from "react";
 
 import { ModelPicker } from "@/components/model-picker";
 import { fetchImageModels } from "@/services/api/image";
-import { filterModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { filterModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
+
+type ModelGroup = {
+    capability: ModelCapability;
+    modelKey: "imageModel" | "videoModel" | "textModel" | "audioModel";
+    modelsKey: "imageModels" | "videoModels" | "textModels" | "audioModels";
+    defaultLabel: string;
+    optionsLabel: string;
+};
+
+const modelGroups: ModelGroup[] = [
+    { capability: "image", modelKey: "imageModel", modelsKey: "imageModels", defaultLabel: "默认生图模型", optionsLabel: "生图模型可选项" },
+    { capability: "video", modelKey: "videoModel", modelsKey: "videoModels", defaultLabel: "默认视频模型", optionsLabel: "视频模型可选项" },
+    { capability: "text", modelKey: "textModel", modelsKey: "textModels", defaultLabel: "默认文本模型", optionsLabel: "文本模型可选项" },
+    { capability: "audio", modelKey: "audioModel", modelsKey: "audioModels", defaultLabel: "默认音频模型", optionsLabel: "音频模型可选项" },
+];
 
 export function AppConfigModal() {
     const { message } = App.useApp();
@@ -22,6 +37,7 @@ export function AppConfigModal() {
     const allowCustomChannel = modelChannel?.allowCustomChannel === true;
     const effectiveMode = allowCustomChannel ? config.channelMode : "remote";
     const modelConfig = effectiveMode === "remote" ? effectiveConfig : config;
+    const modelOptions = config.models.map((model) => ({ label: model, value: model }));
 
     const finishConfig = () => {
         setConfigDialogOpen(false);
@@ -44,10 +60,20 @@ export function AppConfigModal() {
             const imageModels = filterModelsByCapability(models, "image");
             const videoModels = filterModelsByCapability(models, "video");
             const textModels = filterModelsByCapability(models, "text");
+            const audioModels = filterModelsByCapability(models, "audio");
+            const nextImageModels = resolveNextCapabilityModels(config.imageModels, imageModels, models);
+            const nextVideoModels = resolveNextCapabilityModels(config.videoModels, videoModels, models);
+            const nextTextModels = resolveNextCapabilityModels(config.textModels, textModels, models);
+            const nextAudioModels = resolveNextCapabilityModels(config.audioModels, audioModels, models);
             updateConfig("models", models);
-            if (imageModels.length && !imageModels.includes(config.imageModel)) updateConfig("imageModel", imageModels[0]);
-            if (videoModels.length && !videoModels.includes(config.videoModel)) updateConfig("videoModel", videoModels[0]);
-            if (textModels.length && !textModels.includes(config.textModel)) updateConfig("textModel", textModels[0]);
+            updateConfig("imageModels", nextImageModels);
+            updateConfig("videoModels", nextVideoModels);
+            updateConfig("textModels", nextTextModels);
+            updateConfig("audioModels", nextAudioModels);
+            if (nextImageModels.length && !nextImageModels.includes(config.imageModel)) updateConfig("imageModel", nextImageModels[0]);
+            if (nextVideoModels.length && !nextVideoModels.includes(config.videoModel)) updateConfig("videoModel", nextVideoModels[0]);
+            if (nextTextModels.length && !nextTextModels.includes(config.textModel)) updateConfig("textModel", nextTextModels[0]);
+            if (nextAudioModels.length && !nextAudioModels.includes(config.audioModel)) updateConfig("audioModel", nextAudioModels[0]);
             message.success("模型列表已更新");
         } catch (error) {
             message.error(error instanceof Error ? error.message : "读取模型失败");
@@ -56,18 +82,25 @@ export function AppConfigModal() {
         }
     };
 
+    const updateCapabilityModels = (group: ModelGroup, models: string[]) => {
+        const next = uniqueModels(models);
+        updateConfig(group.modelsKey, next);
+        if (!next.includes(config[group.modelKey])) updateConfig(group.modelKey, next[0] || "");
+    };
+
     return (
         <Modal
             title={
                 <div>
-                    <div className="text-lg font-semibold">配置</div>
-                    <div className="mt-1 text-xs font-normal text-stone-500">模型和密钥</div>
+                    <div className="text-lg font-semibold">配置与用户偏好</div>
+                    <div className="mt-1 text-xs font-normal text-stone-500">模型、渠道和画布默认行为</div>
                 </div>
             }
             open={isConfigOpen}
-            width={760}
+            width={960}
             centered
             onCancel={() => setConfigDialogOpen(false)}
+            styles={{ body: { maxHeight: "72vh", overflowY: "auto", paddingRight: 18 } }}
             footer={
                 <Button type="primary" onClick={finishConfig}>
                     完成
@@ -77,7 +110,7 @@ export function AppConfigModal() {
             <div className="pt-1">
                 <Form layout="vertical" requiredMark={false}>
                     {allowCustomChannel ? (
-                        <Form.Item label="渠道模式" className="mb-4">
+                        <Form.Item label="渠道模式" className="mb-5">
                             <Segmented
                                 block
                                 size="middle"
@@ -100,7 +133,7 @@ export function AppConfigModal() {
                                     <Input.Password value={config.apiKey} onChange={(event) => updateConfig("apiKey", event.target.value)} />
                                 </Form.Item>
                             </div>
-                            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-stone-200 px-3 py-2 dark:border-stone-800">
+                            <div className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-stone-200 px-3 py-2 dark:border-stone-800">
                                 <div className="min-w-0">
                                     <div className="text-sm font-medium">模型列表</div>
                                     <div className="mt-1 text-xs text-stone-500">当前已保存 {config.models.length} 个模型</div>
@@ -111,21 +144,41 @@ export function AppConfigModal() {
                             </div>
                         </>
                     ) : (
-                        <div className="mb-4 rounded-lg border border-stone-200 p-3 text-sm text-stone-500 dark:border-stone-800">
+                        <div className="mb-5 rounded-lg border border-stone-200 p-3 text-sm text-stone-500 dark:border-stone-800">
                             <div className="font-medium text-stone-900 dark:text-stone-100">云端渠道</div>
                             <div className="mt-1">由系统后台渠道转发请求，当前可用 {modelChannel?.availableModels.length || 0} 个模型。</div>
                         </div>
                     )}
-                    <div className="grid gap-4 md:grid-cols-3">
-                        <Form.Item label="默认生图模型" className="mb-4">
-                            <ModelPicker config={modelConfig} value={modelConfig.imageModel} onChange={(model) => updateConfig("imageModel", model)} capability="image" fullWidth />
-                        </Form.Item>
-                        <Form.Item label="默认视频模型" className="mb-4">
-                            <ModelPicker config={modelConfig} value={modelConfig.videoModel} onChange={(model) => updateConfig("videoModel", model)} capability="video" fullWidth />
-                        </Form.Item>
-                        <Form.Item label="默认文本模型" className="mb-4">
-                            <ModelPicker config={modelConfig} value={modelConfig.textModel} onChange={(model) => updateConfig("textModel", model)} capability="text" fullWidth />
-                        </Form.Item>
+                    {effectiveMode === "local" ? (
+                        <section className="mb-5 rounded-lg border border-stone-200 p-3 dark:border-stone-800">
+                            <div className="mb-3">
+                                <div className="text-sm font-semibold">本地模型可选项</div>
+                                <div className="mt-1 text-xs text-stone-500">从已拉取模型中选择哪些模型可进入各类下拉。</div>
+                            </div>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {modelGroups.map((group) => (
+                                    <Form.Item key={group.modelsKey} label={group.optionsLabel} className="mb-0">
+                                        <Select
+                                            mode="multiple"
+                                            showSearch
+                                            allowClear
+                                            maxTagCount="responsive"
+                                            placeholder={config.models.length ? `请选择${group.optionsLabel}` : "请先拉取模型列表"}
+                                            value={config[group.modelsKey]}
+                                            options={modelOptions}
+                                            onChange={(models) => updateCapabilityModels(group, models)}
+                                        />
+                                    </Form.Item>
+                                ))}
+                            </div>
+                        </section>
+                    ) : null}
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {modelGroups.map((group) => (
+                            <Form.Item key={group.modelKey} label={group.defaultLabel} className="mb-4">
+                                <ModelPicker config={modelConfig} value={modelConfig[group.modelKey]} onChange={(model) => updateConfig(group.modelKey, model)} capability={group.capability} fullWidth />
+                            </Form.Item>
+                        ))}
                     </div>
                     <div className="grid gap-4 md:grid-cols-3">
                         <Form.Item label="画布默认生图张数" extra="新建画布生图和配置节点默认使用，单个节点仍可单独覆盖。" className="mb-4">
@@ -152,4 +205,14 @@ export function AppConfigModal() {
 
 function normalizeImageCount(value: string) {
     return String(Math.max(1, Math.min(15, Math.floor(Math.abs(Number(value)) || 3))));
+}
+
+function resolveNextCapabilityModels(current: string[], suggested: string[], allModels: string[]) {
+    const available = new Set(allModels);
+    const kept = uniqueModels(current).filter((model) => available.has(model));
+    return kept.length ? kept : suggested;
+}
+
+function uniqueModels(models: string[]) {
+    return Array.from(new Set(models.map((model) => model.trim()).filter(Boolean)));
 }
