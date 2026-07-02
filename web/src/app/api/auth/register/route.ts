@@ -45,17 +45,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "密码至少 6 位" }, { status: 400 });
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
+    // 手机号注册：生成唯一邮箱
+    const isPhone = /^1\d{10}$/.test(email);
+    const userEmail = isPhone ? `${email}@phone.local` : email;
+
+    const existing = await prisma.user.findUnique({ where: { email: userEmail } });
     if (existing) {
-      return NextResponse.json({ error: "邮箱已注册" }, { status: 409 });
+      return NextResponse.json({ error: "该手机号已注册" }, { status: 409 });
     }
 
     const hashed = password ? await hashPassword(password) : null;
     const user = await prisma.user.create({
       data: {
-        email,
+        email: userEmail,
         password: hashed,
-        name: name || email.split("@")[0],
+        name: name || (isPhone ? email.slice(-4) : email.split("@")[0]),
         emailVerified: payload.method === "email" ? new Date() : undefined,
         phoneVerified: payload.method === "phone" ? new Date() : undefined,
         phone: payload.method === "phone" ? payload.target : undefined,

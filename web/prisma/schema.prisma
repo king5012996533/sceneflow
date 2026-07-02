@@ -20,20 +20,160 @@ model User {
   avatarUrl     String?
   githubId      String?    @unique            // GitHub OAuth ID
   role          String    @default("user")    // user | pro | admin
+  bannedAt      DateTime?
+  banReason     String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   subscriptions Subscription[]
+  orders        Order[]
+  usageRecords  UsageRecord[]
+  auditLogs     AdminAuditLog[] @relation("AdminAuditActor")
+}
+
+model Plan {
+  id            String        @id // free | creator | team | enterprise
+  name          String
+  description   String        @default("")
+  monthlyPrice  Int           @default(0) // cents
+  yearlyPrice   Int           @default(0) // cents
+  currency      String        @default("CNY")
+  sortOrder     Int           @default(0)
+  isActive      Boolean       @default(true)
+  isPopular     Boolean       @default(false)
+  entitlements  Entitlement[]
+  subscriptions Subscription[]
+  orders        Order[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Entitlement {
+  id          String   @id @default(cuid())
+  planId      String
+  plan        Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  key         String
+  label       String
+  value       String
+  unit        String   @default("")
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([planId, key])
+  @@index([key])
 }
 
 model Subscription {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId             String   @default("free")
+  plan               Plan?    @relation(fields: [planId], references: [id])
+  status             String   @default("active") // active | cancelled | expired | past_due
+  billingCycle       String   @default("monthly") // monthly | yearly | manual
+  currentPeriodStart DateTime @default(now())
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean  @default(false)
+  autoRenew          Boolean  @default(false)
+  provider           String   @default("manual") // manual | wechat | alipay | stripe
+  providerSubId      String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([planId])
+}
+
+model UsageRecord {
   id        String   @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  plan      String   // free | creator | pro | team
-  status    String   @default("active") // active | cancelled | expired
-  startDate DateTime @default(now())
-  endDate   DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metric    String   // projects | storage_bytes | concurrent_jobs | hd_exports | private_characters | team_members
+  used      Int      @default(0)
+  limit     Int?
+  period    String   @default("lifetime") // lifetime | monthly
+  resetAt   DateTime?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, metric, period])
+  @@index([metric])
+}
+
+model Order {
+  id              String         @id @default(cuid())
+  orderNo         String         @unique
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId          String
+  plan            Plan           @relation(fields: [planId], references: [id])
+  amount          Int
+  currency        String         @default("CNY")
+  status          String         @default("pending") // pending | paid | cancelled | failed | refunded
+  provider        String         @default("wechat") // wechat | alipay | stripe | manual
+  billingCycle    String         @default("monthly")
+  providerOrderNo String?
+  paidAt          DateTime?
+  metadata        Json?
+  paymentEvents   PaymentEvent[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([userId, status])
+  @@index([planId])
+  @@index([provider])
+}
+
+model PaymentEvent {
+  id              String   @id @default(cuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider        String
+  eventType       String
+  providerEventId String?
+  payload         Json?
+  createdAt       DateTime @default(now())
+
+  @@index([provider, eventType])
+}
+
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation("AdminAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action    String
+  target    String
+  targetId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([target, targetId])
+}
+
+model ModelConfig {
+  id          String   @id @default(cuid())
+  provider    String
+  model       String
+  displayName String
+  type        String   @default("image") // image | video | audio | text
+  enabled     Boolean  @default(true)
+  isDefault   Boolean  @default(false)
+  params      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([provider, model, type])
+  @@index([type, enabled])
+}
+
+model OperationConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       Json?
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model VerificationCode {

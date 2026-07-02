@@ -149,7 +149,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
       const res = await fetch("/canvas/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: isPhone ? `${target}@phone.local` : target, password, name, verificationToken: verifyToken }),
+        body: JSON.stringify({ email: target, password, name, verificationToken: verifyToken }),
       });
       const data = await res.json();
       if (!res.ok) { message.error(data.error || "注册失败"); return; }
