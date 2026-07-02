@@ -44,17 +44,17 @@ export function UserStatusActions({ showConfig = true, variant = "default", onOp
                         <User className="size-3.5" />
                         {user.name || user.email}
                     </span>
-                    <button type="button" className={naturalIconClass} style={iconStyle} onClick={() => { clearSession(); router.push("/login"); }} title="退出登录">
+                    <button type="button" className={naturalIconClass} style={iconStyle} onClick={() => { clearSession(); router.push("/canvas/login"); }} title="退出登录">
                         <LogOut className="size-4" />
                     </button>
                 </>
             ) : (
                 <>
-                    <a href="/login" className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all", variant === "home" ? "text-white/68 hover:bg-white/8 hover:text-white" : "text-stone-600 hover:bg-stone-100 hover:text-stone-950")}>
+                    <a href="/canvas/login" className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all", variant === "home" ? "text-white/68 hover:bg-white/8 hover:text-white" : "text-stone-600 hover:bg-stone-100 hover:text-stone-950")}>
                         <User className="size-3.5" />
                         登录
                     </a>
-                    <a href="/register" className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all", variant === "home" ? "border border-white/14 bg-white/8 text-white hover:bg-white/12" : "bg-stone-950 text-white hover:bg-stone-800 dark:bg-white dark:text-stone-950 dark:hover:bg-stone-200")}>
+                    <a href="/canvas/register" className={cn("inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all", variant === "home" ? "border border-white/14 bg-white/8 text-white hover:bg-white/12" : "bg-stone-950 text-white hover:bg-stone-800 dark:bg-white dark:text-stone-950 dark:hover:bg-stone-200")}>
                         注册
                     </a>
                 </>

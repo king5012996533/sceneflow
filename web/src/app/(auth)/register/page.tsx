@@ -88,7 +88,7 @@ export default function RegisterPage() {
 
         <div className="mt-6 text-center">
           <button
-            onClick={() => router.push("/login")}
+            onClick={() => router.push("/canvas/login")}
             className="text-sm text-gray-500 hover:text-gray-700"
           >
             已有账号？去登录
