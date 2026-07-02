@@ -13,13 +13,13 @@ function getExternalBase(req: NextRequest): string {
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   if (!code) {
-    return NextResponse.redirect(new URL("/canvas/login?error=github_no_code", getExternalBase(req)));
+    return NextResponse.redirect(new URL("/canvas?error=github_no_code", getExternalBase(req)));
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL("/canvas/login?error=github_not_configured", getExternalBase(req)));
+    return NextResponse.redirect(new URL("/canvas?error=github_not_configured", getExternalBase(req)));
   }
 
   try {
@@ -93,6 +93,6 @@ export async function GET(req: NextRequest) {
     return response;
   } catch (err: unknown) {
     console.error("GitHub OAuth error:", err);
-    return NextResponse.redirect(new URL("/canvas/login?error=github_failed", getExternalBase(req)));
+    return NextResponse.redirect(new URL("/canvas?error=github_failed", getExternalBase(req)));
   }
 }
