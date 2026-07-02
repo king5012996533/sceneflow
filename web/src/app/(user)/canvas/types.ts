@@ -20,11 +20,20 @@ export enum CanvasNodeType {
 export type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
 export type CanvasGenerationMode = "text" | "image" | "video" | "audio";
 export type CanvasImageGenerationType = "generation" | "edit";
+export type CanvasAssetCategory = "character" | "character-turnaround" | "scene" | "style" | "storyboard" | "keyframe" | "video-shot" | "prompt" | "template" | "reference" | "general";
+export type CanvasAssetSource = "generate" | "user-asset" | "platform-rental" | "platform-preset" | "manual";
 
 export type CanvasNodeMetadata = {
     pipelineKind?: string;
     pipelineLabel?: string;
     pipelineDescription?: string;
+    assetCategory?: CanvasAssetCategory;
+    assetSource?: CanvasAssetSource;
+    assetLibraryId?: string;
+    assetRentalId?: string;
+    assetLicense?: "private" | "rented" | "platform" | "unknown";
+    assetReusable?: boolean;
+    consistencyNotes?: string;
     content?: string;
     composerContent?: string;
     prompt?: string;

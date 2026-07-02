@@ -29,7 +29,7 @@ export const CANVAS_AGENT_PANEL_MOTION_MS = 500;
 const PANEL_MOTION_SECONDS = CANVAS_AGENT_PANEL_MOTION_MS / 1000;
 const ONLINE_AGENT_MAX_STEPS = 4;
 const ONLINE_AGENT_PROMPT =
-    "你是 SceneFlow 的视觉生产导演助理，不是普通聊天机器人。当前画布 JSON 会随用户消息提供。首轮必须调用工具：只读问题调用 canvas_get_state；用户要做视觉内容时，先调用 canvas_plan_workflow 判断意图和缺失阶段，再调用 canvas_create_workflow_cards 创建可确认的流程卡片。除非用户明确要求立即生成，否则不要自动触发生成，不要消耗额度。你的工作顺序是：识别意图 -> 判断当前画布缺什么 -> 创建下一步流程卡片 -> 让用户确认提示词、模型、比例、画质。片段视频优先流程：片段策划、角色设定、三视图、场景设定、分镜表、关键帧、视频生成。外部剧本不限制来源，先做解析和拆分。用户上传或选中图片时，先用 canvas_analyze_reference_image 生成结构化素材说明，再决定是否建角色/场景/图生视频流程。工具参数涉及已有节点时必须使用当前画布 JSON 中真实存在的 id；缺少必要 id 或用户意图不明确时直接说明需要用户选择或补充，不要猜测。不要输出 JSON ops，不要编造执行结果。工具返回结果后，再根据真实结果回答用户。";
+    "你是 SceneFlow 的视觉生产导演助理，不是普通聊天机器人。当前画布 JSON 会随用户消息提供。首轮必须调用工具：只读问题调用 canvas_get_state；用户要做视觉内容时，先调用 canvas_plan_workflow 判断意图和缺失阶段，再调用 canvas_create_workflow_cards 创建可确认的流程卡片。除非用户明确要求立即生成，否则不要自动触发生成，不要消耗额度。你的工作顺序是：识别意图 -> 判断当前画布缺什么 -> 创建下一步流程卡片 -> 让用户确认提示词、模型、比例、画质。片段视频优先流程：片段策划、角色来源决策、角色设定、三视图、场景设定、风格校准、分镜表、关键帧、视频生成、资产入库。外部剧本不限制来源，先做解析和拆分；角色不要默认全部新生成，必须判断是新生成、调用用户资产，还是租赁平台角色。生成完成的人设、三视图、场景、风格、分镜、关键帧、视频都要建议回流到素材库。用户上传或选中图片时，先用 canvas_analyze_reference_image 生成结构化素材说明，再决定是否建角色/场景/图生视频流程。工具参数涉及已有节点时必须使用当前画布 JSON 中真实存在的 id；缺少必要 id 或用户意图不明确时直接说明需要用户选择或补充，不要猜测。不要输出 JSON ops，不要编造执行结果。工具返回结果后，再根据真实结果回答用户。";
 const JSON_RECORD_SCHEMA = { type: "object", additionalProperties: true };
 const POSITION_SCHEMA = { type: "object", properties: { x: { type: "number" }, y: { type: "number" } }, required: ["x", "y"], additionalProperties: false };
 const VIEWPORT_SCHEMA = { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, k: { type: "number" } }, required: ["x", "y", "k"], additionalProperties: false };
@@ -1054,6 +1054,9 @@ type WorkflowStage = {
     label: string;
     description: string;
     prompt: (brief: string) => string;
+    assetCategory?: "character" | "character-turnaround" | "scene" | "style" | "storyboard" | "keyframe" | "video-shot" | "prompt" | "template" | "reference" | "general";
+    assetSource?: "generate" | "user-asset" | "platform-rental" | "platform-preset" | "manual";
+    assetReusable?: boolean;
     width?: number;
     height?: number;
     size?: string;
@@ -1066,12 +1069,15 @@ type WorkflowStage = {
 const workflowPresets: Record<VisualWorkflowIntent, WorkflowStage[]> = {
     "fragment-video": [
         stage("brief", "片段策划", CanvasNodeType.Text, "text", "结构拆解", "把一句话或一段戏拆成可执行制作清单。", (brief) => `请把这个视频片段拆成视觉生产策划：${brief}\n\n输出：一句话概述、出场角色、场景地点、情绪节奏、关键动作、镜头数量建议、需要生成的资产清单。只输出可执行清单。`),
+        stage("character-source", "角色来源决策", CanvasNodeType.Text, "text", "资产来源", "判断角色是新生成、调用用户资产，还是租赁平台角色。", (brief) => `请基于片段策划判断每个角色的来源策略：${brief}\n\n必须输出三种选择之一：1. 新生成角色；2. 使用用户已有资产；3. 租赁平台角色。每个角色给出选择理由、需要的参考图/三视图、授权风险、是否适合沉淀为长期角色资产。`, { assetCategory: "prompt", assetSource: "manual", assetReusable: true }),
         stage("character", "人物创建", CanvasNodeType.Image, "image", "角色设定", "先定脸、服装、发型、气质。", (brief) => `根据片段策划生成主要角色设定图。片段：${brief}\n\n要求：脸部特征清晰，服装结构明确，发型和配饰稳定，可作为后续三视图一致性参考。`, { size: "1024x1360", quality: "high", count: 2 }),
         stage("turnaround", "人物三视图", CanvasNodeType.Image, "image", "一致性锚点", "正面、侧面、背面同屏，降低角色漂移。", (brief) => `基于上游人物定稿图，生成同一角色三视图设定表。片段：${brief}\n\n要求：正面、侧面、背面全身站姿；同一服装、同一脸型、同一发型、同一配饰；白底或浅灰底；不要换人。`, { size: "1536x1024", quality: "high", count: 1 }),
         stage("scene", "场景设定", CanvasNodeType.Image, "image", "环境资产", "确定地点、天气、空间层次。", (brief) => `根据片段策划生成场景资产图。片段：${brief}\n\n要求：明确地点、时间、天气、空间层次，可复用于多个镜头；画面不要出现主要人物。`, { size: "1824x1024", quality: "high", count: 2 }),
+        stage("style", "风格校准", CanvasNodeType.Text, "text", "风格资产", "统一画风、色调、构图和负面约束。", (brief) => `请基于片段策划、角色和场景资产输出风格校准规范：${brief}\n\n字段：整体画风、时代/类型、色调、光影、构图规则、镜头语言、角色一致性禁忌、场景一致性禁忌、通用正向提示词、通用负面提示词。`, { assetCategory: "style", assetSource: "manual", assetReusable: true }),
         stage("storyboard", "分镜表", CanvasNodeType.Text, "text", "镜头规划", "拆成镜头编号、景别、动作、台词、运动、秒数。", (brief) => `请根据片段策划、人物设定和场景资产，输出分镜表。片段：${brief}\n\n每个镜头包含：镜头编号、景别、画面描述、角色动作、台词/旁白、镜头运动、预计秒数、所需参考资产。控制在 6-10 个镜头。`),
         stage("keyframe", "镜头关键帧", CanvasNodeType.Image, "image", "关键帧", "生成适合转视频的单镜头画面。", (brief) => `基于上游分镜表、人物三视图和场景资产，生成一个镜头关键帧。片段：${brief}\n\n要求：角色一致、构图明确、动作准确、适合转视频；不要多余肢体、不要换服装、不要换脸。`, { size: "1824x1024", quality: "high", count: 1 }),
         stage("video", "镜头视频", CanvasNodeType.Video, "video", "图生视频", "把关键帧转成短视频。", (brief) => `基于上游镜头关键帧生成短视频。片段：${brief}\n\n要求：保持角色脸、服装、场景一致；动作自然，有镜头运动；不要大幅改变构图。`, { size: "16:9", seconds: "6", vquality: "720p" }),
+        stage("asset-archive", "资产入库", CanvasNodeType.Text, "text", "资产回流", "把本次产物整理成可复用素材库清单。", (brief) => `请整理本次片段生产完成后需要入库的资产：${brief}\n\n按角色资产、三视图资产、场景资产、风格预设、分镜模板、关键帧、镜头视频分类输出。每项包含：资产名称、来源节点、建议标签、复用场景、授权状态、下次项目如何调用。`, { assetCategory: "template", assetSource: "manual", assetReusable: true }),
     ],
     "full-script": [
         stage("script", "剧本解析", CanvasNodeType.Text, "text", "结构拆解", "从外部剧本提取场次、角色、冲突和资产需求。", (brief) => `请解析这个外部剧本，不限制来源：${brief}\n\n输出：故事梗概、场次列表、主要角色、核心场景、视觉风格、资产清单、优先制作的片段。`),
@@ -1152,6 +1158,10 @@ function workflowCardOps(input: Record<string, unknown>, snapshot: CanvasAgentSn
             pipelineKind: item.key,
             pipelineLabel: item.label,
             pipelineDescription: item.description,
+            assetCategory: item.assetCategory || assetCategoryForPipeline(item.key, item.type),
+            assetSource: item.assetSource || (item.type === CanvasNodeType.Image || item.type === CanvasNodeType.Video || item.type === CanvasNodeType.Audio ? "generate" : "manual"),
+            assetReusable: item.assetReusable,
+            assetLicense: item.assetSource === "platform-rental" ? "rented" : item.assetSource === "platform-preset" ? "platform" : "private",
             model: item.mode ? defaultGenerationModel(config, item.mode) : undefined,
             size: item.size || config.size,
             quality: item.quality || config.quality,
@@ -1213,6 +1223,20 @@ function referenceAnalysisOps(input: Record<string, unknown>, snapshot: CanvasAg
         { type: "connect_nodes", fromNodeId: nodeId, toNodeId: id },
         { type: "select_nodes", ids: [id] },
     ];
+}
+
+function assetCategoryForPipeline(key: string, type: CanvasNodeType): NonNullable<WorkflowStage["assetCategory"]> {
+    if (key === "character" || key === "character-image") return "character";
+    if (key === "turnaround") return "character-turnaround";
+    if (key === "scene" || key === "scene-image") return "scene";
+    if (key === "style") return "style";
+    if (key === "storyboard") return "storyboard";
+    if (key === "keyframe") return "keyframe";
+    if (key === "video") return "video-shot";
+    if (key === "asset-archive") return "template";
+    if (type === CanvasNodeType.Text) return "prompt";
+    if (type === CanvasNodeType.Image) return "reference";
+    return "general";
 }
 
 function workflowIntent(value: unknown, brief: string): VisualWorkflowIntent {

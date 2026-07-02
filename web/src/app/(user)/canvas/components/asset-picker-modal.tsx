@@ -5,9 +5,13 @@ import { Empty, Input, Modal, Pagination, Tag } from "antd";
 import { Search } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { useAssetStore, type Asset } from "@/stores/use-asset-store";
+import { useAssetStore, type Asset, type AssetMetadata } from "@/stores/use-asset-store";
 
-export type InsertAssetPayload = { kind: "text"; content: string; title: string } | { kind: "image"; dataUrl: string; title: string; storageKey?: string } | { kind: "video"; url: string; title: string; storageKey?: string; width?: number; height?: number };
+type InsertAssetBase = { assetId: string; metadata?: AssetMetadata };
+export type InsertAssetPayload =
+    | (InsertAssetBase & { kind: "text"; content: string; title: string })
+    | (InsertAssetBase & { kind: "image"; dataUrl: string; title: string; storageKey?: string })
+    | (InsertAssetBase & { kind: "video"; url: string; title: string; storageKey?: string; width?: number; height?: number });
 
 type Props = {
     open: boolean;
@@ -78,9 +82,9 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
 
     const handleInsert = (asset: Asset) => {
         if (asset.kind === "text") {
-            onInsert({ kind: "text", content: asset.data.content, title: asset.title });
+            onInsert({ kind: "text", content: asset.data.content, title: asset.title, assetId: asset.id, metadata: asset.metadata });
         } else {
-            onInsert(asset.kind === "video" ? { kind: "video", url: asset.data.url, storageKey: asset.data.storageKey, title: asset.title, width: asset.data.width, height: asset.data.height } : { kind: "image", dataUrl: asset.data.dataUrl, storageKey: asset.data.storageKey, title: asset.title });
+            onInsert(asset.kind === "video" ? { kind: "video", url: asset.data.url, storageKey: asset.data.storageKey, title: asset.title, width: asset.data.width, height: asset.data.height, assetId: asset.id, metadata: asset.metadata } : { kind: "image", dataUrl: asset.data.dataUrl, storageKey: asset.data.storageKey, title: asset.title, assetId: asset.id, metadata: asset.metadata });
         }
     };
 

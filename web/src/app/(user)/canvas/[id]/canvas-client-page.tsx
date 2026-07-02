@@ -19,7 +19,7 @@ import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { fetchClientEntitlements, isOverLimit, type ClientEntitlements } from "@/lib/client-entitlements";
 import { checkGenerationQuota, recordGeneration } from "@/lib/generation-quota";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
-import { useAssetStore } from "@/stores/use-asset-store";
+import { useAssetStore, type AssetCategory, type AssetMetadata } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { cropDataUrl, splitDataUrl, upscaleDataUrl } from "../utils/canvas-image-data";
 import { fitNodeSize, nodeSizeFromRatio } from "../utils/canvas-node-size";
@@ -111,6 +111,46 @@ const IMAGE_PROMPT_REVERSE_PRESET = `请根据参考图片反推一段适合用�
 1. 只输出提示词正文，不要解释。
 2. 覆盖主体、构图、风格、光线、色彩、材质、镜头和氛围。
 3. 尽量写成可直接用于生图模型的完整提示词。`;
+
+function assetCategoryFromNode(node: CanvasNodeData): AssetCategory {
+    if (node.metadata?.assetCategory) return node.metadata.assetCategory;
+    const kind = node.metadata?.pipelineKind;
+    if (kind === "character" || kind === "character-image") return "character";
+    if (kind === "turnaround" || kind === "character-sheet") return "character-turnaround";
+    if (kind === "scene" || kind === "scene-image") return "scene";
+    if (kind === "style") return "style";
+    if (kind === "storyboard") return "storyboard";
+    if (kind === "keyframe" || kind === "shot-image") return "keyframe";
+    if (kind === "video" || kind === "shot-video") return "video-shot";
+    if (kind === "asset-archive") return "template";
+    if (node.type === CanvasNodeType.Text) return "prompt";
+    if (node.type === CanvasNodeType.Image) return "reference";
+    return "general";
+}
+
+function nodeAssetTags(node: CanvasNodeData): string[] {
+    const tags = new Set<string>();
+    tags.add(assetCategoryFromNode(node));
+    if (node.metadata?.pipelineLabel) tags.add(node.metadata.pipelineLabel);
+    if (node.metadata?.pipelineKind) tags.add(node.metadata.pipelineKind);
+    if (node.metadata?.assetSource) tags.add(node.metadata.assetSource);
+    return Array.from(tags);
+}
+
+function nodeAssetMetadata(node: CanvasNodeData): AssetMetadata {
+    return {
+        source: "canvas",
+        origin: node.metadata?.assetSource === "platform-rental" ? "platform-rental" : node.metadata?.assetSource === "user-asset" ? "user-upload" : "canvas-generated",
+        license: node.metadata?.assetLicense || (node.metadata?.assetSource === "platform-rental" ? "rented" : "private"),
+        category: assetCategoryFromNode(node),
+        nodeId: node.id,
+        pipelineKind: node.metadata?.pipelineKind,
+        prompt: node.metadata?.prompt,
+        reusablePrompt: node.metadata?.composerContent || node.metadata?.prompt || node.metadata?.content,
+        consistencyNotes: node.metadata?.consistencyNotes || node.metadata?.pipelineDescription,
+        commercialUse: node.metadata?.assetSource !== "platform-rental",
+    };
+}
 
 function createCanvasNode(type: CanvasNodeType, position: Position, metadata?: CanvasNodeMetadata): CanvasNodeData {
     const spec = getNodeSpec(type);
@@ -1600,16 +1640,18 @@ function InfiniteCanvasPage() {
 
     const saveNodeAsset = useCallback(
         async (node: CanvasNodeData) => {
+            const tags = nodeAssetTags(node);
+            const metadata = nodeAssetMetadata(node);
             if (node.type === CanvasNodeType.Text) {
                 const content = node.metadata?.content?.trim();
                 if (!content) return message.error("没有可保存的文本");
-                addAsset({ kind: "text", title: node.metadata?.prompt?.slice(0, 24) || "画布文本", coverUrl: "", tags: [], source: "Canvas", data: { content }, metadata: { source: "canvas", nodeId: node.id } });
+                addAsset({ kind: "text", title: node.title || node.metadata?.prompt?.slice(0, 24) || "画布文本", coverUrl: "", tags, source: "Canvas", data: { content }, metadata });
                 message.success("已加入我的素材");
                 return;
             }
             if (node.type === CanvasNodeType.Video) {
                 if (!node.metadata?.content) return message.error("没有可保存的视频");
-                addAsset({ kind: "video", title: node.metadata?.prompt?.slice(0, 24) || "画布视频", coverUrl: "", tags: [], source: "Canvas", data: { url: node.metadata.content, storageKey: node.metadata.storageKey, width: node.width, height: node.height, bytes: node.metadata.bytes || 0, mimeType: node.metadata.mimeType || "video/mp4" }, metadata: { source: "canvas", nodeId: node.id, prompt: node.metadata?.prompt } });
+                addAsset({ kind: "video", title: node.title || node.metadata?.prompt?.slice(0, 24) || "画布视频", coverUrl: "", tags, source: "Canvas", data: { url: node.metadata.content, storageKey: node.metadata.storageKey, width: node.width, height: node.height, bytes: node.metadata.bytes || 0, mimeType: node.metadata.mimeType || "video/mp4" }, metadata });
                 message.success("已加入我的素材");
                 return;
             }
@@ -1617,9 +1659,9 @@ function InfiniteCanvasPage() {
             const dataUrl = node.metadata.storageKey ? "" : node.metadata.content;
             addAsset({
                 kind: "image",
-                title: node.metadata?.prompt?.slice(0, 24) || "画布图片",
+                title: node.title || node.metadata?.prompt?.slice(0, 24) || "画布图片",
                 coverUrl: node.metadata.content,
-                tags: [],
+                tags,
                 source: "Canvas",
                 data: {
                     dataUrl,
@@ -1629,7 +1671,7 @@ function InfiniteCanvasPage() {
                     bytes: node.metadata.bytes || getDataUrlByteSize(dataUrl),
                     mimeType: node.metadata.mimeType || "image/png",
                 },
-                metadata: { source: "canvas", nodeId: node.id, prompt: node.metadata?.prompt },
+                metadata,
             });
             message.success("已加入我的素材");
         },
@@ -2500,22 +2542,55 @@ function InfiniteCanvasPage() {
     );
 
     const handleAssetInsert = useCallback(
-        (payload: InsertAssetPayload) => {
+        async (payload: InsertAssetPayload) => {
+            const insertedAssetMetadata: CanvasNodeMetadata = {
+                assetLibraryId: payload.assetId,
+                assetCategory: payload.metadata?.category,
+                assetSource: payload.metadata?.origin === "platform-rental" ? "platform-rental" : "user-asset",
+                assetLicense: payload.metadata?.license || "private",
+                assetReusable: true,
+                prompt: payload.metadata?.prompt || payload.metadata?.reusablePrompt,
+                consistencyNotes: payload.metadata?.consistencyNotes,
+            };
             if (payload.kind === "text") {
-                insertAssistantText(payload.content);
+                const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
+                const node = {
+                    ...createCanvasNode(CanvasNodeType.Text, center, { ...insertedAssetMetadata, content: payload.content, status: NODE_STATUS_SUCCESS }),
+                    title: payload.title,
+                };
+                setNodes((prev) => [...prev, node]);
+                setSelectedNodeIds(new Set([node.id]));
+                setSelectedConnectionId(null);
             } else if (payload.kind === "video") {
                 const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
                 const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
                 const id = `video-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
                 const nextSize = fitNodeSize(payload.width || spec.width, payload.height || spec.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
-                setNodes((prev) => [...prev, { id, type: CanvasNodeType.Video, title: payload.title, position: { x: center.x - nextSize.width / 2, y: center.y - nextSize.height / 2 }, width: nextSize.width, height: nextSize.height, metadata: { content: payload.url, storageKey: payload.storageKey, status: NODE_STATUS_SUCCESS, naturalWidth: payload.width, naturalHeight: payload.height } }]);
+                setNodes((prev) => [...prev, { id, type: CanvasNodeType.Video, title: payload.title, position: { x: center.x - nextSize.width / 2, y: center.y - nextSize.height / 2 }, width: nextSize.width, height: nextSize.height, metadata: { ...insertedAssetMetadata, content: payload.url, storageKey: payload.storageKey, status: NODE_STATUS_SUCCESS, naturalWidth: payload.width, naturalHeight: payload.height } }]);
                 setSelectedNodeIds(new Set([id]));
             } else {
-                insertAssistantImage({ id: `asset-${Date.now()}`, prompt: payload.title, dataUrl: payload.dataUrl, storageKey: payload.storageKey });
+                const storedImage = payload.storageKey ? { url: payload.dataUrl, storageKey: payload.storageKey, width: 1, height: 1, bytes: 0, mimeType: "image/png" } : await uploadImage(payload.dataUrl);
+                const meta = storedImage.width === 1 && storedImage.height === 1 ? await readImageMeta(storedImage.url) : storedImage;
+                const config = fitNodeSize(meta.width, meta.height);
+                const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
+                const id = `image-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                const node: CanvasNodeData = {
+                    id,
+                    type: CanvasNodeType.Image,
+                    title: payload.title,
+                    position: { x: center.x - config.width / 2, y: center.y - config.height / 2 },
+                    width: config.width,
+                    height: config.height,
+                    metadata: { ...imageMetadata({ ...storedImage, width: meta.width, height: meta.height }), ...insertedAssetMetadata, prompt: insertedAssetMetadata.prompt || payload.title },
+                };
+                setNodes((prev) => [...prev, node]);
+                setSelectedNodeIds(new Set([id]));
+                setSelectedConnectionId(null);
+                setDialogNodeId(id);
             }
             setAssetPickerOpen(false);
         },
-        [insertAssistantImage, insertAssistantText, screenToCanvas, size.height, size.width],
+        [screenToCanvas, size.height, size.width],
     );
 
     const assistantOpen = assistantMounted && !assistantCollapsed;

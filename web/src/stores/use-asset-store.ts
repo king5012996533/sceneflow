@@ -9,6 +9,24 @@ import { cleanupUnusedImages, resolveImageUrl, uploadImage } from "@/services/im
 import { cleanupUnusedMedia, resolveMediaUrl } from "@/services/file-storage";
 
 export type AssetKind = "text" | "image" | "video";
+export type AssetCategory = "character" | "character-turnaround" | "scene" | "style" | "storyboard" | "keyframe" | "video-shot" | "prompt" | "template" | "reference" | "general";
+export type AssetOrigin = "user-upload" | "canvas-generated" | "platform-rental" | "manual" | "imported";
+export type AssetLicense = "private" | "rented" | "platform" | "unknown";
+export type AssetMetadata = {
+    category?: AssetCategory;
+    origin?: AssetOrigin;
+    license?: AssetLicense;
+    source?: string;
+    nodeId?: string;
+    projectId?: string;
+    pipelineKind?: string;
+    prompt?: string;
+    reusablePrompt?: string;
+    consistencyNotes?: string;
+    commercialUse?: boolean;
+    expiresAt?: string;
+    [key: string]: unknown;
+};
 export type TextAsset = AssetBase<"text"> & { data: { content: string } };
 export type ImageAsset = AssetBase<"image"> & { data: { dataUrl: string; storageKey?: string; width: number; height: number; bytes: number; mimeType: string } };
 export type VideoAsset = AssetBase<"video"> & { data: { url: string; storageKey?: string; width: number; height: number; bytes: number; mimeType: string } };
@@ -24,7 +42,7 @@ type AssetBase<T extends AssetKind> = {
     note?: string;
     createdAt: string;
     updatedAt: string;
-    metadata?: Record<string, unknown>;
+    metadata?: AssetMetadata;
 };
 
 type AssetStore = {
