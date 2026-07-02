@@ -40,14 +40,15 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const planId = String(body.planId || "");
         const billingCycle = String(body.billingCycle || "monthly") as BillingCycle;
-        const provider = String(body.provider || "wechat") as PaymentProvider;
+        const provider = String(body.provider || "manual") as PaymentProvider;
+        const intent = String(body.intent || (provider === "manual" ? "beta_application" : "checkout"));
 
         if (!cycles.has(billingCycle)) return NextResponse.json({ error: "计费周期无效" }, { status: 400 });
         if (!providers.has(provider)) return NextResponse.json({ error: "支付渠道无效" }, { status: 400 });
 
         const plan = await prisma.plan.findUnique({ where: { id: planId } });
         if (!plan || !plan.isActive) return NextResponse.json({ error: "套餐不存在或已下架" }, { status: 404 });
-        if (plan.id === "free") return NextResponse.json({ error: "免费版不需要创建订单" }, { status: 400 });
+        if (plan.id === "free") return NextResponse.json({ error: "免费版不需要申请" }, { status: 400 });
 
         const amount = getPlanAmount(plan, billingCycle);
         if (amount <= 0) return NextResponse.json({ error: "套餐价格配置异常" }, { status: 400 });
@@ -63,8 +64,9 @@ export async function POST(req: NextRequest) {
                 provider,
                 billingCycle,
                 metadata: {
-                    note: "真实微信/支付宝/Stripe 参数需要在支付 provider 层生成。",
-                    checkoutMode: "stub",
+                    intent,
+                    checkoutMode: provider === "manual" ? "beta_application" : "stub",
+                    note: provider === "manual" ? "内测阶段不收款，由管理员后台手动开通。" : "真实支付参数后续在 provider 层生成。",
                 },
             },
             include: { plan: true },
@@ -73,13 +75,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             order,
             checkout: {
-                mode: "stub",
+                mode: provider === "manual" ? "beta_application" : "stub",
                 provider,
-                message: "订单已创建。接入真实支付时，这里返回二维码、收银台 URL 或客户端支付参数。",
+                message: provider === "manual" ? "内测申请已提交，等待管理员手动开通。" : "订单已创建。接入真实支付时返回二维码、收银台 URL 或客户端支付参数。",
             },
         });
     } catch (error) {
         console.error("[billing/orders:post]", error);
-        return NextResponse.json({ error: "创建订单失败" }, { status: 500 });
+        return NextResponse.json({ error: "提交申请失败" }, { status: 500 });
     }
 }

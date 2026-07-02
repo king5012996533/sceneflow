@@ -24,7 +24,7 @@ type AdminUser = {
     bannedAt?: string | null;
     banReason?: string | null;
     createdAt: string;
-    subscriptions: Array<{ plan?: { name: string } | null; status: string }>;
+    subscriptions: Array<{ planId?: string; plan?: { id: string; name: string } | null; status: string }>;
 };
 
 type AdminOrder = {
@@ -39,7 +39,14 @@ type AdminOrder = {
 };
 
 type AdminConfig = {
-    plans: Array<{ id: string; name: string; monthlyPrice: number; yearlyPrice: number; isActive: boolean; entitlements: Array<{ label: string; value: string; unit: string }> }>;
+    plans: Array<{
+        id: string;
+        name: string;
+        monthlyPrice: number;
+        yearlyPrice: number;
+        isActive: boolean;
+        entitlements: Array<{ label: string; value: string; unit: string }>;
+    }>;
     modelConfigs: Array<{ id: string; provider: string; model: string; displayName: string; type: string; enabled: boolean; isDefault: boolean }>;
     operationConfigs: Array<{ id: string; key: string; value: unknown; description: string }>;
 };
@@ -56,6 +63,8 @@ export default function AdminPage() {
     const [config, setConfig] = useState<AdminConfig | null>(null);
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
+    const [selectedPlans, setSelectedPlans] = useState<Record<string, string>>({});
+    const [selectedCycles, setSelectedCycles] = useState<Record<string, "monthly" | "yearly">>({});
 
     async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
         const res = await fetch(url, init);
@@ -77,6 +86,8 @@ export default function AdminPage() {
             setUsers(usersData.users);
             setOrders(ordersData.orders);
             setConfig(configData);
+            setSelectedPlans(Object.fromEntries(usersData.users.map((user) => [user.id, user.subscriptions[0]?.plan?.id || "free"])));
+            setSelectedCycles(Object.fromEntries(usersData.users.map((user) => [user.id, "monthly"])));
         } catch (error) {
             message.error(error instanceof Error ? error.message : "加载后台失败");
         } finally {
@@ -109,12 +120,14 @@ export default function AdminPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ orderId, status }),
             });
-            message.success("订单已更新");
+            message.success("记录已更新");
             await loadAll();
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "更新订单失败");
+            message.error(error instanceof Error ? error.message : "更新记录失败");
         }
     }
+
+    const planOptions = (config?.plans || []).map((plan) => ({ label: plan.name, value: plan.id }));
 
     return (
         <main className="h-full overflow-y-auto bg-[#f5f5f2] px-6 py-8 text-stone-950">
@@ -126,6 +139,7 @@ export default function AdminPage() {
                             ADMIN
                         </div>
                         <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">管理后台</h1>
+                        <p className="mt-2 text-sm text-stone-500">内测阶段先手动开通套餐，支付和收银台暂不上线。</p>
                     </div>
                     <Button loading={loading} onClick={() => void loadAll()}>
                         刷新数据
@@ -135,9 +149,9 @@ export default function AdminPage() {
                 <div className="mb-4 grid gap-3 md:grid-cols-5">
                     <Metric icon={Users} label="用户" value={overview?.users ?? "-"} />
                     <Metric icon={Boxes} label="活跃订阅" value={overview?.activeSubscriptions ?? "-"} />
-                    <Metric icon={CreditCard} label="已支付订单" value={overview?.paidOrders ?? "-"} />
-                    <Metric icon={CreditCard} label="待支付订单" value={overview?.pendingOrders ?? "-"} />
-                    <Metric icon={Database} label="收入" value={overview ? formatPrice(overview.revenue) : "-"} />
+                    <Metric icon={CreditCard} label="已开通记录" value={overview?.paidOrders ?? "-"} />
+                    <Metric icon={CreditCard} label="内测申请" value={overview?.pendingOrders ?? "-"} />
+                    <Metric icon={Database} label="参考金额" value={overview ? formatPrice(overview.revenue) : "-"} />
                 </div>
 
                 <Tabs
@@ -148,27 +162,22 @@ export default function AdminPage() {
                             children: (
                                 <section className="rounded-lg border border-stone-200 bg-white p-5">
                                     <div className="mb-4 flex flex-wrap gap-3">
-                                        <Input.Search
-                                            value={query}
-                                            onChange={(event) => setQuery(event.target.value)}
-                                            onSearch={() => void loadAll()}
-                                            placeholder="搜索邮箱、昵称、手机号"
-                                            className="max-w-md"
-                                        />
+                                        <Input.Search value={query} onChange={(event) => setQuery(event.target.value)} onSearch={() => void loadAll()} placeholder="搜索邮箱、昵称、手机号" className="max-w-md" />
                                     </div>
                                     <DataTable empty={!users.length}>
                                         <thead className="border-b border-stone-200 text-stone-500">
                                             <tr>
                                                 <th className="py-3 font-medium">用户</th>
                                                 <th className="py-3 font-medium">角色</th>
-                                                <th className="py-3 font-medium">套餐</th>
+                                                <th className="py-3 font-medium">当前套餐</th>
+                                                <th className="py-3 font-medium">手动开通</th>
                                                 <th className="py-3 font-medium">状态</th>
                                                 <th className="py-3 font-medium">操作</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {users.map((user) => (
-                                                <tr key={user.id} className="border-b border-stone-100">
+                                                <tr key={user.id} className="border-b border-stone-100 align-top">
                                                     <td className="py-3">
                                                         <div className="font-medium">{user.name || user.email}</div>
                                                         <div className="text-xs text-stone-500">{user.email}</div>
@@ -185,14 +194,36 @@ export default function AdminPage() {
                                                             className="w-28"
                                                         />
                                                     </td>
-                                                    <td className="py-3">{user.subscriptions[0]?.plan?.name || "无"}</td>
+                                                    <td className="py-3">{user.subscriptions[0]?.plan?.name || "未开通"}</td>
+                                                    <td className="py-3">
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <Select value={selectedPlans[user.id] || "free"} options={planOptions} onChange={(value) => setSelectedPlans((prev) => ({ ...prev, [user.id]: value }))} className="w-32" />
+                                                            <Select
+                                                                value={selectedCycles[user.id] || "monthly"}
+                                                                options={[
+                                                                    { label: "月度", value: "monthly" },
+                                                                    { label: "年度", value: "yearly" },
+                                                                ]}
+                                                                onChange={(value) => setSelectedCycles((prev) => ({ ...prev, [user.id]: value }))}
+                                                                className="w-24"
+                                                            />
+                                                            <Button
+                                                                size="small"
+                                                                type="primary"
+                                                                onClick={() =>
+                                                                    void updateUser(user.id, "subscription", {
+                                                                        planId: selectedPlans[user.id] || "free",
+                                                                        billingCycle: selectedCycles[user.id] || "monthly",
+                                                                    })
+                                                                }
+                                                            >
+                                                                开通
+                                                            </Button>
+                                                        </div>
+                                                    </td>
                                                     <td className="py-3">{user.bannedAt ? <Tag color="red">已封禁</Tag> : <Tag color="green">正常</Tag>}</td>
                                                     <td className="py-3">
-                                                        <Button
-                                                            size="small"
-                                                            icon={<Ban className="size-3.5" />}
-                                                            onClick={() => void updateUser(user.id, user.bannedAt ? "unban" : "ban")}
-                                                        >
+                                                        <Button size="small" icon={<Ban className="size-3.5" />} onClick={() => void updateUser(user.id, user.bannedAt ? "unban" : "ban")}>
                                                             {user.bannedAt ? "解封" : "封禁"}
                                                         </Button>
                                                     </td>
@@ -205,17 +236,17 @@ export default function AdminPage() {
                         },
                         {
                             key: "orders",
-                            label: "订单管理",
+                            label: "内测申请",
                             children: (
                                 <section className="rounded-lg border border-stone-200 bg-white p-5">
                                     <DataTable empty={!orders.length}>
                                         <thead className="border-b border-stone-200 text-stone-500">
                                             <tr>
-                                                <th className="py-3 font-medium">订单号</th>
+                                                <th className="py-3 font-medium">记录号</th>
                                                 <th className="py-3 font-medium">用户</th>
                                                 <th className="py-3 font-medium">套餐</th>
-                                                <th className="py-3 font-medium">金额</th>
-                                                <th className="py-3 font-medium">渠道</th>
+                                                <th className="py-3 font-medium">参考金额</th>
+                                                <th className="py-3 font-medium">来源</th>
                                                 <th className="py-3 font-medium">状态</th>
                                             </tr>
                                         </thead>
@@ -226,11 +257,17 @@ export default function AdminPage() {
                                                     <td className="py-3">{order.user.email}</td>
                                                     <td className="py-3">{order.plan.name}</td>
                                                     <td className="py-3">{formatPrice(order.amount)}</td>
-                                                    <td className="py-3">{order.provider}</td>
+                                                    <td className="py-3">{order.provider === "manual" ? "内测申请" : order.provider}</td>
                                                     <td className="py-3">
                                                         <Select
                                                             value={order.status}
-                                                            options={["pending", "paid", "cancelled", "failed", "refunded"].map((value) => ({ label: value, value }))}
+                                                            options={[
+                                                                { label: "待处理", value: "pending" },
+                                                                { label: "已开通", value: "paid" },
+                                                                { label: "已取消", value: "cancelled" },
+                                                                { label: "失败", value: "failed" },
+                                                                { label: "已退款", value: "refunded" },
+                                                            ]}
                                                             onChange={(status) => void updateOrder(order.id, status)}
                                                             className="w-32"
                                                         />
@@ -247,9 +284,7 @@ export default function AdminPage() {
                             label: "项目管理",
                             children: (
                                 <section className="rounded-lg border border-stone-200 bg-white p-6">
-                                    <Empty
-                                        description="当前画布项目主要存储在前端/本地持久化，尚未接入服务端项目表。后续需要新增 Project、CanvasSnapshot、AssetReference 后才能做全局检索和异常排查。"
-                                    />
+                                    <Empty description="当前画布项目主要存储在前端/本地持久化，后续接入服务端 Project、CanvasSnapshot、AssetReference 后再做全局检索和异常排查。" />
                                 </section>
                             ),
                         },
@@ -271,7 +306,7 @@ export default function AdminPage() {
                                                         <Tag>{plan.isActive ? "上架" : "下架"}</Tag>
                                                     </div>
                                                     <div className="mt-2 text-sm text-stone-500">
-                                                        月付 {formatPrice(plan.monthlyPrice)} / 年付 {formatPrice(plan.yearlyPrice)}
+                                                        月度 {formatPrice(plan.monthlyPrice)} / 年度 {formatPrice(plan.yearlyPrice)}
                                                     </div>
                                                     <div className="mt-3 flex flex-wrap gap-2">
                                                         {plan.entitlements.map((item) => (
@@ -328,7 +363,7 @@ function DataTable({ children, empty }: { children: ReactNode; empty: boolean })
     if (empty) return <Empty description="暂无数据" />;
     return (
         <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">{children}</table>
+            <table className="w-full min-w-[980px] text-left text-sm">{children}</table>
         </div>
     );
 }

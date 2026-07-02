@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const BASE_PATH = "/canvas";
-
 const PUBLIC_PATHS = [
     "/",
     "/login",
@@ -36,7 +34,7 @@ export function middleware(request: NextRequest) {
         if (pathname.startsWith("/api/")) {
             return NextResponse.json({ error: "请先登录" }, { status: 401 });
         }
-        return NextResponse.redirect(new URL(`${BASE_PATH}/login`, request.url));
+        return NextResponse.redirect(new URL("/canvas/login", request.url));
     }
 
     return NextResponse.next();

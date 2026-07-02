@@ -1,3 +1,4 @@
+import { apiPath } from "@/lib/app-paths";
 import { compactApiParams, serializeApiParams } from "@/services/api/request";
 
 export type Prompt = {
@@ -22,7 +23,19 @@ export type PromptListResponse = {
     total: number;
 };
 
-export async function fetchPrompts({ keyword = "", tag = [], category = ALL_PROMPTS_OPTION, page, pageSize }: { keyword?: string; tag?: string[]; category?: string; page?: number; pageSize?: number } = {}) {
+export async function fetchPrompts({
+    keyword = "",
+    tag = [],
+    category = ALL_PROMPTS_OPTION,
+    page,
+    pageSize,
+}: {
+    keyword?: string;
+    tag?: string[];
+    category?: string;
+    page?: number;
+    pageSize?: number;
+} = {}) {
     const params = serializeApiParams(
         compactApiParams({
             ...(keyword ? { keyword } : {}),
@@ -32,7 +45,8 @@ export async function fetchPrompts({ keyword = "", tag = [], category = ALL_PROM
             ...(pageSize ? { pageSize } : {}),
         }),
     );
-    const response = await fetch(`/api/prompts${params.size ? `?${params}` : ""}`);
+
+    const response = await fetch(apiPath(`/api/prompts${params.size ? `?${params}` : ""}`));
     if (!response.ok) throw new Error("获取提示词失败");
     return (await response.json()) as PromptListResponse;
 }
