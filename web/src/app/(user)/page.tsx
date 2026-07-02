@@ -14,6 +14,8 @@ import {
     Video,
 } from "lucide-react";
 
+import { publicPath } from "@/lib/app-paths";
+
 import { LoginModal } from "@/components/layout/login-modal";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -61,22 +63,22 @@ const entries = [
 
 const caseImages = [
     {
-        src: "/showcase/ai-production-studio.png",
+        src: publicPath("/showcase/ai-production-studio.png"),
         title: "Production Studio",
         desc: "A connected visual board for directors, artists, and operators.",
     },
     {
-        src: "/showcase/wuxia-character-board.png",
+        src: publicPath("/showcase/wuxia-character-board.png"),
         title: "Character Bible",
         desc: "Portrait, costume details, weapon references, and three-view consistency.",
     },
     {
-        src: "/showcase/wuxia-keyframe-grid.png",
+        src: publicPath("/showcase/wuxia-keyframe-grid.png"),
         title: "Action Keyframes",
         desc: "Shot-scale variations for image generation and image-to-video planning.",
     },
     {
-        src: "/showcase/story-production-wall.png",
+        src: publicPath("/showcase/story-production-wall.png"),
         title: "Production Memory",
         desc: "Storyboards, references, scenes, and visual decisions preserved together.",
     },
@@ -147,7 +149,7 @@ export default function IndexPage() {
 
                     <div className="mx-auto mt-10 max-w-[1220px]">
                         <ShowcaseImage
-                            src="/showcase/visual-workflow-canvas.png"
+                            src={publicPath("/showcase/visual-workflow-canvas.png")}
                             alt="SceneFlow visual workflow canvas"
                             label="Live workflow canvas"
                             caption="A complete visual production board: structure, character design, three-view consistency, environment design, storyboard, and keyframes."
@@ -200,7 +202,7 @@ export default function IndexPage() {
                         </div>
                     </div>
                     <ShowcaseImage
-                        src="/showcase/storyboard-table.png"
+                        src={publicPath("/showcase/storyboard-table.png")}
                         alt="SceneFlow storyboard table output"
                         label="Storyboard output"
                         caption="Shot number, framing, visual description, character action, dialogue, camera movement, duration, and required assets in one board."

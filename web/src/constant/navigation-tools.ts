@@ -1,4 +1,4 @@
-import { FileText, ImagePlus, Images, Maximize2, Video } from "lucide-react";
+import { CreditCard, FileText, ImagePlus, Images, Maximize2, Shield, Video } from "lucide-react";
 
 export const navigationTools = [
     {
@@ -25,6 +25,16 @@ export const navigationTools = [
         slug: "assets",
         label: "我的素材",
         icon: Images,
+    },
+    {
+        slug: "pricing",
+        label: "价格套餐",
+        icon: CreditCard,
+    },
+    {
+        slug: "admin",
+        label: "管理后台",
+        icon: Shield,
     },
 ] as const;
 

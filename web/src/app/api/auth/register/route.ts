@@ -26,16 +26,19 @@ export async function POST(req: NextRequest) {
 
     // 校验 verification token
     if (!verificationToken) {
+      console.log("[register] no verificationToken");
       return NextResponse.json({ error: "请先完成邮箱验证" }, { status: 400 });
     }
 
     let payload: { target: string; method: string; purpose: string } | null = null;
     try {
       payload = jwt.verify(verificationToken, VERIFY_TOKEN_SECRET) as { target: string; method: string; purpose: string };
-    } catch {
+    } catch (e: any) {
+      console.log("[register] token verify failed:", e.message);
       return NextResponse.json({ error: "验证码已过期，请重新验证" }, { status: 400 });
     }
 
+    console.log("[register] email=", email, "payload.target=", payload.target, "purpose=", payload.purpose);
     if (payload.purpose !== "register" || payload.target !== email) {
       return NextResponse.json({ error: "验证码无效" }, { status: 400 });
     }

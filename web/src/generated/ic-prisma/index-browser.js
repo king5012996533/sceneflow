@@ -131,6 +131,34 @@ exports.Prisma.UserScalarFieldEnum = {
   avatarUrl: 'avatarUrl',
   githubId: 'githubId',
   role: 'role',
+  bannedAt: 'bannedAt',
+  banReason: 'banReason',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.PlanScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  description: 'description',
+  monthlyPrice: 'monthlyPrice',
+  yearlyPrice: 'yearlyPrice',
+  currency: 'currency',
+  sortOrder: 'sortOrder',
+  isActive: 'isActive',
+  isPopular: 'isPopular',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.EntitlementScalarFieldEnum = {
+  id: 'id',
+  planId: 'planId',
+  key: 'key',
+  label: 'label',
+  value: 'value',
+  unit: 'unit',
+  description: 'description',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -138,11 +166,88 @@ exports.Prisma.UserScalarFieldEnum = {
 exports.Prisma.SubscriptionScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
-  plan: 'plan',
+  planId: 'planId',
   status: 'status',
-  startDate: 'startDate',
-  endDate: 'endDate',
+  billingCycle: 'billingCycle',
+  currentPeriodStart: 'currentPeriodStart',
+  currentPeriodEnd: 'currentPeriodEnd',
+  cancelAtPeriodEnd: 'cancelAtPeriodEnd',
+  autoRenew: 'autoRenew',
+  provider: 'provider',
+  providerSubId: 'providerSubId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.UsageRecordScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  metric: 'metric',
+  used: 'used',
+  limit: 'limit',
+  period: 'period',
+  resetAt: 'resetAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.OrderScalarFieldEnum = {
+  id: 'id',
+  orderNo: 'orderNo',
+  userId: 'userId',
+  planId: 'planId',
+  amount: 'amount',
+  currency: 'currency',
+  status: 'status',
+  provider: 'provider',
+  billingCycle: 'billingCycle',
+  providerOrderNo: 'providerOrderNo',
+  paidAt: 'paidAt',
+  metadata: 'metadata',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.PaymentEventScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  provider: 'provider',
+  eventType: 'eventType',
+  providerEventId: 'providerEventId',
+  payload: 'payload',
   createdAt: 'createdAt'
+};
+
+exports.Prisma.AdminAuditLogScalarFieldEnum = {
+  id: 'id',
+  actorId: 'actorId',
+  action: 'action',
+  target: 'target',
+  targetId: 'targetId',
+  metadata: 'metadata',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.ModelConfigScalarFieldEnum = {
+  id: 'id',
+  provider: 'provider',
+  model: 'model',
+  displayName: 'displayName',
+  type: 'type',
+  enabled: 'enabled',
+  isDefault: 'isDefault',
+  params: 'params',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.OperationConfigScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  value: 'value',
+  description: 'description',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.VerificationCodeScalarFieldEnum = {
@@ -167,6 +272,11 @@ exports.Prisma.SortOrder = {
   desc: 'desc'
 };
 
+exports.Prisma.NullableJsonNullValueInput = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull
+};
+
 exports.Prisma.QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
@@ -177,10 +287,24 @@ exports.Prisma.NullsOrder = {
   last: 'last'
 };
 
+exports.Prisma.JsonNullValueFilter = {
+  DbNull: Prisma.DbNull,
+  JsonNull: Prisma.JsonNull,
+  AnyNull: Prisma.AnyNull
+};
+
 
 exports.Prisma.ModelName = {
   User: 'User',
+  Plan: 'Plan',
+  Entitlement: 'Entitlement',
   Subscription: 'Subscription',
+  UsageRecord: 'UsageRecord',
+  Order: 'Order',
+  PaymentEvent: 'PaymentEvent',
+  AdminAuditLog: 'AdminAuditLog',
+  ModelConfig: 'ModelConfig',
+  OperationConfig: 'OperationConfig',
   VerificationCode: 'VerificationCode',
   RateLimitEntry: 'RateLimitEntry'
 };
