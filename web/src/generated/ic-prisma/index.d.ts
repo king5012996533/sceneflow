@@ -23,6 +23,16 @@ export type User = $Result.DefaultSelection<Prisma.$UserPayload>
  * 
  */
 export type Subscription = $Result.DefaultSelection<Prisma.$SubscriptionPayload>
+/**
+ * Model VerificationCode
+ * 
+ */
+export type VerificationCode = $Result.DefaultSelection<Prisma.$VerificationCodePayload>
+/**
+ * Model RateLimitEntry
+ * 
+ */
+export type RateLimitEntry = $Result.DefaultSelection<Prisma.$RateLimitEntryPayload>
 
 /**
  * ##  Prisma Client ʲˢ
@@ -164,6 +174,26 @@ export class PrismaClient<
     * ```
     */
   get subscription(): Prisma.SubscriptionDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.verificationCode`: Exposes CRUD operations for the **VerificationCode** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more VerificationCodes
+    * const verificationCodes = await prisma.verificationCode.findMany()
+    * ```
+    */
+  get verificationCode(): Prisma.VerificationCodeDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.rateLimitEntry`: Exposes CRUD operations for the **RateLimitEntry** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more RateLimitEntries
+    * const rateLimitEntries = await prisma.rateLimitEntry.findMany()
+    * ```
+    */
+  get rateLimitEntry(): Prisma.RateLimitEntryDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -599,7 +629,9 @@ export namespace Prisma {
 
   export const ModelName: {
     User: 'User',
-    Subscription: 'Subscription'
+    Subscription: 'Subscription',
+    VerificationCode: 'VerificationCode',
+    RateLimitEntry: 'RateLimitEntry'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -615,7 +647,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "subscription"
+      modelProps: "user" | "subscription" | "verificationCode" | "rateLimitEntry"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -767,6 +799,154 @@ export namespace Prisma {
           }
         }
       }
+      VerificationCode: {
+        payload: Prisma.$VerificationCodePayload<ExtArgs>
+        fields: Prisma.VerificationCodeFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.VerificationCodeFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.VerificationCodeFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload>
+          }
+          findFirst: {
+            args: Prisma.VerificationCodeFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.VerificationCodeFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload>
+          }
+          findMany: {
+            args: Prisma.VerificationCodeFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload>[]
+          }
+          create: {
+            args: Prisma.VerificationCodeCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload>
+          }
+          createMany: {
+            args: Prisma.VerificationCodeCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.VerificationCodeCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload>[]
+          }
+          delete: {
+            args: Prisma.VerificationCodeDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload>
+          }
+          update: {
+            args: Prisma.VerificationCodeUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload>
+          }
+          deleteMany: {
+            args: Prisma.VerificationCodeDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.VerificationCodeUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.VerificationCodeUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload>[]
+          }
+          upsert: {
+            args: Prisma.VerificationCodeUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$VerificationCodePayload>
+          }
+          aggregate: {
+            args: Prisma.VerificationCodeAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateVerificationCode>
+          }
+          groupBy: {
+            args: Prisma.VerificationCodeGroupByArgs<ExtArgs>
+            result: $Utils.Optional<VerificationCodeGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.VerificationCodeCountArgs<ExtArgs>
+            result: $Utils.Optional<VerificationCodeCountAggregateOutputType> | number
+          }
+        }
+      }
+      RateLimitEntry: {
+        payload: Prisma.$RateLimitEntryPayload<ExtArgs>
+        fields: Prisma.RateLimitEntryFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.RateLimitEntryFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.RateLimitEntryFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload>
+          }
+          findFirst: {
+            args: Prisma.RateLimitEntryFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.RateLimitEntryFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload>
+          }
+          findMany: {
+            args: Prisma.RateLimitEntryFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload>[]
+          }
+          create: {
+            args: Prisma.RateLimitEntryCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload>
+          }
+          createMany: {
+            args: Prisma.RateLimitEntryCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.RateLimitEntryCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload>[]
+          }
+          delete: {
+            args: Prisma.RateLimitEntryDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload>
+          }
+          update: {
+            args: Prisma.RateLimitEntryUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload>
+          }
+          deleteMany: {
+            args: Prisma.RateLimitEntryDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.RateLimitEntryUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.RateLimitEntryUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload>[]
+          }
+          upsert: {
+            args: Prisma.RateLimitEntryUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$RateLimitEntryPayload>
+          }
+          aggregate: {
+            args: Prisma.RateLimitEntryAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateRateLimitEntry>
+          }
+          groupBy: {
+            args: Prisma.RateLimitEntryGroupByArgs<ExtArgs>
+            result: $Utils.Optional<RateLimitEntryGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.RateLimitEntryCountArgs<ExtArgs>
+            result: $Utils.Optional<RateLimitEntryCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -877,6 +1057,8 @@ export namespace Prisma {
   export type GlobalOmitConfig = {
     user?: UserOmit
     subscription?: SubscriptionOmit
+    verificationCode?: VerificationCodeOmit
+    rateLimitEntry?: RateLimitEntryOmit
   }
 
   /* Types for Logging */
@@ -1002,8 +1184,12 @@ export namespace Prisma {
     email: string | null
     name: string | null
     password: string | null
-    role: string | null
+    phone: string | null
+    emailVerified: Date | null
+    phoneVerified: Date | null
     avatarUrl: string | null
+    githubId: string | null
+    role: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -1013,8 +1199,12 @@ export namespace Prisma {
     email: string | null
     name: string | null
     password: string | null
-    role: string | null
+    phone: string | null
+    emailVerified: Date | null
+    phoneVerified: Date | null
     avatarUrl: string | null
+    githubId: string | null
+    role: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -1024,8 +1214,12 @@ export namespace Prisma {
     email: number
     name: number
     password: number
-    role: number
+    phone: number
+    emailVerified: number
+    phoneVerified: number
     avatarUrl: number
+    githubId: number
+    role: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -1037,8 +1231,12 @@ export namespace Prisma {
     email?: true
     name?: true
     password?: true
-    role?: true
+    phone?: true
+    emailVerified?: true
+    phoneVerified?: true
     avatarUrl?: true
+    githubId?: true
+    role?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -1048,8 +1246,12 @@ export namespace Prisma {
     email?: true
     name?: true
     password?: true
-    role?: true
+    phone?: true
+    emailVerified?: true
+    phoneVerified?: true
     avatarUrl?: true
+    githubId?: true
+    role?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -1059,8 +1261,12 @@ export namespace Prisma {
     email?: true
     name?: true
     password?: true
-    role?: true
+    phone?: true
+    emailVerified?: true
+    phoneVerified?: true
     avatarUrl?: true
+    githubId?: true
+    role?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -1142,9 +1348,13 @@ export namespace Prisma {
     id: string
     email: string
     name: string
-    password: string
-    role: string
+    password: string | null
+    phone: string | null
+    emailVerified: Date | null
+    phoneVerified: Date | null
     avatarUrl: string | null
+    githubId: string | null
+    role: string
     createdAt: Date
     updatedAt: Date
     _count: UserCountAggregateOutputType | null
@@ -1171,8 +1381,12 @@ export namespace Prisma {
     email?: boolean
     name?: boolean
     password?: boolean
-    role?: boolean
+    phone?: boolean
+    emailVerified?: boolean
+    phoneVerified?: boolean
     avatarUrl?: boolean
+    githubId?: boolean
+    role?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     subscriptions?: boolean | User$subscriptionsArgs<ExtArgs>
@@ -1184,8 +1398,12 @@ export namespace Prisma {
     email?: boolean
     name?: boolean
     password?: boolean
-    role?: boolean
+    phone?: boolean
+    emailVerified?: boolean
+    phoneVerified?: boolean
     avatarUrl?: boolean
+    githubId?: boolean
+    role?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["user"]>
@@ -1195,8 +1413,12 @@ export namespace Prisma {
     email?: boolean
     name?: boolean
     password?: boolean
-    role?: boolean
+    phone?: boolean
+    emailVerified?: boolean
+    phoneVerified?: boolean
     avatarUrl?: boolean
+    githubId?: boolean
+    role?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["user"]>
@@ -1206,13 +1428,17 @@ export namespace Prisma {
     email?: boolean
     name?: boolean
     password?: boolean
-    role?: boolean
+    phone?: boolean
+    emailVerified?: boolean
+    phoneVerified?: boolean
     avatarUrl?: boolean
+    githubId?: boolean
+    role?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "name" | "password" | "role" | "avatarUrl" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "name" | "password" | "phone" | "emailVerified" | "phoneVerified" | "avatarUrl" | "githubId" | "role" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     subscriptions?: boolean | User$subscriptionsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
@@ -1229,9 +1455,13 @@ export namespace Prisma {
       id: string
       email: string
       name: string
-      password: string
-      role: string
+      password: string | null
+      phone: string | null
+      emailVerified: Date | null
+      phoneVerified: Date | null
       avatarUrl: string | null
+      githubId: string | null
+      role: string
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["user"]>
@@ -1662,8 +1892,12 @@ export namespace Prisma {
     readonly email: FieldRef<"User", 'String'>
     readonly name: FieldRef<"User", 'String'>
     readonly password: FieldRef<"User", 'String'>
-    readonly role: FieldRef<"User", 'String'>
+    readonly phone: FieldRef<"User", 'String'>
+    readonly emailVerified: FieldRef<"User", 'DateTime'>
+    readonly phoneVerified: FieldRef<"User", 'DateTime'>
     readonly avatarUrl: FieldRef<"User", 'String'>
+    readonly githubId: FieldRef<"User", 'String'>
+    readonly role: FieldRef<"User", 'String'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
   }
@@ -3191,6 +3425,2053 @@ export namespace Prisma {
 
 
   /**
+   * Model VerificationCode
+   */
+
+  export type AggregateVerificationCode = {
+    _count: VerificationCodeCountAggregateOutputType | null
+    _min: VerificationCodeMinAggregateOutputType | null
+    _max: VerificationCodeMaxAggregateOutputType | null
+  }
+
+  export type VerificationCodeMinAggregateOutputType = {
+    id: string | null
+    target: string | null
+    method: string | null
+    code: string | null
+    expiresAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type VerificationCodeMaxAggregateOutputType = {
+    id: string | null
+    target: string | null
+    method: string | null
+    code: string | null
+    expiresAt: Date | null
+    createdAt: Date | null
+  }
+
+  export type VerificationCodeCountAggregateOutputType = {
+    id: number
+    target: number
+    method: number
+    code: number
+    expiresAt: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type VerificationCodeMinAggregateInputType = {
+    id?: true
+    target?: true
+    method?: true
+    code?: true
+    expiresAt?: true
+    createdAt?: true
+  }
+
+  export type VerificationCodeMaxAggregateInputType = {
+    id?: true
+    target?: true
+    method?: true
+    code?: true
+    expiresAt?: true
+    createdAt?: true
+  }
+
+  export type VerificationCodeCountAggregateInputType = {
+    id?: true
+    target?: true
+    method?: true
+    code?: true
+    expiresAt?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type VerificationCodeAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which VerificationCode to aggregate.
+     */
+    where?: VerificationCodeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VerificationCodes to fetch.
+     */
+    orderBy?: VerificationCodeOrderByWithRelationInput | VerificationCodeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: VerificationCodeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VerificationCodes from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VerificationCodes.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned VerificationCodes
+    **/
+    _count?: true | VerificationCodeCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: VerificationCodeMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: VerificationCodeMaxAggregateInputType
+  }
+
+  export type GetVerificationCodeAggregateType<T extends VerificationCodeAggregateArgs> = {
+        [P in keyof T & keyof AggregateVerificationCode]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateVerificationCode[P]>
+      : GetScalarType<T[P], AggregateVerificationCode[P]>
+  }
+
+
+
+
+  export type VerificationCodeGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: VerificationCodeWhereInput
+    orderBy?: VerificationCodeOrderByWithAggregationInput | VerificationCodeOrderByWithAggregationInput[]
+    by: VerificationCodeScalarFieldEnum[] | VerificationCodeScalarFieldEnum
+    having?: VerificationCodeScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: VerificationCodeCountAggregateInputType | true
+    _min?: VerificationCodeMinAggregateInputType
+    _max?: VerificationCodeMaxAggregateInputType
+  }
+
+  export type VerificationCodeGroupByOutputType = {
+    id: string
+    target: string
+    method: string
+    code: string
+    expiresAt: Date
+    createdAt: Date
+    _count: VerificationCodeCountAggregateOutputType | null
+    _min: VerificationCodeMinAggregateOutputType | null
+    _max: VerificationCodeMaxAggregateOutputType | null
+  }
+
+  type GetVerificationCodeGroupByPayload<T extends VerificationCodeGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<VerificationCodeGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof VerificationCodeGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], VerificationCodeGroupByOutputType[P]>
+            : GetScalarType<T[P], VerificationCodeGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type VerificationCodeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    target?: boolean
+    method?: boolean
+    code?: boolean
+    expiresAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["verificationCode"]>
+
+  export type VerificationCodeSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    target?: boolean
+    method?: boolean
+    code?: boolean
+    expiresAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["verificationCode"]>
+
+  export type VerificationCodeSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    target?: boolean
+    method?: boolean
+    code?: boolean
+    expiresAt?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["verificationCode"]>
+
+  export type VerificationCodeSelectScalar = {
+    id?: boolean
+    target?: boolean
+    method?: boolean
+    code?: boolean
+    expiresAt?: boolean
+    createdAt?: boolean
+  }
+
+  export type VerificationCodeOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "target" | "method" | "code" | "expiresAt" | "createdAt", ExtArgs["result"]["verificationCode"]>
+
+  export type $VerificationCodePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "VerificationCode"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      target: string
+      method: string
+      code: string
+      expiresAt: Date
+      createdAt: Date
+    }, ExtArgs["result"]["verificationCode"]>
+    composites: {}
+  }
+
+  type VerificationCodeGetPayload<S extends boolean | null | undefined | VerificationCodeDefaultArgs> = $Result.GetResult<Prisma.$VerificationCodePayload, S>
+
+  type VerificationCodeCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<VerificationCodeFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: VerificationCodeCountAggregateInputType | true
+    }
+
+  export interface VerificationCodeDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['VerificationCode'], meta: { name: 'VerificationCode' } }
+    /**
+     * Find zero or one VerificationCode that matches the filter.
+     * @param {VerificationCodeFindUniqueArgs} args - Arguments to find a VerificationCode
+     * @example
+     * // Get one VerificationCode
+     * const verificationCode = await prisma.verificationCode.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends VerificationCodeFindUniqueArgs>(args: SelectSubset<T, VerificationCodeFindUniqueArgs<ExtArgs>>): Prisma__VerificationCodeClient<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one VerificationCode that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {VerificationCodeFindUniqueOrThrowArgs} args - Arguments to find a VerificationCode
+     * @example
+     * // Get one VerificationCode
+     * const verificationCode = await prisma.verificationCode.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends VerificationCodeFindUniqueOrThrowArgs>(args: SelectSubset<T, VerificationCodeFindUniqueOrThrowArgs<ExtArgs>>): Prisma__VerificationCodeClient<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first VerificationCode that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCodeFindFirstArgs} args - Arguments to find a VerificationCode
+     * @example
+     * // Get one VerificationCode
+     * const verificationCode = await prisma.verificationCode.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends VerificationCodeFindFirstArgs>(args?: SelectSubset<T, VerificationCodeFindFirstArgs<ExtArgs>>): Prisma__VerificationCodeClient<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first VerificationCode that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCodeFindFirstOrThrowArgs} args - Arguments to find a VerificationCode
+     * @example
+     * // Get one VerificationCode
+     * const verificationCode = await prisma.verificationCode.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends VerificationCodeFindFirstOrThrowArgs>(args?: SelectSubset<T, VerificationCodeFindFirstOrThrowArgs<ExtArgs>>): Prisma__VerificationCodeClient<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more VerificationCodes that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCodeFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all VerificationCodes
+     * const verificationCodes = await prisma.verificationCode.findMany()
+     * 
+     * // Get first 10 VerificationCodes
+     * const verificationCodes = await prisma.verificationCode.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const verificationCodeWithIdOnly = await prisma.verificationCode.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends VerificationCodeFindManyArgs>(args?: SelectSubset<T, VerificationCodeFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a VerificationCode.
+     * @param {VerificationCodeCreateArgs} args - Arguments to create a VerificationCode.
+     * @example
+     * // Create one VerificationCode
+     * const VerificationCode = await prisma.verificationCode.create({
+     *   data: {
+     *     // ... data to create a VerificationCode
+     *   }
+     * })
+     * 
+     */
+    create<T extends VerificationCodeCreateArgs>(args: SelectSubset<T, VerificationCodeCreateArgs<ExtArgs>>): Prisma__VerificationCodeClient<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many VerificationCodes.
+     * @param {VerificationCodeCreateManyArgs} args - Arguments to create many VerificationCodes.
+     * @example
+     * // Create many VerificationCodes
+     * const verificationCode = await prisma.verificationCode.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends VerificationCodeCreateManyArgs>(args?: SelectSubset<T, VerificationCodeCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many VerificationCodes and returns the data saved in the database.
+     * @param {VerificationCodeCreateManyAndReturnArgs} args - Arguments to create many VerificationCodes.
+     * @example
+     * // Create many VerificationCodes
+     * const verificationCode = await prisma.verificationCode.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many VerificationCodes and only return the `id`
+     * const verificationCodeWithIdOnly = await prisma.verificationCode.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends VerificationCodeCreateManyAndReturnArgs>(args?: SelectSubset<T, VerificationCodeCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a VerificationCode.
+     * @param {VerificationCodeDeleteArgs} args - Arguments to delete one VerificationCode.
+     * @example
+     * // Delete one VerificationCode
+     * const VerificationCode = await prisma.verificationCode.delete({
+     *   where: {
+     *     // ... filter to delete one VerificationCode
+     *   }
+     * })
+     * 
+     */
+    delete<T extends VerificationCodeDeleteArgs>(args: SelectSubset<T, VerificationCodeDeleteArgs<ExtArgs>>): Prisma__VerificationCodeClient<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one VerificationCode.
+     * @param {VerificationCodeUpdateArgs} args - Arguments to update one VerificationCode.
+     * @example
+     * // Update one VerificationCode
+     * const verificationCode = await prisma.verificationCode.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends VerificationCodeUpdateArgs>(args: SelectSubset<T, VerificationCodeUpdateArgs<ExtArgs>>): Prisma__VerificationCodeClient<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more VerificationCodes.
+     * @param {VerificationCodeDeleteManyArgs} args - Arguments to filter VerificationCodes to delete.
+     * @example
+     * // Delete a few VerificationCodes
+     * const { count } = await prisma.verificationCode.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends VerificationCodeDeleteManyArgs>(args?: SelectSubset<T, VerificationCodeDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more VerificationCodes.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCodeUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many VerificationCodes
+     * const verificationCode = await prisma.verificationCode.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends VerificationCodeUpdateManyArgs>(args: SelectSubset<T, VerificationCodeUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more VerificationCodes and returns the data updated in the database.
+     * @param {VerificationCodeUpdateManyAndReturnArgs} args - Arguments to update many VerificationCodes.
+     * @example
+     * // Update many VerificationCodes
+     * const verificationCode = await prisma.verificationCode.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more VerificationCodes and only return the `id`
+     * const verificationCodeWithIdOnly = await prisma.verificationCode.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends VerificationCodeUpdateManyAndReturnArgs>(args: SelectSubset<T, VerificationCodeUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one VerificationCode.
+     * @param {VerificationCodeUpsertArgs} args - Arguments to update or create a VerificationCode.
+     * @example
+     * // Update or create a VerificationCode
+     * const verificationCode = await prisma.verificationCode.upsert({
+     *   create: {
+     *     // ... data to create a VerificationCode
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the VerificationCode we want to update
+     *   }
+     * })
+     */
+    upsert<T extends VerificationCodeUpsertArgs>(args: SelectSubset<T, VerificationCodeUpsertArgs<ExtArgs>>): Prisma__VerificationCodeClient<$Result.GetResult<Prisma.$VerificationCodePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of VerificationCodes.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCodeCountArgs} args - Arguments to filter VerificationCodes to count.
+     * @example
+     * // Count the number of VerificationCodes
+     * const count = await prisma.verificationCode.count({
+     *   where: {
+     *     // ... the filter for the VerificationCodes we want to count
+     *   }
+     * })
+    **/
+    count<T extends VerificationCodeCountArgs>(
+      args?: Subset<T, VerificationCodeCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], VerificationCodeCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a VerificationCode.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCodeAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends VerificationCodeAggregateArgs>(args: Subset<T, VerificationCodeAggregateArgs>): Prisma.PrismaPromise<GetVerificationCodeAggregateType<T>>
+
+    /**
+     * Group by VerificationCode.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {VerificationCodeGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends VerificationCodeGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: VerificationCodeGroupByArgs['orderBy'] }
+        : { orderBy?: VerificationCodeGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, VerificationCodeGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetVerificationCodeGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the VerificationCode model
+   */
+  readonly fields: VerificationCodeFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for VerificationCode.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__VerificationCodeClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the VerificationCode model
+   */
+  interface VerificationCodeFieldRefs {
+    readonly id: FieldRef<"VerificationCode", 'String'>
+    readonly target: FieldRef<"VerificationCode", 'String'>
+    readonly method: FieldRef<"VerificationCode", 'String'>
+    readonly code: FieldRef<"VerificationCode", 'String'>
+    readonly expiresAt: FieldRef<"VerificationCode", 'DateTime'>
+    readonly createdAt: FieldRef<"VerificationCode", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * VerificationCode findUnique
+   */
+  export type VerificationCodeFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * Filter, which VerificationCode to fetch.
+     */
+    where: VerificationCodeWhereUniqueInput
+  }
+
+  /**
+   * VerificationCode findUniqueOrThrow
+   */
+  export type VerificationCodeFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * Filter, which VerificationCode to fetch.
+     */
+    where: VerificationCodeWhereUniqueInput
+  }
+
+  /**
+   * VerificationCode findFirst
+   */
+  export type VerificationCodeFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * Filter, which VerificationCode to fetch.
+     */
+    where?: VerificationCodeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VerificationCodes to fetch.
+     */
+    orderBy?: VerificationCodeOrderByWithRelationInput | VerificationCodeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for VerificationCodes.
+     */
+    cursor?: VerificationCodeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VerificationCodes from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VerificationCodes.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of VerificationCodes.
+     */
+    distinct?: VerificationCodeScalarFieldEnum | VerificationCodeScalarFieldEnum[]
+  }
+
+  /**
+   * VerificationCode findFirstOrThrow
+   */
+  export type VerificationCodeFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * Filter, which VerificationCode to fetch.
+     */
+    where?: VerificationCodeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VerificationCodes to fetch.
+     */
+    orderBy?: VerificationCodeOrderByWithRelationInput | VerificationCodeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for VerificationCodes.
+     */
+    cursor?: VerificationCodeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VerificationCodes from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VerificationCodes.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of VerificationCodes.
+     */
+    distinct?: VerificationCodeScalarFieldEnum | VerificationCodeScalarFieldEnum[]
+  }
+
+  /**
+   * VerificationCode findMany
+   */
+  export type VerificationCodeFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * Filter, which VerificationCodes to fetch.
+     */
+    where?: VerificationCodeWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of VerificationCodes to fetch.
+     */
+    orderBy?: VerificationCodeOrderByWithRelationInput | VerificationCodeOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing VerificationCodes.
+     */
+    cursor?: VerificationCodeWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` VerificationCodes from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` VerificationCodes.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of VerificationCodes.
+     */
+    distinct?: VerificationCodeScalarFieldEnum | VerificationCodeScalarFieldEnum[]
+  }
+
+  /**
+   * VerificationCode create
+   */
+  export type VerificationCodeCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * The data needed to create a VerificationCode.
+     */
+    data: XOR<VerificationCodeCreateInput, VerificationCodeUncheckedCreateInput>
+  }
+
+  /**
+   * VerificationCode createMany
+   */
+  export type VerificationCodeCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many VerificationCodes.
+     */
+    data: VerificationCodeCreateManyInput | VerificationCodeCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * VerificationCode createManyAndReturn
+   */
+  export type VerificationCodeCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * The data used to create many VerificationCodes.
+     */
+    data: VerificationCodeCreateManyInput | VerificationCodeCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * VerificationCode update
+   */
+  export type VerificationCodeUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * The data needed to update a VerificationCode.
+     */
+    data: XOR<VerificationCodeUpdateInput, VerificationCodeUncheckedUpdateInput>
+    /**
+     * Choose, which VerificationCode to update.
+     */
+    where: VerificationCodeWhereUniqueInput
+  }
+
+  /**
+   * VerificationCode updateMany
+   */
+  export type VerificationCodeUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update VerificationCodes.
+     */
+    data: XOR<VerificationCodeUpdateManyMutationInput, VerificationCodeUncheckedUpdateManyInput>
+    /**
+     * Filter which VerificationCodes to update
+     */
+    where?: VerificationCodeWhereInput
+    /**
+     * Limit how many VerificationCodes to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * VerificationCode updateManyAndReturn
+   */
+  export type VerificationCodeUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * The data used to update VerificationCodes.
+     */
+    data: XOR<VerificationCodeUpdateManyMutationInput, VerificationCodeUncheckedUpdateManyInput>
+    /**
+     * Filter which VerificationCodes to update
+     */
+    where?: VerificationCodeWhereInput
+    /**
+     * Limit how many VerificationCodes to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * VerificationCode upsert
+   */
+  export type VerificationCodeUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * The filter to search for the VerificationCode to update in case it exists.
+     */
+    where: VerificationCodeWhereUniqueInput
+    /**
+     * In case the VerificationCode found by the `where` argument doesn't exist, create a new VerificationCode with this data.
+     */
+    create: XOR<VerificationCodeCreateInput, VerificationCodeUncheckedCreateInput>
+    /**
+     * In case the VerificationCode was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<VerificationCodeUpdateInput, VerificationCodeUncheckedUpdateInput>
+  }
+
+  /**
+   * VerificationCode delete
+   */
+  export type VerificationCodeDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+    /**
+     * Filter which VerificationCode to delete.
+     */
+    where: VerificationCodeWhereUniqueInput
+  }
+
+  /**
+   * VerificationCode deleteMany
+   */
+  export type VerificationCodeDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which VerificationCodes to delete
+     */
+    where?: VerificationCodeWhereInput
+    /**
+     * Limit how many VerificationCodes to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * VerificationCode without action
+   */
+  export type VerificationCodeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the VerificationCode
+     */
+    select?: VerificationCodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the VerificationCode
+     */
+    omit?: VerificationCodeOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model RateLimitEntry
+   */
+
+  export type AggregateRateLimitEntry = {
+    _count: RateLimitEntryCountAggregateOutputType | null
+    _avg: RateLimitEntryAvgAggregateOutputType | null
+    _sum: RateLimitEntrySumAggregateOutputType | null
+    _min: RateLimitEntryMinAggregateOutputType | null
+    _max: RateLimitEntryMaxAggregateOutputType | null
+  }
+
+  export type RateLimitEntryAvgAggregateOutputType = {
+    count: number | null
+  }
+
+  export type RateLimitEntrySumAggregateOutputType = {
+    count: number | null
+  }
+
+  export type RateLimitEntryMinAggregateOutputType = {
+    id: string | null
+    key: string | null
+    count: number | null
+    resetAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type RateLimitEntryMaxAggregateOutputType = {
+    id: string | null
+    key: string | null
+    count: number | null
+    resetAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type RateLimitEntryCountAggregateOutputType = {
+    id: number
+    key: number
+    count: number
+    resetAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type RateLimitEntryAvgAggregateInputType = {
+    count?: true
+  }
+
+  export type RateLimitEntrySumAggregateInputType = {
+    count?: true
+  }
+
+  export type RateLimitEntryMinAggregateInputType = {
+    id?: true
+    key?: true
+    count?: true
+    resetAt?: true
+    updatedAt?: true
+  }
+
+  export type RateLimitEntryMaxAggregateInputType = {
+    id?: true
+    key?: true
+    count?: true
+    resetAt?: true
+    updatedAt?: true
+  }
+
+  export type RateLimitEntryCountAggregateInputType = {
+    id?: true
+    key?: true
+    count?: true
+    resetAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type RateLimitEntryAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which RateLimitEntry to aggregate.
+     */
+    where?: RateLimitEntryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RateLimitEntries to fetch.
+     */
+    orderBy?: RateLimitEntryOrderByWithRelationInput | RateLimitEntryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: RateLimitEntryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RateLimitEntries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RateLimitEntries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned RateLimitEntries
+    **/
+    _count?: true | RateLimitEntryCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: RateLimitEntryAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: RateLimitEntrySumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: RateLimitEntryMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: RateLimitEntryMaxAggregateInputType
+  }
+
+  export type GetRateLimitEntryAggregateType<T extends RateLimitEntryAggregateArgs> = {
+        [P in keyof T & keyof AggregateRateLimitEntry]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateRateLimitEntry[P]>
+      : GetScalarType<T[P], AggregateRateLimitEntry[P]>
+  }
+
+
+
+
+  export type RateLimitEntryGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: RateLimitEntryWhereInput
+    orderBy?: RateLimitEntryOrderByWithAggregationInput | RateLimitEntryOrderByWithAggregationInput[]
+    by: RateLimitEntryScalarFieldEnum[] | RateLimitEntryScalarFieldEnum
+    having?: RateLimitEntryScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: RateLimitEntryCountAggregateInputType | true
+    _avg?: RateLimitEntryAvgAggregateInputType
+    _sum?: RateLimitEntrySumAggregateInputType
+    _min?: RateLimitEntryMinAggregateInputType
+    _max?: RateLimitEntryMaxAggregateInputType
+  }
+
+  export type RateLimitEntryGroupByOutputType = {
+    id: string
+    key: string
+    count: number
+    resetAt: Date
+    updatedAt: Date
+    _count: RateLimitEntryCountAggregateOutputType | null
+    _avg: RateLimitEntryAvgAggregateOutputType | null
+    _sum: RateLimitEntrySumAggregateOutputType | null
+    _min: RateLimitEntryMinAggregateOutputType | null
+    _max: RateLimitEntryMaxAggregateOutputType | null
+  }
+
+  type GetRateLimitEntryGroupByPayload<T extends RateLimitEntryGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<RateLimitEntryGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof RateLimitEntryGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], RateLimitEntryGroupByOutputType[P]>
+            : GetScalarType<T[P], RateLimitEntryGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type RateLimitEntrySelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    key?: boolean
+    count?: boolean
+    resetAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["rateLimitEntry"]>
+
+  export type RateLimitEntrySelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    key?: boolean
+    count?: boolean
+    resetAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["rateLimitEntry"]>
+
+  export type RateLimitEntrySelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    key?: boolean
+    count?: boolean
+    resetAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["rateLimitEntry"]>
+
+  export type RateLimitEntrySelectScalar = {
+    id?: boolean
+    key?: boolean
+    count?: boolean
+    resetAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type RateLimitEntryOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "key" | "count" | "resetAt" | "updatedAt", ExtArgs["result"]["rateLimitEntry"]>
+
+  export type $RateLimitEntryPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "RateLimitEntry"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      key: string
+      count: number
+      resetAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["rateLimitEntry"]>
+    composites: {}
+  }
+
+  type RateLimitEntryGetPayload<S extends boolean | null | undefined | RateLimitEntryDefaultArgs> = $Result.GetResult<Prisma.$RateLimitEntryPayload, S>
+
+  type RateLimitEntryCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<RateLimitEntryFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: RateLimitEntryCountAggregateInputType | true
+    }
+
+  export interface RateLimitEntryDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['RateLimitEntry'], meta: { name: 'RateLimitEntry' } }
+    /**
+     * Find zero or one RateLimitEntry that matches the filter.
+     * @param {RateLimitEntryFindUniqueArgs} args - Arguments to find a RateLimitEntry
+     * @example
+     * // Get one RateLimitEntry
+     * const rateLimitEntry = await prisma.rateLimitEntry.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends RateLimitEntryFindUniqueArgs>(args: SelectSubset<T, RateLimitEntryFindUniqueArgs<ExtArgs>>): Prisma__RateLimitEntryClient<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one RateLimitEntry that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {RateLimitEntryFindUniqueOrThrowArgs} args - Arguments to find a RateLimitEntry
+     * @example
+     * // Get one RateLimitEntry
+     * const rateLimitEntry = await prisma.rateLimitEntry.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends RateLimitEntryFindUniqueOrThrowArgs>(args: SelectSubset<T, RateLimitEntryFindUniqueOrThrowArgs<ExtArgs>>): Prisma__RateLimitEntryClient<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first RateLimitEntry that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RateLimitEntryFindFirstArgs} args - Arguments to find a RateLimitEntry
+     * @example
+     * // Get one RateLimitEntry
+     * const rateLimitEntry = await prisma.rateLimitEntry.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends RateLimitEntryFindFirstArgs>(args?: SelectSubset<T, RateLimitEntryFindFirstArgs<ExtArgs>>): Prisma__RateLimitEntryClient<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first RateLimitEntry that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RateLimitEntryFindFirstOrThrowArgs} args - Arguments to find a RateLimitEntry
+     * @example
+     * // Get one RateLimitEntry
+     * const rateLimitEntry = await prisma.rateLimitEntry.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends RateLimitEntryFindFirstOrThrowArgs>(args?: SelectSubset<T, RateLimitEntryFindFirstOrThrowArgs<ExtArgs>>): Prisma__RateLimitEntryClient<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more RateLimitEntries that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RateLimitEntryFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all RateLimitEntries
+     * const rateLimitEntries = await prisma.rateLimitEntry.findMany()
+     * 
+     * // Get first 10 RateLimitEntries
+     * const rateLimitEntries = await prisma.rateLimitEntry.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const rateLimitEntryWithIdOnly = await prisma.rateLimitEntry.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends RateLimitEntryFindManyArgs>(args?: SelectSubset<T, RateLimitEntryFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a RateLimitEntry.
+     * @param {RateLimitEntryCreateArgs} args - Arguments to create a RateLimitEntry.
+     * @example
+     * // Create one RateLimitEntry
+     * const RateLimitEntry = await prisma.rateLimitEntry.create({
+     *   data: {
+     *     // ... data to create a RateLimitEntry
+     *   }
+     * })
+     * 
+     */
+    create<T extends RateLimitEntryCreateArgs>(args: SelectSubset<T, RateLimitEntryCreateArgs<ExtArgs>>): Prisma__RateLimitEntryClient<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many RateLimitEntries.
+     * @param {RateLimitEntryCreateManyArgs} args - Arguments to create many RateLimitEntries.
+     * @example
+     * // Create many RateLimitEntries
+     * const rateLimitEntry = await prisma.rateLimitEntry.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends RateLimitEntryCreateManyArgs>(args?: SelectSubset<T, RateLimitEntryCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many RateLimitEntries and returns the data saved in the database.
+     * @param {RateLimitEntryCreateManyAndReturnArgs} args - Arguments to create many RateLimitEntries.
+     * @example
+     * // Create many RateLimitEntries
+     * const rateLimitEntry = await prisma.rateLimitEntry.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many RateLimitEntries and only return the `id`
+     * const rateLimitEntryWithIdOnly = await prisma.rateLimitEntry.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends RateLimitEntryCreateManyAndReturnArgs>(args?: SelectSubset<T, RateLimitEntryCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a RateLimitEntry.
+     * @param {RateLimitEntryDeleteArgs} args - Arguments to delete one RateLimitEntry.
+     * @example
+     * // Delete one RateLimitEntry
+     * const RateLimitEntry = await prisma.rateLimitEntry.delete({
+     *   where: {
+     *     // ... filter to delete one RateLimitEntry
+     *   }
+     * })
+     * 
+     */
+    delete<T extends RateLimitEntryDeleteArgs>(args: SelectSubset<T, RateLimitEntryDeleteArgs<ExtArgs>>): Prisma__RateLimitEntryClient<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one RateLimitEntry.
+     * @param {RateLimitEntryUpdateArgs} args - Arguments to update one RateLimitEntry.
+     * @example
+     * // Update one RateLimitEntry
+     * const rateLimitEntry = await prisma.rateLimitEntry.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends RateLimitEntryUpdateArgs>(args: SelectSubset<T, RateLimitEntryUpdateArgs<ExtArgs>>): Prisma__RateLimitEntryClient<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more RateLimitEntries.
+     * @param {RateLimitEntryDeleteManyArgs} args - Arguments to filter RateLimitEntries to delete.
+     * @example
+     * // Delete a few RateLimitEntries
+     * const { count } = await prisma.rateLimitEntry.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends RateLimitEntryDeleteManyArgs>(args?: SelectSubset<T, RateLimitEntryDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more RateLimitEntries.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RateLimitEntryUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many RateLimitEntries
+     * const rateLimitEntry = await prisma.rateLimitEntry.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends RateLimitEntryUpdateManyArgs>(args: SelectSubset<T, RateLimitEntryUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more RateLimitEntries and returns the data updated in the database.
+     * @param {RateLimitEntryUpdateManyAndReturnArgs} args - Arguments to update many RateLimitEntries.
+     * @example
+     * // Update many RateLimitEntries
+     * const rateLimitEntry = await prisma.rateLimitEntry.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more RateLimitEntries and only return the `id`
+     * const rateLimitEntryWithIdOnly = await prisma.rateLimitEntry.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends RateLimitEntryUpdateManyAndReturnArgs>(args: SelectSubset<T, RateLimitEntryUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one RateLimitEntry.
+     * @param {RateLimitEntryUpsertArgs} args - Arguments to update or create a RateLimitEntry.
+     * @example
+     * // Update or create a RateLimitEntry
+     * const rateLimitEntry = await prisma.rateLimitEntry.upsert({
+     *   create: {
+     *     // ... data to create a RateLimitEntry
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the RateLimitEntry we want to update
+     *   }
+     * })
+     */
+    upsert<T extends RateLimitEntryUpsertArgs>(args: SelectSubset<T, RateLimitEntryUpsertArgs<ExtArgs>>): Prisma__RateLimitEntryClient<$Result.GetResult<Prisma.$RateLimitEntryPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of RateLimitEntries.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RateLimitEntryCountArgs} args - Arguments to filter RateLimitEntries to count.
+     * @example
+     * // Count the number of RateLimitEntries
+     * const count = await prisma.rateLimitEntry.count({
+     *   where: {
+     *     // ... the filter for the RateLimitEntries we want to count
+     *   }
+     * })
+    **/
+    count<T extends RateLimitEntryCountArgs>(
+      args?: Subset<T, RateLimitEntryCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], RateLimitEntryCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a RateLimitEntry.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RateLimitEntryAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends RateLimitEntryAggregateArgs>(args: Subset<T, RateLimitEntryAggregateArgs>): Prisma.PrismaPromise<GetRateLimitEntryAggregateType<T>>
+
+    /**
+     * Group by RateLimitEntry.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {RateLimitEntryGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends RateLimitEntryGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: RateLimitEntryGroupByArgs['orderBy'] }
+        : { orderBy?: RateLimitEntryGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, RateLimitEntryGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetRateLimitEntryGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the RateLimitEntry model
+   */
+  readonly fields: RateLimitEntryFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for RateLimitEntry.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__RateLimitEntryClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the RateLimitEntry model
+   */
+  interface RateLimitEntryFieldRefs {
+    readonly id: FieldRef<"RateLimitEntry", 'String'>
+    readonly key: FieldRef<"RateLimitEntry", 'String'>
+    readonly count: FieldRef<"RateLimitEntry", 'Int'>
+    readonly resetAt: FieldRef<"RateLimitEntry", 'DateTime'>
+    readonly updatedAt: FieldRef<"RateLimitEntry", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * RateLimitEntry findUnique
+   */
+  export type RateLimitEntryFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * Filter, which RateLimitEntry to fetch.
+     */
+    where: RateLimitEntryWhereUniqueInput
+  }
+
+  /**
+   * RateLimitEntry findUniqueOrThrow
+   */
+  export type RateLimitEntryFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * Filter, which RateLimitEntry to fetch.
+     */
+    where: RateLimitEntryWhereUniqueInput
+  }
+
+  /**
+   * RateLimitEntry findFirst
+   */
+  export type RateLimitEntryFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * Filter, which RateLimitEntry to fetch.
+     */
+    where?: RateLimitEntryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RateLimitEntries to fetch.
+     */
+    orderBy?: RateLimitEntryOrderByWithRelationInput | RateLimitEntryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for RateLimitEntries.
+     */
+    cursor?: RateLimitEntryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RateLimitEntries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RateLimitEntries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of RateLimitEntries.
+     */
+    distinct?: RateLimitEntryScalarFieldEnum | RateLimitEntryScalarFieldEnum[]
+  }
+
+  /**
+   * RateLimitEntry findFirstOrThrow
+   */
+  export type RateLimitEntryFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * Filter, which RateLimitEntry to fetch.
+     */
+    where?: RateLimitEntryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RateLimitEntries to fetch.
+     */
+    orderBy?: RateLimitEntryOrderByWithRelationInput | RateLimitEntryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for RateLimitEntries.
+     */
+    cursor?: RateLimitEntryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RateLimitEntries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RateLimitEntries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of RateLimitEntries.
+     */
+    distinct?: RateLimitEntryScalarFieldEnum | RateLimitEntryScalarFieldEnum[]
+  }
+
+  /**
+   * RateLimitEntry findMany
+   */
+  export type RateLimitEntryFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * Filter, which RateLimitEntries to fetch.
+     */
+    where?: RateLimitEntryWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of RateLimitEntries to fetch.
+     */
+    orderBy?: RateLimitEntryOrderByWithRelationInput | RateLimitEntryOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing RateLimitEntries.
+     */
+    cursor?: RateLimitEntryWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` RateLimitEntries from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` RateLimitEntries.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of RateLimitEntries.
+     */
+    distinct?: RateLimitEntryScalarFieldEnum | RateLimitEntryScalarFieldEnum[]
+  }
+
+  /**
+   * RateLimitEntry create
+   */
+  export type RateLimitEntryCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * The data needed to create a RateLimitEntry.
+     */
+    data: XOR<RateLimitEntryCreateInput, RateLimitEntryUncheckedCreateInput>
+  }
+
+  /**
+   * RateLimitEntry createMany
+   */
+  export type RateLimitEntryCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many RateLimitEntries.
+     */
+    data: RateLimitEntryCreateManyInput | RateLimitEntryCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * RateLimitEntry createManyAndReturn
+   */
+  export type RateLimitEntryCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * The data used to create many RateLimitEntries.
+     */
+    data: RateLimitEntryCreateManyInput | RateLimitEntryCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * RateLimitEntry update
+   */
+  export type RateLimitEntryUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * The data needed to update a RateLimitEntry.
+     */
+    data: XOR<RateLimitEntryUpdateInput, RateLimitEntryUncheckedUpdateInput>
+    /**
+     * Choose, which RateLimitEntry to update.
+     */
+    where: RateLimitEntryWhereUniqueInput
+  }
+
+  /**
+   * RateLimitEntry updateMany
+   */
+  export type RateLimitEntryUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update RateLimitEntries.
+     */
+    data: XOR<RateLimitEntryUpdateManyMutationInput, RateLimitEntryUncheckedUpdateManyInput>
+    /**
+     * Filter which RateLimitEntries to update
+     */
+    where?: RateLimitEntryWhereInput
+    /**
+     * Limit how many RateLimitEntries to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * RateLimitEntry updateManyAndReturn
+   */
+  export type RateLimitEntryUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * The data used to update RateLimitEntries.
+     */
+    data: XOR<RateLimitEntryUpdateManyMutationInput, RateLimitEntryUncheckedUpdateManyInput>
+    /**
+     * Filter which RateLimitEntries to update
+     */
+    where?: RateLimitEntryWhereInput
+    /**
+     * Limit how many RateLimitEntries to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * RateLimitEntry upsert
+   */
+  export type RateLimitEntryUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * The filter to search for the RateLimitEntry to update in case it exists.
+     */
+    where: RateLimitEntryWhereUniqueInput
+    /**
+     * In case the RateLimitEntry found by the `where` argument doesn't exist, create a new RateLimitEntry with this data.
+     */
+    create: XOR<RateLimitEntryCreateInput, RateLimitEntryUncheckedCreateInput>
+    /**
+     * In case the RateLimitEntry was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<RateLimitEntryUpdateInput, RateLimitEntryUncheckedUpdateInput>
+  }
+
+  /**
+   * RateLimitEntry delete
+   */
+  export type RateLimitEntryDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+    /**
+     * Filter which RateLimitEntry to delete.
+     */
+    where: RateLimitEntryWhereUniqueInput
+  }
+
+  /**
+   * RateLimitEntry deleteMany
+   */
+  export type RateLimitEntryDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which RateLimitEntries to delete
+     */
+    where?: RateLimitEntryWhereInput
+    /**
+     * Limit how many RateLimitEntries to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * RateLimitEntry without action
+   */
+  export type RateLimitEntryDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the RateLimitEntry
+     */
+    select?: RateLimitEntrySelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the RateLimitEntry
+     */
+    omit?: RateLimitEntryOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -3209,8 +5490,12 @@ export namespace Prisma {
     email: 'email',
     name: 'name',
     password: 'password',
-    role: 'role',
+    phone: 'phone',
+    emailVerified: 'emailVerified',
+    phoneVerified: 'phoneVerified',
     avatarUrl: 'avatarUrl',
+    githubId: 'githubId',
+    role: 'role',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
@@ -3229,6 +5514,29 @@ export namespace Prisma {
   };
 
   export type SubscriptionScalarFieldEnum = (typeof SubscriptionScalarFieldEnum)[keyof typeof SubscriptionScalarFieldEnum]
+
+
+  export const VerificationCodeScalarFieldEnum: {
+    id: 'id',
+    target: 'target',
+    method: 'method',
+    code: 'code',
+    expiresAt: 'expiresAt',
+    createdAt: 'createdAt'
+  };
+
+  export type VerificationCodeScalarFieldEnum = (typeof VerificationCodeScalarFieldEnum)[keyof typeof VerificationCodeScalarFieldEnum]
+
+
+  export const RateLimitEntryScalarFieldEnum: {
+    id: 'id',
+    key: 'key',
+    count: 'count',
+    resetAt: 'resetAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type RateLimitEntryScalarFieldEnum = (typeof RateLimitEntryScalarFieldEnum)[keyof typeof RateLimitEntryScalarFieldEnum]
 
 
   export const SortOrder: {
@@ -3300,6 +5608,20 @@ export namespace Prisma {
    */
   export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
     
+
+
+  /**
+   * Reference to a field of type 'Float'
+   */
+  export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
+    
+
+
+  /**
+   * Reference to a field of type 'Float[]'
+   */
+  export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float[]'>
+    
   /**
    * Deep Input Types
    */
@@ -3312,9 +5634,13 @@ export namespace Prisma {
     id?: StringFilter<"User"> | string
     email?: StringFilter<"User"> | string
     name?: StringFilter<"User"> | string
-    password?: StringFilter<"User"> | string
-    role?: StringFilter<"User"> | string
+    password?: StringNullableFilter<"User"> | string | null
+    phone?: StringNullableFilter<"User"> | string | null
+    emailVerified?: DateTimeNullableFilter<"User"> | Date | string | null
+    phoneVerified?: DateTimeNullableFilter<"User"> | Date | string | null
     avatarUrl?: StringNullableFilter<"User"> | string | null
+    githubId?: StringNullableFilter<"User"> | string | null
+    role?: StringFilter<"User"> | string
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     subscriptions?: SubscriptionListRelationFilter
@@ -3324,9 +5650,13 @@ export namespace Prisma {
     id?: SortOrder
     email?: SortOrder
     name?: SortOrder
-    password?: SortOrder
-    role?: SortOrder
+    password?: SortOrderInput | SortOrder
+    phone?: SortOrderInput | SortOrder
+    emailVerified?: SortOrderInput | SortOrder
+    phoneVerified?: SortOrderInput | SortOrder
     avatarUrl?: SortOrderInput | SortOrder
+    githubId?: SortOrderInput | SortOrder
+    role?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     subscriptions?: SubscriptionOrderByRelationAggregateInput
@@ -3335,25 +5665,33 @@ export namespace Prisma {
   export type UserWhereUniqueInput = Prisma.AtLeast<{
     id?: string
     email?: string
+    githubId?: string
     AND?: UserWhereInput | UserWhereInput[]
     OR?: UserWhereInput[]
     NOT?: UserWhereInput | UserWhereInput[]
     name?: StringFilter<"User"> | string
-    password?: StringFilter<"User"> | string
-    role?: StringFilter<"User"> | string
+    password?: StringNullableFilter<"User"> | string | null
+    phone?: StringNullableFilter<"User"> | string | null
+    emailVerified?: DateTimeNullableFilter<"User"> | Date | string | null
+    phoneVerified?: DateTimeNullableFilter<"User"> | Date | string | null
     avatarUrl?: StringNullableFilter<"User"> | string | null
+    role?: StringFilter<"User"> | string
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     subscriptions?: SubscriptionListRelationFilter
-  }, "id" | "email">
+  }, "id" | "email" | "githubId">
 
   export type UserOrderByWithAggregationInput = {
     id?: SortOrder
     email?: SortOrder
     name?: SortOrder
-    password?: SortOrder
-    role?: SortOrder
+    password?: SortOrderInput | SortOrder
+    phone?: SortOrderInput | SortOrder
+    emailVerified?: SortOrderInput | SortOrder
+    phoneVerified?: SortOrderInput | SortOrder
     avatarUrl?: SortOrderInput | SortOrder
+    githubId?: SortOrderInput | SortOrder
+    role?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: UserCountOrderByAggregateInput
@@ -3368,9 +5706,13 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"User"> | string
     email?: StringWithAggregatesFilter<"User"> | string
     name?: StringWithAggregatesFilter<"User"> | string
-    password?: StringWithAggregatesFilter<"User"> | string
-    role?: StringWithAggregatesFilter<"User"> | string
+    password?: StringNullableWithAggregatesFilter<"User"> | string | null
+    phone?: StringNullableWithAggregatesFilter<"User"> | string | null
+    emailVerified?: DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+    phoneVerified?: DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
     avatarUrl?: StringNullableWithAggregatesFilter<"User"> | string | null
+    githubId?: StringNullableWithAggregatesFilter<"User"> | string | null
+    role?: StringWithAggregatesFilter<"User"> | string
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
   }
@@ -3440,13 +5782,129 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"Subscription"> | Date | string
   }
 
+  export type VerificationCodeWhereInput = {
+    AND?: VerificationCodeWhereInput | VerificationCodeWhereInput[]
+    OR?: VerificationCodeWhereInput[]
+    NOT?: VerificationCodeWhereInput | VerificationCodeWhereInput[]
+    id?: StringFilter<"VerificationCode"> | string
+    target?: StringFilter<"VerificationCode"> | string
+    method?: StringFilter<"VerificationCode"> | string
+    code?: StringFilter<"VerificationCode"> | string
+    expiresAt?: DateTimeFilter<"VerificationCode"> | Date | string
+    createdAt?: DateTimeFilter<"VerificationCode"> | Date | string
+  }
+
+  export type VerificationCodeOrderByWithRelationInput = {
+    id?: SortOrder
+    target?: SortOrder
+    method?: SortOrder
+    code?: SortOrder
+    expiresAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type VerificationCodeWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    target_method?: VerificationCodeTargetMethodCompoundUniqueInput
+    AND?: VerificationCodeWhereInput | VerificationCodeWhereInput[]
+    OR?: VerificationCodeWhereInput[]
+    NOT?: VerificationCodeWhereInput | VerificationCodeWhereInput[]
+    target?: StringFilter<"VerificationCode"> | string
+    method?: StringFilter<"VerificationCode"> | string
+    code?: StringFilter<"VerificationCode"> | string
+    expiresAt?: DateTimeFilter<"VerificationCode"> | Date | string
+    createdAt?: DateTimeFilter<"VerificationCode"> | Date | string
+  }, "id" | "target_method">
+
+  export type VerificationCodeOrderByWithAggregationInput = {
+    id?: SortOrder
+    target?: SortOrder
+    method?: SortOrder
+    code?: SortOrder
+    expiresAt?: SortOrder
+    createdAt?: SortOrder
+    _count?: VerificationCodeCountOrderByAggregateInput
+    _max?: VerificationCodeMaxOrderByAggregateInput
+    _min?: VerificationCodeMinOrderByAggregateInput
+  }
+
+  export type VerificationCodeScalarWhereWithAggregatesInput = {
+    AND?: VerificationCodeScalarWhereWithAggregatesInput | VerificationCodeScalarWhereWithAggregatesInput[]
+    OR?: VerificationCodeScalarWhereWithAggregatesInput[]
+    NOT?: VerificationCodeScalarWhereWithAggregatesInput | VerificationCodeScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"VerificationCode"> | string
+    target?: StringWithAggregatesFilter<"VerificationCode"> | string
+    method?: StringWithAggregatesFilter<"VerificationCode"> | string
+    code?: StringWithAggregatesFilter<"VerificationCode"> | string
+    expiresAt?: DateTimeWithAggregatesFilter<"VerificationCode"> | Date | string
+    createdAt?: DateTimeWithAggregatesFilter<"VerificationCode"> | Date | string
+  }
+
+  export type RateLimitEntryWhereInput = {
+    AND?: RateLimitEntryWhereInput | RateLimitEntryWhereInput[]
+    OR?: RateLimitEntryWhereInput[]
+    NOT?: RateLimitEntryWhereInput | RateLimitEntryWhereInput[]
+    id?: StringFilter<"RateLimitEntry"> | string
+    key?: StringFilter<"RateLimitEntry"> | string
+    count?: IntFilter<"RateLimitEntry"> | number
+    resetAt?: DateTimeFilter<"RateLimitEntry"> | Date | string
+    updatedAt?: DateTimeFilter<"RateLimitEntry"> | Date | string
+  }
+
+  export type RateLimitEntryOrderByWithRelationInput = {
+    id?: SortOrder
+    key?: SortOrder
+    count?: SortOrder
+    resetAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type RateLimitEntryWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    key?: string
+    AND?: RateLimitEntryWhereInput | RateLimitEntryWhereInput[]
+    OR?: RateLimitEntryWhereInput[]
+    NOT?: RateLimitEntryWhereInput | RateLimitEntryWhereInput[]
+    count?: IntFilter<"RateLimitEntry"> | number
+    resetAt?: DateTimeFilter<"RateLimitEntry"> | Date | string
+    updatedAt?: DateTimeFilter<"RateLimitEntry"> | Date | string
+  }, "id" | "key">
+
+  export type RateLimitEntryOrderByWithAggregationInput = {
+    id?: SortOrder
+    key?: SortOrder
+    count?: SortOrder
+    resetAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: RateLimitEntryCountOrderByAggregateInput
+    _avg?: RateLimitEntryAvgOrderByAggregateInput
+    _max?: RateLimitEntryMaxOrderByAggregateInput
+    _min?: RateLimitEntryMinOrderByAggregateInput
+    _sum?: RateLimitEntrySumOrderByAggregateInput
+  }
+
+  export type RateLimitEntryScalarWhereWithAggregatesInput = {
+    AND?: RateLimitEntryScalarWhereWithAggregatesInput | RateLimitEntryScalarWhereWithAggregatesInput[]
+    OR?: RateLimitEntryScalarWhereWithAggregatesInput[]
+    NOT?: RateLimitEntryScalarWhereWithAggregatesInput | RateLimitEntryScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"RateLimitEntry"> | string
+    key?: StringWithAggregatesFilter<"RateLimitEntry"> | string
+    count?: IntWithAggregatesFilter<"RateLimitEntry"> | number
+    resetAt?: DateTimeWithAggregatesFilter<"RateLimitEntry"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"RateLimitEntry"> | Date | string
+  }
+
   export type UserCreateInput = {
     id?: string
     email: string
     name?: string
-    password: string
-    role?: string
+    password?: string | null
+    phone?: string | null
+    emailVerified?: Date | string | null
+    phoneVerified?: Date | string | null
     avatarUrl?: string | null
+    githubId?: string | null
+    role?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     subscriptions?: SubscriptionCreateNestedManyWithoutUserInput
@@ -3456,9 +5914,13 @@ export namespace Prisma {
     id?: string
     email: string
     name?: string
-    password: string
-    role?: string
+    password?: string | null
+    phone?: string | null
+    emailVerified?: Date | string | null
+    phoneVerified?: Date | string | null
     avatarUrl?: string | null
+    githubId?: string | null
+    role?: string
     createdAt?: Date | string
     updatedAt?: Date | string
     subscriptions?: SubscriptionUncheckedCreateNestedManyWithoutUserInput
@@ -3468,9 +5930,13 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    role?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     subscriptions?: SubscriptionUpdateManyWithoutUserNestedInput
@@ -3480,9 +5946,13 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    role?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     subscriptions?: SubscriptionUncheckedUpdateManyWithoutUserNestedInput
@@ -3492,9 +5962,13 @@ export namespace Prisma {
     id?: string
     email: string
     name?: string
-    password: string
-    role?: string
+    password?: string | null
+    phone?: string | null
+    emailVerified?: Date | string | null
+    phoneVerified?: Date | string | null
     avatarUrl?: string | null
+    githubId?: string | null
+    role?: string
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -3503,9 +5977,13 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    role?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -3514,9 +5992,13 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    role?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -3590,6 +6072,125 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type VerificationCodeCreateInput = {
+    id?: string
+    target: string
+    method: string
+    code: string
+    expiresAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type VerificationCodeUncheckedCreateInput = {
+    id?: string
+    target: string
+    method: string
+    code: string
+    expiresAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type VerificationCodeUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    target?: StringFieldUpdateOperationsInput | string
+    method?: StringFieldUpdateOperationsInput | string
+    code?: StringFieldUpdateOperationsInput | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type VerificationCodeUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    target?: StringFieldUpdateOperationsInput | string
+    method?: StringFieldUpdateOperationsInput | string
+    code?: StringFieldUpdateOperationsInput | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type VerificationCodeCreateManyInput = {
+    id?: string
+    target: string
+    method: string
+    code: string
+    expiresAt: Date | string
+    createdAt?: Date | string
+  }
+
+  export type VerificationCodeUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    target?: StringFieldUpdateOperationsInput | string
+    method?: StringFieldUpdateOperationsInput | string
+    code?: StringFieldUpdateOperationsInput | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type VerificationCodeUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    target?: StringFieldUpdateOperationsInput | string
+    method?: StringFieldUpdateOperationsInput | string
+    code?: StringFieldUpdateOperationsInput | string
+    expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RateLimitEntryCreateInput = {
+    id?: string
+    key: string
+    count?: number
+    resetAt: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type RateLimitEntryUncheckedCreateInput = {
+    id?: string
+    key: string
+    count?: number
+    resetAt: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type RateLimitEntryUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    key?: StringFieldUpdateOperationsInput | string
+    count?: IntFieldUpdateOperationsInput | number
+    resetAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RateLimitEntryUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    key?: StringFieldUpdateOperationsInput | string
+    count?: IntFieldUpdateOperationsInput | number
+    resetAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RateLimitEntryCreateManyInput = {
+    id?: string
+    key: string
+    count?: number
+    resetAt: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type RateLimitEntryUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    key?: StringFieldUpdateOperationsInput | string
+    count?: IntFieldUpdateOperationsInput | number
+    resetAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type RateLimitEntryUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    key?: StringFieldUpdateOperationsInput | string
+    count?: IntFieldUpdateOperationsInput | number
+    resetAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type StringFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -3618,6 +6219,17 @@ export namespace Prisma {
     endsWith?: string | StringFieldRefInput<$PrismaModel>
     mode?: QueryMode
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
+  export type DateTimeNullableFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
   }
 
   export type DateTimeFilter<$PrismaModel = never> = {
@@ -3651,8 +6263,12 @@ export namespace Prisma {
     email?: SortOrder
     name?: SortOrder
     password?: SortOrder
-    role?: SortOrder
+    phone?: SortOrder
+    emailVerified?: SortOrder
+    phoneVerified?: SortOrder
     avatarUrl?: SortOrder
+    githubId?: SortOrder
+    role?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -3662,8 +6278,12 @@ export namespace Prisma {
     email?: SortOrder
     name?: SortOrder
     password?: SortOrder
-    role?: SortOrder
+    phone?: SortOrder
+    emailVerified?: SortOrder
+    phoneVerified?: SortOrder
     avatarUrl?: SortOrder
+    githubId?: SortOrder
+    role?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -3673,8 +6293,12 @@ export namespace Prisma {
     email?: SortOrder
     name?: SortOrder
     password?: SortOrder
-    role?: SortOrder
+    phone?: SortOrder
+    emailVerified?: SortOrder
+    phoneVerified?: SortOrder
     avatarUrl?: SortOrder
+    githubId?: SortOrder
+    role?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -3715,6 +6339,20 @@ export namespace Prisma {
     _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
+  export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedDateTimeNullableFilter<$PrismaModel>
+    _max?: NestedDateTimeNullableFilter<$PrismaModel>
+  }
+
   export type DateTimeWithAggregatesFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -3727,17 +6365,6 @@ export namespace Prisma {
     _count?: NestedIntFilter<$PrismaModel>
     _min?: NestedDateTimeFilter<$PrismaModel>
     _max?: NestedDateTimeFilter<$PrismaModel>
-  }
-
-  export type DateTimeNullableFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
   }
 
   export type UserScalarRelationFilter = {
@@ -3775,18 +6402,95 @@ export namespace Prisma {
     createdAt?: SortOrder
   }
 
-  export type DateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedDateTimeNullableFilter<$PrismaModel>
-    _max?: NestedDateTimeNullableFilter<$PrismaModel>
+  export type VerificationCodeTargetMethodCompoundUniqueInput = {
+    target: string
+    method: string
+  }
+
+  export type VerificationCodeCountOrderByAggregateInput = {
+    id?: SortOrder
+    target?: SortOrder
+    method?: SortOrder
+    code?: SortOrder
+    expiresAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type VerificationCodeMaxOrderByAggregateInput = {
+    id?: SortOrder
+    target?: SortOrder
+    method?: SortOrder
+    code?: SortOrder
+    expiresAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type VerificationCodeMinOrderByAggregateInput = {
+    id?: SortOrder
+    target?: SortOrder
+    method?: SortOrder
+    code?: SortOrder
+    expiresAt?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type IntFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntFilter<$PrismaModel> | number
+  }
+
+  export type RateLimitEntryCountOrderByAggregateInput = {
+    id?: SortOrder
+    key?: SortOrder
+    count?: SortOrder
+    resetAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type RateLimitEntryAvgOrderByAggregateInput = {
+    count?: SortOrder
+  }
+
+  export type RateLimitEntryMaxOrderByAggregateInput = {
+    id?: SortOrder
+    key?: SortOrder
+    count?: SortOrder
+    resetAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type RateLimitEntryMinOrderByAggregateInput = {
+    id?: SortOrder
+    key?: SortOrder
+    count?: SortOrder
+    resetAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type RateLimitEntrySumOrderByAggregateInput = {
+    count?: SortOrder
+  }
+
+  export type IntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
   }
 
   export type SubscriptionCreateNestedManyWithoutUserInput = {
@@ -3809,6 +6513,10 @@ export namespace Prisma {
 
   export type NullableStringFieldUpdateOperationsInput = {
     set?: string | null
+  }
+
+  export type NullableDateTimeFieldUpdateOperationsInput = {
+    set?: Date | string | null
   }
 
   export type DateTimeFieldUpdateOperationsInput = {
@@ -3849,16 +6557,20 @@ export namespace Prisma {
     connect?: UserWhereUniqueInput
   }
 
-  export type NullableDateTimeFieldUpdateOperationsInput = {
-    set?: Date | string | null
-  }
-
   export type UserUpdateOneRequiredWithoutSubscriptionsNestedInput = {
     create?: XOR<UserCreateWithoutSubscriptionsInput, UserUncheckedCreateWithoutSubscriptionsInput>
     connectOrCreate?: UserCreateOrConnectWithoutSubscriptionsInput
     upsert?: UserUpsertWithoutSubscriptionsInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSubscriptionsInput, UserUpdateWithoutSubscriptionsInput>, UserUncheckedUpdateWithoutSubscriptionsInput>
+  }
+
+  export type IntFieldUpdateOperationsInput = {
+    set?: number
+    increment?: number
+    decrement?: number
+    multiply?: number
+    divide?: number
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {
@@ -3887,6 +6599,17 @@ export namespace Prisma {
     startsWith?: string | StringFieldRefInput<$PrismaModel>
     endsWith?: string | StringFieldRefInput<$PrismaModel>
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
+  export type NestedDateTimeNullableFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
   }
 
   export type NestedDateTimeFilter<$PrismaModel = never> = {
@@ -3956,6 +6679,20 @@ export namespace Prisma {
     not?: NestedIntNullableFilter<$PrismaModel> | number | null
   }
 
+  export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
+    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
+    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
+    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedDateTimeNullableFilter<$PrismaModel>
+    _max?: NestedDateTimeNullableFilter<$PrismaModel>
+  }
+
   export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
     equals?: Date | string | DateTimeFieldRefInput<$PrismaModel>
     in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel>
@@ -3970,29 +6707,31 @@ export namespace Prisma {
     _max?: NestedDateTimeFilter<$PrismaModel>
   }
 
-  export type NestedDateTimeNullableFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeNullableFilter<$PrismaModel> | Date | string | null
+  export type NestedIntWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: number | IntFieldRefInput<$PrismaModel>
+    in?: number[] | ListIntFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListIntFieldRefInput<$PrismaModel>
+    lt?: number | IntFieldRefInput<$PrismaModel>
+    lte?: number | IntFieldRefInput<$PrismaModel>
+    gt?: number | IntFieldRefInput<$PrismaModel>
+    gte?: number | IntFieldRefInput<$PrismaModel>
+    not?: NestedIntWithAggregatesFilter<$PrismaModel> | number
+    _count?: NestedIntFilter<$PrismaModel>
+    _avg?: NestedFloatFilter<$PrismaModel>
+    _sum?: NestedIntFilter<$PrismaModel>
+    _min?: NestedIntFilter<$PrismaModel>
+    _max?: NestedIntFilter<$PrismaModel>
   }
 
-  export type NestedDateTimeNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
-    in?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    notIn?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
-    lt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    lte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gt?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    gte?: Date | string | DateTimeFieldRefInput<$PrismaModel>
-    not?: NestedDateTimeNullableWithAggregatesFilter<$PrismaModel> | Date | string | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedDateTimeNullableFilter<$PrismaModel>
-    _max?: NestedDateTimeNullableFilter<$PrismaModel>
+  export type NestedFloatFilter<$PrismaModel = never> = {
+    equals?: number | FloatFieldRefInput<$PrismaModel>
+    in?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    notIn?: number[] | ListFloatFieldRefInput<$PrismaModel>
+    lt?: number | FloatFieldRefInput<$PrismaModel>
+    lte?: number | FloatFieldRefInput<$PrismaModel>
+    gt?: number | FloatFieldRefInput<$PrismaModel>
+    gte?: number | FloatFieldRefInput<$PrismaModel>
+    not?: NestedFloatFilter<$PrismaModel> | number
   }
 
   export type SubscriptionCreateWithoutUserInput = {
@@ -4056,9 +6795,13 @@ export namespace Prisma {
     id?: string
     email: string
     name?: string
-    password: string
-    role?: string
+    password?: string | null
+    phone?: string | null
+    emailVerified?: Date | string | null
+    phoneVerified?: Date | string | null
     avatarUrl?: string | null
+    githubId?: string | null
+    role?: string
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -4067,9 +6810,13 @@ export namespace Prisma {
     id?: string
     email: string
     name?: string
-    password: string
-    role?: string
+    password?: string | null
+    phone?: string | null
+    emailVerified?: Date | string | null
+    phoneVerified?: Date | string | null
     avatarUrl?: string | null
+    githubId?: string | null
+    role?: string
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -4094,9 +6841,13 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    role?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -4105,9 +6856,13 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     email?: StringFieldUpdateOperationsInput | string
     name?: StringFieldUpdateOperationsInput | string
-    password?: StringFieldUpdateOperationsInput | string
-    role?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }

@@ -125,8 +125,12 @@ exports.Prisma.UserScalarFieldEnum = {
   email: 'email',
   name: 'name',
   password: 'password',
-  role: 'role',
+  phone: 'phone',
+  emailVerified: 'emailVerified',
+  phoneVerified: 'phoneVerified',
   avatarUrl: 'avatarUrl',
+  githubId: 'githubId',
+  role: 'role',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 };
@@ -139,6 +143,23 @@ exports.Prisma.SubscriptionScalarFieldEnum = {
   startDate: 'startDate',
   endDate: 'endDate',
   createdAt: 'createdAt'
+};
+
+exports.Prisma.VerificationCodeScalarFieldEnum = {
+  id: 'id',
+  target: 'target',
+  method: 'method',
+  code: 'code',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.RateLimitEntryScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  count: 'count',
+  resetAt: 'resetAt',
+  updatedAt: 'updatedAt'
 };
 
 exports.Prisma.SortOrder = {
@@ -159,7 +180,9 @@ exports.Prisma.NullsOrder = {
 
 exports.Prisma.ModelName = {
   User: 'User',
-  Subscription: 'Subscription'
+  Subscription: 'Subscription',
+  VerificationCode: 'VerificationCode',
+  RateLimitEntry: 'RateLimitEntry'
 };
 
 /**

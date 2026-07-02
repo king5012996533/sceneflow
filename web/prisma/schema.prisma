@@ -13,9 +13,13 @@ model User {
   id            String    @id @default(cuid())
   email         String    @unique
   name          String    @default("")
-  password      String
-  role          String    @default("user") // user | pro | admin
+  password      String?                       // OAuth 用户可以没有密码
+  phone         String?                       // 手机号（可选）
+  emailVerified DateTime?                     // 邮箱验证时间
+  phoneVerified DateTime?                     // 手机验证时间
   avatarUrl     String?
+  githubId      String?    @unique            // GitHub OAuth ID
+  role          String    @default("user")    // user | pro | admin
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   subscriptions Subscription[]
@@ -30,4 +34,26 @@ model Subscription {
   startDate DateTime @default(now())
   endDate   DateTime?
   createdAt DateTime @default(now())
+}
+
+model VerificationCode {
+  id        String   @id @default(cuid())
+  target    String                          // 邮箱或手机号
+  method    String                          // "email" | "phone"
+  code      String                          // 6位验证码
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([target, method])
+  @@index([expiresAt])
+}
+
+model RateLimitEntry {
+  id        String   @id @default(cuid())
+  key       String   @unique                // "auth:ip:{ip}" | "auth:target:{target}"
+  count     Int      @default(1)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
 }
