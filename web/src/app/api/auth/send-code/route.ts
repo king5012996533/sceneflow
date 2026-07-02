@@ -57,11 +57,18 @@ export async function POST(req: NextRequest) {
 
     // 手机短信
     if (method === "phone") {
+      // 先存储本地验证码（作为回退）
+      await storeCode(target, "phone", code);
+
       const hasAliyun = !!process.env.ALIYUN_SMS_ACCESS_KEY_ID;
       if (hasAliyun) {
-        // 阿里云 PNVS 自动管理验证码，不需要本地存储
         const result = await sendSmsVerifyCode(target);
         if (!result.ok) {
+          // 阿里云失败时，开发环境返回本地验证码
+          if (process.env.NODE_ENV !== "production") {
+            console.log(`[DEV] 短信验证码 ${target}: ${code}（阿里云失败，使用本地验证码）`);
+            return NextResponse.json({ ok: true, dev: true });
+          }
           return NextResponse.json({ error: result.error || "短信发送失败" }, { status: 502 });
         }
         return NextResponse.json({ ok: true });
