@@ -29,7 +29,8 @@ export function getGenerationCount(): number {
     return getCurrentUsage().count;
 }
 
-export function getGenerationLimit(entitlements: ClientEntitlements | null): number | null {
+export function getGenerationLimit(entitlements: ClientEntitlements | null, userRole?: string): number | null {
+    if (userRole === "admin") return null; // admin 不限
     if (!entitlements) return FREE_MONTHLY_LIMIT;
     // generations 不在 entitlements 里，free 固定 3 次
     if (entitlements.projects !== null && entitlements.projects <= 3) return FREE_MONTHLY_LIMIT;
@@ -37,9 +38,9 @@ export function getGenerationLimit(entitlements: ClientEntitlements | null): num
     return null;
 }
 
-export function checkGenerationQuota(entitlements: ClientEntitlements | null, count = 1): { allowed: boolean; remaining: number; limit: number | null } {
+export function checkGenerationQuota(entitlements: ClientEntitlements | null, count = 1, userRole?: string): { allowed: boolean; remaining: number; limit: number | null } {
     const usage = getCurrentUsage();
-    const limit = getGenerationLimit(entitlements);
+    const limit = getGenerationLimit(entitlements, userRole);
     if (limit === null) return { allowed: true, remaining: -1, limit: null };
     const remaining = limit - usage.count;
     return { allowed: remaining >= count, remaining, limit };

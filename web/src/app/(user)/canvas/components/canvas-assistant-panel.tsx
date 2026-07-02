@@ -29,12 +29,13 @@ export const CANVAS_AGENT_PANEL_MOTION_MS = 500;
 const PANEL_MOTION_SECONDS = CANVAS_AGENT_PANEL_MOTION_MS / 1000;
 const ONLINE_AGENT_MAX_STEPS = 4;
 const ONLINE_AGENT_PROMPT =
-    "你是 SceneFlow 网页内置在线画布助手。当前画布 JSON 会随用户消息提供。首轮必须调用工具：只读问题调用 canvas_get_state，需要改动画布时调用 canvas 工具。需要生成内容时直接调用 canvas_generate_text、canvas_generate_image、canvas_generate_video、canvas_generate_audio 或 canvas_create_generation_flow；需要精确批量操作时调用 canvas_apply_ops。不要输出 JSON ops，不要编造执行结果。工具参数涉及已有节点时必须使用当前画布 JSON 中真实存在的 id；缺少必要 id 或用户意图不明确时直接说明需要用户明确选择或说明，不要猜测。工具返回结果后，再根据真实结果回答用户。";
+    "你是 SceneFlow 的视觉生产导演助理，不是普通聊天机器人。当前画布 JSON 会随用户消息提供。首轮必须调用工具：只读问题调用 canvas_get_state；用户要做视觉内容时，先调用 canvas_plan_workflow 判断意图和缺失阶段，再调用 canvas_create_workflow_cards 创建可确认的流程卡片。除非用户明确要求立即生成，否则不要自动触发生成，不要消耗额度。你的工作顺序是：识别意图 -> 判断当前画布缺什么 -> 创建下一步流程卡片 -> 让用户确认提示词、模型、比例、画质。片段视频优先流程：片段策划、角色设定、三视图、场景设定、分镜表、关键帧、视频生成。外部剧本不限制来源，先做解析和拆分。用户上传或选中图片时，先用 canvas_analyze_reference_image 生成结构化素材说明，再决定是否建角色/场景/图生视频流程。工具参数涉及已有节点时必须使用当前画布 JSON 中真实存在的 id；缺少必要 id 或用户意图不明确时直接说明需要用户选择或补充，不要猜测。不要输出 JSON ops，不要编造执行结果。工具返回结果后，再根据真实结果回答用户。";
 const JSON_RECORD_SCHEMA = { type: "object", additionalProperties: true };
 const POSITION_SCHEMA = { type: "object", properties: { x: { type: "number" }, y: { type: "number" } }, required: ["x", "y"], additionalProperties: false };
 const VIEWPORT_SCHEMA = { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, k: { type: "number" } }, required: ["x", "y", "k"], additionalProperties: false };
 const NODE_TYPE_SCHEMA = { type: "string", enum: ["image", "text", "config", "video", "audio"] };
 const GENERATION_MODE_SCHEMA = { type: "string", enum: ["text", "image", "video", "audio"] };
+const WORKFLOW_INTENT_SCHEMA = { type: "string", enum: ["fragment-video", "full-script", "character", "scene", "storyboard", "image-to-video", "asset-analysis", "general-visual"] };
 const GENERATION_OPTION_PROPERTIES = {
     model: { type: "string" },
     size: { type: "string" },
@@ -94,6 +95,41 @@ const ONLINE_AGENT_TOOLS: ResponseFunctionTool[] = [
     toolDefinition("canvas_get_state", "读取当前网页画布的节点、连线、选区和视口。", {}),
     toolDefinition("canvas_get_selection", "读取当前网页画布选中的节点。", {}),
     toolDefinition("canvas_export_snapshot", "导出当前画布快照，用于理解布局。", {}),
+    toolDefinition(
+        "canvas_plan_workflow",
+        "识别用户的视觉生产意图，并返回推荐流程、缺失阶段和下一步建议。该工具只做规划，不改动画布。",
+        {
+            brief: { type: "string" },
+            intent: WORKFLOW_INTENT_SCHEMA,
+            outputGoal: { type: "string" },
+        },
+        ["brief"],
+    ),
+    toolDefinition(
+        "canvas_create_workflow_cards",
+        "按视觉生产意图创建一组可确认的流程卡片，不自动生成内容。适合片段视频、完整剧本、角色、场景、分镜、图生视频和素材分析。",
+        {
+            brief: { type: "string" },
+            intent: WORKFLOW_INTENT_SCHEMA,
+            sourceNodeId: { type: "string" },
+            referenceNodeIds: { type: "array", items: { type: "string" } },
+            x: { type: "number" },
+            y: { type: "number" },
+        },
+        ["brief"],
+    ),
+    toolDefinition(
+        "canvas_analyze_reference_image",
+        "为选中或指定的参考图创建结构化分析卡片，输出角色外貌、服装、风格、场景、可复用提示词和风险点。该工具不直接识别图片像素，只把参考图挂到分析流程，后续由多模态模型或用户确认。",
+        {
+            nodeId: { type: "string" },
+            brief: { type: "string" },
+            analysisType: { type: "string", enum: ["character", "scene", "style", "shot", "auto"] },
+            x: { type: "number" },
+            y: { type: "number" },
+        },
+        ["nodeId"],
+    ),
     toolDefinition("canvas_apply_ops", "批量操作当前网页画布。ops 支持 add_node、update_node、delete_node、delete_connections、connect_nodes、set_viewport、select_nodes、run_generation。", { ops: { type: "array", items: CANVAS_OP_SCHEMA } }, ["ops"], false),
     toolDefinition("canvas_create_node", "创建任意类型节点：text、image、config、video、audio。适合创建占位图、媒体占位、配置节点或自定义 metadata 节点。", { nodeType: NODE_TYPE_SCHEMA, title: { type: "string" }, x: { type: "number" }, y: { type: "number" }, width: { type: "number" }, height: { type: "number" }, metadata: JSON_RECORD_SCHEMA }, ["nodeType"]),
     toolDefinition("canvas_create_text_node", "在当前画布创建单个文本节点。", { text: { type: "string" }, x: { type: "number" }, y: { type: "number" }, title: { type: "string" }, width: { type: "number" }, height: { type: "number" } }),
@@ -376,6 +412,10 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
             if (name === "canvas_get_selection") {
                 const ids = new Set(current.selectedNodeIds || []);
                 return { ok: true, message: `当前选中 ${ids.size} 个节点。`, data: { nodes: compactSnapshot({ ...current, nodes: current.nodes.filter((node) => ids.has(node.id)) }).nodes } };
+            }
+            if (name === "canvas_plan_workflow") {
+                const plan = buildWorkflowPlan(args, current);
+                return { ok: true, message: workflowPlanMessage(plan), data: plan };
             }
             const ops = onlineToolToOps(name, args, current, effectiveConfig);
             const result = executeOps(ops);
@@ -807,7 +847,7 @@ function OnlineAgentLogView({ logs, theme, context, onClear }: { logs: OnlineAge
     const content = mode === "text" ? formatOnlineLogText(logs, context) : formatOnlineLogJson(logs, context);
     const lastError = [...logs].reverse().find((item) => /错误|失败|error/i.test(`${item.title}\n${stringifyLog(item.data)}`));
     const copy = async (value = content) => {
-        if (copyToClipboard(value)) return;
+        if (await copyToClipboard(value)) return;
         textareaRef.current?.focus();
         textareaRef.current?.select();
     };
@@ -938,6 +978,8 @@ function parseToolArguments(value: string) {
 }
 
 function onlineToolToOps(name: string, input: Record<string, unknown>, snapshot: CanvasAgentSnapshot, config: AiConfig): CanvasAgentOp[] {
+    if (name === "canvas_create_workflow_cards") return workflowCardOps(input, snapshot, config);
+    if (name === "canvas_analyze_reference_image") return referenceAnalysisOps(input, snapshot);
     if (name === "canvas_apply_ops") return requireOps(input.ops);
     if (name === "canvas_create_node") {
         const nodeType = requireNodeType(input.nodeType);
@@ -1001,6 +1043,211 @@ function generationFlowOps(input: Record<string, unknown>, snapshot: CanvasAgent
         { type: "select_nodes", ids: [configId] },
         ...(input.autoRun ? [runGenerationOp(configId, mode, tokens.join("\n"))] : []),
     ];
+}
+
+type VisualWorkflowIntent = "fragment-video" | "full-script" | "character" | "scene" | "storyboard" | "image-to-video" | "asset-analysis" | "general-visual";
+type WorkflowStage = {
+    key: string;
+    title: string;
+    type: CanvasNodeType;
+    mode?: "text" | "image" | "video" | "audio";
+    label: string;
+    description: string;
+    prompt: (brief: string) => string;
+    width?: number;
+    height?: number;
+    size?: string;
+    quality?: string;
+    count?: number;
+    seconds?: string;
+    vquality?: string;
+};
+
+const workflowPresets: Record<VisualWorkflowIntent, WorkflowStage[]> = {
+    "fragment-video": [
+        stage("brief", "片段策划", CanvasNodeType.Text, "text", "结构拆解", "把一句话或一段戏拆成可执行制作清单。", (brief) => `请把这个视频片段拆成视觉生产策划：${brief}\n\n输出：一句话概述、出场角色、场景地点、情绪节奏、关键动作、镜头数量建议、需要生成的资产清单。只输出可执行清单。`),
+        stage("character", "人物创建", CanvasNodeType.Image, "image", "角色设定", "先定脸、服装、发型、气质。", (brief) => `根据片段策划生成主要角色设定图。片段：${brief}\n\n要求：脸部特征清晰，服装结构明确，发型和配饰稳定，可作为后续三视图一致性参考。`, { size: "1024x1360", quality: "high", count: 2 }),
+        stage("turnaround", "人物三视图", CanvasNodeType.Image, "image", "一致性锚点", "正面、侧面、背面同屏，降低角色漂移。", (brief) => `基于上游人物定稿图，生成同一角色三视图设定表。片段：${brief}\n\n要求：正面、侧面、背面全身站姿；同一服装、同一脸型、同一发型、同一配饰；白底或浅灰底；不要换人。`, { size: "1536x1024", quality: "high", count: 1 }),
+        stage("scene", "场景设定", CanvasNodeType.Image, "image", "环境资产", "确定地点、天气、空间层次。", (brief) => `根据片段策划生成场景资产图。片段：${brief}\n\n要求：明确地点、时间、天气、空间层次，可复用于多个镜头；画面不要出现主要人物。`, { size: "1824x1024", quality: "high", count: 2 }),
+        stage("storyboard", "分镜表", CanvasNodeType.Text, "text", "镜头规划", "拆成镜头编号、景别、动作、台词、运动、秒数。", (brief) => `请根据片段策划、人物设定和场景资产，输出分镜表。片段：${brief}\n\n每个镜头包含：镜头编号、景别、画面描述、角色动作、台词/旁白、镜头运动、预计秒数、所需参考资产。控制在 6-10 个镜头。`),
+        stage("keyframe", "镜头关键帧", CanvasNodeType.Image, "image", "关键帧", "生成适合转视频的单镜头画面。", (brief) => `基于上游分镜表、人物三视图和场景资产，生成一个镜头关键帧。片段：${brief}\n\n要求：角色一致、构图明确、动作准确、适合转视频；不要多余肢体、不要换服装、不要换脸。`, { size: "1824x1024", quality: "high", count: 1 }),
+        stage("video", "镜头视频", CanvasNodeType.Video, "video", "图生视频", "把关键帧转成短视频。", (brief) => `基于上游镜头关键帧生成短视频。片段：${brief}\n\n要求：保持角色脸、服装、场景一致；动作自然，有镜头运动；不要大幅改变构图。`, { size: "16:9", seconds: "6", vquality: "720p" }),
+    ],
+    "full-script": [
+        stage("script", "剧本解析", CanvasNodeType.Text, "text", "结构拆解", "从外部剧本提取场次、角色、冲突和资产需求。", (brief) => `请解析这个外部剧本，不限制来源：${brief}\n\n输出：故事梗概、场次列表、主要角色、核心场景、视觉风格、资产清单、优先制作的片段。`),
+        stage("characters", "角色表", CanvasNodeType.Text, "text", "角色资产规划", "列出角色和需要的设定图/三视图。", (brief) => `基于剧本解析输出角色资产表。剧本：${brief}\n\n字段：角色名、年龄气质、外貌、服装、道具、关系、需要的参考资产。`),
+        stage("scenes", "场景表", CanvasNodeType.Text, "text", "场景资产规划", "列出可复用场景。", (brief) => `基于剧本解析输出场景资产表。剧本：${brief}\n\n字段：地点、时间、天气、空间层次、出现频次、所需画面资产。`),
+        stage("storyboard", "重点片段分镜", CanvasNodeType.Text, "text", "镜头规划", "先拆最值得制作的一段。", (brief) => `从剧本中选择最适合先制作的 15-30 秒片段并输出分镜表。剧本：${brief}`),
+    ],
+    character: [
+        stage("character-brief", "角色设定说明", CanvasNodeType.Text, "text", "角色说明", "整理角色文字设定。", (brief) => `整理角色设定：${brief}\n\n输出：外貌、发型、服装、配饰、气质、禁忌变化、提示词。`),
+        stage("character-image", "角色定稿图", CanvasNodeType.Image, "image", "首张定稿", "生成角色定稿图。", (brief) => `生成角色定稿图：${brief}\n\n要求：脸部清晰、服装稳定、可作为后续一致性参考。`, { size: "1024x1360", quality: "high", count: 2 }),
+        stage("turnaround", "角色三视图", CanvasNodeType.Image, "image", "一致性锚点", "正侧背三视图。", (brief) => `基于角色定稿图生成三视图：${brief}\n\n正面、侧面、背面全身站姿，同一服装、同一脸型、同一发型。`, { size: "1536x1024", quality: "high", count: 1 }),
+    ],
+    scene: [
+        stage("scene-brief", "场景设定说明", CanvasNodeType.Text, "text", "环境说明", "整理地点、时间、天气、空间。", (brief) => `整理场景设定：${brief}\n\n输出：地点、时间、天气、空间层次、色调、镜头可用角度、提示词。`),
+        stage("scene-image", "场景资产图", CanvasNodeType.Image, "image", "环境资产", "生成可复用场景图。", (brief) => `生成场景资产图：${brief}\n\n要求：不出现主要人物，空间清晰，可复用于多个镜头。`, { size: "1824x1024", quality: "high", count: 2 }),
+    ],
+    storyboard: [
+        stage("storyboard", "分镜表", CanvasNodeType.Text, "text", "镜头规划", "把内容拆成镜头表。", (brief) => `请把内容拆成分镜表：${brief}\n\n字段：镜头编号、景别、画面描述、角色动作、台词/旁白、镜头运动、预计秒数、所需参考资产。`),
+        stage("keyframe", "关键帧生成", CanvasNodeType.Image, "image", "关键帧", "为分镜生成关键画面。", (brief) => `基于上游分镜生成关键帧。内容：${brief}\n\n要求：构图明确、动作准确、适合转视频。`, { size: "1824x1024", quality: "high", count: 1 }),
+    ],
+    "image-to-video": [
+        stage("image-analysis", "参考图分析", CanvasNodeType.Text, "text", "图像理解", "先分析首帧/参考图。", (brief) => `分析选中参考图并整理图生视频要求。补充说明：${brief}\n\n输出：主体、场景、风格、可动区域、禁止改变项、推荐镜头运动。`),
+        stage("motion", "运镜设计", CanvasNodeType.Text, "text", "运动规划", "设计镜头运动和动作。", (brief) => `基于参考图分析设计图生视频方案：${brief}\n\n输出：动作、镜头运动、时长、节奏、负面约束。`),
+        stage("video", "视频生成", CanvasNodeType.Video, "video", "图生视频", "生成短视频节点。", (brief) => `基于上游参考图和运镜设计生成短视频：${brief}\n\n保持主体、服装、场景一致，不要改变身份和构图。`, { size: "16:9", seconds: "6", vquality: "720p" }),
+    ],
+    "asset-analysis": [
+        stage("asset-analysis", "素材结构化分析", CanvasNodeType.Text, "text", "素材分析", "把素材转成可复用描述。", (brief) => `结构化分析素材：${brief}\n\n输出：主体、外貌/场景、风格、可复用提示词、可作为角色/场景/关键帧的建议、风险点。`),
+    ],
+    "general-visual": [
+        stage("brief", "视觉需求拆解", CanvasNodeType.Text, "text", "需求分析", "先把需求拆成可生产任务。", (brief) => `把这个视觉生产需求拆成可执行计划：${brief}\n\n输出：目标、素材需求、推荐流程、下一步卡片。`),
+        stage("image", "图片生成", CanvasNodeType.Image, "image", "视觉产出", "生成首张视觉稿。", (brief) => `基于视觉需求生成首张视觉稿：${brief}`, { size: "1024x1024", quality: "high", count: 1 }),
+    ],
+};
+
+function stage(key: string, title: string, type: CanvasNodeType, mode: "text" | "image" | "video" | "audio", label: string, description: string, prompt: (brief: string) => string, options: Partial<WorkflowStage> = {}): WorkflowStage {
+    return { key, title, type, mode, label, description, prompt, ...options };
+}
+
+function buildWorkflowPlan(input: Record<string, unknown>, snapshot: CanvasAgentSnapshot) {
+    const brief = requireString(input.brief, "brief");
+    const intent = workflowIntent(input.intent, brief);
+    const stages = workflowPresets[intent];
+    const existingKinds = new Set(snapshot.nodes.map((node) => node.metadata?.pipelineKind).filter(Boolean));
+    const missing = stages.filter((item) => !existingKinds.has(item.key)).map((item) => item.title);
+    return {
+        intent,
+        outputGoal: stringOptional(input.outputGoal) || workflowGoal(intent),
+        recommendedStages: stages.map((item) => ({ key: item.key, title: item.title, type: item.type, label: item.label })),
+        missingStages: missing,
+        nextStep: missing[0] ? `建议先创建「${missing[0]}」流程卡片。` : "当前流程卡片基本完整，可以选择具体节点确认提示词并生成。",
+        shouldAutoRun: false,
+        reason: "公测阶段默认先创建可确认流程卡片，避免误触发生成和浪费额度。",
+        brief,
+    };
+}
+
+function workflowPlanMessage(plan: ReturnType<typeof buildWorkflowPlan>) {
+    return [`识别意图：${intentLabel(plan.intent)}`, `目标：${plan.outputGoal}`, `推荐流程：${plan.recommendedStages.map((item) => item.title).join(" -> ")}`, `缺失阶段：${plan.missingStages.length ? plan.missingStages.join("、") : "无"}`, plan.nextStep].join("\n");
+}
+
+function workflowCardOps(input: Record<string, unknown>, snapshot: CanvasAgentSnapshot, config: AiConfig): CanvasAgentOp[] {
+    const brief = requireString(input.brief, "brief");
+    const intent = workflowIntent(input.intent, brief);
+    const stages = workflowPresets[intent];
+    const x = numberOr(input.x, nextCanvasX(snapshot));
+    const y = numberOr(input.y, 0);
+    const sourceNodeId = stringOptional(input.sourceNodeId);
+    const referenceNodeIds = Array.isArray(input.referenceNodeIds) ? input.referenceNodeIds.filter((id): id is string => typeof id === "string") : [];
+    const nodeIds = stages.map((item) => `${item.key}-${nanoid(6)}`);
+    const ops: CanvasAgentOp[] = stages.map((item, index) => {
+        const prompt = item.prompt(brief);
+        const metadata: CanvasNodeData["metadata"] = cleanRecord({
+            content: item.type === CanvasNodeType.Text ? prompt : "",
+            prompt,
+            composerContent: item.type === CanvasNodeType.Text ? "" : prompt,
+            status: item.type === CanvasNodeType.Text ? "success" : "idle",
+            generationMode: item.mode,
+            pipelineKind: item.key,
+            pipelineLabel: item.label,
+            pipelineDescription: item.description,
+            model: item.mode ? defaultGenerationModel(config, item.mode) : undefined,
+            size: item.size || config.size,
+            quality: item.quality || config.quality,
+            count: item.count,
+            seconds: item.seconds || config.videoSeconds,
+            vquality: item.vquality || config.vquality,
+            references: index === 0 ? referenceNodeIds : undefined,
+        }) as CanvasNodeData["metadata"];
+        return {
+            type: "add_node",
+            id: nodeIds[index],
+            nodeType: item.type,
+            title: item.title,
+            position: { x: x + index * 420, y: y + (index % 2) * 320 },
+            width: item.width || NODE_DEFAULT_SIZE[item.type].width,
+            height: item.height || NODE_DEFAULT_SIZE[item.type].height,
+            metadata,
+        };
+    });
+    const connectionOps: CanvasAgentOp[] = [];
+    if (sourceNodeId && snapshot.nodes.some((node) => node.id === sourceNodeId)) connectionOps.push({ type: "connect_nodes", fromNodeId: sourceNodeId, toNodeId: nodeIds[0] });
+    referenceNodeIds.filter((id) => snapshot.nodes.some((node) => node.id === id)).forEach((id) => connectionOps.push({ type: "connect_nodes", fromNodeId: id, toNodeId: nodeIds[0] }));
+    nodeIds.slice(0, -1).forEach((fromNodeId, index) => connectionOps.push({ type: "connect_nodes", fromNodeId, toNodeId: nodeIds[index + 1] }));
+    return [...ops, ...connectionOps, { type: "select_nodes", ids: [nodeIds[0]] }];
+}
+
+function referenceAnalysisOps(input: Record<string, unknown>, snapshot: CanvasAgentSnapshot): CanvasAgentOp[] {
+    const nodeId = requireString(input.nodeId, "nodeId");
+    const source = snapshot.nodes.find((node) => node.id === nodeId);
+    if (!source) throw new Error("找不到要分析的参考图节点");
+    const brief = stringOptional(input.brief);
+    const analysisType = stringOptional(input.analysisType) || "auto";
+    const x = numberOr(input.x, source.position.x + source.width + 96);
+    const y = numberOr(input.y, source.position.y);
+    const id = `analysis-${nanoid(6)}`;
+    const text = [
+        `参考图分析类型：${analysisType}`,
+        brief ? `补充说明：${brief}` : "",
+        "",
+        "请基于连接的参考图输出结构化分析：",
+        "1. 主体/角色/场景是什么",
+        "2. 外貌、服装、发型、道具或环境元素",
+        "3. 画风、色调、构图、镜头语言",
+        "4. 可复用提示词",
+        "5. 后续可创建的卡片：角色设定、三视图、场景设定、关键帧或图生视频",
+        "6. 一致性风险和禁止改变项",
+    ].filter(Boolean).join("\n");
+    return [
+        {
+            type: "add_node",
+            id,
+            nodeType: CanvasNodeType.Text,
+            title: "参考图分析",
+            position: { x, y },
+            width: 380,
+            height: 260,
+            metadata: { content: text, status: "success", fontSize: 14, pipelineKind: "asset-analysis", pipelineLabel: "素材分析", pipelineDescription: "把参考图转成可复用视觉设定。" },
+        },
+        { type: "connect_nodes", fromNodeId: nodeId, toNodeId: id },
+        { type: "select_nodes", ids: [id] },
+    ];
+}
+
+function workflowIntent(value: unknown, brief: string): VisualWorkflowIntent {
+    if (value === "fragment-video" || value === "full-script" || value === "character" || value === "scene" || value === "storyboard" || value === "image-to-video" || value === "asset-analysis" || value === "general-visual") return value;
+    const text = brief.toLowerCase();
+    if (/图生视频|首帧|尾帧|运镜|动起来|视频/.test(brief)) return "image-to-video";
+    if (/完整剧本|剧本|长篇|全集|多场|分集/.test(brief) && brief.length > 80) return "full-script";
+    if (/分镜|镜头|镜头表|storyboard/.test(text)) return "storyboard";
+    if (/角色|人物|三视图|设定/.test(brief)) return "character";
+    if (/场景|环境|地点|空间/.test(brief)) return "scene";
+    if (/片段|一段|打斗|名场面|pk|PK|动作戏|短片/.test(brief)) return "fragment-video";
+    if (/参考图|素材|图片|分析/.test(brief)) return "asset-analysis";
+    return "general-visual";
+}
+
+function workflowGoal(intent: VisualWorkflowIntent) {
+    if (intent === "fragment-video") return "制作一段可进入图生视频的短片流程";
+    if (intent === "full-script") return "把外部剧本拆成可生产的角色、场景和分镜资产";
+    if (intent === "character") return "建立稳定角色设定和三视图";
+    if (intent === "scene") return "建立可复用场景资产";
+    if (intent === "storyboard") return "输出可执行分镜表和关键帧流程";
+    if (intent === "image-to-video") return "把参考图转成视频生成流程";
+    if (intent === "asset-analysis") return "把素材转成结构化视觉设定";
+    return "拆解视觉生产任务并创建下一步卡片";
+}
+
+function intentLabel(intent: VisualWorkflowIntent) {
+    if (intent === "fragment-video") return "片段视频";
+    if (intent === "full-script") return "完整剧本";
+    if (intent === "character") return "角色创建";
+    if (intent === "scene") return "场景创建";
+    if (intent === "storyboard") return "分镜规划";
+    if (intent === "image-to-video") return "图生视频";
+    if (intent === "asset-analysis") return "素材分析";
+    return "通用视觉生产";
 }
 
 function textNodeOp(input: Record<string, unknown>, x: number, y: number): CanvasAgentOp {
@@ -1070,6 +1317,9 @@ function toolCallLabel(name: string) {
     if (name === "canvas_get_state") return "读取画布";
     if (name === "canvas_get_selection") return "读取选区";
     if (name === "canvas_export_snapshot") return "导出快照";
+    if (name === "canvas_plan_workflow") return "规划流程";
+    if (name === "canvas_create_workflow_cards") return "创建流程卡";
+    if (name === "canvas_analyze_reference_image") return "分析参考图";
     if (name === "canvas_create_node") return "创建节点";
     if (name === "canvas_create_text_node") return "创建文本";
     if (name === "canvas_create_text_nodes") return "批量创建文本";
@@ -1266,7 +1516,7 @@ async function buildToolAgentMessages(snapshot: CanvasAgentSnapshot, history: Ca
     return [
         { role: "system", content: ONLINE_AGENT_PROMPT },
         ...history
-            .filter((message) => message.role === "user" || message.role === "assistant" || message.role === "system")
+            .filter((message): message is CanvasAssistantMessage & { role: "user" | "assistant" | "system" } => message.role === "user" || message.role === "assistant" || message.role === "system")
             .slice(-8)
             .map((message): ResponseInputMessage => ({ role: message.role, content: message.text })),
         {
