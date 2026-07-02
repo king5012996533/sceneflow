@@ -15,6 +15,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "参数不完整" }, { status: 400 });
     }
 
+    if (!/^\d{4,6}$/.test(code)) {
+      return NextResponse.json({ error: "验证码格式不正确" }, { status: 400 });
+    }
+
     let valid = false;
 
     if (method === "email") {

@@ -63,7 +63,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
     try {
       if (isPhone) {
         // 手机号需要验证码登录
-        if (!code) { message.warning("请输入验证码"); setLoading(false); return; }
+        if (!code || !/^\d{4,6}$/.test(code)) { message.warning("请输入验证码"); setLoading(false); return; }
         const res = await fetch("/canvas/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -122,7 +122,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
 
   // === 注册：校验验证码 ===
   const handleVerifyCode = async () => {
-    if (!code || code.length !== 6) { message.warning("请输入6位验证码"); return; }
+    if (!code || !/^\d{4,6}$/.test(code)) { message.warning("请输入4-6位验证码"); return; }
     setLoading(true);
     try {
       const res = await fetch("/canvas/api/auth/verify-code", {
@@ -274,7 +274,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
             <>
               <Input
                 size="large"
-                placeholder="6位验证码"
+                placeholder="4-6位验证码"
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                 onPressEnter={handleVerifyCode}
