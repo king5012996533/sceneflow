@@ -3,16 +3,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/ic-prisma";
 import { signToken } from "@/lib/auth";
 
+// 从请求头构造外部 base URL（standalone 模式下 req.url 是 localhost）
+function getExternalBase(req: NextRequest): string {
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "xingtudesign.com";
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  return `${proto}://${host}`;
+}
+
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=github_no_code", req.url));
+    return NextResponse.redirect(new URL("/canvas/login?error=github_no_code", getExternalBase(req)));
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL("/login?error=github_not_configured", req.url));
+    return NextResponse.redirect(new URL("/canvas/login?error=github_not_configured", getExternalBase(req)));
   }
 
   try {
@@ -74,7 +81,8 @@ export async function GET(req: NextRequest) {
 
     // 签发 JWT，设置 cookie
     const token = signToken({ userId: user.id, email: user.email });
-    const response = NextResponse.redirect(new URL("/canvas", req.url));
+    const base = getExternalBase(req);
+    const response = NextResponse.redirect(new URL("/canvas", base));
     response.cookies.set("ic_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -85,6 +93,6 @@ export async function GET(req: NextRequest) {
     return response;
   } catch (err: unknown) {
     console.error("GitHub OAuth error:", err);
-    return NextResponse.redirect(new URL("/login?error=github_failed", req.url));
+    return NextResponse.redirect(new URL("/canvas/login?error=github_failed", getExternalBase(req)));
   }
 }

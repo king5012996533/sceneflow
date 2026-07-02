@@ -7,7 +7,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "GitHub OAuth 未配置" }, { status: 503 });
   }
 
-  const baseUrl = req.nextUrl.origin;
+  // 从 Host / x-forwarded-host 构造外部 URL（standalone 模式下 req.nextUrl.origin 是 localhost）
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "xingtudesign.com";
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const basePath = "/canvas";
+  const baseUrl = `${proto}://${host}${basePath}`;
   const redirectUri = `${baseUrl}/api/auth/github/callback`;
 
   const params = new URLSearchParams({
