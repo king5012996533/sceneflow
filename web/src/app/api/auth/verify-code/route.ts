@@ -24,15 +24,11 @@ export async function POST(req: NextRequest) {
     if (method === "email") {
       valid = await verifyCode(target, "email", code);
     } else if (method === "phone") {
-      // 优先用阿里云服务端校验，失败时回退到本地校验
+      // 阿里云配置了就用阿里云校验，否则用本地校验
       const hasAliyun = !!process.env.ALIYUN_SMS_ACCESS_KEY_ID;
       if (hasAliyun) {
         const result = await checkSmsVerifyCode(target, code);
         valid = result.ok;
-        if (!valid) {
-          // 阿里云校验失败，回退到本地验证码
-          valid = await verifyCode(target, "phone", code);
-        }
       } else {
         valid = await verifyCode(target, "phone", code);
       }
