@@ -64,7 +64,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
       if (isPhone) {
         // 手机号需要验证码登录
         if (!code) { message.warning("请输入验证码"); setLoading(false); return; }
-        const res = await fetch("/api/auth/login", {
+        const res = await fetch("/canvas/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ phone: target, code }),
@@ -78,7 +78,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
       } else {
         // 邮箱密码登录
         if (!password) { message.warning("请输入密码"); setLoading(false); return; }
-        const res = await fetch("/api/auth/login", {
+        const res = await fetch("/canvas/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: target, password }),
@@ -103,7 +103,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
     if (!isEmail && !isPhone) { message.warning("请输入有效的邮箱或手机号"); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/send-code", {
+      const res = await fetch("/canvas/api/auth/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target, method }),
@@ -125,7 +125,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
     if (!code || code.length !== 6) { message.warning("请输入6位验证码"); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/verify-code", {
+      const res = await fetch("/canvas/api/auth/verify-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target, method, code }),
@@ -146,7 +146,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
     if (!password || password.length < 6) { message.warning("密码至少6位"); return; }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch("/canvas/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: isPhone ? `${target}@phone.local` : target, password, name, verificationToken: verifyToken }),
@@ -166,7 +166,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
 
   // === GitHub 登录 ===
   const handleGitHub = () => {
-    window.location.href = "/api/auth/github";
+    window.location.href = "/canvas/api/auth/github";
   };
 
   return (

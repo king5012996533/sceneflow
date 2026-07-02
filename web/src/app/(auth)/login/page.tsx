@@ -23,7 +23,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch(`/api/auth/${isRegister ? "register" : "login"}`, {
+      const res = await fetch(`/canvas/api/auth/${isRegister ? "register" : "login"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, name }),

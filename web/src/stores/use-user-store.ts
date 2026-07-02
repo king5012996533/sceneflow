@@ -22,11 +22,11 @@ export const useUserStore = create<UserStore>()((set) => ({
   setUser: (user) => set({ user }),
   clearSession: () => {
     set({ user: null });
-    fetch("/api/auth/logout", { method: "POST" });
+    fetch("/canvas/api/auth/logout", { method: "POST" });
   },
   fetchSession: async () => {
     try {
-      const res = await fetch("/api/auth/session", { credentials: "include" });
+      const res = await fetch("/canvas/api/auth/session", { credentials: "include" });
       const data = await res.json();
       set({ user: data.user });
     } catch {
