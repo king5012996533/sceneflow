@@ -22,6 +22,9 @@ export type CanvasGenerationMode = "text" | "image" | "video" | "audio";
 export type CanvasImageGenerationType = "generation" | "edit";
 
 export type CanvasNodeMetadata = {
+    pipelineKind?: string;
+    pipelineLabel?: string;
+    pipelineDescription?: string;
     content?: string;
     composerContent?: string;
     prompt?: string;

@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/ic-prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // URL 定义在 prisma.config.ts 中
+}
+
+// 使用 ic_ 前缀避免与 Creatify 主站表名冲突
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String    @default("")
+  password      String
+  role          String    @default("user") // user | pro | admin
+  avatarUrl     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  plan      String   // free | creator | pro | team
+  status    String   @default("active") // active | cancelled | expired
+  startDate DateTime @default(now())
+  endDate   DateTime?
+  createdAt DateTime @default(now())
+}

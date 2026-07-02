@@ -15,16 +15,16 @@ const neutral = {
         tableSelectedHoverBg: "rgba(17, 17, 17, 0.08)",
     },
     dark: {
-        primary: "#fafafa",
+        primary: "#f5f5f5",
         primaryHover: "#ffffff",
-        primaryText: "#171717",
-        menuBg: "#262626",
-        menuText: "#fafafa",
-        selectActiveBg: "#262626",
-        selectSelectedBg: "#333333",
-        selectText: "#fafafa",
-        tableSelectedBg: "rgba(255, 255, 255, 0.08)",
-        tableSelectedHoverBg: "rgba(255, 255, 255, 0.12)",
+        primaryText: "#0a0a0a",
+        menuBg: "#111111",
+        menuText: "#f5f5f5",
+        selectActiveBg: "#1a1a1a",
+        selectSelectedBg: "#222222",
+        selectText: "#f5f5f5",
+        tableSelectedBg: "rgba(255, 255, 255, 0.06)",
+        tableSelectedHoverBg: "rgba(255, 255, 255, 0.1)",
     },
 };
 
@@ -33,7 +33,7 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
 
     return {
         algorithm: dark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-        cssVar: { key: dark ? "infinite-canvas-dark" : "infinite-canvas-light" },
+        cssVar: { key: dark ? "sceneflow-dark" : "sceneflow-light" },
         token: {
             colorPrimary: color.primary,
             colorInfo: color.primary,
@@ -41,6 +41,11 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
             colorLinkHover: color.primaryHover,
             colorLinkActive: color.primary,
             colorTextLightSolid: color.primaryText,
+            colorBgContainer: dark ? "#141414" : undefined,
+            colorBgElevated: dark ? "#1a1a1a" : undefined,
+            colorBorder: dark ? "rgba(255,255,255,0.06)" : undefined,
+            borderRadius: 6,
+            fontFamily: `"SF Pro Display","SF Pro Text","PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif`,
         },
         components: {
             Button: {
@@ -63,6 +68,16 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
             Table: {
                 rowSelectedBg: color.tableSelectedBg,
                 rowSelectedHoverBg: color.tableSelectedHoverBg,
+            },
+            Modal: {
+                contentBg: dark ? "#141414" : undefined,
+                headerBg: dark ? "#141414" : undefined,
+            },
+            Popover: {
+                colorBgElevated: dark ? "#1a1a1a" : undefined,
+            },
+            Card: {
+                colorBgContainer: dark ? "#141414" : undefined,
             },
         },
     };

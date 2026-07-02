@@ -8,6 +8,8 @@ import { Download, FileUp, Plus } from "lucide-react";
 import { readZip } from "@/lib/zip";
 import { setMediaBlob } from "@/services/file-storage";
 import { setImageBlob } from "@/services/image-storage";
+import { LoginModal } from "@/components/layout/login-modal";
+import { useUserStore } from "@/stores/use-user-store";
 import { CanvasDeleteProjectsDialog } from "./components/canvas-delete-projects-dialog";
 import { CanvasProjectCard } from "./components/canvas-project-card";
 import type { CanvasExportFile } from "./export-types";
@@ -19,6 +21,7 @@ export default function CanvasPage() {
     const { message } = App.useApp();
     const router = useRouter();
     const searchParams = useSearchParams();
+    const user = useUserStore((s) => s.user);
     const inputRef = useRef<HTMLInputElement>(null);
     const autoOpenRef = useRef(false);
     const hydrated = useCanvasStore((state) => state.hydrated);
@@ -68,6 +71,15 @@ export default function CanvasPage() {
     }, [createProject, hydrated, mode, projects]);
 
     if (hydrated && (mode === "new" || mode === "recent")) return <main className="flex h-full items-center justify-center bg-background text-sm text-stone-500">正在打开画布...</main>;
+
+    if (!user) {
+        return (
+            <main className="flex h-full flex-col items-center justify-center bg-background text-stone-950 dark:text-stone-100">
+                <LoginModal open={true} onClose={() => router.push("/")} />
+                <p className="text-sm text-stone-500">请先登录后再使用画布</p>
+            </main>
+        );
+    }
 
     return (
         <main className="h-full overflow-auto bg-background text-stone-950 dark:text-stone-100">

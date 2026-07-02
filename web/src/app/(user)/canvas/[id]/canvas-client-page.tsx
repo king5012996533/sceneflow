@@ -47,6 +47,7 @@ import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
 import { useCanvasStore } from "../stores/use-canvas-store";
 import { applyCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import { buildCanvasResourceReferences, buildNodeMentionReferences } from "../utils/canvas-resource-references";
+import { createMangaWorkflow } from "../utils/manga-workflow";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     CanvasNodeType,
@@ -802,6 +803,16 @@ function InfiniteCanvasPage() {
         },
         [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, getCanvasCenter],
     );
+
+    const createMangaWorkflowNodes = useCallback(() => {
+        const workflow = createMangaWorkflow(getCanvasCenter(), effectiveConfig);
+        setNodes((prev) => [...prev, ...workflow.nodes]);
+        setConnections((prev) => [...prev, ...workflow.connections]);
+        setSelectedNodeIds(new Set([workflow.nodes[0]?.id].filter(Boolean)));
+        setSelectedConnectionId(null);
+        setDialogNodeId(workflow.nodes[0]?.id || null);
+        message.success("已创建漫剧生产流程");
+    }, [effectiveConfig, getCanvasCenter, message]);
 
     const deleteNodes = useCallback(
         (ids: Set<string>) => {
@@ -2702,6 +2713,7 @@ function InfiniteCanvasPage() {
                     onAddAudio={() => createNode(CanvasNodeType.Audio)}
                     onAddText={() => createNode(CanvasNodeType.Text)}
                     onAddConfig={() => createNode(CanvasNodeType.Config)}
+                    onCreateMangaWorkflow={createMangaWorkflowNodes}
                     onUndo={undoCanvas}
                     onRedo={redoCanvas}
                     onUpload={() => handleUploadRequest()}

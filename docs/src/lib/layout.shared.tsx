@@ -2,8 +2,7 @@ import type { BaseLayoutProps } from 'fumadocs-ui/layouts/shared';
 import { appName, gitConfig } from './shared';
 import { ArrowUpRight } from 'lucide-react';
 
-const githubUrl = `https://github.com/${gitConfig.user}/${gitConfig.repo}`;
-const qqUrl = 'https://qm.qq.com/q/DFnKzZ807u';
+const qqUrl = '';
 
 export function baseOptions(): BaseLayoutProps {
   return {

@@ -317,6 +317,7 @@ export const CanvasNode = React.memo(function CanvasNode({
 
                 {showImageInfo && hasImageContent ? <ImageInfoBar node={data} /> : null}
                 {resourceLabel ? <ResourceLabelBadge reference={resourceLabel} /> : null}
+                {data.metadata?.pipelineLabel ? <PipelineBadge node={data} /> : null}
 
                 {!hasImageContent && !hasVideoContent && !hasAudioContent ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(to top, ${theme.canvas.background}66, transparent)` }} /> : null}
 
@@ -335,13 +336,21 @@ export const CanvasNode = React.memo(function CanvasNode({
 });
 
 function NodeContent(props: NodeContentRendererProps) {
-    if (props.node.type === CanvasNodeType.Config && props.renderNodeContent) return props.renderNodeContent(props.node);
+    if (props.node.type === CanvasNodeType.Config && props.renderNodeContent) return <>{props.renderNodeContent(props.node)}</>;
     if (props.isBatchRoot) return <ImageNodeContent {...props} />;
     if (props.node.metadata?.status === "loading") return <LoadingContent theme={props.theme} />;
     if (props.node.metadata?.status === "error") return <ErrorContent node={props.node} theme={props.theme} onRetry={props.onRetry} />;
 
     const Renderer = nodeContentRenderers[props.node.type];
     return Renderer ? <Renderer {...props} /> : <UnknownNodeContent theme={props.theme} />;
+}
+
+function PipelineBadge({ node }: { node: CanvasNodeData }) {
+    return (
+        <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-[calc(100%-24px)] rounded-full border border-black/10 bg-white/90 px-2.5 py-1 text-xs font-medium text-[#242529] shadow-sm backdrop-blur">
+            <span className="block truncate">{node.metadata?.pipelineLabel}</span>
+        </div>
+    );
 }
 
 const nodeContentRenderers = {

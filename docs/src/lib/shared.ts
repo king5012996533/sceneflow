@@ -1,11 +1,11 @@
-export const appName = '无限画布';
+export const appName = '漫剧工厂';
 export const docsRoute = '/docs';
 export const docsContentRoute = '/llms.mdx/docs';
 
-// fill this with your actual GitHub info, for example:
+// 按需修改为你的实际 GitHub 信息
 export const gitConfig = {
-  user: 'basketikun',
-  repo: 'infinite-canvas',
+  user: '',
+  repo: '',
   branch: 'main',
   docsContentDir: 'docs/content/docs',
 };

@@ -387,34 +387,137 @@ function consumeResponseStreamText(state: ResponseStreamState, text: string, onD
 }
 
 async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
-    const response = await fetch(aiApiUrl(config, "/responses"), {
+    // 将 Responses API 的 input 格式转为 Chat Completions 的 messages 格式
+    const input = body.input;
+    const messages: any[] = [];
+    if (config.systemPrompt?.trim()) {
+        messages.push({ role: "system", content: config.systemPrompt.trim() });
+    }
+    if (Array.isArray(input)) {
+        let pendingToolCalls: any[] = [];
+        const flushToolCalls = () => {
+            if (pendingToolCalls.length) {
+                messages.push({ role: "assistant", content: null, tool_calls: pendingToolCalls });
+                pendingToolCalls = [];
+            }
+        };
+        for (const msg of input) {
+            if (msg.type === "function_call") {
+                // Responses API 的 function_call → assistant message 的 tool_calls
+                pendingToolCalls.push({
+                    id: msg.call_id || msg.id || `call_${Date.now()}`,
+                    type: "function",
+                    function: { name: msg.name || "", arguments: msg.arguments || "{}" },
+                });
+            } else if (msg.type === "function_call_output" || msg.role === "tool") {
+                flushToolCalls();
+                messages.push({ role: "tool", tool_call_id: msg.call_id || msg.tool_call_id || "", content: String(msg.output || msg.content || "") });
+            } else if (msg.role === "assistant") {
+                flushToolCalls();
+                const rawContent = typeof msg.content === "string" ? msg.content : "";
+                // 从存储的 [REASONING] 标记中提取 reasoning
+                let cleanContent = rawContent;
+                let reasoningContent = (msg as any).reasoning_content || (msg as any).reasoning || "";
+                if (!reasoningContent && rawContent.includes("[REASONING]")) {
+                    const parts = rawContent.split(/\[REASONING\]|\[\/REASONING\]/);
+                    if (parts.length >= 3) { reasoningContent = parts[1]; cleanContent = parts.slice(2).join(""); }
+                }
+                const assistantMsg: any = { role: "assistant", content: cleanContent || null };
+                // DeepSeek 严格要求往返携带 reasoning_content
+                assistantMsg.reasoning_content = reasoningContent || null;
+                messages.push(assistantMsg);
+            } else if (msg.role === "system" || msg.role === "user") {
+                flushToolCalls();
+                messages.push({ role: msg.role, content: String(msg.content || "") });
+            }
+        }
+        flushToolCalls();
+    }
+
+    const chatBody: Record<string, unknown> = {
+        model: body.model,
+        messages,
+        stream: true,
+    };
+    // 转换 tools 格式：Responses API → Chat Completions 格式
+    if (Array.isArray(body.tools)) {
+        chatBody.tools = body.tools.map((t: any) => ({
+            type: "function",
+            function: {
+                name: t.name || t.function?.name,
+                description: t.description || t.function?.description,
+                parameters: t.parameters || t.function?.parameters,
+                strict: t.strict ?? t.function?.strict,
+            },
+        }));
+    }
+
+    const response = await fetch(aiApiUrl(config, "/chat/completions"), {
         method: "POST",
         headers: { ...aiHeaders(config, "application/json"), Accept: "text/event-stream" },
-        body: JSON.stringify({ ...body, stream: true }),
+        body: JSON.stringify(chatBody),
         signal: options?.signal,
     });
     if (!response.ok) throw new Error(await readFetchError(response, "请求失败"));
     if (!response.body) {
-        const payload = (await response.json()) as ResponseApiPayload;
-        validateResponsePayload(payload);
-        return parseToolResponse(payload);
+        const payload = (await response.json()) as any;
+        if (payload.error?.message) throw new Error(payload.error.message);
+        const text = payload.choices?.[0]?.message?.content || "";
+        const toolCalls = (payload.choices?.[0]?.message?.tool_calls || []).map((tc: any) => ({
+            id: tc.id,
+            type: "function" as const,
+            function: { name: tc.function.name, arguments: tc.function.arguments },
+        }));
+        return { content: text, toolCalls };
     }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    const state: ResponseStreamState = { buffer: "", text: "" };
+    let buffer = "";
+    let fullText = "";
+    let toolCalls: ToolResponseResult["toolCalls"] = [];
+
     for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        consumeResponseStreamText(state, decoder.decode(value, { stream: true }), onDelta);
-        if (state.error) throw new Error(state.error);
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data: ")) continue;
+            const jsonStr = trimmed.slice(6);
+            if (jsonStr === "[DONE]") continue;
+            try {
+                const chunk = JSON.parse(jsonStr);
+                const delta = chunk.choices?.[0]?.delta;
+                if (delta?.reasoning_content) {
+                    if (!fullText) onDelta?.("\n");
+                    fullText += "[REASONING]" + delta.reasoning_content + "[/REASONING]";
+                }
+                if (delta?.content) {
+                    fullText += delta.content;
+                    // onDelta 显示的文本要去掉 [REASONING] 标记
+                    const displayText = fullText.replace(/\[REASONING\].*?\[\/REASONING\]/g, "").trim();
+                    onDelta?.(displayText || " ");
+                }
+                if (delta?.tool_calls) {
+                    for (const tc of delta.tool_calls) {
+                        let existing = toolCalls.find((t) => t.id === tc.id);
+                        if (!existing) {
+                            existing = { id: tc.id || "", type: "function", function: { name: "", arguments: "" } };
+                            toolCalls.push(existing);
+                        }
+                        if (tc.function?.name) existing.function.name += tc.function.name;
+                        if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
+                    }
+                }
+            } catch { /* skip parse errors */ }
+        }
     }
-    consumeResponseStreamText(state, decoder.decode(), onDelta, true);
-    if (state.error) throw new Error(state.error);
-    if (!state.payload) return { content: state.text, toolCalls: [] };
-    validateResponsePayload(state.payload);
-    const result = parseToolResponse(state.payload);
-    return { ...result, content: state.text || result.content };
+
+    return { content: fullText.replace(/\[REASONING\].*?\[\/REASONING\]/g, "").trim(), toolCalls };
 }
 
 function toGeminiBody(config: AiConfig, messages: ResponseInputMessage[], extra?: Record<string, unknown>) {

@@ -3,8 +3,9 @@ import { App } from "antd";
 import { APP_VERSION } from "@/constant/env";
 import { parseChangelog, type ReleaseInfo } from "@/lib/release";
 
-const latestVersionUrl = "https://raw.githubusercontent.com/basketikun/infinite-canvas/main/VERSION";
-const latestChangelogUrl = "https://raw.githubusercontent.com/basketikun/infinite-canvas/main/CHANGELOG.md";
+// 版本检查已移除上游依赖
+const latestVersionUrl = "";
+const latestChangelogUrl = "";
 
 function readLocalReleases(): ReleaseInfo[] {
     try {
