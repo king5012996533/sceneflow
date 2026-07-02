@@ -7,8 +7,29 @@ import "./globals.css";
 import React from "react";
 
 export const metadata: Metadata = {
-    title: "SceneFlow",
-    description: "视觉内容生产的空间工作台",
+    title: {
+        default: "SceneFlow — AI 视觉内容生产工作台",
+        template: "%s | SceneFlow",
+    },
+    description: "SceneFlow 是一款基于画布的 AI 视觉内容生产工具，支持图片生成、视频创作、角色设定、分镜规划，让创意从构思到交付在同一空间完成。",
+    keywords: ["AI画布", "图片生成", "视频创作", "分镜规划", "角色设定", "视觉内容生产", "SceneFlow"],
+    openGraph: {
+        title: "SceneFlow — AI 视觉内容生产工作台",
+        description: "基于画布的 AI 视觉内容生产工具，支持图片生成、视频创作、分镜规划。",
+        url: "https://xingtudesign.com",
+        siteName: "SceneFlow",
+        locale: "zh_CN",
+        type: "website",
+    },
+    twitter: {
+        card: "summary_large_image",
+        title: "SceneFlow — AI 视觉内容生产工作台",
+        description: "基于画布的 AI 视觉内容生产工具，支持图片生成、视频创作、分镜规划。",
+    },
+    robots: {
+        index: true,
+        follow: true,
+    },
 };
 
 export default function RootLayout({

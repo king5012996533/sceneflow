@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Allow: /canvas
+Disallow: /api/
+Disallow: /admin/
+Disallow: /_next/
+
+Sitemap: https://xingtudesign.com/sitemap.xml
