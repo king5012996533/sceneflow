@@ -2,8 +2,36 @@
 // GET /api/sync?type=projects — 从服务器加载画布数据
 import { NextRequest, NextResponse } from "next/server";
 
+import { activateSubscription, ensureDefaultPlans } from "@/lib/billing";
 import { requireCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
+
+function parseLimit(value?: string | null) {
+  if (!value || value === "custom" || value === "unlimited") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function getProjectLimit(userId: string) {
+  await ensureDefaultPlans();
+  let subscription = await prisma?.subscription.findFirst({
+    where: { userId, status: "active" },
+    include: { plan: { include: { entitlements: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!subscription) {
+    subscription = await activateSubscription({
+      userId,
+      planId: "free",
+      cycle: "monthly",
+      provider: "manual",
+    });
+  }
+
+  const entitlement = subscription.plan?.entitlements.find((item) => item.key === "projects");
+  return parseLimit(entitlement?.value);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +48,13 @@ export async function POST(req: NextRequest) {
     const validTypes = ["projects", "assets", "image-workbench", "video-workbench"];
     if (!validTypes.includes(type)) {
       return NextResponse.json({ error: "无效的同步类型" }, { status: 400 });
+    }
+
+    if (type === "projects" && Array.isArray(data)) {
+      const projectLimit = await getProjectLimit(user.id);
+      if (projectLimit !== null && data.length > projectLimit) {
+        return NextResponse.json({ error: `当前套餐最多保存 ${projectLimit} 个画布项目` }, { status: 403 });
+      }
     }
 
     const record = await prisma.canvasBackup.upsert({

@@ -7,6 +7,12 @@ export async function POST(req: NextRequest) {
     try {
         if (!prisma) return NextResponse.json({ error: "数据库不可用" }, { status: 503 });
 
+        const callbackSecret = process.env.PAYMENT_CALLBACK_SECRET;
+        if (!callbackSecret) return NextResponse.json({ error: "支付回调尚未启用" }, { status: 403 });
+        if (req.headers.get("x-payment-callback-secret") !== callbackSecret) {
+            return NextResponse.json({ error: "回调签名无效" }, { status: 401 });
+        }
+
         const body = await req.json();
         const orderNo = String(body.orderNo || "");
         const provider = String(body.provider || "manual") as PaymentProvider;

@@ -18,6 +18,8 @@ import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { requestEdit, requestGeneration } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
+import { checkGenerationQuota, recordGeneration } from "@/lib/generation-quota";
+import { fetchClientEntitlements, type ClientEntitlements } from "@/lib/client-entitlements";
 import { useAssetStore } from "@/stores/use-asset-store";
 import type { ReferenceImage } from "@/types/image";
 
@@ -75,6 +77,9 @@ export default function ImagePage() {
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+    const [entitlements, setEntitlements] = useState<ClientEntitlements | null>(null);
+
+    useEffect(() => { void fetchClientEntitlements().then(setEntitlements); }, []);
     const addAsset = useAssetStore((state) => state.addAsset);
     const [prompt, setPrompt] = useState("");
     const [references, setReferences] = useState<ReferenceImage[]>([]);
@@ -143,6 +148,20 @@ export default function ImagePage() {
             message.error("请输入生图提示词");
             return;
         }
+        // 配额检查
+        const { allowed, remaining, limit } = checkGenerationQuota(entitlements, generationCount);
+        if (!allowed) {
+            message.warning(`本月免费生成次数已用完（${limit}次/月），请升级套餐继续使用。`);
+            return;
+        }
+        if (remaining > 0 && remaining <= 1) {
+            message.info(`免费套餐本月还剩 ${remaining} 次生成机会`);
+        }
+        const concurrentLimit = entitlements?.concurrentJobs ?? 1;
+        if (concurrentLimit !== null && generationCount > concurrentLimit) {
+            message.warning(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请减少生成数量或升级套餐。`);
+            return;
+        }
         if (!isAiConfigReady(effectiveConfig, model)) {
             message.warning("请先完成配置");
             openConfigDialog(true);
@@ -154,6 +173,7 @@ export default function ImagePage() {
 
         setElapsedMs(0);
         setRunning(true);
+        recordGeneration(generationCount);
         setPreviewLog(null);
         setResults(Array.from({ length: generationCount }, () => ({ id: nanoid(), status: "pending" })));
         const batchStartedAt = performance.now();
@@ -187,6 +207,7 @@ export default function ImagePage() {
                     images: logImages,
                 }),
             );
+            if (successCount) recordGeneration(successCount);
             successCount ? message.success("图片已生成") : message.error(failed?.reason instanceof Error ? failed.reason.message : "生成失败");
         } finally {
             setRunning(false);

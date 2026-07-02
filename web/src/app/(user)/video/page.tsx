@@ -18,6 +18,8 @@ import { deleteStoredMedia, resolveMediaUrl, uploadMediaFile } from "@/services/
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { createVideoGenerationTask, pollVideoGenerationTask, storeGeneratedVideo, type VideoGenerationTask } from "@/services/api/video";
 import { useAssetStore } from "@/stores/use-asset-store";
+import { checkGenerationQuota, recordGeneration } from "@/lib/generation-quota";
+import { fetchClientEntitlements, type ClientEntitlements } from "@/lib/client-entitlements";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { ReferenceImage } from "@/types/image";
@@ -70,6 +72,8 @@ const LOG_STORE_KEY = "infinite-canvas:video_generation_logs";
 const logStore = localforage.createInstance({ name: "infinite-canvas", storeName: "video_generation_logs" });
 
 export default function VideoPage() {
+    const [entitlements, setEntitlements] = useState<ClientEntitlements | null>(null);
+    useEffect(() => { void fetchClientEntitlements().then(setEntitlements); }, []);
     const { message } = App.useApp();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const activeLogIdsRef = useRef<Set<string>>(new Set());
@@ -169,8 +173,18 @@ export default function VideoPage() {
     const generate = async () => {
         const snapshot = buildRequestSnapshot();
         if (!snapshot) return;
+        // 配额检查
+        const { allowed, remaining, limit } = checkGenerationQuota(entitlements);
+        if (!allowed) {
+            message.warning(`本月免费生成次数已用完（${limit}次/月），请升级套餐继续使用。`);
+            return;
+        }
+        if (remaining > 0 && remaining <= 1) {
+            message.info(`免费套餐本月还剩 ${remaining} 次生成机会`);
+        }
         setElapsedMs(0);
         setRunning(true);
+        recordGeneration();
         setPreviewLog(null);
         setResults([{ id: nanoid(), status: "pending" }]);
         const batchStartedAt = performance.now();

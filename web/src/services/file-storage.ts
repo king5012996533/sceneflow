@@ -3,15 +3,49 @@
 import localforage from "localforage";
 import { nanoid } from "nanoid";
 
+import { fetchClientEntitlements } from "@/lib/client-entitlements";
+
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
 
 const store = localforage.createInstance({ name: "infinite-canvas", storeName: "media_files" });
 const objectUrls = new Map<string, string>();
+const STORAGE_KEY = "sceneflow:storage_usage";
+
+function getStorageUsage(): number {
+    try {
+        return Number(localStorage.getItem(STORAGE_KEY)) || 0;
+    } catch {
+        return 0;
+    }
+}
+
+function addStorageUsage(bytes: number) {
+    try {
+        localStorage.setItem(STORAGE_KEY, String(Math.max(0, getStorageUsage() + bytes)));
+    } catch {}
+}
+
+function removeStorageUsage(bytes: number) {
+    try {
+        localStorage.setItem(STORAGE_KEY, String(Math.max(0, getStorageUsage() - bytes)));
+    } catch {}
+}
+
+async function checkStorageAllowed(additionalBytes: number): Promise<boolean> {
+    const entitlements = await fetchClientEntitlements();
+    const limitBytes = entitlements.storageGb !== null ? entitlements.storageGb * 1024 * 1024 * 1024 : null;
+    if (limitBytes === null) return true;
+    return getStorageUsage() + additionalBytes <= limitBytes;
+}
 
 export async function uploadMediaFile(input: string | Blob, prefix = "file"): Promise<UploadedFile> {
     const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
+    if (!(await checkStorageAllowed(blob.size))) {
+        throw new Error("存储空间不足，请清理旧素材或升级套餐。");
+    }
     const storageKey = `${prefix}:${nanoid()}`;
     await store.setItem(storageKey, blob);
+    addStorageUsage(blob.size);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     const meta = blob.type.startsWith("video/") ? await readVideoMeta(url) : blob.type.startsWith("audio/") ? await readAudioMeta(url) : {};
@@ -34,7 +68,13 @@ export async function getMediaBlob(storageKey: string) {
 }
 
 export async function setMediaBlob(storageKey: string, blob: Blob) {
+    if (!(await checkStorageAllowed(blob.size))) {
+        throw new Error("存储空间不足，请清理旧素材或升级套餐。");
+    }
+    const previous = await store.getItem<Blob>(storageKey);
     await store.setItem(storageKey, blob);
+    if (previous) removeStorageUsage(previous.size);
+    addStorageUsage(blob.size);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     return url;
@@ -46,7 +86,9 @@ export async function deleteStoredMedia(keys: Iterable<string>) {
             const url = objectUrls.get(key);
             if (url) URL.revokeObjectURL(url);
             objectUrls.delete(key);
+            const blob = await store.getItem<Blob>(key);
             await store.removeItem(key);
+            if (blob) removeStorageUsage(blob.size);
         }),
     );
 }
@@ -57,7 +99,7 @@ export async function cleanupUnusedMedia(usedData: unknown) {
     await store.iterate((_value, key) => {
         if (!usedKeys.has(key)) unused.push(key);
     });
-    await Promise.all(unused.map((key) => store.removeItem(key)));
+    await deleteStoredMedia(unused);
 }
 
 export function collectMediaStorageKeys(value: unknown, keys = new Set<string>()) {

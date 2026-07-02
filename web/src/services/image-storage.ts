@@ -71,7 +71,13 @@ export async function getImageBlob(storageKey: string) {
 }
 
 export async function setImageBlob(storageKey: string, blob: Blob) {
+    if (!(await checkStorageAllowed(blob.size))) {
+        throw new Error("存储空间不足，请清理旧素材或升级套餐。");
+    }
+    const previous = await store.getItem<Blob>(storageKey);
     await store.setItem(storageKey, blob);
+    if (previous) removeStorageUsage(previous.size);
+    addStorageUsage(blob.size);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     return url;

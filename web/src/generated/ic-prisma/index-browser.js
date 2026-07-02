@@ -259,6 +259,16 @@ exports.Prisma.VerificationCodeScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.CanvasBackupScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  type: 'type',
+  data: 'data',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.RateLimitEntryScalarFieldEnum = {
   id: 'id',
   key: 'key',
@@ -306,6 +316,7 @@ exports.Prisma.ModelName = {
   ModelConfig: 'ModelConfig',
   OperationConfig: 'OperationConfig',
   VerificationCode: 'VerificationCode',
+  CanvasBackup: 'CanvasBackup',
   RateLimitEntry: 'RateLimitEntry'
 };
 

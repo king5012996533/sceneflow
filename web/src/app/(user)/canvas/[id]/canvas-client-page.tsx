@@ -17,6 +17,7 @@ import { nanoid } from "nanoid";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { fetchClientEntitlements, isOverLimit, type ClientEntitlements } from "@/lib/client-entitlements";
+import { checkGenerationQuota, recordGeneration } from "@/lib/generation-quota";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -363,6 +364,11 @@ function InfiniteCanvasPage() {
         if (isOverLimit(activeRequests, concurrentLimit)) {
             throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请等待已有任务完成或升级套餐。`);
         }
+        const quota = checkGenerationQuota(entitlements, 1);
+        if (!quota.allowed) {
+            throw new Error(`本月免费生成次数已用完（${quota.limit}次/月），请升级套餐继续使用。`);
+        }
+        recordGeneration(1);
         generationRequestsRef.current.set(targetNodeId, { targetNodeId, originNodeId, runningNodeId: runningId, controller });
         return controller;
     }, [entitlements?.concurrentJobs]);
@@ -819,9 +825,9 @@ function InfiniteCanvasPage() {
         // 先检查角色资产额度
         const charLimit = entitlements?.privateCharacters ?? 0;
         if (charLimit !== null) {
-            const existingChars = getNodes().filter((n) => n.type === CanvasNodeType.Image && (n.data as CanvasNodeData)?.metadata?.label === "角色设定").length;
+            const existingChars = nodesRef.current.filter((node) => node.type === CanvasNodeType.Image && (node.metadata as Record<string, unknown> | undefined)?.label === "角色设定").length;
             const workflow = createMangaWorkflow(getCanvasCenter(), effectiveConfig);
-            const newChars = workflow.nodes.filter((n) => n.type === CanvasNodeType.Image && n.metadata?.label === "角色设定").length;
+            const newChars = workflow.nodes.filter((node) => node.type === CanvasNodeType.Image && (node.metadata as Record<string, unknown> | undefined)?.label === "角色设定").length;
             if (existingChars + newChars > charLimit) {
                 message.warning(`当前套餐最多保存 ${charLimit} 个角色资产，请清理旧角色或升级套餐。`);
                 return;
@@ -841,7 +847,7 @@ function InfiniteCanvasPage() {
             setDialogNodeId(workflow.nodes[0]?.id || null);
             message.success("已创建漫剧生产流程");
         }
-    }, [effectiveConfig, entitlements, getCanvasCenter, getNodes, message]);
+    }, [effectiveConfig, entitlements, getCanvasCenter, message]);
 
     const deleteNodes = useCallback(
         (ids: Set<string>) => {
@@ -1071,9 +1077,15 @@ function InfiniteCanvasPage() {
     }, [applyHistory]);
 
     const createAndOpenProject = useCallback(() => {
-        const id = createProject(`无限画布 ${useCanvasStore.getState().projects.length + 1}`);
+        const projects = useCanvasStore.getState().projects;
+        const projectLimit = entitlements?.projects ?? 3;
+        if (isOverLimit(projects.length, projectLimit)) {
+            message.warning(`当前套餐最多创建 ${projectLimit} 个画布项目，请申请内测或升级套餐。`);
+            return;
+        }
+        const id = createProject(`无限画布 ${projects.length + 1}`);
         router.push(`/canvas/${id}`);
-    }, [createProject, router]);
+    }, [createProject, entitlements?.projects, message, router]);
 
     const deleteCurrentProject = useCallback(() => {
         deleteProjects([projectId]);

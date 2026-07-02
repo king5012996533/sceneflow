@@ -14,7 +14,7 @@ import { useUserStore } from "@/stores/use-user-store";
 import { CanvasDeleteProjectsDialog } from "./components/canvas-delete-projects-dialog";
 import { CanvasProjectCard } from "./components/canvas-project-card";
 import type { CanvasExportFile } from "./export-types";
-import { useCanvasStore } from "./stores/use-canvas-store";
+import { useCanvasStore, type CanvasProject } from "./stores/use-canvas-store";
 import { useCanvasUiStore } from "./stores/use-canvas-ui-store";
 import { exportCanvasProjects } from "./utils/canvas-export";
 
