@@ -2,13 +2,14 @@
 
 import { Check, Download, Pencil, Trash2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Input } from "antd";
+import { App, Button, Input } from "antd";
 
 import { useCanvasStore, type CanvasProject } from "../stores/use-canvas-store";
 import { useCanvasUiStore } from "../stores/use-canvas-ui-store";
 import { exportCanvasProjects } from "../utils/canvas-export";
 
 export function CanvasProjectCard({ project }: { project: CanvasProject }) {
+    const { message } = App.useApp();
     const router = useRouter();
     const searchParams = useSearchParams();
     const renameProject = useCanvasStore((state) => state.renameProject);
@@ -67,7 +68,7 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
                         </>
                     ) : (
                         <>
-                            <Button type="text" size="small" shape="circle" icon={<Download className="size-4" />} onClick={() => void exportCanvasProjects([project], project.title || "无限画布")} aria-label="导出" />
+                            <Button type="text" size="small" shape="circle" icon={<Download className="size-4" />} onClick={async () => { try { await exportCanvasProjects([project], project.title || "无限画布"); } catch (err) { message.error(err instanceof Error ? err.message : "导出失败"); } }} aria-label="导出" />
                             <Button type="text" size="small" shape="circle" icon={<Pencil className="size-4" />} onClick={() => startEditing(project.id, project.title)} aria-label="重命名" />
                             <Button type="text" size="small" shape="circle" icon={<Trash2 className="size-4" />} onClick={() => setDeleteIds([project.id])} aria-label="删除" />
                         </>

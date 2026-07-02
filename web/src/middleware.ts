@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// 公开路径（免登录）
 const PUBLIC_PATHS = [
     "/",
     "/login",
@@ -14,27 +15,37 @@ const PUBLIC_PATHS = [
     "/api/auth/github",
     "/api/auth/github/callback",
     "/api/billing/plans",
+    "/api/billing/orders",
     "/api/payments/callback",
     "/api/prompts",
+    "/showcase",
 ];
+
+// 静态资源前缀
+const STATIC_PREFIXES = ["/_next", "/favicon", "/icon.png", "/apple-icon", "/opengraph-image", "/logo.svg"];
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
-    if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+    // 公开路径放行
+    if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
         return NextResponse.next();
     }
-
-    if (pathname.startsWith("/_next") || pathname.startsWith("/showcase") || pathname === "/favicon.ico") {
+    // 静态资源放行
+    if (STATIC_PREFIXES.some((p) => pathname.startsWith(p))) {
         return NextResponse.next();
     }
 
     const token = request.cookies.get("ic_token")?.value;
-    if (!token || token.length < 10) {
+    if (!token || token.length < 20) {
+        // API 请求返回 JSON 错误
         if (pathname.startsWith("/api/")) {
             return NextResponse.json({ error: "请先登录" }, { status: 401 });
         }
-        return NextResponse.redirect(new URL("/canvas/login", request.url));
+        // 页面请求跳转登录
+        const loginUrl = new URL("/canvas/login", request.url);
+        loginUrl.searchParams.set("from", pathname);
+        return NextResponse.redirect(loginUrl);
     }
 
     return NextResponse.next();

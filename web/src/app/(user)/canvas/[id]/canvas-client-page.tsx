@@ -16,6 +16,7 @@ import { resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/
 import { nanoid } from "nanoid";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
+import { fetchClientEntitlements, isOverLimit, type ClientEntitlements } from "@/lib/client-entitlements";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -285,6 +286,7 @@ function InfiniteCanvasPage() {
     const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
     const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
+    const [entitlements, setEntitlements] = useState<ClientEntitlements | null>(null);
     const [isMiniMapOpen, setIsMiniMapOpen] = useState(false);
     const [backgroundMode, setBackgroundMode] = useState<CanvasBackgroundMode>("lines");
     const [showImageInfo, setShowImageInfo] = useState(false);
@@ -349,12 +351,21 @@ function InfiniteCanvasPage() {
         [cleanupAssetImages],
     );
 
+    useEffect(() => {
+        void fetchClientEntitlements().then(setEntitlements);
+    }, []);
+
     const startGenerationRequest = useCallback((targetNodeId: string, originNodeId: string, runningId = originNodeId, controller = new AbortController()) => {
         const previous = generationRequestsRef.current.get(targetNodeId);
         if (previous?.controller !== controller) previous?.controller.abort();
+        const concurrentLimit = entitlements?.concurrentJobs ?? 1;
+        const activeRequests = Array.from(generationRequestsRef.current.values()).filter((request) => request.targetNodeId !== targetNodeId).length;
+        if (isOverLimit(activeRequests, concurrentLimit)) {
+            throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请等待已有任务完成或升级套餐。`);
+        }
         generationRequestsRef.current.set(targetNodeId, { targetNodeId, originNodeId, runningNodeId: runningId, controller });
         return controller;
-    }, []);
+    }, [entitlements?.concurrentJobs]);
 
     const finishGenerationRequest = useCallback((targetNodeId: string, controller: AbortController) => {
         const request = generationRequestsRef.current.get(targetNodeId);
@@ -805,14 +816,32 @@ function InfiniteCanvasPage() {
     );
 
     const createMangaWorkflowNodes = useCallback(() => {
-        const workflow = createMangaWorkflow(getCanvasCenter(), effectiveConfig);
-        setNodes((prev) => [...prev, ...workflow.nodes]);
-        setConnections((prev) => [...prev, ...workflow.connections]);
-        setSelectedNodeIds(new Set([workflow.nodes[0]?.id].filter(Boolean)));
-        setSelectedConnectionId(null);
-        setDialogNodeId(workflow.nodes[0]?.id || null);
-        message.success("已创建漫剧生产流程");
-    }, [effectiveConfig, getCanvasCenter, message]);
+        // 先检查角色资产额度
+        const charLimit = entitlements?.privateCharacters ?? 0;
+        if (charLimit !== null) {
+            const existingChars = getNodes().filter((n) => n.type === CanvasNodeType.Image && (n.data as CanvasNodeData)?.metadata?.label === "角色设定").length;
+            const workflow = createMangaWorkflow(getCanvasCenter(), effectiveConfig);
+            const newChars = workflow.nodes.filter((n) => n.type === CanvasNodeType.Image && n.metadata?.label === "角色设定").length;
+            if (existingChars + newChars > charLimit) {
+                message.warning(`当前套餐最多保存 ${charLimit} 个角色资产，请清理旧角色或升级套餐。`);
+                return;
+            }
+            setNodes((prev) => [...prev, ...workflow.nodes]);
+            setConnections((prev) => [...prev, ...workflow.connections]);
+            setSelectedNodeIds(new Set([workflow.nodes[0]?.id].filter(Boolean)));
+            setSelectedConnectionId(null);
+            setDialogNodeId(workflow.nodes[0]?.id || null);
+            message.success("已创建漫剧生产流程");
+        } else {
+            const workflow = createMangaWorkflow(getCanvasCenter(), effectiveConfig);
+            setNodes((prev) => [...prev, ...workflow.nodes]);
+            setConnections((prev) => [...prev, ...workflow.connections]);
+            setSelectedNodeIds(new Set([workflow.nodes[0]?.id].filter(Boolean)));
+            setSelectedConnectionId(null);
+            setDialogNodeId(workflow.nodes[0]?.id || null);
+            message.success("已创建漫剧生产流程");
+        }
+    }, [effectiveConfig, entitlements, getCanvasCenter, getNodes, message]);
 
     const deleteNodes = useCallback(
         (ids: Set<string>) => {

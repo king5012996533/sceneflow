@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { App, Button, Empty, Input, Select, Tabs, Tag } from "antd";
 import { Ban, Boxes, CreditCard, Database, Settings, Shield, Users } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
+import { useUserStore } from "@/stores/use-user-store";
 
 type Overview = {
     users: number;
@@ -56,13 +58,17 @@ function formatPrice(amount: number) {
 }
 
 export default function AdminPage() {
+    const router = useRouter();
     const { message } = App.useApp();
+    const user = useUserStore((state) => state.user);
+    const fetchSession = useUserStore((state) => state.fetchSession);
     const [overview, setOverview] = useState<Overview | null>(null);
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [orders, setOrders] = useState<AdminOrder[]>([]);
     const [config, setConfig] = useState<AdminConfig | null>(null);
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
+    const [checkingAccess, setCheckingAccess] = useState(true);
     const [selectedPlans, setSelectedPlans] = useState<Record<string, string>>({});
     const [selectedCycles, setSelectedCycles] = useState<Record<string, "monthly" | "yearly">>({});
 
@@ -96,8 +102,28 @@ export default function AdminPage() {
     }
 
     useEffect(() => {
+        let mounted = true;
+
+        async function checkAccess() {
+            await fetchSession();
+            if (mounted) setCheckingAccess(false);
+        }
+
+        void checkAccess();
+        return () => {
+            mounted = false;
+        };
+    }, [fetchSession]);
+
+    useEffect(() => {
+        if (checkingAccess) return;
+        if (user?.role !== "admin") {
+            message.error("没有管理员权限");
+            router.replace("/canvas");
+            return;
+        }
         void loadAll();
-    }, []);
+    }, [checkingAccess, user?.role]);
 
     async function updateUser(userId: string, action: string, payload: Record<string, unknown> = {}) {
         try {
@@ -128,6 +154,14 @@ export default function AdminPage() {
     }
 
     const planOptions = (config?.plans || []).map((plan) => ({ label: plan.name, value: plan.id }));
+
+    if (checkingAccess || user?.role !== "admin") {
+        return (
+            <main className="grid h-full place-items-center bg-[#f5f5f2] px-6 text-stone-950">
+                <div className="rounded-lg border border-stone-200 bg-white p-6 text-sm text-stone-500 shadow-sm">正在校验管理员权限...</div>
+            </main>
+        );
+    }
 
     return (
         <main className="h-full overflow-y-auto bg-[#f5f5f2] px-6 py-8 text-stone-950">

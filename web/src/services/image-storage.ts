@@ -4,6 +4,7 @@ import localforage from "localforage";
 
 import { nanoid } from "nanoid";
 import { readImageMeta } from "@/lib/image-utils";
+import { fetchClientEntitlements } from "@/lib/client-entitlements";
 
 export type UploadedImage = {
     url: string;
@@ -17,10 +18,37 @@ export type UploadedImage = {
 const store = localforage.createInstance({ name: "infinite-canvas", storeName: "image_files" });
 const objectUrls = new Map<string, string>();
 
+// 存储用量追踪（客户端估算）
+const STORAGE_KEY = "sceneflow:storage_usage";
+function getStorageUsage(): number {
+    try { return Number(localStorage.getItem(STORAGE_KEY)) || 0; } catch { return 0; }
+}
+function addStorageUsage(bytes: number) {
+    try { localStorage.setItem(STORAGE_KEY, String(Math.max(0, getStorageUsage() + bytes))); } catch { /* localStorage 不可用时静默 */ }
+}
+function removeStorageUsage(bytes: number) {
+    try { localStorage.setItem(STORAGE_KEY, String(Math.max(0, getStorageUsage() - bytes))); } catch { /* 同上 */ }
+}
+export function resetStorageUsage() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* 同上 */ }
+}
+
+async function checkStorageAllowed(additionalBytes: number): Promise<boolean> {
+    const entitlements = await fetchClientEntitlements();
+    const limitBytes = entitlements.storageGb !== null ? entitlements.storageGb * 1024 * 1024 * 1024 : null;
+    if (limitBytes === null) return true; // 无限空间
+    const used = getStorageUsage() + additionalBytes;
+    return used <= limitBytes;
+}
+
 export async function uploadImage(input: string | Blob): Promise<UploadedImage> {
     const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
+    if (!(await checkStorageAllowed(blob.size))) {
+        throw new Error("存储空间不足，请清理旧素材或升级套餐。");
+    }
     const storageKey = `image:${nanoid()}`;
     await store.setItem(storageKey, blob);
+    addStorageUsage(blob.size);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     const meta = await readImageMeta(url);
@@ -61,7 +89,9 @@ export async function deleteStoredImages(keys: Iterable<string>) {
             const url = objectUrls.get(key);
             if (url) URL.revokeObjectURL(url);
             objectUrls.delete(key);
+            const blob = await store.getItem<Blob>(key);
             await store.removeItem(key);
+            if (blob) removeStorageUsage(blob.size);
         }),
     );
 }

@@ -16,6 +16,9 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
   const [name, setName] = useState("");
 
+  // 登录后跳回来源页
+  const from = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") || "/" : "/";
+
   const handleSubmit = async () => {
     if (!email || !password) {
       message.warning("请输入邮箱和密码");
@@ -35,7 +38,7 @@ export default function LoginPage() {
       }
       message.success(isRegister ? "注册成功" : "登录成功");
       await fetchSession();
-      router.push("/canvas");
+      router.push(from);
     } catch {
       message.error("网络错误");
     } finally {

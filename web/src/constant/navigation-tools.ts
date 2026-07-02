@@ -35,7 +35,13 @@ export const navigationTools = [
         slug: "admin",
         label: "管理后台",
         icon: Shield,
+        adminOnly: true,
     },
 ] as const;
 
-export type NavigationToolSlug = (typeof navigationTools)[number]["slug"];
+export type NavigationTool = (typeof navigationTools)[number];
+export type NavigationToolSlug = NavigationTool["slug"];
+
+export function getVisibleNavigationTools(role?: string | null) {
+    return navigationTools.filter((tool) => !("adminOnly" in tool && tool.adminOnly) || role === "admin");
+}

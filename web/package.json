@@ -9,7 +9,10 @@
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",
-        "postinstall": "prisma generate"
+        "postinstall": "prisma generate",
+        "db:push": "prisma db push",
+        "db:migrate": "prisma migrate deploy",
+        "db:seed": "prisma db seed"
     },
     "dependencies": {
         "@alicloud/dypnsapi20170525": "^2.0.0",
