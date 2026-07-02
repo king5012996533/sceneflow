@@ -21,7 +21,7 @@ const PUBLIC_PATHS = [
 ];
 
 // 静态资源前缀
-const STATIC_PREFIXES = ["/_next", "/favicon", "/icon.png", "/apple-icon", "/opengraph-image", "/logo.svg"];
+const STATIC_PREFIXES = ["/_next", "/favicon", "/icon.png", "/apple-icon", "/opengraph-image", "/logo.svg", "/robots.txt", "/sitemap.xml"];
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
