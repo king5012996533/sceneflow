@@ -15,6 +15,7 @@ export default function nextConfig(phase: string): NextConfig {
 
     return {
         output: "standalone",
+        basePath: "/canvas",
         allowedDevOrigins: isDev ? ["*.*.*.*"] : [],
         typescript: {
             ignoreBuildErrors: true,
