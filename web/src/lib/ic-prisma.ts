@@ -9,16 +9,20 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
-    console.warn("DATABASE_URL 未配置，数据库功能不可用");
+    console.warn("[ic-prisma] DATABASE_URL 未配置，数据库功能不可用");
     return null;
   }
 
   try {
-    return new PrismaClient({
-      adapter: new PrismaPg({ connectionString, connectionTimeoutMillis: 5000 }),
+    const adapter = new PrismaPg({ connectionString, connectionTimeoutMillis: 5000 });
+    const client = new PrismaClient({ adapter });
+    // 连接池预热，首次查询不卡死
+    client.$connect().catch((err: Error) => {
+      console.warn("[ic-prisma] 数据库连接失败:", err.message);
     });
+    return client;
   } catch (err) {
-    console.warn("数据库连接失败:", (err as Error).message);
+    console.warn("[ic-prisma] 创建客户端失败:", (err as Error).message);
     return null;
   }
 }
