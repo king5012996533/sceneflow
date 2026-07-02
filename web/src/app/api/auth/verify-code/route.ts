@@ -24,13 +24,15 @@ export async function POST(req: NextRequest) {
     if (method === "email") {
       valid = await verifyCode(target, "email", code);
     } else if (method === "phone") {
-      // 阿里云配置了就用阿里云校验，否则用本地校验
       const hasAliyun = !!process.env.ALIYUN_SMS_ACCESS_KEY_ID;
+      console.log(`[verify-code] phone=${target} code=${code} hasAliyun=${hasAliyun}`);
       if (hasAliyun) {
         const result = await checkSmsVerifyCode(target, code);
+        console.log(`[verify-code] aliyun result:`, JSON.stringify(result));
         valid = result.ok;
       } else {
         valid = await verifyCode(target, "phone", code);
+        console.log(`[verify-code] local result: ${valid}`);
       }
     } else {
       return NextResponse.json({ error: "不支持的验证方式" }, { status: 400 });
