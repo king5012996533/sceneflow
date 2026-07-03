@@ -6,6 +6,7 @@
     "scripts": {
         "dev": "next dev --webpack -H 0.0.0.0 -p 3000",
         "build": "next build",
+        "guard": "node scripts/regression-guards.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

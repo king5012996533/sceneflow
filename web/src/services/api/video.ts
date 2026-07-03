@@ -20,8 +20,8 @@ type SeedanceTask = {
 type ApiEnvelope<T> = T | { code?: number; data?: T | null; msg?: string };
 type RequestOptions = { signal?: AbortSignal };
 
-const SEEDANCE_PROXY_IMAGE_MAX_BYTES = 900 * 1024;
-const SEEDANCE_PROXY_IMAGE_MAX_SIDE = 1280;
+const SEEDANCE_PROXY_IMAGE_MAX_BYTES = 420 * 1024;
+const SEEDANCE_PROXY_IMAGE_MAX_SIDE = 960;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
 export type VideoGenerationTask = { id: string; provider: "openai" | "seedance"; model: string };
