@@ -17,6 +17,7 @@ const PUBLIC_PATHS = [
     "/api/billing/plans",
     "/api/payments/callback",
     "/api/prompts",
+    "/api/experience-agent",
     "/showcase",
 ];
 

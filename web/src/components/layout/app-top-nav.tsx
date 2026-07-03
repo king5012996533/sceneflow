@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowRight, Bot, Menu } from "lucide-react";
+import { Bot, Menu, Send } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button, Modal } from "antd";
+import { Button, Input, Modal } from "antd";
 
 import { getVisibleNavigationTools, navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
 import { AppConfigModal } from "@/components/layout/app-config-modal";
@@ -106,88 +106,88 @@ export function AppTopNav() {
 }
 
 function ExperienceOfficerModal({ open, onClose, onOpenConfig }: { open: boolean; onClose: () => void; onOpenConfig: () => void }) {
-    const paths = [
-        ["我还没有 API", "先了解需要准备什么：供应商账号、API Key、Base URL 和可用模型名称。", "config"],
-        ["我想开始创作", "进入画布，粘贴剧本、片段或上传参考图，让 Agent 帮你搭流程。", "/canvas"],
-        ["我想复用素材", "进入素材库，调用已有角色、三视图、场景、风格和视频资产。", "/assets"],
-    ];
-    const apiSteps = ["申请供应商账号", "创建 API Key", "复制 Base URL", "填写模型名称", "保存后测试生成"];
-    const productionSteps = ["打开画布", "告诉 Agent 目标", "确认角色/素材来源", "逐步生成资产", "满意结果存入素材库"];
+    const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; content: string }>>([
+        { role: "assistant", content: "你好，我是 SceneFlow 体验官。你可以直接问我 API 怎么接、Seedance 为什么报错、画布怎么开始、素材怎么复用。" },
+    ]);
+    const [input, setInput] = useState("");
+    const [sending, setSending] = useState(false);
+    const quickQuestions = ["Seedance 2.0 怎么配置？", "API Key 格式不正确怎么办？", "我有一段剧本怎么开始？", "角色三视图有什么用？"];
+
+    const sendQuestion = async (value = input) => {
+        const text = value.trim();
+        if (!text || sending) return;
+        const nextMessages = [...messages, { role: "user" as const, content: text }];
+        setMessages(nextMessages);
+        setInput("");
+        setSending(true);
+        try {
+            const response = await fetch("/canvas/api/experience-agent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messages: nextMessages }),
+                credentials: "include",
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.error || "体验官暂时无法回复");
+            setMessages((current) => [...current, { role: "assistant", content: data?.answer || "我没有拿到有效回复，请换个问法再试。" }]);
+        } catch (error) {
+            setMessages((current) => [...current, { role: "assistant", content: error instanceof Error ? error.message : "体验官暂时无法回复" }]);
+        } finally {
+            setSending(false);
+        }
+    };
 
     return (
-        <Modal open={open} onCancel={onClose} footer={null} centered width={820} title={null} destroyOnHidden>
-            <div className="space-y-6 py-1">
-                <div className="border-b border-stone-200 pb-5 dark:border-stone-800">
+        <Modal open={open} onCancel={onClose} footer={null} centered width={720} title={null} destroyOnHidden>
+            <div className="flex h-[620px] max-h-[76vh] flex-col py-1">
+                <div className="border-b border-stone-200 pb-4 dark:border-stone-800">
                     <div className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 dark:bg-stone-900 dark:text-stone-300">
                         <Bot className="size-3.5" />
                         SceneFlow 体验官
                     </div>
-                    <h2 className="mt-4 text-2xl font-semibold tracking-tight text-stone-950 dark:text-stone-100">第一次使用，从 API 接入开始</h2>
-                    <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500 dark:text-stone-400">
-                        SceneFlow 不只是漫剧创作工具，更是一个视觉生产工作台。你可以接入自己的图片、视频、文本、音频模型；如果还没有 API，体验官会先告诉你要准备什么。
-                    </p>
+                    <h2 className="mt-3 text-xl font-semibold tracking-tight text-stone-950 dark:text-stone-100">直接问我问题</h2>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-3">
-                    {paths.map(([title, desc, href]) => (
-                        <button
-                            key={title}
-                            type="button"
-                            onClick={() => {
-                                if (href === "config") {
-                                    onOpenConfig();
-                                } else {
-                                    onClose();
-                                    window.location.href = href;
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-4">
+                    {messages.map((message, index) => (
+                        <div key={`${message.role}-${index}`} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
+                            <div className={cn("max-w-[82%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6", message.role === "user" ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "bg-stone-100 text-stone-700 dark:bg-stone-900 dark:text-stone-200")}>
+                                {message.content}
+                            </div>
+                        </div>
+                    ))}
+                    {sending ? <div className="text-xs text-stone-400">体验官正在回复...</div> : null}
+                </div>
+
+                <div className="border-t border-stone-200 pt-3 dark:border-stone-800">
+                    <div className="mb-2 flex flex-wrap gap-2">
+                        {quickQuestions.map((question) => (
+                            <button key={question} type="button" className="rounded-full bg-stone-100 px-3 py-1.5 text-xs text-stone-600 transition hover:bg-stone-200 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800" onClick={() => void sendQuestion(question)}>
+                                {question}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex gap-2">
+                        <Input.TextArea
+                            value={input}
+                            autoSize={{ minRows: 1, maxRows: 3 }}
+                            placeholder="直接输入你的问题，例如：Seedance 报 API key format incorrect 怎么办？"
+                            onChange={(event) => setInput(event.target.value)}
+                            onPressEnter={(event) => {
+                                if (!event.shiftKey) {
+                                    event.preventDefault();
+                                    void sendQuestion();
                                 }
                             }}
-                            className="group rounded-lg border border-stone-200 p-4 text-left transition hover:border-stone-400 hover:bg-stone-50 dark:border-stone-800 dark:hover:border-stone-600 dark:hover:bg-stone-900"
-                        >
-                            <div className="text-sm font-semibold text-stone-950 dark:text-stone-100">{title}</div>
-                            <p className="mt-2 min-h-12 text-xs leading-5 text-stone-500 dark:text-stone-400">{desc}</p>
-                            <div className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-stone-900 dark:text-stone-100">
-                                开始
-                                <ArrowRight className="size-3.5 transition group-hover:translate-x-0.5" />
-                            </div>
-                        </button>
-                    ))}
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-                    <div className="rounded-lg border border-stone-200 p-4 dark:border-stone-800">
-                        <div className="text-sm font-semibold text-stone-950 dark:text-stone-100">API 接入需要准备</div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {apiSteps.map((step, index) => (
-                                <span key={step} className="rounded-md bg-stone-100 px-2.5 py-1.5 text-xs text-stone-600 dark:bg-stone-900 dark:text-stone-300">
-                                    {index + 1}. {step}
-                                </span>
-                            ))}
-                        </div>
-                        <div className="mt-4 rounded-lg bg-stone-100 p-3 text-xs leading-5 text-stone-600 dark:bg-stone-900 dark:text-stone-300">
-                            支持 OpenAI 兼容接口和 Gemini 格式。常见要填：Base URL、API Key、文本模型、图片模型、视频模型、音频模型。
-                        </div>
+                        />
+                        <Button type="primary" className="!h-auto" icon={<Send className="size-4" />} loading={sending} onClick={() => void sendQuestion()} />
                     </div>
-
-                    <div className="rounded-lg border border-stone-200 p-4 dark:border-stone-800">
-                        <div className="text-sm font-semibold text-stone-950 dark:text-stone-100">5 分钟跑通一个视觉任务</div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {productionSteps.map((step, index) => (
-                                <span key={step} className="rounded-md bg-stone-100 px-2.5 py-1.5 text-xs text-stone-600 dark:bg-stone-900 dark:text-stone-300">
-                                    {index + 1}. {step}
-                                </span>
-                            ))}
-                        </div>
-                        <div className="mt-4 rounded-lg bg-stone-100 p-3 text-xs leading-5 text-stone-600 dark:bg-stone-900 dark:text-stone-300">
-                            推荐对 Agent 说：帮我把这个视觉需求拆成生产流程，重点做素材来源、风格校准、关键帧、视频和资产入库。
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex justify-end gap-2">
-                    <Button onClick={onOpenConfig}>配置 API</Button>
+                    <div className="mt-3 flex justify-end gap-2">
+                        <Button onClick={onOpenConfig}>配置 API</Button>
                     <Link href="/canvas" onClick={onClose}>
                         <Button type="primary">进入画布</Button>
                     </Link>
+                    </div>
                 </div>
             </div>
         </Modal>
