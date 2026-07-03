@@ -1,5 +1,6 @@
 import axios from "axios";
 
+import { proxyFetch } from "./proxy-client";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
@@ -126,7 +127,13 @@ async function createSeedanceTask(config: AiConfig, model: string, prompt: strin
     };
 
     try {
-        const created = unwrapSeedanceTask((await axios.post<ApiEnvelope<SeedanceTask>>(seedanceApiUrl(config), payload, { headers: aiHeaders(config, "application/json"), signal: options?.signal })).data);
+        const data = await proxyFetch<ApiEnvelope<SeedanceTask>>({
+            url: seedanceApiUrl(config),
+            method: "POST",
+            headers: aiHeaders(config, "application/json"),
+            body: payload,
+        });
+        const created = unwrapSeedanceTask(data);
         if (!created.id) throw new Error("Seedance 接口没有返回任务 ID");
         return { id: created.id, provider: "seedance", model };
     } catch (error) {
@@ -136,7 +143,11 @@ async function createSeedanceTask(config: AiConfig, model: string, prompt: strin
 
 async function pollSeedanceTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     try {
-        const state = unwrapSeedanceTask((await axios.get<ApiEnvelope<SeedanceTask>>(seedanceApiUrl(config, task.id), { headers: aiHeaders(config), signal: options?.signal })).data);
+        const state = unwrapSeedanceTask(await proxyFetch<ApiEnvelope<SeedanceTask>>({
+            url: seedanceApiUrl(config, task.id),
+            method: "GET",
+            headers: aiHeaders(config),
+        }));
         if (state.status === "succeeded") {
             const url = state.content?.video_url;
             if (!url) return { status: "failed", error: "Seedance 任务成功但没有返回视频 URL" };
