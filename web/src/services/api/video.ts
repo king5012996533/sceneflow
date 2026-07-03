@@ -1,7 +1,7 @@
 import axios from "axios";
 
 import { proxyFetch } from "./proxy-client";
-import { dataUrlToFile } from "@/lib/image-utils";
+import { dataUrlToFile, getDataUrlByteSize } from "@/lib/image-utils";
 import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
 import { boolConfig, buildSeedancePromptText, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceVideoReferenceError, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
@@ -19,6 +19,9 @@ type SeedanceTask = {
 };
 type ApiEnvelope<T> = T | { code?: number; data?: T | null; msg?: string };
 type RequestOptions = { signal?: AbortSignal };
+
+const SEEDANCE_PROXY_IMAGE_MAX_BYTES = 900 * 1024;
+const SEEDANCE_PROXY_IMAGE_MAX_SIDE = 1280;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
 export type VideoGenerationTask = { id: string; provider: "openai" | "seedance"; model: string };
@@ -211,7 +214,7 @@ async function resolveSeedanceImageUrl(config: AiConfig, image: ReferenceImage) 
     if (isPublicMediaUrl(directUrl) || directUrl.startsWith("asset://")) return directUrl;
     const dataUrl = await imageToDataUrl(image);
     if (!dataUrl) throw new Error("参考图读取失败，请换一张图片或重新上传");
-    return dataUrl;
+    return compressSeedanceImageDataUrl(dataUrl);
 }
 
 async function resolveSeedanceVideoUrl(video: ReferenceVideo) {
@@ -317,6 +320,65 @@ async function assertVideoBlob(blob: Blob) {
 
 function isPublicMediaUrl(value: string) {
     return /^https?:\/\//i.test(value || "");
+}
+
+async function compressSeedanceImageDataUrl(dataUrl: string) {
+    if (!dataUrl.startsWith("data:image/")) return dataUrl;
+    const originalBytes = getDataUrlByteSize(dataUrl);
+    const image = await loadImage(dataUrl);
+    const { width, height } = fitImageSize(image.naturalWidth || image.width || 1024, image.naturalHeight || image.height || 1024, SEEDANCE_PROXY_IMAGE_MAX_SIDE);
+    if (originalBytes <= SEEDANCE_PROXY_IMAGE_MAX_BYTES && width === (image.naturalWidth || image.width) && height === (image.naturalHeight || image.height) && dataUrl.startsWith("data:image/jpeg")) {
+        return dataUrl;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return dataUrl;
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    let best = await canvasToDataUrl(canvas, 0.86);
+    for (const quality of [0.78, 0.68, 0.58, 0.48]) {
+        if (getDataUrlByteSize(best) <= SEEDANCE_PROXY_IMAGE_MAX_BYTES) break;
+        best = await canvasToDataUrl(canvas, quality);
+    }
+    return best;
+}
+
+function fitImageSize(width: number, height: number, maxSide: number) {
+    const scale = Math.min(1, maxSide / Math.max(width, height));
+    return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
+
+function loadImage(src: string) {
+    return new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error("参考图压缩失败，请换一张图片或重新上传"));
+        image.src = src;
+    });
+}
+
+function canvasToDataUrl(canvas: HTMLCanvasElement, quality: number) {
+    return new Promise<string>((resolve) => {
+        canvas.toBlob(
+            (blob) => {
+                if (!blob) {
+                    resolve(canvas.toDataURL("image/jpeg", quality));
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result || ""));
+                reader.onerror = () => resolve(canvas.toDataURL("image/jpeg", quality));
+                reader.readAsDataURL(blob);
+            },
+            "image/jpeg",
+            quality,
+        );
+    });
 }
 
 function delay(ms: number, signal?: AbortSignal) {
