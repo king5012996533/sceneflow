@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, Bot, HelpCircle, Home, ImageIcon, Images, List, Menu, Music2, Plus, Redo2, Settings2, Trash2, Undo2, Upload, Video } from "lucide-react";
+import { BookOpen, Bot, Home, ImageIcon, Images, List, Menu, Music2, Plus, Redo2, Settings2, Trash2, Undo2, Upload, Video } from "lucide-react";
 import { saveAs } from "file-saver";
 
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
@@ -333,7 +333,6 @@ function InfiniteCanvasPage() {
     const [showImageInfo, setShowImageInfo] = useState(false);
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
     const [assetPickerOpen, setAssetPickerOpen] = useState(false);
-    const [tutorialOpen, setTutorialOpen] = useState(false);
     const [projectLoaded, setProjectLoaded] = useState(false);
     const [toolbarNodeId, setToolbarNodeId] = useState<string | null>(null);
     const [nodeImageSettingsOpen, setNodeImageSettingsOpen] = useState(false);
@@ -2641,7 +2640,6 @@ function InfiniteCanvasPage() {
                     agentOpen={assistantOpen}
                     compactAgentStatus={codexCompactAgent ? { connected: localAgentConnected, enabled: localAgentEnabled, activity: localAgentActivity } : undefined}
                     onToggleAgent={() => (assistantOpen ? closeAgent() : openAgent())}
-                    onOpenTutorial={() => setTutorialOpen(true)}
                 />
 
                 <InfiniteCanvas
@@ -2923,7 +2921,6 @@ function InfiniteCanvasPage() {
                 </Modal>
 
                 <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={() => setAssetPickerOpen(false)} />
-                <CanvasTutorialModal open={tutorialOpen} onClose={() => setTutorialOpen(false)} onOpenAgent={() => { setTutorialOpen(false); openAgent(); }} onCreateWorkflow={() => { setTutorialOpen(false); createMangaWorkflowNodes(); }} onOpenAssets={() => { setTutorialOpen(false); setAssetPickerOpen(true); }} />
                 {codexCompactAgent && !assistantMounted ? <CanvasLocalAgentPanel headless snapshot={agentSnapshot} canUndoOps={Boolean(agentUndoSnapshot)} onApplyOps={applyAgentOps} onUndoOps={undoAgentOps} autoConnect={codexAutoConnect} /> : null}
             </section>
             {assistantMounted ? (
@@ -2970,7 +2967,6 @@ function CanvasTopBar({
     agentOpen,
     compactAgentStatus,
     onToggleAgent,
-    onOpenTutorial,
 }: {
     title: string;
     titleDraft: string;
@@ -2991,7 +2987,6 @@ function CanvasTopBar({
     agentOpen: boolean;
     compactAgentStatus?: { connected: boolean; enabled: boolean; activity: string };
     onToggleAgent: () => void;
-    onOpenTutorial: () => void;
 }) {
     const colorTheme = useThemeStore((state) => state.theme);
     const theme = canvasThemes[colorTheme];
@@ -3063,15 +3058,6 @@ function CanvasTopBar({
 
                 <div className="pointer-events-auto flex items-center gap-1.5">
                     {compactAgentStatus ? <CompactAgentStatus status={compactAgentStatus} onClick={onToggleAgent} /> : null}
-                    <Button
-                        type="text"
-                        className="!h-10 !rounded-xl !px-3 !font-medium"
-                        style={{ background: theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
-                        icon={<HelpCircle className="size-4" />}
-                        onClick={onOpenTutorial}
-                    >
-                        新手教程
-                    </Button>
                     <UserStatusActions
                         variant="canvas"
                         onOpenShortcuts={() => setShortcutsOpen(true)}

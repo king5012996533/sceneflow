@@ -255,6 +255,7 @@ export function AppConfigModal() {
                                         </Button>
                                     </div>
                                 </div>
+                                <SeedanceConfigHint />
                                 <div className="space-y-3">
                                     {config.channels.map((channel) => (
                                         <section key={channel.id} className="rounded-lg border border-stone-200 p-3 dark:border-stone-800">
@@ -479,6 +480,25 @@ function uniqueModels(models: string[]) {
 
 function apiFormatLabel(apiFormat: ApiCallFormat) {
     return apiFormat === "gemini" ? "Gemini" : "OpenAI";
+}
+
+function SeedanceConfigHint() {
+    return (
+        <section className="mb-4 rounded-lg border border-sky-200 bg-sky-50/70 p-3 text-xs leading-5 text-sky-950 dark:border-sky-800/70 dark:bg-sky-950/20 dark:text-sky-100">
+            <div className="text-sm font-semibold">Seedance 2.0 / 火山方舟接入提示</div>
+            <div className="mt-2 grid gap-2 md:grid-cols-2">
+                <div>
+                    <div className="font-medium">渠道页这样填</div>
+                    <div className="mt-1">调用格式选 OpenAI；Base URL 通常填 <code className="rounded bg-white/70 px-1 dark:bg-black/30">https://ark.cn-beijing.volces.com/api/v3</code>，也兼容完整 tasks 地址。</div>
+                </div>
+                <div>
+                    <div className="font-medium">模型页这样选</div>
+                    <div className="mt-1">模型列表手动加入你的 Seedance 模型名，例如 <code className="rounded bg-white/70 px-1 dark:bg-black/30">doubao-seedance-2-0-pro</code>，然后到“模型”页选为默认视频模型。</div>
+                </div>
+            </div>
+            <div className="mt-2 text-sky-800 dark:text-sky-200">如果报 401/403，多半是 API Key、模型权限或账号服务开通问题；如果报 404，多半是 Base URL 填成了错误路径。</div>
+        </section>
+    );
 }
 
 function formatWebdavTime(value: string) {
