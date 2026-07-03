@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
                 metadata: {
                     intent,
                     checkoutMode: provider === "manual" ? "beta_application" : "stub",
-                    note: provider === "manual" ? "内测阶段不收款，由管理员后台手动开通。" : "真实支付参数后续在 provider 层生成。",
+                    note: provider === "manual" ? "内测阶段暂不接入在线收银台，由管理员确认套餐后人工开通权益。" : "真实支付参数后续在 provider 层生成。",
                 },
             },
             include: { plan: true },
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
             checkout: {
                 mode: provider === "manual" ? "beta_application" : "stub",
                 provider,
-                message: provider === "manual" ? "内测申请已提交，等待管理员手动开通。" : "订单已创建。接入真实支付时返回二维码、收银台 URL 或客户端支付参数。",
+                message: provider === "manual" ? "开通申请已提交，管理员会联系确认场景与套餐后开通。" : "订单已创建。接入真实支付时返回二维码、收银台 URL 或客户端支付参数。",
             },
         });
     } catch (error) {

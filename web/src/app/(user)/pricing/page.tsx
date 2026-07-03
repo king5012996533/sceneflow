@@ -72,7 +72,7 @@ export default function PricingPage() {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "提交内测申请失败");
-            message.success(`已提交 ${plan.name} 内测申请，管理员会在后台手动开通。`);
+            message.success(`已提交 ${plan.name} 开通申请，管理员会联系确认场景与套餐后开通。`);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "提交内测申请失败");
         } finally {
@@ -87,11 +87,11 @@ export default function PricingPage() {
                     <div>
                         <div className="mb-3 flex flex-wrap items-center gap-2">
                             <span className="text-xs font-medium tracking-[0.18em] text-stone-400">BETA ACCESS</span>
-                            <Tag color="blue">内测阶段暂不收款</Tag>
+                            <Tag color="blue">内测期人工开通</Tag>
                         </div>
                         <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">选择适合你的生产规模</h1>
                         <p className="mt-4 max-w-2xl text-base leading-7 text-stone-500">
-                            当前阶段先收集真实创作反馈，不接入在线支付。你可以提交内测申请，管理员会根据使用场景手动开通套餐权益。
+                            当前阶段暂不接入在线收银台，套餐仍按所选权益开通。提交申请后，管理员会联系确认使用场景、套餐周期和开通方式。
                         </p>
                     </div>
                     <Segmented
@@ -116,7 +116,7 @@ export default function PricingPage() {
                                     plan.isPopular ? "border-stone-950 ring-2 ring-stone-950/10" : "border-stone-200",
                                 )}
                             >
-                                {plan.isPopular ? <div className="absolute right-4 top-4 rounded-full bg-stone-950 px-2.5 py-1 text-xs text-white">推荐内测</div> : null}
+                                {plan.isPopular ? <div className="absolute right-4 top-4 rounded-full bg-stone-950 px-2.5 py-1 text-xs text-white">推荐套餐</div> : null}
                                 <div className="mb-5 flex size-11 items-center justify-center rounded-md bg-stone-950 text-white">
                                     <Icon className="size-5" />
                                 </div>
@@ -124,7 +124,7 @@ export default function PricingPage() {
                                 <p className="mt-2 min-h-12 text-sm leading-6 text-stone-500">{plan.description}</p>
                                 <div className="mt-6 flex items-end gap-2">
                                     <span className="text-4xl font-semibold tracking-tight">{formatPrice(price)}</span>
-                                    {price > 0 ? <span className="pb-1 text-sm text-stone-400">/{cycle === "yearly" ? "年" : "月"}，正式期参考价</span> : null}
+                                    {price > 0 ? <span className="pb-1 text-sm text-stone-400">/{cycle === "yearly" ? "年" : "月"}，内测开通价</span> : null}
                                 </div>
                                 <div className="mt-6 space-y-3">
                                     {plan.entitlements.map((item) => (
@@ -138,7 +138,7 @@ export default function PricingPage() {
                                 </div>
                                 <div className="mt-auto pt-8">
                                     <Button type={plan.isPopular ? "primary" : "default"} block size="large" loading={loadingPlan === plan.id} onClick={() => void applyBeta(plan)}>
-                                        {plan.id === "free" ? "免费开始" : "申请内测"}
+                                        {plan.id === "free" ? "免费开始" : "提交开通申请"}
                                     </Button>
                                 </div>
                             </section>
@@ -147,7 +147,7 @@ export default function PricingPage() {
                 </div>
 
                 <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4">
-                    <span className="text-sm text-stone-500">管理员可在后台查看申请记录，并为用户手动开通创作者版、团队版或企业版。</span>
+                    <span className="text-sm text-stone-500">提交申请不是免费开通。管理员会根据你的创作场景确认套餐，并完成权益开通。</span>
                     <Link href="/billing" className="inline-flex items-center gap-2 text-sm font-medium text-stone-950">
                         查看当前套餐
                         <ArrowRight className="size-4" />

@@ -151,7 +151,7 @@ export default function ImagePage() {
         // 配额检查
         const { allowed, remaining, limit } = checkGenerationQuota(entitlements, generationCount);
         if (!allowed) {
-            message.warning(`本月免费生成次数已用完（${limit}次/月），请升级套餐继续使用。`);
+            message.warning(`本月免费生成次数已用完（${limit}次/月），请提交开通申请或联系管理员确认套餐。`);
             return;
         }
         if (remaining > 0 && remaining <= 1) {

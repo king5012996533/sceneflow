@@ -68,7 +68,7 @@ export default function BillingPage() {
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || "更新订阅失败");
-            message.success(cancelAtPeriodEnd ? "已设置到期不续费" : "已恢复续费状态");
+            message.success(cancelAtPeriodEnd ? "已标记到期后不保留权益" : "已恢复权益保留状态");
             await loadBilling();
         } catch (error) {
             message.error(error instanceof Error ? error.message : "更新订阅失败");
@@ -83,11 +83,11 @@ export default function BillingPage() {
             <div className="mx-auto max-w-7xl">
                 <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-stone-400">BILLING</div>
-                        <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">当前套餐与用量</h1>
+                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-stone-400">BETA ACCESS</div>
+                        <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">当前权益与用量</h1>
                     </div>
                     <Link href="/pricing" className="inline-flex h-10 items-center gap-2 rounded-md bg-stone-950 px-4 text-sm font-medium text-white">
-                        升级套餐
+                        提交开通申请
                         <ArrowRight className="size-4" />
                     </Link>
                 </div>
@@ -96,7 +96,7 @@ export default function BillingPage() {
                     <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
                         <div className="mb-5 flex items-center gap-2 text-lg font-semibold">
                             <PackageCheck className="size-5" />
-                            订阅状态
+                            权益状态
                         </div>
                         {subscription ? (
                             <div className="space-y-4">
@@ -105,19 +105,19 @@ export default function BillingPage() {
                                     <div className="mt-2 flex flex-wrap gap-2">
                                         <Tag color={subscription.status === "active" ? "green" : "default"}>{subscription.status}</Tag>
                                         <Tag>{subscription.billingCycle}</Tag>
-                                        {subscription.autoRenew ? <Tag color="blue">自动续费</Tag> : <Tag>不自动续费</Tag>}
+                                        {subscription.autoRenew ? <Tag color="blue">权益保留</Tag> : <Tag>到期结束</Tag>}
                                     </div>
                                 </div>
                                 <div className="text-sm leading-7 text-stone-500">
-                                    到期时间：
+                                    权益到期：
                                     {subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleString("zh-CN") : "无固定期限"}
                                 </div>
                                 <Button onClick={() => void toggleCancel(!subscription.cancelAtPeriodEnd)} loading={loading}>
-                                    {subscription.cancelAtPeriodEnd ? "恢复续费" : "到期不续费"}
+                                    {subscription.cancelAtPeriodEnd ? "恢复权益保留" : "到期后不保留"}
                                 </Button>
                             </div>
                         ) : (
-                            <Empty description="暂无订阅信息" />
+                            <Empty description="暂无权益信息" />
                         )}
                     </section>
 
@@ -152,17 +152,17 @@ export default function BillingPage() {
                 <section className="mt-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
                     <div className="mb-5 flex items-center gap-2 text-lg font-semibold">
                         <CreditCard className="size-5" />
-                        订单记录
+                        内测申请记录
                     </div>
                     {data?.orders?.length ? (
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[760px] text-left text-sm">
                                 <thead className="border-b border-stone-200 text-stone-500">
                                     <tr>
-                                        <th className="py-3 font-medium">订单号</th>
+                                        <th className="py-3 font-medium">申请编号</th>
                                         <th className="py-3 font-medium">套餐</th>
-                                        <th className="py-3 font-medium">金额</th>
-                                        <th className="py-3 font-medium">渠道</th>
+                                        <th className="py-3 font-medium">开通金额</th>
+                                        <th className="py-3 font-medium">方式</th>
                                         <th className="py-3 font-medium">状态</th>
                                         <th className="py-3 font-medium">创建时间</th>
                                     </tr>
@@ -184,7 +184,7 @@ export default function BillingPage() {
                             </table>
                         </div>
                     ) : (
-                        <Empty description="暂无订单" />
+                        <Empty description="暂无内测申请" />
                     )}
                 </section>
             </div>
