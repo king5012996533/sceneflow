@@ -91,7 +91,7 @@ export default function PricingPage() {
                         </div>
                         <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">选择适合你的生产规模</h1>
                         <p className="mt-4 max-w-2xl text-base leading-7 text-stone-500">
-                            当前阶段暂不接入在线收银台，套餐仍按所选权益开通。提交申请后，管理员会联系确认使用场景、套餐周期和开通方式。
+                            当前阶段因内测阶段暂不接入在线收银台，套餐仍按所选权益开通。可以联系管理员付费手动开通权益，提交申请后，管理员会联系确认使用场景、套餐周期和开通方式。
                         </p>
                     </div>
                     <Segmented
