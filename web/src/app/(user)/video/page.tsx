@@ -18,10 +18,11 @@ import { deleteStoredMedia, resolveMediaUrl, uploadMediaFile } from "@/services/
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { createVideoGenerationTask, pollVideoGenerationTask, storeGeneratedVideo, type VideoGenerationTask } from "@/services/api/video";
 import { useAssetStore } from "@/stores/use-asset-store";
-import { checkGenerationQuota, recordGeneration } from "@/lib/generation-quota";
+import { checkGenerationQuota, reserveGenerationQuota } from "@/lib/generation-quota";
 import { fetchClientEntitlements, type ClientEntitlements } from "@/lib/client-entitlements";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
+import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
@@ -82,6 +83,7 @@ export default function VideoPage() {
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+    const user = useUserStore((state) => state.user);
     const addAsset = useAssetStore((state) => state.addAsset);
     const [prompt, setPrompt] = useState("");
     const [references, setReferences] = useState<ReferenceImage[]>([]);
@@ -174,7 +176,7 @@ export default function VideoPage() {
         const snapshot = buildRequestSnapshot();
         if (!snapshot) return;
         // 配额检查
-        const { allowed, remaining, limit } = checkGenerationQuota(entitlements);
+        const { allowed, remaining, limit } = checkGenerationQuota(entitlements, 1, user?.role);
         if (!allowed) {
             message.warning(`本月免费生成次数已用完（${limit}次/月），请提交开通申请或联系管理员确认套餐。`);
             return;
@@ -184,7 +186,13 @@ export default function VideoPage() {
         }
         setElapsedMs(0);
         setRunning(true);
-        recordGeneration();
+        try {
+            await reserveGenerationQuota(1);
+        } catch (error) {
+            message.warning(error instanceof Error ? error.message : "生成额度检查失败");
+            setRunning(false);
+            return;
+        }
         setPreviewLog(null);
         setResults([{ id: nanoid(), status: "pending" }]);
         const batchStartedAt = performance.now();

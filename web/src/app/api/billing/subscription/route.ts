@@ -40,7 +40,12 @@ export async function GET(req: NextRequest) {
             take: 10,
         });
 
-        return NextResponse.json({ subscription, usage, orders });
+        return NextResponse.json({
+            user: { id: user.id, role: user.role },
+            subscription,
+            usage,
+            orders,
+        });
     } catch (error) {
         console.error("[billing/subscription:get]", error);
         return NextResponse.json({ error: "获取订阅失败" }, { status: 500 });

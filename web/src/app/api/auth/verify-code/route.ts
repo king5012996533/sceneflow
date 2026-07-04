@@ -4,8 +4,16 @@ import jwt from "jsonwebtoken";
 import { checkSmsVerifyCode } from "@/lib/sms";
 import { verifyCode } from "@/lib/verification-code";
 
-const VERIFY_TOKEN_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "infinite-canvas-secret-key";
 const VERIFY_TOKEN_EXPIRY = "10m";
+
+function verifyTokenSecret() {
+    const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+    if (secret) return secret;
+    if (process.env.NODE_ENV === "production") {
+        throw new Error("JWT_SECRET or NEXTAUTH_SECRET must be configured in production");
+    }
+    return "infinite-canvas-dev-secret-key";
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -32,7 +40,7 @@ export async function POST(req: NextRequest) {
 
         if (!valid) return NextResponse.json({ error: "验证码错误或已过期" }, { status: 400 });
 
-        const token = jwt.sign({ target, method, purpose: "register" }, VERIFY_TOKEN_SECRET, {
+        const token = jwt.sign({ target, method, purpose: "register" }, verifyTokenSecret(), {
             expiresIn: VERIFY_TOKEN_EXPIRY,
         });
 

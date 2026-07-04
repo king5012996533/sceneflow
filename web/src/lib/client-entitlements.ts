@@ -18,6 +18,15 @@ const defaultFreeEntitlements: ClientEntitlements = {
     teamMembers: 1,
 };
 
+const unlimitedEntitlements: ClientEntitlements = {
+    projects: null,
+    storageGb: null,
+    concurrentJobs: null,
+    hdExport: true,
+    privateCharacters: null,
+    teamMembers: null,
+};
+
 function parseLimit(value?: string) {
     if (!value || value === "custom" || value === "unlimited") return null;
     const parsed = Number(value);
@@ -29,6 +38,7 @@ export async function fetchClientEntitlements(): Promise<ClientEntitlements> {
         const res = await fetch(apiPath("/api/billing/subscription"), { credentials: "include" });
         if (!res.ok) return defaultFreeEntitlements;
         const data = await res.json();
+        if (data?.user?.role === "admin") return unlimitedEntitlements;
         const entries = data.subscription?.plan?.entitlements || [];
         const byKey = new Map<string, string>(entries.map((item: { key: string; value: string }) => [item.key, item.value]));
         return {

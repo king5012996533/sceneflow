@@ -17,10 +17,11 @@ import { nanoid } from "nanoid";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { fetchClientEntitlements, isOverLimit, type ClientEntitlements } from "@/lib/client-entitlements";
-import { checkGenerationQuota, recordGeneration } from "@/lib/generation-quota";
+import { checkGenerationQuota, reserveGenerationQuota } from "@/lib/generation-quota";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { useAssetStore, type AssetCategory, type AssetMetadata } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
+import { useUserStore } from "@/stores/use-user-store";
 import { cropDataUrl, splitDataUrl, upscaleDataUrl } from "../utils/canvas-image-data";
 import { fitNodeSize, nodeSizeFromRatio } from "../utils/canvas-node-size";
 import { App, Button, Dropdown, Modal } from "antd";
@@ -301,6 +302,7 @@ function InfiniteCanvasPage() {
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+    const user = useUserStore((state) => state.user);
     const addAsset = useAssetStore((state) => state.addAsset);
     const cleanupAssetImages = useAssetStore((state) => state.cleanupImages);
     const hydrated = useCanvasStore((state) => state.hydrated);
@@ -396,22 +398,22 @@ function InfiniteCanvasPage() {
         void fetchClientEntitlements().then(setEntitlements);
     }, []);
 
-    const startGenerationRequest = useCallback((targetNodeId: string, originNodeId: string, runningId = originNodeId, controller = new AbortController()) => {
+    const startGenerationRequest = useCallback(async (targetNodeId: string, originNodeId: string, runningId = originNodeId, controller = new AbortController()) => {
         const previous = generationRequestsRef.current.get(targetNodeId);
         if (previous?.controller !== controller) previous?.controller.abort();
-        const concurrentLimit = entitlements?.concurrentJobs ?? 1;
+        const concurrentLimit = entitlements ? entitlements.concurrentJobs : null;
         const activeRequests = Array.from(generationRequestsRef.current.values()).filter((request) => request.targetNodeId !== targetNodeId).length;
         if (isOverLimit(activeRequests, concurrentLimit)) {
             throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请等待已有任务完成或升级套餐。`);
         }
-        const quota = checkGenerationQuota(entitlements, 1);
+        const quota = checkGenerationQuota(entitlements, 1, user?.role);
         if (!quota.allowed) {
             throw new Error(`本月免费生成次数已用完（${quota.limit}次/月），请提交开通申请或联系管理员确认套餐。`);
         }
-        recordGeneration(1);
+        await reserveGenerationQuota(1);
         generationRequestsRef.current.set(targetNodeId, { targetNodeId, originNodeId, runningNodeId: runningId, controller });
         return controller;
-    }, [entitlements?.concurrentJobs]);
+    }, [entitlements, user?.role]);
 
     const finishGenerationRequest = useCallback((targetNodeId: string, controller: AbortController) => {
         const request = generationRequestsRef.current.get(targetNodeId);
@@ -1819,7 +1821,7 @@ function InfiniteCanvasPage() {
             setSelectedNodeIds(new Set([childId]));
             setSelectedConnectionId(null);
             setDialogNodeId(childId);
-            const controller = startGenerationRequest(childId, node.id, childId);
+            const controller = await startGenerationRequest(childId, node.id, childId);
             try {
                 const image = await requestEdit(generationConfig, prompt, [source], { id: `${node.id}-mask`, name: "mask.png", type: "image/png", dataUrl: payload.maskDataUrl }, { signal: controller.signal }).then((items) => items[0]);
                 const uploaded = await uploadImage(image.dataUrl);
@@ -1895,7 +1897,7 @@ function InfiniteCanvasPage() {
             setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
             setSelectedNodeIds(new Set([childId]));
             setDialogNodeId(childId);
-            const controller = startGenerationRequest(childId, node.id, childId);
+            const controller = await startGenerationRequest(childId, node.id, childId);
             try {
                 const image = await requestEdit(generationConfig, prompt, [{ id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey }], undefined, { signal: controller.signal }).then(
                     (items) => items[0],
@@ -2052,7 +2054,7 @@ function InfiniteCanvasPage() {
             }
 
             setRunningNodeId(nodeId);
-            const runController = startGenerationRequest(nodeId, nodeId, nodeId);
+            const runController = await startGenerationRequest(nodeId, nodeId, nodeId);
             const sourceTextContent = sourceNode?.type === CanvasNodeType.Text ? sourceNode.metadata?.content?.trim() || "" : "";
             const editingTextNode = mode === "text" && Boolean(sourceTextContent);
             const generationContext = await hydrateNodeGenerationContext(
@@ -2171,8 +2173,8 @@ function InfiniteCanvasPage() {
                     setDialogNodeId(nodeId);
 
                     const controller = runController;
-                    targetIds.forEach((targetId) => startGenerationRequest(targetId, nodeId, nodeId, controller));
-                    if (count > 1) startGenerationRequest(rootId, nodeId, nodeId, controller);
+                    await Promise.all(targetIds.map((targetId) => startGenerationRequest(targetId, nodeId, nodeId, controller)));
+                    if (count > 1) await startGenerationRequest(rootId, nodeId, nodeId, controller);
                     let hasSuccess = false;
                     let hasFailure = false;
                     await Promise.all(
@@ -2258,7 +2260,7 @@ function InfiniteCanvasPage() {
                     pendingChildIds = [videoId];
                     setNodes((prev) => (isEmptyVideoNode ? prev.map((node) => (node.id === nodeId ? { ...node, ...videoNode } : node)) : [...prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node)), videoNode]));
                     if (!isEmptyVideoNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: videoId }]);
-                    const controller = startGenerationRequest(videoId, nodeId, nodeId, runController);
+                    const controller = await startGenerationRequest(videoId, nodeId, nodeId, runController);
                     try {
                         const video = await storeGeneratedVideo(await requestVideoGeneration(generationConfig, effectivePrompt, generationContext.referenceImages, generationContext.referenceVideos, generationContext.referenceAudios, { signal: controller.signal }));
                         const videoSize = fitNodeSize(video.width || spec.width, video.height || spec.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
@@ -2286,7 +2288,7 @@ function InfiniteCanvasPage() {
                     pendingChildIds = [audioId];
                     setNodes((prev) => (isEmptyAudioNode ? prev.map((node) => (node.id === nodeId ? { ...node, ...audioNode } : node)) : [...prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node)), audioNode]));
                     if (!isEmptyAudioNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: audioId }]);
-                    const controller = startGenerationRequest(audioId, nodeId, nodeId, runController);
+                    const controller = await startGenerationRequest(audioId, nodeId, nodeId, runController);
                     try {
                         const audio = await storeGeneratedAudio(await requestAudioGeneration(generationConfig, effectivePrompt, { signal: controller.signal }), generationConfig.audioFormat);
                         setNodes((prev) => prev.map((node) => (node.id === audioId ? { ...node, metadata: { ...node.metadata, ...audioMetadata(audio), prompt: effectivePrompt, ...buildAudioGenerationMetadata(generationConfig) } } : node)));
@@ -2323,7 +2325,7 @@ function InfiniteCanvasPage() {
 
                 const controller = runController;
                 const textTargetIds = childIds.length ? childIds : [nodeId];
-                textTargetIds.forEach((targetNodeId) => startGenerationRequest(targetNodeId, nodeId, nodeId, controller));
+                await Promise.all(textTargetIds.map((targetNodeId) => startGenerationRequest(targetNodeId, nodeId, nodeId, controller)));
                 const answers = await Promise.all(
                     textTargetIds.map((targetNodeId) => {
                         let localStreamed = "";
@@ -2406,7 +2408,7 @@ function InfiniteCanvasPage() {
 
             setRunningNodeId(node.id);
             setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined } } : item)));
-            const controller = startGenerationRequest(node.id, sourceNode.id, node.id);
+            const controller = await startGenerationRequest(node.id, sourceNode.id, node.id);
 
             try {
                 if (node.type === CanvasNodeType.Text) {

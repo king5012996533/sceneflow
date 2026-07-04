@@ -219,20 +219,22 @@ async function resolveSeedanceImageUrl(config: AiConfig, image: ReferenceImage) 
 
 async function resolveSeedanceVideoUrl(video: ReferenceVideo) {
     if (isPublicMediaUrl(video.url) || video.url.startsWith("asset://")) return video.url;
+    throw new Error("Seedance reference videos must use a public URL or Volcengine asset:// URL. Local videos are too large for the proxy; upload them first and use the returned URL.");
     let blob: Blob | null = null;
-    if (video.storageKey) blob = await getMediaBlob(video.storageKey);
-    if (!blob && video.url?.startsWith("blob:")) blob = await (await fetch(video.url)).blob();
+    if (video.storageKey) blob = await getMediaBlob(video.storageKey!);
+    if (!blob && video.url?.startsWith("blob:")) blob = await (await fetch(video.url!)).blob();
     if (!blob) throw new Error("参考视频必须是公网 URL、素材 ID，或本地已保存的视频");
-    return blobToDataUrl(blob);
+    return blobToDataUrl(blob!);
 }
 
 async function resolveSeedanceAudioUrl(audio: ReferenceAudio) {
     if (isPublicMediaUrl(audio.url) || audio.url.startsWith("asset://")) return audio.url;
+    throw new Error("Seedance reference audio must use a public URL or Volcengine asset:// URL. Local audio is too large for the proxy; upload it first and use the returned URL.");
     let blob: Blob | null = null;
-    if (audio.storageKey) blob = await getMediaBlob(audio.storageKey);
-    if (!blob && audio.url?.startsWith("blob:")) blob = await (await fetch(audio.url)).blob();
+    if (audio.storageKey) blob = await getMediaBlob(audio.storageKey!);
+    if (!blob && audio.url?.startsWith("blob:")) blob = await (await fetch(audio.url!)).blob();
     if (!blob) throw new Error("参考音频必须是公网 URL、素材 ID，或本地已保存的音频");
-    return blobToDataUrl(blob);
+    return blobToDataUrl(blob!);
 }
 
 async function videoResultFromUrl(url: string, options?: RequestOptions): Promise<VideoGenerationResult> {

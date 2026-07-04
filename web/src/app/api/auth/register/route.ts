@@ -5,8 +5,16 @@ import { hashPassword, signToken } from "@/lib/auth";
 import { prisma } from "@/lib/ic-prisma";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
-const VERIFY_TOKEN_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || "infinite-canvas-secret-key";
 const PHONE_REGEX = /^1\d{10}$/;
+
+function verifyTokenSecret() {
+    const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+    if (secret) return secret;
+    if (process.env.NODE_ENV === "production") {
+        throw new Error("JWT_SECRET or NEXTAUTH_SECRET must be configured in production");
+    }
+    return "infinite-canvas-dev-secret-key";
+}
 
 export async function POST(req: NextRequest) {
     try {
@@ -23,7 +31,7 @@ export async function POST(req: NextRequest) {
 
         let payload: { target: string; method: string; purpose: string };
         try {
-            payload = jwt.verify(verificationToken, VERIFY_TOKEN_SECRET) as { target: string; method: string; purpose: string };
+            payload = jwt.verify(verificationToken, verifyTokenSecret()) as { target: string; method: string; purpose: string };
         } catch {
             return NextResponse.json({ error: "验证码已过期，请重新验证" }, { status: 400 });
         }
