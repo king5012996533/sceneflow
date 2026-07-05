@@ -68,6 +68,8 @@ export type CanvasNodeMetadata = {
     mimeType?: string;
     bytes?: number;
     durationMs?: number;
+    tailFrameSourceNodeId?: string;
+    continuitySourceNodeId?: string;
 };
 
 export type CanvasNodeData = {

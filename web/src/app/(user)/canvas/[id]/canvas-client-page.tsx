@@ -1402,6 +1402,85 @@ function InfiniteCanvasPage() {
         setDialogNodeId(id);
     }, []);
 
+    const createContinuationFromVideo = useCallback(
+        async (node: CanvasNodeData) => {
+            if (node.type !== CanvasNodeType.Video || !node.metadata?.content) {
+                message.warning("请先生成或上传一段视频");
+                return;
+            }
+
+            const key = "video-continuity";
+            message.loading({ key, content: "正在提取尾帧...", duration: 0 });
+
+            try {
+                const videoUrl = await resolveMediaUrl(node.metadata.storageKey, node.metadata.content);
+                const frame = await extractVideoFrame(videoUrl);
+                const uploaded = await uploadImage(frame);
+                const imageSize = fitNodeSize(uploaded.width, uploaded.height);
+                const videoSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
+                const gap = 88;
+                const frameId = `tail-frame-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                const nextVideoId = `video-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                const y = node.position.y + node.height / 2;
+                const frameNode: CanvasNodeData = {
+                    id: frameId,
+                    type: CanvasNodeType.Image,
+                    title: `${node.title || "视频"} 尾帧`,
+                    position: {
+                        x: node.position.x + node.width + gap,
+                        y: y - imageSize.height / 2,
+                    },
+                    width: imageSize.width,
+                    height: imageSize.height,
+                    metadata: {
+                        ...imageMetadata(uploaded),
+                        prompt: "上一段视频尾帧，用于下一镜头连续叙事参考。",
+                        assetCategory: "keyframe",
+                        assetSource: "generate",
+                        pipelineKind: "continuity-tail-frame",
+                        tailFrameSourceNodeId: node.id,
+                    },
+                };
+                const nextPrompt = buildContinuationPrompt(node.metadata.prompt);
+                const nextVideoNode: CanvasNodeData = {
+                    id: nextVideoId,
+                    type: CanvasNodeType.Video,
+                    title: "下一镜头",
+                    position: {
+                        x: frameNode.position.x + frameNode.width + gap,
+                        y: y - videoSpec.height / 2,
+                    },
+                    width: videoSpec.width,
+                    height: videoSpec.height,
+                    metadata: {
+                        content: "",
+                        status: NODE_STATUS_IDLE,
+                        generationMode: "video",
+                        prompt: nextPrompt,
+                        assetCategory: "video-shot",
+                        assetSource: "generate",
+                        pipelineKind: "continuity-video",
+                        continuitySourceNodeId: node.id,
+                    },
+                };
+
+                setNodes((prev) => [...prev, frameNode, nextVideoNode]);
+                setConnections((prev) => [
+                    ...prev,
+                    { id: nanoid(), fromNodeId: node.id, toNodeId: frameId },
+                    { id: nanoid(), fromNodeId: frameId, toNodeId: nextVideoId },
+                ]);
+                setSelectedNodeIds(new Set([nextVideoId]));
+                setSelectedConnectionId(null);
+                setDialogNodeId(nextVideoId);
+                message.success({ key, content: "已创建尾帧和下一镜头，请确认提示词后生成。" });
+            } catch (error) {
+                message.error({ key, content: error instanceof Error ? error.message : "提取尾帧失败" });
+            }
+        },
+        [message],
+    );
+
     const createAudioFileNode = useCallback(async (file: File, position: Position) => {
         const audio = await uploadMediaFile(file, "audio");
         const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Audio];
@@ -2814,6 +2893,7 @@ function InfiniteCanvasPage() {
                     onSuperResolve={(node) => setSuperResolveNodeId(node.id)}
                     onAngle={(node) => setAngleNodeId(node.id)}
                     onViewImage={(node) => setPreviewNodeId(node.id)}
+                    onContinueVideo={(node) => void createContinuationFromVideo(node)}
                     onReversePrompt={createImageReversePromptNodes}
                     onRetry={(node) => void handleRetryNode(node)}
                     onToggleFreeResize={(node) => toggleNodeFreeResize(node.id)}
@@ -3221,6 +3301,76 @@ function Shortcut({ keys, value }: { keys: string[]; value: string }) {
             <span className="text-right text-sm opacity-55">{value}</span>
         </div>
     );
+}
+
+function buildContinuationPrompt(previousPrompt?: string) {
+    const base = previousPrompt?.trim();
+    return [
+        "延续上一段视频尾帧的角色位置、服装、场景、光线、构图和镜头方向。",
+        "从当前画面自然继续动作，不要重置场景，不要改变角色身份，不要突然切换风格。",
+        "请描述下一段 15 秒镜头的动作推进、镜头运动和情绪变化。",
+        base ? `上一段镜头参考：${base}` : "",
+    ]
+        .filter(Boolean)
+        .join("\n");
+}
+
+function extractVideoFrame(src: string): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement("video");
+        let settled = false;
+        const cleanup = () => {
+            video.removeAttribute("src");
+            video.load();
+        };
+        const fail = (message: string) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(new Error(message));
+        };
+        const timeout = window.setTimeout(() => fail("视频尾帧提取超时，请确认视频可正常预览"), 15000);
+
+        video.crossOrigin = "anonymous";
+        video.muted = true;
+        video.preload = "auto";
+        video.playsInline = true;
+        video.onerror = () => {
+            window.clearTimeout(timeout);
+            fail("视频读取失败，无法提取尾帧");
+        };
+        video.onloadedmetadata = () => {
+            const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
+            video.currentTime = Math.max(0, duration - 0.08);
+        };
+        video.onseeked = () => {
+            const width = video.videoWidth || 1280;
+            const height = video.videoHeight || 720;
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext("2d");
+            if (!context) {
+                window.clearTimeout(timeout);
+                fail("浏览器不支持视频抽帧");
+                return;
+            }
+            context.drawImage(video, 0, 0, width, height);
+            canvas.toBlob((blob) => {
+                window.clearTimeout(timeout);
+                if (!blob) {
+                    fail("视频尾帧导出失败，可能是视频跨域限制");
+                    return;
+                }
+                if (settled) return;
+                settled = true;
+                cleanup();
+                resolve(blob);
+            }, "image/png");
+        };
+        video.src = src;
+        video.load();
+    });
 }
 
 function imageExtension(dataUrl: string) {
