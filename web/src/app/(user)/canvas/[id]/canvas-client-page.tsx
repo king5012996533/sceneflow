@@ -1422,8 +1422,9 @@ function InfiniteCanvasPage() {
                     proxyBlobUrl = URL.createObjectURL(blob);
                     videoUrl = proxyBlobUrl;
                 }
-                const frame = await extractVideoFrame(videoUrl);
-                if (proxyBlobUrl) URL.revokeObjectURL(proxyBlobUrl);
+                const frame = await extractVideoFrame(videoUrl).finally(() => {
+                    if (proxyBlobUrl) URL.revokeObjectURL(proxyBlobUrl);
+                });
                 const uploaded = await uploadImage(frame);
                 const imageSize = fitNodeSize(uploaded.width, uploaded.height);
                 const videoSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
