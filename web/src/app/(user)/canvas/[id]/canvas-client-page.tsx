@@ -9,6 +9,7 @@ import { saveAs } from "file-saver";
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
 import { requestVideoGeneration, storeGeneratedVideo } from "@/services/api/video";
+import { proxyFetch } from "@/services/api/proxy-client";
 import { DOCS_URL } from "@/constant/env";
 import { defaultConfig, type AiConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { resolveImageUrl, uploadImage, type UploadedImage } from "@/services/image-storage";
@@ -1413,8 +1414,16 @@ function InfiniteCanvasPage() {
             message.loading({ key, content: "正在提取尾帧...", duration: 0 });
 
             try {
-                const videoUrl = await resolveMediaUrl(node.metadata.storageKey, node.metadata.content);
+                let videoUrl = await resolveMediaUrl(node.metadata.storageKey, node.metadata.content);
+                let proxyBlobUrl: string | undefined;
+                // 远程 URL（无 storageKey）需通过代理下载以避免 CORS 限制
+                if (!node.metadata.storageKey && videoUrl && !videoUrl.startsWith("blob:")) {
+                    const blob = await proxyFetch<Blob>({ url: videoUrl, method: "GET", responseType: "blob" });
+                    proxyBlobUrl = URL.createObjectURL(blob);
+                    videoUrl = proxyBlobUrl;
+                }
                 const frame = await extractVideoFrame(videoUrl);
+                if (proxyBlobUrl) URL.revokeObjectURL(proxyBlobUrl);
                 const uploaded = await uploadImage(frame);
                 const imageSize = fitNodeSize(uploaded.width, uploaded.height);
                 const videoSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
