@@ -3,12 +3,13 @@
 import type { CSSProperties } from "react";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Keyboard, Settings2, LogOut, User } from "lucide-react";
+import { BookOpen, Keyboard, Settings2, LogOut, Shield, User } from "lucide-react";
 
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { GitHubLink } from "@/components/layout/github-link";
 import { VersionReleaseModal } from "@/components/layout/version-release-modal";
 import { DOCS_URL } from "@/constant/env";
+import { publicPath } from "@/lib/app-paths";
 import { cn } from "@/lib/utils";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useConfigStore } from "@/stores/use-config-store";
@@ -45,6 +46,11 @@ export function UserStatusActions({ showConfig = true, showThemeToggle = true, v
                         <User className="size-3.5" />
                         {user.name || user.email}
                     </span>
+                    {user.role === "admin" ? (
+                        <a href={publicPath("/admin")} className={naturalIconClass} style={iconStyle} aria-label="管理后台" title="管理后台">
+                            <Shield className="size-4" />
+                        </a>
+                    ) : null}
                     <button type="button" className={naturalIconClass} style={iconStyle} onClick={() => { clearSession(); router.push("/canvas/login"); }} title="退出登录">
                         <LogOut className="size-4" />
                     </button>
