@@ -1,4 +1,4 @@
-import type { AiTextMessage } from "@/services/api/image";
+import type { AiTextMessage } from "@/lib/generation/generation-request";
 import { imageReferenceLabel } from "@/lib/image-reference-prompt";
 import { seedanceReferenceLabel } from "@/lib/seedance-video";
 import type { ReferenceImage } from "@/types/image";

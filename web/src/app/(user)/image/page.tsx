@@ -16,7 +16,7 @@ import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } f
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
-import { requestEdit, requestGeneration } from "@/services/api/image";
+import { requestGeneratedImages } from "@/lib/generation/generation-request";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { checkGenerationQuota, reserveGenerationQuota } from "@/lib/generation-quota";
 import { fetchClientEntitlements, type ClientEntitlements } from "@/lib/client-entitlements";
@@ -313,7 +313,7 @@ export default function ImagePage() {
     const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }) => {
         const itemStartedAt = performance.now();
         try {
-            const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references) : await requestGeneration(snapshot.config, snapshot.text);
+            const result = await requestGeneratedImages({ config: snapshot.config, prompt: snapshot.text, references: snapshot.references });
             const image = result[0];
             if (!image) throw new Error("接口没有返回图片");
             const meta = await readImageMeta(image.dataUrl);

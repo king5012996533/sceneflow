@@ -9,7 +9,7 @@ import { motion } from "motion/react";
 import { modelOptionName, normalizeModelOptionValue, resolveModelChannel, selectableModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { nanoid } from "nanoid";
-import { requestToolResponse, type ResponseFunctionTool, type ResponseInputMessage, type ResponseToolCall } from "@/services/api/image";
+import { requestGeneratedToolResponse, type ResponseFunctionTool, type ResponseInputMessage, type ResponseToolCall } from "@/lib/generation/generation-request";
 import { imageToDataUrl } from "@/services/image-storage";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -316,10 +316,10 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
             const messages = await buildToolAgentMessages(snapshotRef.current, history, userMessage);
             addOnlineLog(`Agent Tool Loop ${loop.step} 开始`, { toolChoice: "required" });
             let streamed = "";
-            const result = await requestToolResponse({ ...requestConfig, systemPrompt: "" }, messages, ONLINE_AGENT_TOOLS, "required", (text) => {
+            const result = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages, tools: ONLINE_AGENT_TOOLS, toolChoice: "required", onDelta: (text) => {
                 streamed = text;
                 if (text.trim()) upsertMessage(sessionId, { id: assistantId, role: "assistant", text });
-            });
+            } });
             addOnlineLog("模型工具回复", result);
             if (result.toolCalls.length) {
                 const writableCalls = result.toolCalls.filter(isWritableToolCall);
@@ -372,10 +372,10 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
         }
         const requestConfig = { ...effectiveConfig, model: effectiveConfig.textModel || effectiveConfig.model };
         let streamed = "";
-        const next = await requestToolResponse({ ...requestConfig, systemPrompt: "" }, nextMessages, ONLINE_AGENT_TOOLS, "auto", (text) => {
+        const next = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages: nextMessages, tools: ONLINE_AGENT_TOOLS, toolChoice: "auto", onDelta: (text) => {
             streamed = text;
             if (text.trim()) upsertMessage(sessionId, { id: assistantId, role: "assistant", text });
-        });
+        } });
         addOnlineLog(`Agent Tool Loop ${step + 1} 回复`, next);
         if (next.toolCalls.length) {
             const writableCalls = next.toolCalls.filter(isWritableToolCall);

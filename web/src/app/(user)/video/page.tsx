@@ -17,7 +17,7 @@ import { buildVideoGenerationConfig, normalizeVideoResolution as normalizeResolu
 import { seedanceReferenceLabel, seedanceVideoReferenceError, seedanceVideoReferenceHint, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
 import { deleteStoredMedia, resolveMediaUrl, uploadMediaFile } from "@/services/file-storage";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
-import { createVideoGenerationTask, pollVideoGenerationTask, storeGeneratedVideo, type VideoGenerationTask } from "@/services/api/video";
+import { createGeneratedVideoTask, persistGeneratedVideo, pollGeneratedVideoTask, type VideoGenerationTask } from "@/lib/generation/generation-request";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { checkGenerationQuota, reserveGenerationQuota } from "@/lib/generation-quota";
 import { fetchClientEntitlements, type ClientEntitlements } from "@/lib/client-entitlements";
@@ -199,7 +199,7 @@ export default function VideoPage() {
         const batchStartedAt = performance.now();
         setStartedAt(batchStartedAt);
         try {
-            const task = await createVideoGenerationTask(snapshot.config, snapshot.text, snapshot.references, snapshot.videoReferences, snapshot.audioReferences);
+            const task = await createGeneratedVideoTask({ config: snapshot.config, prompt: snapshot.text, references: snapshot.references, videoReferences: snapshot.videoReferences, audioReferences: snapshot.audioReferences });
             const log = buildLog({ prompt: snapshot.text, model, config: snapshot.config, references: snapshot.references, videoReferences: snapshot.videoReferences, audioReferences: snapshot.audioReferences, durationMs: 0, status: "生成中", task });
             await saveLog(log);
             void pollGenerationLog(log, snapshot.config);
@@ -317,9 +317,9 @@ export default function VideoPage() {
         const taskConfig = buildVideoConfig({ ...effectiveConfig, ...log.config }, log.task.model || log.model);
         try {
             for (let attempt = 0; attempt < 120; attempt += 1) {
-                const state = await pollVideoGenerationTask(configOverride || taskConfig, log.task);
+                const state = await pollGeneratedVideoTask(configOverride || taskConfig, log.task);
                 if (state.status === "completed") {
-                    const stored = await storeGeneratedVideo(state.result);
+                    const stored = await persistGeneratedVideo(state.result);
                     const nextVideo: GeneratedVideo = {
                         id: nanoid(),
                         url: stored.url,

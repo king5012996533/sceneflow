@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -20,6 +20,23 @@ function assertNotMatches(path, pattern, message) {
     assert(!pattern.test(read(path)), message || `${path} should not match ${pattern}`);
 }
 
+function walkFiles(path) {
+    const fullPath = join(root, path);
+    if (!existsSync(fullPath)) return [];
+    return readdirSync(fullPath).flatMap((entry) => {
+        const child = `${path}/${entry}`;
+        const childFullPath = join(root, child);
+        return statSync(childFullPath).isDirectory() ? walkFiles(child) : [child];
+    });
+}
+
+function assertNoAppDirectGenerationApiImports() {
+    const offenders = walkFiles("src/app")
+        .filter((path) => /\.(tsx?|jsx?)$/.test(path))
+        .filter((path) => /@\/services\/api\/(?:image|video|audio)/.test(read(path)));
+    assert(!offenders.length, `app pages must use src/lib/generation/generation-request.ts instead of direct generation API imports: ${offenders.join(", ")}`);
+}
+
 assert(existsSync(join(root, "src/app/api/auth/verify-code/route.ts")), "verify-code route must exist; SMS login depends on it.");
 assertIncludes("src/components/layout/login-modal.tsx", "/api/auth/verify-code", "login modal must keep calling verify-code.");
 assertIncludes("src/app/api/auth/send-code/route.ts", "storeCode", "send-code must persist the code after provider send succeeds.");
@@ -28,6 +45,8 @@ assertIncludes("src/app/api/auth/verify-code/route.ts", "verifyCode", "verify-co
 assertIncludes("src/services/api/video.ts", "compressSeedanceImageDataUrl", "Seedance local reference images must be compressed before proxying.");
 assertIncludes("src/services/api/video.ts", "SEEDANCE_PROXY_IMAGE_MAX_BYTES = 420 * 1024", "Seedance reference image payload guard should stay under the online gateway limit.");
 assertIncludes("src/services/api/proxy-client.ts", "status === 413", "proxy client must translate 413 into a clear user-facing message.");
+assertIncludes("src/lib/generation/generation-request.ts", "requestGeneratedImages", "generation requests must keep a unified app-facing entry.");
+assertNoAppDirectGenerationApiImports();
 
 assertNotMatches("src/app/(user)/pricing/page.tsx", /暂不收款|不收款|可以免费|免费开通权益/, "pricing copy must not imply beta packages are free.");
 assertIncludes("src/app/(user)/pricing/page.tsx", "付费手动开通权益", "pricing copy must keep paid manual opening clear.");
