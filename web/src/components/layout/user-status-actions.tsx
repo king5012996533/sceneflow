@@ -39,7 +39,7 @@ export function UserStatusActions({ showConfig = true, showThemeToggle = true, v
     useEffect(() => { fetchSession(); }, []);
 
     return (
-        <div className="inline-flex shrink-0 items-center gap-1">
+        <div className="inline-flex shrink-0 items-center gap-1.5">
             {user ? (
                 <>
                     <span className={cn("inline-flex items-center gap-1.5 px-2 py-1 text-xs", variant === "home" ? "text-white/72" : "text-[#1f2937]")}>
@@ -57,11 +57,11 @@ export function UserStatusActions({ showConfig = true, showThemeToggle = true, v
                 </>
             ) : (
                 <>
-                    <a href="/canvas/login" className={cn("inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all", variant === "home" ? "border-transparent text-white/68 hover:bg-white/8 hover:text-white" : "border-[#ded3c4] bg-[#fffefa] text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] hover:bg-[#f2ede4] hover:text-[#050816]")}>
+                    <a href="/canvas/login" className={cn("inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-all", variant === "home" ? "border-transparent text-white/68 hover:bg-white/8 hover:text-white" : "border-[#ded3c4] bg-[#fffefa] text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] hover:bg-[#f2ede4] hover:text-[#050816]")}>
                         <User className="size-3.5" />
                         登录
                     </a>
-                    <a href="/canvas/register" className={cn("sceneflow-register-action inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all", variant === "home" ? "border border-white/14 bg-white/8 text-white hover:bg-white/12" : "bg-[#4f5dff] text-white shadow-[0_10px_24px_rgba(79,93,255,0.18)] hover:bg-[#3846e8] dark:bg-white dark:text-stone-950 dark:hover:bg-stone-200")}>
+                    <a href="/canvas/register" className={cn("sceneflow-register-action inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-all", variant === "home" ? "border border-white/14 bg-white/8 text-white hover:bg-white/12" : "bg-[#4f5dff] text-white shadow-[0_10px_24px_rgba(79,93,255,0.18)] hover:bg-[#3846e8] dark:bg-white dark:text-stone-950 dark:hover:bg-stone-200")}>
                         注册
                     </a>
                 </>

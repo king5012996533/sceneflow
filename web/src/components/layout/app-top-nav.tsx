@@ -32,7 +32,7 @@ export function AppTopNav() {
         <>
             {!hideHeader ? (
                 <header className={cn("sceneflow-top-nav sticky top-0 z-20 h-16 shrink-0 border-b", useDarkHome ? "border-white/10 bg-[#090a0c]" : "border-[#beb2a3] bg-[#fffefa] shadow-[0_1px_0_rgba(255,255,255,1)_inset,0_14px_34px_rgba(35,28,20,0.16)]")}>
-                    <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-5 px-6">
+                    <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-4 px-6">
                         <div className="flex min-w-0 items-center">
                             <Link href="/" className={cn("flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight transition", useDarkHome ? "text-white hover:text-white/72" : "text-[#050816] hover:text-[#2432c9]")}>
                                 <span
@@ -55,7 +55,7 @@ export function AppTopNav() {
                                 <Menu className="size-5" />
                             </button>
 
-                            <nav className="hide-scrollbar ml-8 hidden h-16 min-w-0 items-center gap-7 overflow-x-auto md:flex">
+                            <nav className="hide-scrollbar ml-7 hidden h-16 min-w-0 items-center gap-4 overflow-x-auto md:flex">
                                 {visibleTools.map((tool) => {
                                     const Icon = tool.icon;
                                     const active = tool.slug === activeToolSlug;
@@ -64,7 +64,7 @@ export function AppTopNav() {
                                             key={tool.slug}
                                             href={`/${tool.slug}`}
                                             className={cn(
-                                                "relative flex h-9 shrink-0 items-center gap-2 rounded-full px-3 text-sm leading-6 transition",
+                                                "relative flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-sm leading-6 transition",
                                                 active
                                                     ? useDarkHome
                                                         ? "bg-white/12 font-medium text-white"
@@ -82,11 +82,11 @@ export function AppTopNav() {
                             </nav>
                         </div>
 
-                        <div className="my-auto flex h-9 min-w-0 items-center justify-end gap-2 justify-self-end whitespace-nowrap">
+                        <div className="my-auto ml-auto flex h-9 shrink-0 items-center justify-end gap-2 border-l border-[#e6dccd] pl-3 whitespace-nowrap">
                             {isHome ? (
                                 <button
                                     type="button"
-                                    className="hidden h-9 items-center gap-2 rounded-xl border border-[#eadfce] bg-white/70 px-3 text-sm font-medium text-[#4b5567] shadow-sm transition hover:border-[#cfc5ff] hover:bg-[#f5f2ff] hover:text-[#4f5dff] md:inline-flex"
+                                    className="hidden h-9 shrink-0 items-center gap-1.5 rounded-xl border border-[#ded3c4] bg-[#fffefa] px-3 text-sm font-medium text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] transition hover:border-[#cfc5ff] hover:bg-[#f5f2ff] hover:text-[#4f5dff] lg:inline-flex"
                                     onClick={() => setExperienceOpen(true)}
                                 >
                                     <Bot className="size-4" />
