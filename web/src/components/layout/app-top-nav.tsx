@@ -1,9 +1,9 @@
 "use client";
 
-import { Bot, Menu, Send } from "lucide-react";
+import { Bot, Menu, Send, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button, Input, Modal } from "antd";
+import { Button, Input } from "antd";
 
 import { getVisibleNavigationTools, navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
 import { AppConfigModal } from "@/components/layout/app-config-modal";
@@ -23,6 +23,7 @@ export function AppTopNav() {
     const user = useUserStore((state) => state.user);
     const hideHeader = /^\/canvas\/[^/]+/.test(pathname);
     const isHome = pathname === "/";
+    const useDarkHome = false;
     const slug = pathname.split("/").filter(Boolean)[0];
     const activeToolSlug = navigationTools.some((tool) => tool.slug === slug) ? (slug as NavigationToolSlug) : undefined;
     const visibleTools = getVisibleNavigationTools(user?.role);
@@ -30,10 +31,10 @@ export function AppTopNav() {
     return (
         <>
             {!hideHeader ? (
-                <header className={cn("sticky top-0 z-20 h-16 shrink-0 border-b backdrop-blur-xl", isHome ? "border-white/10 bg-[#090a0c]/92" : "border-border bg-background/90")}>
+                <header className={cn("sceneflow-top-nav sticky top-0 z-20 h-16 shrink-0 border-b", useDarkHome ? "border-white/10 bg-[#090a0c]" : "border-[#beb2a3] bg-[#fffefa] shadow-[0_1px_0_rgba(255,255,255,1)_inset,0_14px_34px_rgba(35,28,20,0.16)]")}>
                     <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-5 px-6">
                         <div className="flex min-w-0 items-center">
-                            <Link href="/" className={cn("flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight transition", isHome ? "text-white hover:text-white/72" : "text-stone-950 hover:text-stone-600 dark:text-stone-100 dark:hover:text-stone-300")}>
+                            <Link href="/" className={cn("flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight transition", useDarkHome ? "text-white hover:text-white/72" : "text-[#050816] hover:text-[#2432c9]")}>
                                 <span
                                     className="size-5 shrink-0 bg-current"
                                     style={{
@@ -46,7 +47,7 @@ export function AppTopNav() {
 
                             <button
                                 type="button"
-                                className={cn("ml-3 inline-flex size-8 shrink-0 items-center justify-center transition md:hidden", isHome ? "text-white/72 hover:text-white" : "text-stone-600 hover:text-stone-950 dark:text-stone-300 dark:hover:text-white")}
+                                className={cn("ml-3 inline-flex size-8 shrink-0 items-center justify-center transition md:hidden", useDarkHome ? "text-white/72 hover:text-white" : "text-[#746b7a] hover:text-[#172033]")}
                                 onClick={() => setMobileNavOpen(true)}
                                 aria-label="打开导航菜单"
                                 title="导航菜单"
@@ -63,14 +64,14 @@ export function AppTopNav() {
                                             key={tool.slug}
                                             href={`/${tool.slug}`}
                                             className={cn(
-                                                "relative flex h-16 shrink-0 items-center gap-2 text-sm leading-6 transition after:absolute after:inset-x-0 after:bottom-0 after:h-px",
+                                                "relative flex h-9 shrink-0 items-center gap-2 rounded-full px-3 text-sm leading-6 transition",
                                                 active
-                                                    ? isHome
-                                                        ? "font-medium text-white after:bg-white"
-                                                        : "font-medium text-stone-950 after:bg-stone-950 dark:text-stone-100 dark:after:bg-stone-100"
-                                                    : isHome
-                                                      ? "text-white/46 after:bg-transparent hover:text-white/86"
-                                                      : "text-stone-500 after:bg-transparent hover:text-stone-950 dark:text-stone-400 dark:hover:text-stone-100",
+                                                    ? useDarkHome
+                                                        ? "bg-white/12 font-medium text-white"
+                                                        : "sceneflow-nav-active bg-[#e6e9ff] font-semibold text-[#1722b8] shadow-[0_1px_0_rgba(255,255,255,1)_inset,0_8px_20px_rgba(79,93,255,0.16)]"
+                                                    : useDarkHome
+                                                      ? "text-white/54 hover:bg-white/8 hover:text-white/88"
+                                                      : "font-semibold text-[#1f2937] hover:bg-[#f2ede4] hover:text-[#050816]",
                                             )}
                                         >
                                             <Icon className="size-4" />
@@ -85,14 +86,14 @@ export function AppTopNav() {
                             {isHome ? (
                                 <button
                                     type="button"
-                                    className="hidden h-9 items-center gap-2 rounded-lg border border-white/12 bg-white/[0.055] px-3 text-sm font-medium text-white/78 transition hover:border-white/22 hover:bg-white/[0.09] hover:text-white md:inline-flex"
+                                    className="hidden h-9 items-center gap-2 rounded-xl border border-[#eadfce] bg-white/70 px-3 text-sm font-medium text-[#4b5567] shadow-sm transition hover:border-[#cfc5ff] hover:bg-[#f5f2ff] hover:text-[#4f5dff] md:inline-flex"
                                     onClick={() => setExperienceOpen(true)}
                                 >
                                     <Bot className="size-4" />
                                     体验官
                                 </button>
                             ) : null}
-                            <UserStatusActions variant={isHome ? "home" : "default"} />
+                            <UserStatusActions variant={useDarkHome ? "home" : "default"} showThemeToggle={false} />
                         </div>
                     </div>
                 </header>
@@ -137,32 +138,37 @@ function ExperienceOfficerModal({ open, onClose, onOpenConfig }: { open: boolean
         }
     };
 
+    if (!open) return null;
+
     return (
-        <Modal open={open} onCancel={onClose} footer={null} centered width={720} title={null} destroyOnHidden>
-            <div className="flex h-[620px] max-h-[76vh] flex-col py-1">
-                <div className="border-b border-stone-200 pb-4 dark:border-stone-800">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600 dark:bg-stone-900 dark:text-stone-300">
+        <div className="sceneflow-experience-dialog fixed inset-0 z-50 flex items-center justify-center bg-[#172033]/38 p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" onMouseDown={onClose}>
+            <div className="relative flex h-[560px] max-h-[76vh] w-full max-w-[680px] flex-col overflow-hidden rounded-[18px] border border-[#ded3c4] bg-[#fffefa] p-5 text-[#172033] shadow-[0_28px_90px_rgba(23,32,51,0.22)]" onMouseDown={(event) => event.stopPropagation()}>
+                <button type="button" className="absolute right-3 top-3 inline-flex size-8 items-center justify-center rounded-lg text-[#4b5567] transition hover:bg-[#f2ede4] hover:text-[#111827]" onClick={onClose} aria-label="关闭">
+                    <X className="size-4" />
+                </button>
+                <div className="border-b border-[#ded3c4] pb-4">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-[#f4f1ff] px-3 py-1 text-xs font-medium text-[#4f5dff]">
                         <Bot className="size-3.5" />
                         SceneFlow 体验官
                     </div>
-                    <h2 className="mt-3 text-xl font-semibold tracking-tight text-stone-950 dark:text-stone-100">直接问我问题</h2>
+                    <h2 className="mt-3 text-xl font-semibold tracking-tight text-[#172033]">直接问我问题</h2>
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-4">
                     {messages.map((message, index) => (
                         <div key={`${message.role}-${index}`} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
-                            <div className={cn("max-w-[82%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6", message.role === "user" ? "bg-stone-950 text-white dark:bg-stone-100 dark:text-stone-950" : "bg-stone-100 text-stone-700 dark:bg-stone-900 dark:text-stone-200")}>
+                            <div className={cn("max-w-[82%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6", message.role === "user" ? "bg-[#4f5dff] text-white" : "bg-[#fff7eb] text-[#263043]")}>
                                 {message.content}
                             </div>
                         </div>
                     ))}
-                    {sending ? <div className="text-xs text-stone-400">体验官正在回复...</div> : null}
+                    {sending ? <div className="text-xs text-[#8a7f91]">体验官正在回复...</div> : null}
                 </div>
 
-                <div className="border-t border-stone-200 pt-3 dark:border-stone-800">
+                <div className="border-t border-[#ded3c4] pt-3">
                     <div className="mb-2 flex flex-wrap gap-2">
                         {quickQuestions.map((question) => (
-                            <button key={question} type="button" className="rounded-full bg-stone-100 px-3 py-1.5 text-xs text-stone-600 transition hover:bg-stone-200 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800" onClick={() => void sendQuestion(question)}>
+                            <button key={question} type="button" className="rounded-full bg-[#f6f0e6] px-3 py-1.5 text-xs font-medium text-[#6d6472] transition hover:bg-[#ebe7ff] hover:text-[#4f5dff]" onClick={() => void sendQuestion(question)}>
                                 {question}
                             </button>
                         ))}
@@ -190,6 +196,6 @@ function ExperienceOfficerModal({ open, onClose, onOpenConfig }: { open: boolean
                     </div>
                 </div>
             </div>
-        </Modal>
+        </div>
     );
 }

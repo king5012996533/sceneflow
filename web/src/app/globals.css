@@ -48,38 +48,38 @@
 }
 
 :root {
-    --radius: 0.375rem;
-    --border: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --input: oklch(0.922 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --radius: 0.625rem;
+    --border: #ded3c4;
+    --ring: rgba(94, 108, 255, 0.3);
+    --background: #f7f3ea;
+    --foreground: #172033;
+    --card: #fffdfa;
+    --card-foreground: #172033;
+    --popover: #fffdfa;
+    --popover-foreground: #172033;
+    --primary: #4f5dff;
+    --primary-foreground: #ffffff;
+    --secondary: #f2ede4;
+    --secondary-foreground: #253149;
+    --muted: #f3eee6;
+    --muted-foreground: #746b7a;
+    --accent: #e8f7f2;
+    --accent-foreground: #144239;
+    --destructive: #dc4446;
+    --input: #ddd2c3;
+    --chart-1: #4f5dff;
+    --chart-2: #18a889;
+    --chart-3: #f2a541;
+    --chart-4: #c96df0;
+    --chart-5: #64748b;
+    --sidebar: #fffdf8;
+    --sidebar-foreground: #172033;
+    --sidebar-primary: #4f5dff;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f1ebe0;
+    --sidebar-accent-foreground: #253149;
+    --sidebar-border: #ded3c4;
+    --sidebar-ring: rgba(94, 108, 255, 0.3);
 }
 
 .dark {
@@ -127,6 +127,103 @@
     }
     body {
         @apply bg-background text-foreground;
+    }
+    .sceneflow-top-nav,
+    .sceneflow-top-nav a,
+    .sceneflow-top-nav button {
+        color: #1f2937 !important;
+    }
+    .sceneflow-top-nav button {
+        background: #fffefa !important;
+        border-color: #ded3c4 !important;
+        box-shadow: 0 6px 14px rgba(35, 28, 20, 0.06) !important;
+    }
+    .sceneflow-top-nav .sceneflow-nav-active {
+        color: #1722b8 !important;
+    }
+    .sceneflow-top-nav .sceneflow-register-action {
+        background: #4f5dff !important;
+        color: #ffffff !important;
+        box-shadow: 0 10px 24px rgba(79, 93, 255, 0.18) !important;
+    }
+    .sceneflow-top-nav button[aria-label*="切换"] {
+        display: none !important;
+    }
+    .sceneflow-top-nav svg {
+        stroke: currentColor;
+    }
+    .sceneflow-experience-modal .ant-modal-content {
+        background: #fffefa !important;
+        border: 1px solid #ded3c4;
+        box-shadow: 0 28px 90px rgba(23, 32, 51, 0.22);
+    }
+    .sceneflow-experience-modal,
+    .sceneflow-experience-modal * {
+        color-scheme: light;
+    }
+    .sceneflow-experience-modal .ant-modal-close {
+        color: #4b5567 !important;
+    }
+    .sceneflow-experience-modal .ant-modal-close:hover {
+        color: #111827 !important;
+        background: #f2ede4 !important;
+    }
+    .sceneflow-experience-modal h2,
+    .sceneflow-experience-modal p,
+    .sceneflow-experience-modal div,
+    .sceneflow-experience-modal span {
+        color: inherit;
+    }
+    .sceneflow-experience-modal .ant-input,
+    .sceneflow-experience-modal .ant-input-outlined {
+        background: #ffffff !important;
+        border-color: #ded3c4 !important;
+        color: #172033 !important;
+    }
+    .sceneflow-experience-modal .ant-input::placeholder {
+        color: #8a7f91 !important;
+    }
+    .sceneflow-experience-modal .ant-btn-default {
+        background: #ffffff !important;
+        border-color: #ded3c4 !important;
+        color: #172033 !important;
+    }
+    .sceneflow-experience-modal .ant-btn-primary {
+        background: #4f5dff !important;
+        border-color: #4f5dff !important;
+        color: #ffffff !important;
+    }
+    .ant-modal .ant-modal-content,
+    .ant-modal .ant-modal-header,
+    .ant-drawer .ant-drawer-content,
+    .ant-popover .ant-popover-inner,
+    .ant-select-dropdown,
+    .ant-dropdown .ant-dropdown-menu {
+        background: #fffefa !important;
+        color: #172033;
+    }
+    .ant-modal .ant-modal-content,
+    .ant-drawer .ant-drawer-content,
+    .ant-popover .ant-popover-inner,
+    .ant-select-dropdown,
+    .ant-dropdown .ant-dropdown-menu {
+        border: 1px solid #ded3c4;
+        box-shadow: 0 24px 80px rgba(35, 28, 20, 0.18);
+    }
+    .ant-modal .ant-modal-mask,
+    .ant-drawer .ant-drawer-mask {
+        background: rgba(23, 32, 51, 0.38) !important;
+        backdrop-filter: blur(3px);
+    }
+    .dark .ant-modal .ant-modal-content,
+    .dark .ant-modal .ant-modal-header,
+    .dark .ant-drawer .ant-drawer-content,
+    .dark .ant-popover .ant-popover-inner,
+    .dark .ant-select-dropdown,
+    .dark .ant-dropdown .ant-dropdown-menu {
+        background: #141414 !important;
+        border-color: rgba(255, 255, 255, 0.08);
+        color: #f5f5f5;
     }
     textarea {
         resize: none;
@@ -469,4 +566,73 @@
 ::view-transition-new(root) {
     animation: none;
     mix-blend-mode: normal;
+}
+
+.dark .sceneflow-experience-modal .ant-modal-content,
+.sceneflow-experience-modal .ant-modal-content {
+    background: #fffefa !important;
+    border: 1px solid #ded3c4 !important;
+    border-radius: 18px !important;
+    box-shadow: 0 28px 90px rgba(23, 32, 51, 0.22) !important;
+    color: #172033 !important;
+    overflow: hidden;
+    padding: 0 !important;
+}
+
+.dark .sceneflow-experience-modal,
+.sceneflow-experience-modal {
+    background: transparent !important;
+    padding-bottom: 0 !important;
+}
+
+.dark .sceneflow-experience-modal .ant-modal-body,
+.sceneflow-experience-modal .ant-modal-body {
+    background: #fffefa !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.dark .sceneflow-experience-modal .ant-modal-close,
+.sceneflow-experience-modal .ant-modal-close {
+    color: #4b5567 !important;
+    inset-inline-end: 14px;
+    top: 14px;
+}
+
+.dark .sceneflow-experience-modal .ant-modal-close:hover,
+.sceneflow-experience-modal .ant-modal-close:hover {
+    background: #f2ede4 !important;
+    color: #111827 !important;
+}
+
+.sceneflow-experience-dialog .ant-input,
+.sceneflow-experience-dialog .ant-input-outlined,
+.sceneflow-experience-dialog textarea {
+    background: #ffffff !important;
+    border-color: #ded3c4 !important;
+    color: #172033 !important;
+}
+
+.sceneflow-experience-dialog .ant-input::placeholder,
+.sceneflow-experience-dialog textarea::placeholder {
+    color: #8a7f91 !important;
+}
+
+.sceneflow-experience-dialog .ant-btn-default {
+    background: #ffffff !important;
+    border-color: #ded3c4 !important;
+    color: #172033 !important;
+}
+
+.sceneflow-experience-dialog .ant-btn-primary {
+    background: #4f5dff !important;
+    border-color: #4f5dff !important;
+    color: #ffffff !important;
+}
+
+.sceneflow-experience-dialog .ant-btn-primary[disabled],
+.sceneflow-experience-dialog .ant-btn-primary:disabled {
+    background: #a8afff !important;
+    border-color: #a8afff !important;
+    color: #ffffff !important;
 }

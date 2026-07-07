@@ -110,6 +110,17 @@ export const AnimatedThemeToggler = ({ children, className, duration = 400, vari
     }, [theme]);
 
     const toggleTheme = useCallback(() => {
+        const immediateTheme = targetTheme ?? (isDark ? "light" : "dark");
+        if (immediateTheme === (isDark ? "dark" : "light")) return;
+        setIsDark(immediateTheme === "dark");
+        document.documentElement.classList.toggle("dark", immediateTheme === "dark");
+        document.documentElement.style.colorScheme = immediateTheme;
+        delete document.documentElement.dataset.magicuiThemeVt;
+        document.documentElement.style.removeProperty("--magicui-theme-toggle-vt-duration");
+        document.documentElement.style.removeProperty("--magicui-theme-vt-clip-from");
+        onThemeChange?.(immediateTheme);
+        return;
+
         const button = buttonRef.current;
         if (!button) return;
 

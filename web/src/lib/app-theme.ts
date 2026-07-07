@@ -3,16 +3,16 @@ import { theme as antdTheme } from "antd";
 
 const neutral = {
     light: {
-        primary: "#171717",
-        primaryHover: "#000000",
+        primary: "#4f5dff",
+        primaryHover: "#3846e8",
         primaryText: "#ffffff",
-        menuBg: "#f5f5f5",
-        menuText: "#171717",
-        selectActiveBg: "#f5f5f5",
-        selectSelectedBg: "#f0f0f0",
-        selectText: "#171717",
-        tableSelectedBg: "rgba(17, 17, 17, 0.05)",
-        tableSelectedHoverBg: "rgba(17, 17, 17, 0.08)",
+        menuBg: "#f2ede4",
+        menuText: "#172033",
+        selectActiveBg: "#f3eee6",
+        selectSelectedBg: "#ebe7ff",
+        selectText: "#172033",
+        tableSelectedBg: "rgba(79, 93, 255, 0.08)",
+        tableSelectedHoverBg: "rgba(79, 93, 255, 0.12)",
     },
     dark: {
         primary: "#f5f5f5",
@@ -41,10 +41,13 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
             colorLinkHover: color.primaryHover,
             colorLinkActive: color.primary,
             colorTextLightSolid: color.primaryText,
-            colorBgContainer: dark ? "#141414" : undefined,
-            colorBgElevated: dark ? "#1a1a1a" : undefined,
-            colorBorder: dark ? "rgba(255,255,255,0.06)" : undefined,
-            borderRadius: 6,
+            colorBgBase: dark ? "#0a0a0a" : "#f7f3ea",
+            colorBgContainer: dark ? "#141414" : "#fffdfa",
+            colorBgElevated: dark ? "#1a1a1a" : "#ffffff",
+            colorBorder: dark ? "rgba(255,255,255,0.06)" : "#ded3c4",
+            colorText: dark ? undefined : "#172033",
+            colorTextSecondary: dark ? undefined : "#746b7a",
+            borderRadius: 10,
             fontFamily: `"SF Pro Display","SF Pro Text","PingFang SC","Microsoft YaHei","Helvetica Neue",sans-serif`,
         },
         components: {
@@ -70,11 +73,15 @@ export function getAntThemeConfig(dark: boolean): ThemeConfig {
                 rowSelectedHoverBg: color.tableSelectedHoverBg,
             },
             Modal: {
-                contentBg: dark ? "#141414" : undefined,
-                headerBg: dark ? "#141414" : undefined,
+                contentBg: dark ? "#141414" : "#fffefa",
+                headerBg: dark ? "#141414" : "#fffefa",
+                footerBg: dark ? "#141414" : "#fffefa",
             },
             Popover: {
-                colorBgElevated: dark ? "#1a1a1a" : undefined,
+                colorBgElevated: dark ? "#1a1a1a" : "#fffefa",
+            },
+            Drawer: {
+                colorBgElevated: dark ? "#141414" : "#fffefa",
             },
             Card: {
                 colorBgContainer: dark ? "#141414" : undefined,

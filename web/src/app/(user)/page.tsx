@@ -100,39 +100,41 @@ export default function IndexPage() {
     };
 
     return (
-        <main className="h-full overflow-y-auto bg-[#08090b] text-white">
+        <main className="h-full overflow-y-auto bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_42%,#eef4ff_100%)] text-[#172033]">
             <LoginModal
                 open={loginOpen}
                 onClose={() => setLoginOpen(false)}
                 onSuccess={() => { if (pendingHref) { router.push(pendingHref); setPendingHref(null); } }}
             />
-            <section className="relative overflow-hidden border-b border-white/10 px-6 pb-16 pt-12">
+            <section className="relative overflow-hidden border-b border-[#ded3c4] px-6 pb-16 pt-12">
                 <CanvasGrid />
-                <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_50%_0%,rgba(82,95,255,.24),transparent_58%)]" />
+                <div className="absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_50%_0%,rgba(79,93,255,.18),transparent_58%)]" />
+                <div className="absolute -left-28 top-36 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(24,168,137,.16),transparent_68%)] blur-2xl" />
+                <div className="absolute -right-32 top-20 h-80 w-80 rounded-full bg-[radial-gradient(circle,rgba(201,109,240,.12),transparent_68%)] blur-2xl" />
                 <div className="relative z-10 mx-auto max-w-7xl">
                     <div className="mx-auto max-w-5xl text-center">
-                        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.045] px-3 py-1.5 text-sm text-white/68 backdrop-blur">
-                            <Sparkles className="size-4 text-cyan-300" />
+                        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/70 bg-white/80 px-3 py-1.5 text-sm text-[#746b7a] shadow-[0_10px_30px_rgba(57,48,34,0.08)] backdrop-blur">
+                            <Sparkles className="size-4 text-[#18a889]" />
                             Spatial workspace for visual production
                         </div>
-                        <h1 className="text-balance text-5xl font-semibold leading-[0.96] tracking-tight sm:text-7xl lg:text-[88px]">
+                        <h1 className="text-balance text-5xl font-semibold leading-[0.96] tracking-tight text-[#111827] sm:text-7xl lg:text-[88px]">
                             SceneFlow turns ideas into visual systems.
                         </h1>
-                        <p className="mx-auto mt-6 max-w-3xl text-balance text-lg leading-8 text-white/58">
+                        <p className="mx-auto mt-6 max-w-3xl text-balance text-lg leading-8 text-[#5f6678]">
                             Build a connected production canvas for scripts, characters, scenes, references, keyframes,
                             storyboard tables, image generation, and video generation.
                         </p>
                         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
                             <button
                                 onClick={() => requireAuth("/canvas")}
-                                className="inline-flex h-11 items-center gap-2 rounded-md border border-white bg-white px-4 text-sm font-medium text-[#08090b] transition hover:bg-white/88"
+                                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#4f5dff] bg-[#4f5dff] px-4 text-sm font-medium text-white shadow-[0_12px_30px_rgba(79,93,255,.22)] transition hover:bg-[#3846e8]"
                             >
                                 Open Canvas
                                 <ArrowRight className="size-4" />
                             </button>
                             <button
                                 onClick={() => requireAuth("/image")}
-                                className="inline-flex h-11 items-center gap-2 rounded-md border border-white/14 bg-white/[0.055] px-4 text-sm font-medium text-white/78 transition hover:bg-white/[0.09]"
+                                className="inline-flex h-11 items-center gap-2 rounded-xl border border-[#d9d0ff] bg-white/75 px-4 text-sm font-medium text-[#4f5dff] transition hover:bg-[#f4f1ff]"
                             >
                                 Try Generation
                             </button>
@@ -141,7 +143,7 @@ export default function IndexPage() {
 
                     <div className="mx-auto mt-9 flex max-w-4xl flex-wrap justify-center gap-2">
                         {stack.map((item) => (
-                            <span key={item} className="rounded-md border border-white/10 bg-white/[0.035] px-3 py-1.5 text-xs text-white/44">
+                            <span key={item} className="rounded-lg border border-white/70 bg-white/70 px-3 py-1.5 text-xs text-[#746b7a] shadow-[0_8px_24px_rgba(57,48,34,0.05)] backdrop-blur">
                                 {item}
                             </span>
                         ))}
@@ -159,38 +161,38 @@ export default function IndexPage() {
                 </div>
             </section>
 
-            <section className="mx-auto max-w-7xl border-b border-white/10 px-6 py-16">
+            <section className="mx-auto max-w-7xl border-b border-[#ded3c4] px-6 py-16">
                 <div className="mb-10 grid gap-4 lg:grid-cols-[0.72fr_1.28fr] lg:items-end">
                     <div>
-                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-white/32">PRODUCT PROOF</div>
+                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-[#8a7f91]">PRODUCT PROOF</div>
                         <h2 className="max-w-xl text-3xl font-semibold tracking-tight md:text-4xl">
                             Not another isolated generator.
                         </h2>
                     </div>
-                    <p className="max-w-2xl text-base leading-7 text-white/46 lg:justify-self-end">
+                    <p className="max-w-2xl text-base leading-7 text-[#6d6472] lg:justify-self-end">
                         The canvas is the product. Every generated asset can keep its upstream reasoning, reference,
                         prompt, and downstream usage visible.
                     </p>
                 </div>
                 <div className="grid gap-3 md:grid-cols-3">
                     {proofPoints.map(([index, title, desc]) => (
-                        <div key={index} className="rounded-md border border-white/10 bg-white/[0.028] p-5">
-                            <div className="mb-12 text-sm text-white/26">{index}</div>
+                        <div key={index} className="rounded-xl border border-white/70 bg-white/76 p-5 shadow-[0_22px_70px_rgba(57,48,34,0.08)] backdrop-blur">
+                            <div className="mb-12 text-sm text-[#a49aaa]">{index}</div>
                             <h3 className="text-xl font-medium tracking-tight">{title}</h3>
-                            <p className="mt-4 text-sm leading-6 text-white/44">{desc}</p>
+                            <p className="mt-4 text-sm leading-6 text-[#6d6472]">{desc}</p>
                         </div>
                     ))}
                 </div>
             </section>
 
-            <section className="mx-auto max-w-7xl border-b border-white/10 px-6 py-16">
+            <section className="mx-auto max-w-7xl border-b border-[#ded3c4] px-6 py-16">
                 <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
                     <div>
-                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-white/32">DELIVERABLES</div>
+                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-[#8a7f91]">DELIVERABLES</div>
                         <h2 className="max-w-xl text-3xl font-semibold tracking-tight md:text-4xl">
                             From messy creative intent to a production table.
                         </h2>
-                        <p className="mt-5 max-w-xl text-base leading-7 text-white/50">
+                        <p className="mt-5 max-w-xl text-base leading-7 text-[#6d6472]">
                             Storyboards are not just pictures. SceneFlow can turn a fragment into shots with framing,
                             action, dialogue, camera movement, duration, and required reference assets.
                         </p>
@@ -210,15 +212,15 @@ export default function IndexPage() {
                 </div>
             </section>
 
-            <section className="mx-auto max-w-7xl border-b border-white/10 px-6 py-16">
+            <section className="mx-auto max-w-7xl border-b border-[#ded3c4] px-6 py-16">
                 <div className="mb-10 grid gap-4 lg:grid-cols-[0.78fr_1.22fr] lg:items-end">
                     <div>
-                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-white/32">VISUAL CASES</div>
+                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-[#8a7f91]">VISUAL CASES</div>
                         <h2 className="max-w-xl text-3xl font-semibold tracking-tight md:text-4xl">
                             Make the workflow feel concrete.
                         </h2>
                     </div>
-                    <p className="max-w-2xl text-base leading-7 text-white/46 lg:justify-self-end">
+                    <p className="max-w-2xl text-base leading-7 text-[#6d6472] lg:justify-self-end">
                         SceneFlow is built for visual production, so the homepage should show production-grade outcomes:
                         boards, assets, keyframes, and story memory.
                     </p>
@@ -230,17 +232,17 @@ export default function IndexPage() {
                 </div>
             </section>
 
-            <section className="mx-auto max-w-7xl border-b border-white/10 px-6 py-16">
+            <section className="mx-auto max-w-7xl border-b border-[#ded3c4] px-6 py-16">
                 <div className="mb-10 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
-                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-white/32">CORE CONCEPTS</div>
+                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-[#8a7f91]">CORE CONCEPTS</div>
                         <h2 className="max-w-2xl text-3xl font-semibold tracking-tight md:text-4xl">
                             Build a living workspace around visual assets.
                         </h2>
                     </div>
                     <button
                         onClick={() => requireAuth("/canvas")}
-                        className="inline-flex h-10 w-fit items-center gap-2 rounded-md border border-white/14 px-3 text-sm text-white/58 transition hover:bg-white/[0.06] hover:text-white"
+                        className="inline-flex h-10 w-fit items-center gap-2 rounded-xl border border-[#d9d0ff] bg-white/65 px-3 text-sm text-[#4f5dff] transition hover:bg-[#f4f1ff]"
                     >
                         Open workspace
                         <ArrowRight className="size-4" />
@@ -250,17 +252,17 @@ export default function IndexPage() {
                     {concepts.map((item) => {
                         const Icon = item.icon;
                         return (
-                            <div key={item.label} className="rounded-md border border-white/10 bg-white/[0.028] p-5">
+                            <div key={item.label} className="rounded-xl border border-white/70 bg-white/76 p-5 shadow-[0_22px_70px_rgba(57,48,34,0.07)] backdrop-blur">
                                 <div className="mb-10 flex items-center justify-between">
-                                    <span className="rounded border border-white/10 px-2 py-1 text-[10px] font-medium tracking-[0.16em] text-white/34">
+                                    <span className="rounded-md border border-[#ded3c4] bg-[#f7f3ea] px-2 py-1 text-[10px] font-medium tracking-[0.16em] text-[#8a7f91]">
                                         {item.label}
                                     </span>
-                                    <span className="grid size-9 place-items-center rounded-md border border-white/10 bg-black/20 text-white/58">
+                                    <span className="grid size-9 place-items-center rounded-lg border border-[#d9d0ff] bg-[#f4f1ff] text-[#4f5dff]">
                                         <Icon className="size-4.5" />
                                     </span>
                                 </div>
                                 <h3 className="text-lg font-medium tracking-tight">{item.title}</h3>
-                                <p className="mt-4 text-sm leading-6 text-white/44">{item.desc}</p>
+                                <p className="mt-4 text-sm leading-6 text-[#6d6472]">{item.desc}</p>
                             </div>
                         );
                     })}
@@ -270,9 +272,9 @@ export default function IndexPage() {
             <section className="mx-auto max-w-7xl px-6 py-16">
                 <div className="grid gap-8 lg:grid-cols-[0.66fr_1.34fr] lg:items-start">
                     <div>
-                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-white/32">START POINTS</div>
+                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-[#8a7f91]">START POINTS</div>
                         <h2 className="text-3xl font-semibold tracking-tight">Start from the surface you need.</h2>
-                        <p className="mt-4 max-w-xl text-base leading-7 text-white/52">
+                        <p className="mt-4 max-w-xl text-base leading-7 text-[#6d6472]">
                             SceneFlow can start from a canvas, a single image, a video shot, or an asset library.
                             The final work still returns to the same project space.
                         </p>
@@ -284,14 +286,14 @@ export default function IndexPage() {
                                 <button
                                     key={item.title}
                                     onClick={() => requireAuth(item.href)}
-                                    className="group min-h-36 rounded-md border border-white/10 bg-white/[0.035] p-5 text-left transition hover:border-white/22 hover:bg-white/[0.06]"
+                                    className="group min-h-36 rounded-xl border border-white/70 bg-white/76 p-5 text-left shadow-[0_18px_54px_rgba(57,48,34,0.07)] backdrop-blur transition hover:border-[#cfc8ff] hover:bg-[#f8f6ff]"
                                 >
-                                    <div className="mb-8 flex size-9 items-center justify-center rounded-md border border-white/10 bg-black/20 text-white/72">
+                                    <div className="mb-8 flex size-9 items-center justify-center rounded-lg border border-[#d9d0ff] bg-[#f4f1ff] text-[#4f5dff]">
                                         <Icon className="size-4.5" />
                                     </div>
                                     <div className="flex items-center justify-between gap-3">
                                         <h3 className="text-base font-medium tracking-tight">{item.title}</h3>
-                                        <ArrowRight className="size-4 shrink-0 text-white/30 transition group-hover:translate-x-0.5 group-hover:text-white/80" />
+                                        <ArrowRight className="size-4 shrink-0 text-[#a49aaa] transition group-hover:translate-x-0.5 group-hover:text-[#4f5dff]" />
                                     </div>
                                 </button>
                             );
@@ -306,10 +308,10 @@ export default function IndexPage() {
 function CanvasGrid() {
     return (
         <div
-            className="absolute inset-0 opacity-80"
+            className="absolute inset-0 opacity-70"
             style={{
                 backgroundImage:
-                    "linear-gradient(rgba(255,255,255,.052) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.052) 1px, transparent 1px)",
+                    "linear-gradient(rgba(79,93,255,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(24,168,137,.055) 1px, transparent 1px)",
                 backgroundSize: "40px 40px",
                 backgroundPosition: "center",
             }}
@@ -331,42 +333,42 @@ function ShowcaseImage({
     priority?: boolean;
 }) {
     return (
-        <figure className="overflow-hidden rounded-lg border border-white/10 bg-[#101114] shadow-[0_34px_100px_rgba(0,0,0,.5)]">
-            <div className="flex h-11 items-center justify-between border-b border-white/10 px-4">
-                <div className="flex items-center gap-2 text-sm text-white/46">
+        <figure className="overflow-hidden rounded-2xl border border-white/80 bg-white/86 shadow-[0_1px_0_rgba(255,255,255,0.82)_inset,0_34px_100px_rgba(57,48,34,0.16)] backdrop-blur">
+            <div className="flex h-11 items-center justify-between border-b border-[#ded3c4] bg-[#fffdf8]/82 px-4">
+                <div className="flex items-center gap-2 text-sm text-[#746b7a]">
                     <span className="size-2.5 rounded-full bg-[#ff5f57]" />
                     <span className="size-2.5 rounded-full bg-[#ffbd2e]" />
                     <span className="size-2.5 rounded-full bg-[#28c840]" />
                     <span className="ml-3">{label}</span>
                 </div>
-                <span className="hidden rounded bg-white/[0.06] px-2 py-1 text-xs text-white/36 sm:inline">SceneFlow</span>
+                <span className="hidden rounded-lg bg-[#f4f1ff] px-2 py-1 text-xs text-[#4f5dff] sm:inline">SceneFlow</span>
             </div>
-            <div className="bg-[#e9e7e2]">
+            <div className="bg-[#e9e7e2] ring-1 ring-inset ring-white/70">
                 <img src={src} alt={alt} loading={priority ? "eager" : "lazy"} className="block h-auto w-full" />
             </div>
-            <figcaption className="border-t border-white/10 px-4 py-3 text-sm leading-6 text-white/46">{caption}</figcaption>
+            <figcaption className="border-t border-[#ded3c4] bg-[#fffdf8]/74 px-4 py-3 text-sm leading-6 text-[#6d6472]">{caption}</figcaption>
         </figure>
     );
 }
 
 function Metric({ value, label }: { value: string; label: string }) {
     return (
-        <div className="rounded-md border border-white/10 bg-white/[0.035] p-4">
-            <div className="text-2xl font-semibold tracking-tight text-white">{value}</div>
-            <div className="mt-2 text-sm text-white/38">{label}</div>
+        <div className="rounded-xl border border-white/70 bg-white/76 p-4 shadow-[0_18px_54px_rgba(57,48,34,0.07)] backdrop-blur">
+            <div className="text-2xl font-semibold tracking-tight text-[#172033]">{value}</div>
+            <div className="mt-2 text-sm text-[#8a7f91]">{label}</div>
         </div>
     );
 }
 
 function CaseImage({ src, title, desc }: { src: string; title: string; desc: string }) {
     return (
-        <article className="group overflow-hidden rounded-lg border border-white/10 bg-white/[0.028]">
-            <div className="aspect-[16/9] overflow-hidden bg-[#101114]">
+        <article className="group overflow-hidden rounded-2xl border border-white/72 bg-white/80 shadow-[0_26px_80px_rgba(57,48,34,0.10)] backdrop-blur">
+            <div className="aspect-[16/9] overflow-hidden bg-[#f1ebe0]">
                 <img src={src} alt={title} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.025]" />
             </div>
-            <div className="border-t border-white/10 p-4">
+            <div className="border-t border-[#ded3c4] p-4">
                 <h3 className="text-lg font-medium tracking-tight">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-white/44">{desc}</p>
+                <p className="mt-2 text-sm leading-6 text-[#6d6472]">{desc}</p>
             </div>
         </article>
     );

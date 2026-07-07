@@ -79,21 +79,21 @@ export default function BillingPage() {
     const entitlements = subscription?.plan?.entitlements || [];
 
     return (
-        <main className="h-full overflow-y-auto bg-stone-50 px-6 py-10 text-stone-950">
+        <main className="h-full overflow-y-auto bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#eef4ff_100%)] px-6 py-10 text-[#172033]">
             <div className="mx-auto max-w-7xl">
                 <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
                     <div>
-                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-stone-400">BETA ACCESS</div>
+                        <div className="mb-3 text-xs font-medium tracking-[0.18em] text-[#8a7f91]">BETA ACCESS</div>
                         <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">当前权益与用量</h1>
                     </div>
-                    <Link href="/pricing" className="inline-flex h-10 items-center gap-2 rounded-md bg-stone-950 px-4 text-sm font-medium text-white">
+                    <Link href="/pricing" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#4f5dff] px-4 text-sm font-medium text-white shadow-[0_12px_30px_rgba(79,93,255,.22)]">
                         提交开通申请
                         <ArrowRight className="size-4" />
                     </Link>
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-                    <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+                    <section className="rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
                         <div className="mb-5 flex items-center gap-2 text-lg font-semibold">
                             <PackageCheck className="size-5" />
                             权益状态
@@ -108,7 +108,7 @@ export default function BillingPage() {
                                         {subscription.autoRenew ? <Tag color="blue">权益保留</Tag> : <Tag>到期结束</Tag>}
                                     </div>
                                 </div>
-                                <div className="text-sm leading-7 text-stone-500">
+                                <div className="text-sm leading-7 text-[#6d6472]">
                                     权益到期：
                                     {subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleString("zh-CN") : "无固定期限"}
                                 </div>
@@ -121,7 +121,7 @@ export default function BillingPage() {
                         )}
                     </section>
 
-                    <section className="rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+                    <section className="rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
                         <div className="mb-5 flex items-center gap-2 text-lg font-semibold">
                             <Gauge className="size-5" />
                             权益与用量
@@ -133,10 +133,10 @@ export default function BillingPage() {
                                 const hasNumericLimit = Number.isFinite(limit);
                                 const percent = hasNumericLimit && limit > 0 ? Math.min(100, Math.round(((usage?.used || 0) / limit) * 100)) : 0;
                                 return (
-                                    <div key={item.id} className="rounded-md border border-stone-200 p-4">
+                                    <div key={item.id} className="rounded-xl border border-[#eadfce] bg-[#fffaf2] p-4">
                                         <div className="mb-2 flex items-center justify-between gap-3 text-sm">
                                             <span className="font-medium">{item.label}</span>
-                                            <span className="text-stone-500">
+                                            <span className="text-[#8a7f91]">
                                                 {usage?.used || 0} / {item.value}
                                                 {item.unit}
                                             </span>
@@ -149,7 +149,7 @@ export default function BillingPage() {
                     </section>
                 </div>
 
-                <section className="mt-4 rounded-lg border border-stone-200 bg-white p-5 shadow-sm">
+                <section className="mt-4 rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
                     <div className="mb-5 flex items-center gap-2 text-lg font-semibold">
                         <CreditCard className="size-5" />
                         内测申请记录
@@ -157,7 +157,7 @@ export default function BillingPage() {
                     {data?.orders?.length ? (
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[760px] text-left text-sm">
-                                <thead className="border-b border-stone-200 text-stone-500">
+                                <thead className="border-b border-[#eadfce] text-[#8a7f91]">
                                     <tr>
                                         <th className="py-3 font-medium">申请编号</th>
                                         <th className="py-3 font-medium">套餐</th>
@@ -169,7 +169,7 @@ export default function BillingPage() {
                                 </thead>
                                 <tbody>
                                     {data.orders.map((order) => (
-                                        <tr key={order.id} className="border-b border-stone-100">
+                                        <tr key={order.id} className="border-b border-[#f1ebe0]">
                                             <td className="py-3 font-mono text-xs">{order.orderNo}</td>
                                             <td className="py-3">{order.plan.name}</td>
                                             <td className="py-3">{formatPrice(order.amount)}</td>
@@ -177,7 +177,7 @@ export default function BillingPage() {
                                             <td className="py-3">
                                                 <Tag>{order.status}</Tag>
                                             </td>
-                                            <td className="py-3 text-stone-500">{new Date(order.createdAt).toLocaleString("zh-CN")}</td>
+                                            <td className="py-3 text-[#8a7f91]">{new Date(order.createdAt).toLocaleString("zh-CN")}</td>
                                         </tr>
                                     ))}
                                 </tbody>

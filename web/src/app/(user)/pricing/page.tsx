@@ -81,16 +81,16 @@ export default function PricingPage() {
     }
 
     return (
-        <main className="h-full overflow-y-auto bg-[#f6f3ee] px-6 py-12 text-stone-950">
+        <main className="h-full overflow-y-auto bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#eef4ff_100%)] px-6 py-12 text-[#172033]">
             <div className="mx-auto max-w-7xl">
                 <div className="mb-10 grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
                     <div>
                         <div className="mb-3 flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-medium tracking-[0.18em] text-stone-400">BETA ACCESS</span>
+                            <span className="text-xs font-medium tracking-[0.18em] text-[#8a7f91]">BETA ACCESS</span>
                             <Tag color="blue">内测期人工开通</Tag>
                         </div>
                         <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">选择适合你的生产规模</h1>
-                        <p className="mt-4 max-w-2xl text-base leading-7 text-stone-500">
+                        <p className="mt-4 max-w-2xl text-base leading-7 text-[#6d6472]">
                             当前阶段因内测阶段暂不接入在线收银台，套餐仍按所选权益开通。可以联系管理员付费手动开通权益，提交申请后，管理员会联系确认使用场景、套餐周期和开通方式。
                         </p>
                     </div>
@@ -112,24 +112,24 @@ export default function PricingPage() {
                             <section
                                 key={plan.id}
                                 className={cn(
-                                    "relative flex min-h-[520px] flex-col rounded-lg border bg-white p-5 shadow-sm",
-                                    plan.isPopular ? "border-stone-950 ring-2 ring-stone-950/10" : "border-stone-200",
+                                    "relative flex min-h-[520px] flex-col rounded-2xl border bg-white/78 p-5 shadow-[0_24px_70px_rgba(66,56,38,0.07)]",
+                                    plan.isPopular ? "border-[#4f5dff] ring-2 ring-[#4f5dff]/10" : "border-[#eadfce]",
                                 )}
                             >
-                                {plan.isPopular ? <div className="absolute right-4 top-4 rounded-full bg-stone-950 px-2.5 py-1 text-xs text-white">推荐套餐</div> : null}
-                                <div className="mb-5 flex size-11 items-center justify-center rounded-md bg-stone-950 text-white">
+                                {plan.isPopular ? <div className="absolute right-4 top-4 rounded-full bg-[#4f5dff] px-2.5 py-1 text-xs text-white">推荐套餐</div> : null}
+                                <div className={cn("mb-5 flex size-11 items-center justify-center rounded-xl", plan.isPopular ? "bg-[#4f5dff] text-white" : "bg-[#f4f1ff] text-[#4f5dff]")}>
                                     <Icon className="size-5" />
                                 </div>
                                 <h2 className="text-xl font-semibold tracking-tight">{plan.name}</h2>
-                                <p className="mt-2 min-h-12 text-sm leading-6 text-stone-500">{plan.description}</p>
+                                <p className="mt-2 min-h-12 text-sm leading-6 text-[#6d6472]">{plan.description}</p>
                                 <div className="mt-6 flex items-end gap-2">
                                     <span className="text-4xl font-semibold tracking-tight">{formatPrice(price)}</span>
                                     {price > 0 ? <span className="pb-1 text-sm text-stone-400">/{cycle === "yearly" ? "年" : "月"}，内测开通价</span> : null}
                                 </div>
                                 <div className="mt-6 space-y-3">
                                     {plan.entitlements.map((item) => (
-                                        <div key={item.id} className="flex items-start gap-2 text-sm text-stone-600">
-                                            <Check className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                                        <div key={item.id} className="flex items-start gap-2 text-sm text-[#5f6678]">
+                                            <Check className="mt-0.5 size-4 shrink-0 text-[#18a889]" />
                                             <span>
                                                 {item.label}: {formatEntitlement(item.value, item.unit)}
                                             </span>
@@ -146,7 +146,7 @@ export default function PricingPage() {
                     })}
                 </div>
 
-                <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-stone-200 bg-white p-4">
+                <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/78 p-4 shadow-[0_20px_70px_rgba(57,48,34,0.08)] backdrop-blur">
                     <span className="text-sm text-stone-500">提交申请不是免费开通。管理员会根据你的创作场景确认套餐，并完成权益开通。</span>
                     <Link href="/billing" className="inline-flex items-center gap-2 text-sm font-medium text-stone-950">
                         查看当前套餐
