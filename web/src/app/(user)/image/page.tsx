@@ -153,7 +153,7 @@ export default function ImagePage() {
         // 配额检查
         const { allowed, remaining, limit } = checkGenerationQuota(entitlements, generationCount, user?.role);
         if (!allowed) {
-            message.warning(`今日免费生成次数已用完（${limit} 次/天），请提交开通申请或联系管理员确认套餐。`);
+            message.warning(`今日免费生成次数已用完（${limit} 次/天），请联系管理员申请开通套餐权益。`);
             return;
         }
         if (remaining > 0 && remaining <= 1) {

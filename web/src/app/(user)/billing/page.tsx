@@ -87,7 +87,7 @@ export default function BillingPage() {
                         <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">当前权益与用量</h1>
                     </div>
                     <Link href="/pricing" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#4f5dff] px-4 text-sm font-medium text-white shadow-[0_12px_30px_rgba(79,93,255,.22)]">
-                        提交开通申请
+                        申请开通联系管理员
                         <ArrowRight className="size-4" />
                     </Link>
                 </div>
@@ -152,7 +152,7 @@ export default function BillingPage() {
                 <section className="mt-4 rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
                     <div className="mb-5 flex items-center gap-2 text-lg font-semibold">
                         <CreditCard className="size-5" />
-                        内测申请记录
+                        开通申请记录
                     </div>
                     {data?.orders?.length ? (
                         <div className="overflow-x-auto">
@@ -184,7 +184,7 @@ export default function BillingPage() {
                             </table>
                         </div>
                     ) : (
-                        <Empty description="暂无内测申请" />
+                        <Empty description="暂无开通申请" />
                     )}
                 </section>
             </div>

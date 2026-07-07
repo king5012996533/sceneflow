@@ -57,6 +57,27 @@ function formatPrice(amount: number) {
     return `¥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
 }
 
+function formatDateTime(value?: string | null) {
+    if (!value) return "-";
+    return new Date(value).toLocaleString("zh-CN", { hour12: false });
+}
+
+function formatRelativeTime(value?: string | null) {
+    if (!value) return "";
+    const diffMs = Date.now() - new Date(value).getTime();
+    if (!Number.isFinite(diffMs)) return "";
+    const minutes = Math.floor(diffMs / 60000);
+    if (minutes < 1) return "刚刚注册";
+    if (minutes < 60) return `${minutes} 分钟前`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours} 小时前`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days} 天前`;
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months} 个月前`;
+    return `${Math.floor(months / 12)} 年前`;
+}
+
 export default function AdminPage() {
     const router = useRouter();
     const { message } = App.useApp();
@@ -184,7 +205,7 @@ export default function AdminPage() {
                     <Metric icon={Users} label="用户" value={overview?.users ?? "-"} />
                     <Metric icon={Boxes} label="活跃订阅" value={overview?.activeSubscriptions ?? "-"} />
                     <Metric icon={CreditCard} label="已开通记录" value={overview?.paidOrders ?? "-"} />
-                    <Metric icon={CreditCard} label="内测申请" value={overview?.pendingOrders ?? "-"} />
+                    <Metric icon={CreditCard} label="开通申请" value={overview?.pendingOrders ?? "-"} />
                     <Metric icon={Database} label="参考金额" value={overview ? formatPrice(overview.revenue) : "-"} />
                 </div>
 
@@ -202,6 +223,7 @@ export default function AdminPage() {
                                         <thead className="border-b border-stone-200 text-stone-500">
                                             <tr>
                                                 <th className="py-3 font-medium">用户</th>
+                                                <th className="py-3 font-medium">注册时间</th>
                                                 <th className="py-3 font-medium">角色</th>
                                                 <th className="py-3 font-medium">当前套餐</th>
                                                 <th className="py-3 font-medium">手动开通</th>
@@ -215,6 +237,11 @@ export default function AdminPage() {
                                                     <td className="py-3">
                                                         <div className="font-medium">{user.name || user.email}</div>
                                                         <div className="text-xs text-stone-500">{user.email}</div>
+                                                        {user.phone ? <div className="text-xs text-stone-400">{user.phone}</div> : null}
+                                                    </td>
+                                                    <td className="py-3 text-sm text-stone-600">
+                                                        <div>{formatDateTime(user.createdAt)}</div>
+                                                        <div className="text-xs text-stone-400">{formatRelativeTime(user.createdAt)}</div>
                                                     </td>
                                                     <td className="py-3">
                                                         <Select
@@ -270,7 +297,7 @@ export default function AdminPage() {
                         },
                         {
                             key: "orders",
-                            label: "内测申请",
+                            label: "开通申请",
                             children: (
                                 <section className="rounded-lg border border-stone-200 bg-white p-5">
                                     <DataTable empty={!orders.length}>
@@ -291,7 +318,7 @@ export default function AdminPage() {
                                                     <td className="py-3">{order.user.email}</td>
                                                     <td className="py-3">{order.plan.name}</td>
                                                     <td className="py-3">{formatPrice(order.amount)}</td>
-                                                    <td className="py-3">{order.provider === "manual" ? "内测申请" : order.provider}</td>
+                                                    <td className="py-3">{order.provider === "manual" ? "开通申请" : order.provider}</td>
                                                     <td className="py-3">
                                                         <Select
                                                             value={order.status}

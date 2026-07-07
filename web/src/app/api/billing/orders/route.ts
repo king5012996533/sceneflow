@@ -77,11 +77,11 @@ export async function POST(req: NextRequest) {
             checkout: {
                 mode: provider === "manual" ? "beta_application" : "stub",
                 provider,
-                message: provider === "manual" ? "开通申请已提交，管理员会联系确认场景与套餐后开通。" : "订单已创建。接入真实支付时返回二维码、收银台 URL 或客户端支付参数。",
+                message: provider === "manual" ? "已申请开通，管理员会联系确认使用场景、套餐周期和开通方式。" : "订单已创建。接入真实支付时返回二维码、收银台 URL 或客户端支付参数。",
             },
         });
     } catch (error) {
         console.error("[billing/orders:post]", error);
-        return NextResponse.json({ error: "提交申请失败" }, { status: 500 });
+        return NextResponse.json({ error: "申请开通失败" }, { status: 500 });
     }
 }

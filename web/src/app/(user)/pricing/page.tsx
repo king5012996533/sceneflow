@@ -71,10 +71,10 @@ export default function PricingPage() {
                 body: JSON.stringify({ planId: plan.id, billingCycle: cycle, provider: "manual", intent: "beta_application" }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "提交内测申请失败");
-            message.success(`已提交 ${plan.name} 开通申请，管理员会联系确认场景与套餐后开通。`);
+            if (!res.ok) throw new Error(data.error || "申请开通失败");
+            message.success(`已申请开通 ${plan.name}，管理员会联系确认使用场景、套餐周期和开通方式。`);
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "提交内测申请失败");
+            message.error(error instanceof Error ? error.message : "申请开通失败");
         } finally {
             setLoadingPlan(null);
         }
@@ -91,7 +91,7 @@ export default function PricingPage() {
                         </div>
                         <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">选择适合你的生产规模</h1>
                         <p className="mt-4 max-w-2xl text-base leading-7 text-[#6d6472]">
-                            当前阶段因内测阶段暂不接入在线收银台，套餐仍按所选权益开通。可以联系管理员付费手动开通权益，提交申请后，管理员会联系确认使用场景、套餐周期和开通方式。
+                            当前阶段暂不接入在线收银台，套餐仍按所选权益开通。请联系管理员付费手动开通权益；点击申请后，管理员会联系确认使用场景、套餐周期和开通方式。
                         </p>
                     </div>
                     <Segmented
@@ -138,7 +138,7 @@ export default function PricingPage() {
                                 </div>
                                 <div className="mt-auto pt-8">
                                     <Button type={plan.isPopular ? "primary" : "default"} block size="large" loading={loadingPlan === plan.id} onClick={() => void applyBeta(plan)}>
-                                        {plan.id === "free" ? "免费开始" : "提交开通申请"}
+                                        {plan.id === "free" ? "免费开始" : "申请开通联系管理员"}
                                     </Button>
                                 </div>
                             </section>
@@ -147,7 +147,7 @@ export default function PricingPage() {
                 </div>
 
                 <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/78 p-4 shadow-[0_20px_70px_rgba(57,48,34,0.08)] backdrop-blur">
-                    <span className="text-sm text-stone-500">提交申请不是免费开通。管理员会根据你的创作场景确认套餐，并完成权益开通。</span>
+                    <span className="text-sm text-stone-500">申请开通不是免费开通。管理员会根据你的创作场景确认套餐、周期和开通方式，并完成权益开通。</span>
                     <Link href="/billing" className="inline-flex items-center gap-2 text-sm font-medium text-stone-950">
                         查看当前套餐
                         <ArrowRight className="size-4" />

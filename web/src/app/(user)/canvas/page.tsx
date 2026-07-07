@@ -53,7 +53,7 @@ function CanvasPageInner() {
 
     const warnProjectLimit = () => {
         if (projectLimit === null) return;
-        message.warning(`当前套餐最多创建 ${projectLimit} 个画布项目，请提交开通申请或联系管理员确认套餐。`);
+        message.warning(`当前套餐最多创建 ${projectLimit} 个画布项目，请联系管理员申请开通套餐权益。`);
     };
 
     const handleExport = async (projectsToExport: CanvasProject[], name: string) => {

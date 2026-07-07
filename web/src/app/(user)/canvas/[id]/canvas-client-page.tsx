@@ -410,7 +410,7 @@ function InfiniteCanvasPage() {
             }
             const quota = checkGenerationQuota(entitlements, safeCount, user?.role);
             if (!quota.allowed) {
-                throw new Error(`今日免费生成次数已用完（${quota.limit} 次/天），请提交开通申请或联系管理员确认套餐。`);
+                throw new Error(`今日免费生成次数已用完（${quota.limit} 次/天），请联系管理员申请开通套餐权益。`);
             }
             if (quota.remaining > 0 && quota.remaining <= safeCount) {
                 message.info(`免费套餐今日还剩 ${quota.remaining} 次生成机会`);
@@ -1139,7 +1139,7 @@ function InfiniteCanvasPage() {
         const projects = useCanvasStore.getState().projects;
         const projectLimit = entitlements?.projects ?? 3;
         if (isOverLimit(projects.length, projectLimit)) {
-            message.warning(`当前套餐最多创建 ${projectLimit} 个画布项目，请提交开通申请或联系管理员确认套餐。`);
+            message.warning(`当前套餐最多创建 ${projectLimit} 个画布项目，请联系管理员申请开通套餐权益。`);
             return;
         }
         const id = createProject(`无限画布 ${projects.length + 1}`);

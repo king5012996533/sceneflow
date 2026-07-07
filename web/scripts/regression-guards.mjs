@@ -31,7 +31,7 @@ assertIncludes("src/services/api/proxy-client.ts", "status === 413", "proxy clie
 
 assertNotMatches("src/app/(user)/pricing/page.tsx", /暂不收款|不收款|可以免费|免费开通权益/, "pricing copy must not imply beta packages are free.");
 assertIncludes("src/app/(user)/pricing/page.tsx", "付费手动开通权益", "pricing copy must keep paid manual opening clear.");
-assertIncludes("src/app/(user)/pricing/page.tsx", "提交开通申请", "pricing CTA should not say free beta application.");
+assertIncludes("src/app/(user)/pricing/page.tsx", "申请开通联系管理员", "pricing CTA should route paid plans to admin-assisted opening.");
 
 assertNotMatches("src/app/(user)/image/page.tsx", /请升级套餐继续使用/, "image quota copy should route users to manual opening, not nonexistent online upgrade.");
 assertNotMatches("src/app/(user)/video/page.tsx", /请升级套餐继续使用/, "video quota copy should route users to manual opening, not nonexistent online upgrade.");
