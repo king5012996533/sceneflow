@@ -1,14 +1,14 @@
 import { type ClientEntitlements } from "./client-entitlements";
 import { apiPath } from "./app-paths";
 
-const USAGE_KEY = "sceneflow:generation_usage";
-const FREE_MONTHLY_LIMIT = 3;
+const USAGE_KEY = "sceneflow:generation_usage:daily";
+const FREE_DAILY_LIMIT = 3;
 
-type UsageRecord = { year: number; month: number; count: number };
+type UsageRecord = { year: number; month: number; day: number; count: number };
 
 function currentPeriod() {
     const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+    return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
 }
 
 function getCurrentUsage(): UsageRecord {
@@ -19,7 +19,7 @@ function getCurrentUsage(): UsageRecord {
         if (!raw) return { ...period, count: 0 };
 
         const parsed = JSON.parse(raw) as UsageRecord;
-        if (parsed.year !== period.year || parsed.month !== period.month) return { ...period, count: 0 };
+        if (parsed.year !== period.year || parsed.month !== period.month || parsed.day !== period.day) return { ...period, count: 0 };
         return parsed;
     } catch {
         return { ...period, count: 0 };
@@ -38,10 +38,10 @@ export function getGenerationCount(): number {
 
 export function getGenerationLimit(entitlements: ClientEntitlements | null, userRole?: string): number | null {
     if (userRole === "admin") return null;
-    if (!entitlements) return FREE_MONTHLY_LIMIT;
+    if (!entitlements) return FREE_DAILY_LIMIT;
 
     // Generation count is not stored as a plan entitlement yet; free users get a small trial quota.
-    if (entitlements.projects !== null && entitlements.projects <= 3) return FREE_MONTHLY_LIMIT;
+    if (entitlements.projects !== null && entitlements.projects <= 3) return FREE_DAILY_LIMIT;
     return null;
 }
 

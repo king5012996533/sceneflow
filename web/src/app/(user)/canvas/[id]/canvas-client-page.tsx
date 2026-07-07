@@ -399,6 +399,26 @@ function InfiniteCanvasPage() {
         void fetchClientEntitlements().then(setEntitlements);
     }, []);
 
+    const reserveCanvasGenerationQuota = useCallback(
+        async (count = 1) => {
+            const safeCount = Math.max(1, Math.min(50, Math.floor(Number(count) || 1)));
+            const concurrentLimit = entitlements ? entitlements.concurrentJobs : null;
+            const activeRequests = generationRequestsRef.current.size;
+            if (concurrentLimit !== null && activeRequests + safeCount > concurrentLimit) {
+                throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请减少生成数量或升级套餐。`);
+            }
+            const quota = checkGenerationQuota(entitlements, safeCount, user?.role);
+            if (!quota.allowed) {
+                throw new Error(`今日免费生成次数已用完（${quota.limit} 次/天），请提交开通申请或联系管理员确认套餐。`);
+            }
+            if (quota.remaining > 0 && quota.remaining <= safeCount) {
+                message.info(`免费套餐今日还剩 ${quota.remaining} 次生成机会`);
+            }
+            await reserveGenerationQuota(safeCount);
+        },
+        [entitlements, message, user?.role],
+    );
+
     const startGenerationRequest = useCallback(async (targetNodeId: string, originNodeId: string, runningId = originNodeId, controller = new AbortController()) => {
         const previous = generationRequestsRef.current.get(targetNodeId);
         if (previous?.controller !== controller) previous?.controller.abort();
@@ -407,14 +427,9 @@ function InfiniteCanvasPage() {
         if (isOverLimit(activeRequests, concurrentLimit)) {
             throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请等待已有任务完成或升级套餐。`);
         }
-        const quota = checkGenerationQuota(entitlements, 1, user?.role);
-        if (!quota.allowed) {
-            throw new Error(`本月免费生成次数已用完（${quota.limit}次/月），请提交开通申请或联系管理员确认套餐。`);
-        }
-        await reserveGenerationQuota(1);
         generationRequestsRef.current.set(targetNodeId, { targetNodeId, originNodeId, runningNodeId: runningId, controller });
         return controller;
-    }, [entitlements, user?.role]);
+    }, [entitlements]);
 
     const finishGenerationRequest = useCallback((targetNodeId: string, controller: AbortController) => {
         const request = generationRequestsRef.current.get(targetNodeId);
@@ -1452,6 +1467,12 @@ function InfiniteCanvasPage() {
                     },
                 };
                 const nextPrompt = buildContinuationPrompt(node.metadata.prompt);
+                const nextVideoModel = node.metadata.model || effectiveConfig.videoModel || effectiveConfig.model;
+                const nextVideoSize = node.metadata.size || effectiveConfig.size || defaultConfig.size;
+                const nextVideoSeconds = node.metadata.seconds || effectiveConfig.videoSeconds || defaultConfig.videoSeconds;
+                const nextVideoQuality = node.metadata.vquality || effectiveConfig.vquality || defaultConfig.vquality;
+                const nextVideoGenerateAudio = node.metadata.generateAudio || effectiveConfig.videoGenerateAudio || defaultConfig.videoGenerateAudio;
+                const nextVideoWatermark = node.metadata.watermark || effectiveConfig.videoWatermark || defaultConfig.videoWatermark;
                 const nextVideoNode: CanvasNodeData = {
                     id: nextVideoId,
                     type: CanvasNodeType.Video,
@@ -1467,6 +1488,13 @@ function InfiniteCanvasPage() {
                         status: NODE_STATUS_IDLE,
                         generationMode: "video",
                         prompt: nextPrompt,
+                        model: nextVideoModel,
+                        size: nextVideoSize,
+                        seconds: nextVideoSeconds,
+                        vquality: nextVideoQuality,
+                        generateAudio: nextVideoGenerateAudio,
+                        watermark: nextVideoWatermark,
+                        references: [uploaded.storageKey || uploaded.url].filter(Boolean),
                         assetCategory: "video-shot",
                         assetSource: "generate",
                         pipelineKind: "continuity-video",
@@ -1474,12 +1502,16 @@ function InfiniteCanvasPage() {
                     },
                 };
 
-                setNodes((prev) => [...prev, frameNode, nextVideoNode]);
-                setConnections((prev) => [
-                    ...prev,
+                const newConnections: CanvasConnection[] = [
                     { id: nanoid(), fromNodeId: node.id, toNodeId: frameId },
                     { id: nanoid(), fromNodeId: frameId, toNodeId: nextVideoId },
-                ]);
+                ];
+                const nextNodes = [...nodesRef.current, frameNode, nextVideoNode];
+                const nextConnections = [...connectionsRef.current, ...newConnections];
+                nodesRef.current = nextNodes;
+                connectionsRef.current = nextConnections;
+                setNodes(nextNodes);
+                setConnections(nextConnections);
                 setSelectedNodeIds(new Set([nextVideoId]));
                 setSelectedConnectionId(null);
                 setDialogNodeId(nextVideoId);
@@ -1488,7 +1520,7 @@ function InfiniteCanvasPage() {
                 message.error({ key, content: error instanceof Error ? error.message : "提取尾帧失败" });
             }
         },
-        [message],
+        [effectiveConfig, message],
     );
 
     const createAudioFileNode = useCallback(async (file: File, position: Position) => {
@@ -1721,7 +1753,9 @@ function InfiniteCanvasPage() {
     }, []);
 
     const handleConfigNodeChange = useCallback((nodeId: string, patch: Partial<CanvasNodeData["metadata"]>) => {
-        setNodes((prev) => prev.map((node) => (node.id === nodeId ? applyNodeConfigPatch(node, patch) : node)));
+        const applyPatch = (items: CanvasNodeData[]) => items.map((node) => (node.id === nodeId ? applyNodeConfigPatch(node, patch) : node));
+        nodesRef.current = applyPatch(nodesRef.current);
+        setNodes((prev) => applyPatch(prev));
     }, []);
 
     const downloadNodeImage = useCallback((node: CanvasNodeData) => {
@@ -1889,6 +1923,12 @@ function InfiniteCanvasPage() {
             }
             const userPrompt = payload.prompt.trim();
             const prompt = `只修改蒙版透明区域，其他区域保持不变。${userPrompt}`;
+            try {
+                await reserveCanvasGenerationQuota(1);
+            } catch (error) {
+                message.warning(error instanceof Error ? error.message : "生成额度检查失败");
+                return;
+            }
             const childId = nanoid();
             const source = { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey };
             const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [source]);
@@ -1926,7 +1966,7 @@ function InfiniteCanvasPage() {
                 setRunningNodeId(null);
             }
         },
-        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, startGenerationRequest],
+        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, reserveCanvasGenerationQuota, startGenerationRequest],
     );
 
     const upscaleImageNode = useCallback(async (node: CanvasNodeData, params: CanvasImageUpscaleParams) => {
@@ -1969,6 +2009,12 @@ function InfiniteCanvasPage() {
             const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [
                 { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey },
             ]);
+            try {
+                await reserveCanvasGenerationQuota(1);
+            } catch (error) {
+                message.warning(error instanceof Error ? error.message : "生成额度检查失败");
+                return;
+            }
             setAngleNodeId(null);
             setRunningNodeId(childId);
             setNodes((prev) => [
@@ -2003,7 +2049,7 @@ function InfiniteCanvasPage() {
                 setRunningNodeId(null);
             }
         },
-        [effectiveConfig, finishGenerationRequest, openConfigDialog, startGenerationRequest],
+        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, reserveCanvasGenerationQuota, startGenerationRequest],
     );
 
     const handleFontSizeChange = useCallback((nodeId: string, fontSize: number) => {
@@ -2142,8 +2188,16 @@ function InfiniteCanvasPage() {
                 return;
             }
 
+            const plannedGenerationCount = mode === "image" ? getGenerationCount(generationConfig.count) : mode === "text" && sourceNode?.type === CanvasNodeType.Config ? getGenerationCount(generationConfig.count) : 1;
+            try {
+                await reserveCanvasGenerationQuota(plannedGenerationCount);
+            } catch (error) {
+                message.warning(error instanceof Error ? error.message : "生成额度检查失败");
+                return;
+            }
+
             setRunningNodeId(nodeId);
-            const runController = await startGenerationRequest(nodeId, nodeId, nodeId);
+            const runController = new AbortController();
             const sourceTextContent = sourceNode?.type === CanvasNodeType.Text ? sourceNode.metadata?.content?.trim() || "" : "";
             const editingTextNode = mode === "text" && Boolean(sourceTextContent);
             const generationContext = await hydrateNodeGenerationContext(
@@ -2263,7 +2317,6 @@ function InfiniteCanvasPage() {
 
                     const controller = runController;
                     await Promise.all(targetIds.map((targetId) => startGenerationRequest(targetId, nodeId, nodeId, controller)));
-                    if (count > 1) await startGenerationRequest(rootId, nodeId, nodeId, controller);
                     let hasSuccess = false;
                     let hasFailure = false;
                     await Promise.all(
@@ -2312,7 +2365,6 @@ function InfiniteCanvasPage() {
                             return false;
                         }),
                     );
-                    if (count > 1) finishGenerationRequest(rootId, controller);
                     if (controller.signal.aborted) {
                         setNodes((prev) => prev.map((node) => (node.id === nodeId && isConfigNode && node.metadata?.status === NODE_STATUS_LOADING ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_IDLE, errorDetails: undefined } } : node)));
                         return;
@@ -2451,7 +2503,7 @@ function InfiniteCanvasPage() {
                 setRunningNodeId(null);
             }
         },
-        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, startGenerationRequest],
+        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, reserveCanvasGenerationQuota, startGenerationRequest],
     );
     useEffect(() => {
         generateNodeRef.current = handleGenerateNode;
@@ -2494,6 +2546,13 @@ function InfiniteCanvasPage() {
                 return;
             }
             const retryImages = retryReferenceImages || [];
+
+            try {
+                await reserveCanvasGenerationQuota(1);
+            } catch (error) {
+                message.warning(error instanceof Error ? error.message : "生成额度检查失败");
+                return;
+            }
 
             setRunningNodeId(node.id);
             setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined } } : item)));
@@ -2552,7 +2611,7 @@ function InfiniteCanvasPage() {
                 setRunningNodeId(null);
             }
         },
-        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, startGenerationRequest],
+        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, reserveCanvasGenerationQuota, startGenerationRequest],
     );
 
     const generateImageFromTextNode = useCallback(
@@ -3329,7 +3388,13 @@ function extractVideoFrame(src: string): Promise<Blob> {
     return new Promise((resolve, reject) => {
         const video = document.createElement("video");
         let settled = false;
+        let timeout: number | undefined;
         const cleanup = () => {
+            if (timeout) window.clearTimeout(timeout);
+            video.onerror = null;
+            video.onloadedmetadata = null;
+            video.onseeked = null;
+            video.pause();
             video.removeAttribute("src");
             video.load();
         };
@@ -3339,7 +3404,7 @@ function extractVideoFrame(src: string): Promise<Blob> {
             cleanup();
             reject(new Error(message));
         };
-        const timeout = window.setTimeout(() => fail("视频尾帧提取超时，请确认视频可正常预览"), 15000);
+        timeout = window.setTimeout(() => fail("视频尾帧提取超时，请确认视频可正常预览"), 15000);
 
         video.crossOrigin = "anonymous";
         video.muted = true;

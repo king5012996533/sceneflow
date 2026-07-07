@@ -153,11 +153,11 @@ export default function ImagePage() {
         // 配额检查
         const { allowed, remaining, limit } = checkGenerationQuota(entitlements, generationCount, user?.role);
         if (!allowed) {
-            message.warning(`本月免费生成次数已用完（${limit}次/月），请提交开通申请或联系管理员确认套餐。`);
+            message.warning(`今日免费生成次数已用完（${limit} 次/天），请提交开通申请或联系管理员确认套餐。`);
             return;
         }
         if (remaining > 0 && remaining <= 1) {
-            message.info(`免费套餐本月还剩 ${remaining} 次生成机会`);
+            message.info(`免费套餐今日还剩 ${remaining} 次生成机会`);
         }
         const concurrentLimit = entitlements ? entitlements.concurrentJobs : null;
         if (concurrentLimit !== null && generationCount > concurrentLimit) {

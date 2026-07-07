@@ -10,7 +10,7 @@ export type ServerEntitlements = {
     teamMembers: number | null;
 };
 
-const FREE_MONTHLY_GENERATION_LIMIT = 3;
+const FREE_DAILY_GENERATION_LIMIT = 3;
 
 export function parseEntitlementLimit(value?: string | null) {
     if (!value || value === "custom" || value === "unlimited") return null;
@@ -54,14 +54,15 @@ export async function getServerEntitlements(userId: string): Promise<ServerEntit
     };
 }
 
-export function monthlyPeriod(date = new Date()) {
+export function dailyPeriod(date = new Date()) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
-    return `${year}-${month}`;
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
 }
 
-export function nextMonthStart(date = new Date()) {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 1);
+export function nextDayStart(date = new Date()) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 }
 
 export async function reserveGenerationUsage(userId: string, count: number) {
@@ -73,13 +74,13 @@ export async function reserveGenerationUsage(userId: string, count: number) {
     }
 
     const entitlements = await getServerEntitlements(userId);
-    const generationLimit = entitlements.projects !== null && entitlements.projects <= 3 ? FREE_MONTHLY_GENERATION_LIMIT : null;
+    const generationLimit = entitlements.projects !== null && entitlements.projects <= 3 ? FREE_DAILY_GENERATION_LIMIT : null;
 
     if (generationLimit === null) {
         return { allowed: true, used: 0, reserved: safeCount, remaining: -1, limit: null };
     }
 
-    const period = monthlyPeriod();
+    const period = dailyPeriod();
     const metric = "generations";
 
     const current = await prisma.usageRecord.upsert({
@@ -91,13 +92,13 @@ export async function reserveGenerationUsage(userId: string, count: number) {
             period,
             used: 0,
             limit: generationLimit,
-            resetAt: nextMonthStart(),
+            resetAt: nextDayStart(),
         },
     });
 
     const updatedCount = await prisma.usageRecord.updateMany({
         where: { id: current.id, used: { lte: generationLimit - safeCount } },
-        data: { used: { increment: safeCount }, limit: generationLimit, resetAt: nextMonthStart() },
+        data: { used: { increment: safeCount }, limit: generationLimit, resetAt: nextDayStart() },
     });
 
     if (!updatedCount.count) {

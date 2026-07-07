@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
         if (!result.allowed) {
             return NextResponse.json(
                 {
-                    error: `本月免费生成次数已用完（${result.limit} 次/月），请联系管理员开通套餐权益。`,
+                    error: `今日免费生成次数已用完（${result.limit} 次/天），请联系管理员开通套餐权益。`,
                     usage: result,
                 },
                 { status: 403 },
