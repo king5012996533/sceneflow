@@ -61,6 +61,10 @@ assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "w
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "safeMessageText", "the online agent must stringify message content safely.");
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "isPollutedAgentMessage", "the online agent must filter polluted object-placeholder history.");
 assertNotMatches("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", /toolChoice:\s*"required"/, "the online agent must not force tool calls for normal chat.");
+assertIncludes("src/app/(user)/canvas/components/canvas-agent-chat-ui.tsx", "AgentMarkdownText", "assistant messages should render structured markdown instead of raw table text.");
+assertIncludes("src/app/(user)/canvas/components/canvas-agent-chat-ui.tsx", "AgentMarkdownTable", "assistant markdown tables should render as scrollable tables.");
+assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "chatEndRef", "online agent chat should keep a scroll anchor for new messages.");
+assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "scrollIntoView", "online agent chat should auto-scroll to new messages.");
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "runCanvasPipeline", "pipeline execution must stay connected to the unified node generator.");
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "assetAutoArchived", "generated reusable assets must automatically return to the asset library.");
 

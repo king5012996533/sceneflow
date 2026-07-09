@@ -48,11 +48,73 @@ export function AgentChatMessage({ item, theme, user, onRejectTool, onApproveToo
         <div className={`flex items-start gap-3 ${isUser ? "justify-end" : "justify-start"}`}>
             {!isUser ? <AgentAvatar theme={theme} /> : null}
             <div className={`min-w-0 max-w-[82%] text-sm leading-6 ${isUser ? "text-right" : "text-left"}`} style={{ color }}>
-                <div className="whitespace-pre-wrap break-words text-left">{item.text}</div>
+                {isUser ? <div className="whitespace-pre-wrap break-words text-left">{item.text}</div> : <AgentMarkdownText text={item.text} theme={theme} />}
                 {item.attachments?.length ? <AgentMessageAttachments attachments={item.attachments} /> : null}
                 {item.meta ? <div className="mt-1 text-[11px] opacity-45">{item.meta}</div> : null}
             </div>
             {isUser ? <AgentUserAvatar user={user} theme={theme} /> : null}
+        </div>
+    );
+}
+
+function AgentMarkdownText({ text, theme }: { text: string; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
+    const blocks = splitMarkdownBlocks(text);
+    return (
+        <div className="space-y-3 text-left">
+            {blocks.map((block, index) => {
+                if (block.kind === "table") return <AgentMarkdownTable key={index} rows={block.rows} theme={theme} />;
+                return <AgentMarkdownParagraph key={index} text={block.text} theme={theme} />;
+            })}
+        </div>
+    );
+}
+
+function AgentMarkdownParagraph({ text, theme }: { text: string; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
+    return (
+        <div className="whitespace-pre-wrap break-words leading-6">
+            {text.split("\n").map((line, index) => {
+                const heading = line.match(/^(#{1,4})\s+(.+)$/);
+                if (heading) {
+                    const Tag = heading[1].length <= 2 ? "h3" : "h4";
+                    return (
+                        <Tag key={index} className="mt-2 mb-1 font-semibold" style={{ color: theme.node.text }}>
+                            {renderInlineMarkdown(heading[2])}
+                        </Tag>
+                    );
+                }
+                return <div key={index}>{renderInlineMarkdown(line)}</div>;
+            })}
+        </div>
+    );
+}
+
+function AgentMarkdownTable({ rows, theme }: { rows: string[][]; theme: (typeof canvasThemes)[keyof typeof canvasThemes] }) {
+    const [head, ...body] = rows;
+    if (!head?.length) return null;
+    return (
+        <div className="thin-scrollbar max-w-full overflow-x-auto rounded-xl border" style={{ borderColor: theme.node.stroke }}>
+            <table className="min-w-[620px] border-collapse text-left text-xs leading-5">
+                <thead style={{ background: "rgba(79,93,255,.06)" }}>
+                    <tr>
+                        {head.map((cell, index) => (
+                            <th key={index} className="border-b px-3 py-2 font-semibold" style={{ borderColor: theme.node.stroke }}>
+                                {renderInlineMarkdown(cell)}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {body.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                            {head.map((_, cellIndex) => (
+                                <td key={cellIndex} className="border-b px-3 py-2 align-top" style={{ borderColor: theme.node.stroke }}>
+                                    {renderInlineMarkdown(row[cellIndex] || "")}
+                                </td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
         </div>
     );
 }
@@ -293,6 +355,68 @@ function AgentMessageAttachments({ attachments }: { attachments: CanvasAgentChat
             ))}
         </div>
     );
+}
+
+type MarkdownBlock = { kind: "text"; text: string } | { kind: "table"; rows: string[][] };
+
+function splitMarkdownBlocks(text: string): MarkdownBlock[] {
+    const lines = text.split("\n");
+    const blocks: MarkdownBlock[] = [];
+    let textBuffer: string[] = [];
+    const flushText = () => {
+        const value = textBuffer.join("\n").trim();
+        if (value) blocks.push({ kind: "text", text: value });
+        textBuffer = [];
+    };
+
+    for (let index = 0; index < lines.length; index += 1) {
+        if (isMarkdownTableStart(lines, index)) {
+            flushText();
+            const tableLines: string[] = [];
+            while (index < lines.length && isTableRow(lines[index])) {
+                tableLines.push(lines[index]);
+                index += 1;
+            }
+            index -= 1;
+            const rows = tableLines.filter((line) => !isTableDivider(line)).map(parseTableRow).filter((row) => row.some(Boolean));
+            if (rows.length >= 2) blocks.push({ kind: "table", rows });
+            else textBuffer.push(...tableLines);
+        } else {
+            textBuffer.push(lines[index]);
+        }
+    }
+    flushText();
+    return blocks;
+}
+
+function isMarkdownTableStart(lines: string[], index: number) {
+    return isTableRow(lines[index]) && index + 1 < lines.length && isTableDivider(lines[index + 1]);
+}
+
+function isTableRow(line: string) {
+    return /^\s*\|.*\|\s*$/.test(line);
+}
+
+function isTableDivider(line: string) {
+    return /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+}
+
+function parseTableRow(line: string) {
+    return line
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim());
+}
+
+function renderInlineMarkdown(text: string) {
+    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
+    return parts.map((part, index) => {
+        if (/^\*\*[^*]+\*\*$/.test(part)) return <strong key={index}>{part.slice(2, -2)}</strong>;
+        if (/^`[^`]+`$/.test(part)) return <code key={index} className="rounded bg-black/5 px-1 py-0.5 text-[.92em]">{part.slice(1, -1)}</code>;
+        return <span key={index}>{part}</span>;
+    });
 }
 
 function toolCardState(title: string, text: string, detail?: unknown) {
