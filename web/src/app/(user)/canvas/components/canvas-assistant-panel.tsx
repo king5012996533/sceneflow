@@ -235,6 +235,14 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
         snapshotRef.current = snapshot;
     }, [snapshot]);
 
+    const safeSessions = localSessions.length ? localSessions : [createSession()];
+    const activeSession = useMemo(() => safeSessions.find((session) => session.id === localActiveSessionId) || safeSessions[0] || null, [localActiveSessionId, safeSessions]);
+    const historySessions = safeSessions.filter((session) => session.messages.length > 0);
+    const messages = activeSession?.messages || [];
+    const hasMessages = messages.length > 0;
+    const activeModel = effectiveConfig.textModel || effectiveConfig.model;
+    const selectedNodeKey = useMemo(() => Array.from(selectedNodeIds).sort().join(","), [selectedNodeIds]);
+    const allSelectedReferences = useMemo(() => buildAssistantReferences(nodes, selectedNodeIds), [nodes, selectedNodeIds]);
     const lastMessage = messages.at(-1);
     useEffect(() => {
         if (view !== "chat") return;
@@ -250,14 +258,6 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
         onSessionsChange(localSessions, localActiveSessionId);
     }, [localActiveSessionId, localSessions, onSessionsChange]);
 
-    const safeSessions = localSessions.length ? localSessions : [createSession()];
-    const activeSession = useMemo(() => safeSessions.find((session) => session.id === localActiveSessionId) || safeSessions[0] || null, [localActiveSessionId, safeSessions]);
-    const historySessions = safeSessions.filter((session) => session.messages.length > 0);
-    const messages = activeSession?.messages || [];
-    const hasMessages = messages.length > 0;
-    const activeModel = effectiveConfig.textModel || effectiveConfig.model;
-    const selectedNodeKey = useMemo(() => Array.from(selectedNodeIds).sort().join(","), [selectedNodeIds]);
-    const allSelectedReferences = useMemo(() => buildAssistantReferences(nodes, selectedNodeIds), [nodes, selectedNodeIds]);
     const selectedReferences = useMemo(() => allSelectedReferences.filter((item) => !removedReferenceIds.has(item.id)), [allSelectedReferences, removedReferenceIds]);
     const iconButtonStyle = { color: theme.node.muted };
 
