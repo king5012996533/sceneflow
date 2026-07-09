@@ -55,6 +55,11 @@ assertNoAppDirectGenerationApiImports();
 assertIncludes("src/app/(user)/canvas/utils/canvas-agent-ops.ts", 'type: "run_pipeline"', "the canvas agent must keep an executable pipeline operation.");
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "canvas_run_pipeline", "the online creation agent must expose pipeline execution.");
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "canvas_continue_video", "the creation agent must expose tail-frame continuation.");
+assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "MANGA_PRODUCTION_SKILL", "the creation agent must keep the manga production skill constraints.");
+assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "workflowStageReferenceKeys", "workflow cards must keep stage dependency references.");
+assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "withNodeReferenceTokens", "workflow prompts must include @node references for upstream assets.");
+assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "safeMessageText", "the online agent must stringify message content safely.");
+assertNotMatches("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", /toolChoice:\s*"required"/, "the online agent must not force tool calls for normal chat.");
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "runCanvasPipeline", "pipeline execution must stay connected to the unified node generator.");
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "assetAutoArchived", "generated reusable assets must automatically return to the asset library.");
 

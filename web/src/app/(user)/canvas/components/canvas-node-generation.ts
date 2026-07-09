@@ -35,8 +35,8 @@ export function buildNodeGenerationContext(nodeId: string, nodes: CanvasNodeData
     }
 
     const upstreamText = inputs
-        .map((input) => input.text)
-        .filter(Boolean)
+        .filter((input) => input.text)
+        .map(formatTextInputBlock)
         .join("\n\n");
     const referenceImages = inputs.map((input) => input.image).filter((image): image is ReferenceImage => Boolean(image));
     const referenceVideos = inputs.map((input) => input.video).filter((video): video is ReferenceVideo => Boolean(video));
@@ -74,7 +74,7 @@ function buildComposerGenerationContext(inputs: NodeGenerationInput[], prompt: s
             if (!label) {
                 label = generationLabel(input.type, counts[input.type]++);
                 labelByNodeId.set(input.nodeId, label);
-                if (input.type === "text") textBlocks.push(`【${label}】\n${input.text || ""}`);
+                if (input.type === "text") textBlocks.push(formatTextInputBlock(input, label));
                 else selectedInputs.push(input);
             }
             nextPrompt += input.type === "text" ? `【${label}】` : label;
@@ -148,6 +148,11 @@ export async function hydrateNodeGenerationContext(context: NodeGenerationContex
 function readNodeTextInput(node: CanvasNodeData) {
     if (node.type === CanvasNodeType.Text) return node.metadata?.content || node.metadata?.prompt || "";
     return node.metadata?.prompt || "";
+}
+
+function formatTextInputBlock(input: NodeGenerationInput, fallbackLabel?: string) {
+    const title = input.title?.trim() || fallbackLabel || "上游文本";
+    return `【${title}】\n${input.text || ""}`;
 }
 
 function generationLabel(type: NodeGenerationInput["type"], index: number) {

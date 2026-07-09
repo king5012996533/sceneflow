@@ -28,8 +28,21 @@ import { summarizeCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot }
 export const CANVAS_AGENT_PANEL_MOTION_MS = 500;
 const PANEL_MOTION_SECONDS = CANVAS_AGENT_PANEL_MOTION_MS / 1000;
 const ONLINE_AGENT_MAX_STEPS = 4;
-const ONLINE_AGENT_PROMPT =
-    "你是 SceneFlow 的视觉生产导演助理，不是普通聊天机器人。当前画布 JSON 会随用户消息提供。首轮必须调用工具：只读问题调用 canvas_get_state；用户要做视觉内容时，先调用 canvas_plan_workflow 判断意图和缺失阶段，再调用 canvas_create_workflow_cards 创建可确认的流程卡片。除非用户明确要求立即生成，否则不要自动触发生成，不要消耗额度。你的工作顺序是：识别意图 -> 判断当前画布缺什么 -> 创建下一步流程卡片 -> 让用户确认提示词、模型、比例、画质。片段视频优先流程：片段策划、角色来源决策、角色设定、三视图、场景设定、风格校准、分镜表、关键帧、视频生成、资产入库。外部剧本不限制来源，先做解析和拆分；角色不要默认全部新生成，必须判断是新生成、调用用户资产，还是租赁平台角色。生成完成的人设、三视图、场景、风格、分镜、关键帧、视频都要建议回流到素材库。用户上传或选中图片时，先用 canvas_analyze_reference_image 生成结构化素材说明，再决定是否建角色/场景/图生视频流程。工具参数涉及已有节点时必须使用当前画布 JSON 中真实存在的 id；缺少必要 id 或用户意图不明确时直接说明需要用户选择或补充，不要猜测。不要输出 JSON ops，不要编造执行结果。工具返回结果后，再根据真实结果回答用户。";
+const MANGA_PRODUCTION_SKILL = [
+    "SceneFlow 漫剧生产 Skill：",
+    "1. 标准链路固定为：剧本/片段解析 -> 人物创建提示词 -> 人物三视图提示词 -> 场景设定 -> 风格校准 -> 分镜表 -> 关键帧 -> 视频生成 -> 资产入库。",
+    "2. 人物创建必须先锁定角色锚点：脸部、发型、服装、配饰、道具、气质、禁忌变化；不能直接跳到视频。",
+    "3. 人物三视图必须基于人物定稿图生成，要求正面、侧面、背面同屏，同脸、同衣服、同发型。",
+    "4. 分镜表必须能执行，固定包含：镜头编号、景别、画面描述、角色动作、台词/旁白、镜头运动、预计秒数、所需参考资产、连续性备注。",
+    "5. 关键帧必须同时引用分镜表、人物三视图、场景设定和风格校准。",
+    "6. 视频生成必须同时引用多个上游资产：关键帧、人物三视图、场景/风格、分镜表。提示词必须写清起始状态、动作推进、镜头运动、结束状态和禁止改变项。",
+    "7. 除非用户明确要求立即生成，否则只创建可确认流程卡，先让用户检查提示词、模型、比例、画质和时长。",
+    "8. 用户上传外部剧本或片段不限制来源，先解析和拆分；角色来源必须判断是新生成、用户资产复用，还是平台租赁。",
+    "9. 生成完成的人设、三视图、场景、风格、分镜、关键帧、视频都要建议回流素材库。",
+].join("\n");
+const BASE_ONLINE_AGENT_PROMPT =
+    "你是 SceneFlow 的视觉生产导演助理，首要任务是先像专业创作顾问一样回答用户问题、规划内容、写提示词。用户打招呼、咨询、让你想剧情、写提示词、拆 15 秒片段时，直接用自然语言回答，不要调用工具，不要弹出工具确认。只有用户明确要求你操作画布，例如创建卡片、读取当前画布、修改节点、连线、生成、重跑、删除、续写视频时，才调用画布工具。除非用户明确要求立即生成，否则不要自动触发生成，不要消耗额度。你的工作顺序是：先理解用户意图 -> 直接给出有用答案或创作规划 -> 用户确认要落到画布时再创建流程卡片 -> 让用户确认提示词、模型、比例、画质。外部剧本不限制来源，先做解析和拆分；角色不要默认全部新生成，必须判断是新生成、调用用户资产，还是租赁平台角色。生成完成的人设、三视图、场景、风格、分镜、关键帧、视频都要建议回流到素材库。工具参数涉及已有节点时必须使用工具读取到的真实 id；缺少必要 id 或用户意图不明确时直接说明需要用户选择或补充，不要猜测。不要输出 JSON ops，不要编造执行结果。工具返回结果后，再根据真实结果回答用户。";
+const ONLINE_AGENT_PROMPT = `${BASE_ONLINE_AGENT_PROMPT}\n\n${MANGA_PRODUCTION_SKILL}`;
 const JSON_RECORD_SCHEMA = { type: "object", additionalProperties: true };
 const POSITION_SCHEMA = { type: "object", properties: { x: { type: "number" }, y: { type: "number" } }, required: ["x", "y"], additionalProperties: false };
 const VIEWPORT_SCHEMA = { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, k: { type: "number" } }, required: ["x", "y", "k"], additionalProperties: false };
@@ -323,9 +336,9 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
         try {
             setIsRunning(true);
             const messages = await buildToolAgentMessages(snapshotRef.current, history, userMessage);
-            addOnlineLog(`Agent Tool Loop ${loop.step} 开始`, { toolChoice: "required" });
+            addOnlineLog(`Agent Loop ${loop.step} 开始`, { toolChoice: "auto" });
             let streamed = "";
-            const result = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages, tools: ONLINE_AGENT_TOOLS, toolChoice: "required", onDelta: (text) => {
+            const result = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages, tools: ONLINE_AGENT_TOOLS, toolChoice: "auto", onDelta: (text) => {
                 streamed = text;
                 if (text.trim()) upsertMessage(sessionId, { id: assistantId, role: "assistant", text });
             } });
@@ -343,9 +356,9 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                 }
                 await continueOnlineToolLoop(sessionId, assistantId, messages, result, loop.step);
             } else {
-                if (!result.content.trim()) throw new Error("模型没有返回工具调用，画布操作未执行。");
+                if (!result.content.trim()) throw new Error("模型没有返回内容，请换一种说法再试。");
                 upsertMessage(sessionId, { id: assistantId, role: "assistant", text: result.content || streamed || "没有返回内容。" });
-                addOnlineLog(`Agent Tool Loop ${loop.step} 结束`, { reply: result.content });
+                addOnlineLog(`Agent Loop ${loop.step} 结束`, { reply: result.content });
             }
         } catch (error) {
             addOnlineLog("请求失败", error instanceof Error ? error.message : error);
@@ -1129,7 +1142,70 @@ const workflowPresets: Record<VisualWorkflowIntent, WorkflowStage[]> = {
 };
 
 function stage(key: string, title: string, type: CanvasNodeType, mode: "text" | "image" | "video" | "audio", label: string, description: string, prompt: (brief: string) => string, options: Partial<WorkflowStage> = {}): WorkflowStage {
-    return { key, title, type, mode, label, description, prompt, ...options };
+    return { key, title, type, mode, label, description, prompt: (brief) => enhanceWorkflowPrompt({ key, title, type, mode, label }, prompt(brief)), ...options };
+}
+
+function enhanceWorkflowPrompt(stage: Pick<WorkflowStage, "key" | "title" | "type" | "mode" | "label">, basePrompt: string) {
+    const base = basePrompt.trim();
+    if (stage.mode === "text") return enhanceTextWorkflowPrompt(stage.key, base);
+    if (stage.mode === "image") return enhanceImageWorkflowPrompt(stage.key, base);
+    if (stage.mode === "video") return enhanceVideoWorkflowPrompt(stage.key, base);
+    return base;
+}
+
+function enhanceTextWorkflowPrompt(key: string, basePrompt: string) {
+    const common = [
+        "你是 SceneFlow 的专业视觉制片 Agent，请把用户需求拆成可执行生产资料，不要写空泛建议。",
+        "必须优先保证：剧本解析准确、角色一致、场景可复用、分镜可拍、提示词可直接用于生成。",
+    ];
+    const formats: Record<string, string[]> = {
+        brief: ["输出格式：一句话概述、核心冲突、情绪节奏、出场角色、场景地点、关键动作、镜头数量建议、资产清单、下一步建议。"],
+        script: ["输出格式：故事梗概、人物关系、场次拆解、核心冲突、视觉风格、可复用资产清单、优先制作片段、风险点。"],
+        characters: ["输出角色资产表：角色名、身份定位、外貌锚点、发型、服装、道具、性格气质、关系、三视图需求、一致性禁忌。"],
+        "character-brief": ["输出角色设定卡：身份、年龄感、脸部锚点、发型、服装结构、配饰、气质、正向提示词、负面提示词、一致性禁忌。"],
+        "character-source": ["每个角色必须在三类来源中选择：新生成、用户已有资产、平台租赁角色。补充选择理由、授权风险、是否值得沉淀为长期资产。"],
+        scenes: ["输出场景资产表：地点、时间、天气、空间层次、主要视觉元素、出现频次、可复用镜头角度、所需素材。"],
+        "scene-brief": ["输出场景设定卡：地点、时代/类型、天气、空间层次、色调、光影、可用镜头角度、正向提示词、负面提示词。"],
+        style: ["输出风格圣经：整体画风、时代类型、色调、光影、构图规则、镜头语言、角色一致性禁忌、场景一致性禁忌、通用正向/负面提示词。"],
+        storyboard: ["输出 Markdown 分镜表，列名固定为：镜头编号、景别、画面描述、角色动作、台词/旁白、镜头运动、预计秒数、所需参考资产、连续性备注。", "总时长优先控制在 15-30 秒；每个镜头必须能直接拆成关键帧和视频生成任务。"],
+        "asset-archive": ["输出资产入库清单：资产名称、资产类型、来源节点、建议标签、授权状态、复用场景、下次项目调用方式。"],
+        "asset-analysis": ["输出素材结构化分析：主体、外貌/场景、风格、可复用提示词、可作为角色/场景/关键帧的建议、风险点、禁止改变项。"],
+        "image-analysis": ["输出首帧分析：主体、场景、风格、可动区域、不能改变的视觉锚点、推荐镜头运动、视频负面约束。"],
+        motion: ["输出运镜方案：起始状态、结束状态、主体动作、镜头运动、节奏、时长、需要保持不变的元素、负面约束。"],
+    };
+    const specific = formats[key] || ["输出结构化结果，并明确下一步应该生成的卡片、素材或镜头。"];
+    return [...common, "", basePrompt, "", ...specific].join("\n");
+}
+
+function enhanceImageWorkflowPrompt(key: string, basePrompt: string) {
+    const common = [
+        basePrompt,
+        "",
+        "画面生成要求：主体清晰，构图明确，材质和光影稳定，避免文字、水印、畸形肢体、脸部漂移、服装突变。",
+        "如果上游提供角色、三视图、场景或风格参考，必须优先保持这些视觉锚点，不要自行换脸、换服装、换时代、换画风。",
+    ];
+    const specifics: Record<string, string[]> = {
+        character: ["角色设定图重点：半身或全身清晰展示脸部、发型、服装结构、配饰和气质；背景保持简洁，方便后续三视图复用。"],
+        "character-image": ["角色定稿图重点：脸部辨识度高，服装结构明确，造型不要过度复杂，方便后续保持一致。"],
+        turnaround: ["三视图重点：同一角色正面、侧面、背面同屏，全身站姿，比例一致，白底或浅灰底，不要换人，不要换衣服。"],
+        scene: ["场景资产重点：不要出现主要人物，空间层次清晰，能作为多个镜头的统一背景资产。"],
+        "scene-image": ["场景资产重点：不要出现主要人物，保留可复用空间、天气、色调和镜头角度。"],
+        keyframe: ["关键帧重点：只生成一个明确镜头画面，动作瞬间清楚，景别和机位稳定，适合图生视频。"],
+        image: ["视觉稿重点：先产出一张可判断方向的高完成度主图。"],
+    };
+    return [...common, ...(specifics[key] || [])].join("\n");
+}
+
+function enhanceVideoWorkflowPrompt(key: string, basePrompt: string) {
+    return [
+        basePrompt,
+        "",
+        "视频生成要求：从参考图或上一镜头状态自然开始，保持角色脸、服装、场景、光线、构图方向一致。",
+        "动作要有明确起承转合，镜头运动克制自然；不要突然切场、换脸、换衣服、改变时代风格、生成无意义慢动作。",
+        key === "video" ? "如果这是连续镜头，必须把上一镜头尾帧当作第一帧状态，只推进动作和情绪，不重置画面。" : "",
+    ]
+        .filter(Boolean)
+        .join("\n");
 }
 
 function buildWorkflowPlan(input: Record<string, unknown>, snapshot: CanvasAgentSnapshot) {
@@ -1163,8 +1239,14 @@ function workflowCardOps(input: Record<string, unknown>, snapshot: CanvasAgentSn
     const sourceNodeId = stringOptional(input.sourceNodeId);
     const referenceNodeIds = Array.isArray(input.referenceNodeIds) ? input.referenceNodeIds.filter((id): id is string => typeof id === "string") : [];
     const nodeIds = stages.map((item) => `${item.key}-${nanoid(6)}`);
+    const nodeIdByStageKey = new Map(stages.map((item, index) => [item.key, nodeIds[index]]));
     const ops: CanvasAgentOp[] = stages.map((item, index) => {
-        const prompt = item.prompt(brief);
+        const stageReferenceNodeIds = workflowStageReferenceKeys(intent, item.key)
+            .map((key) => nodeIdByStageKey.get(key))
+            .filter((id): id is string => Boolean(id));
+        const externalReferenceNodeIds = workflowStageUsesExternalReferences(intent, item.key, index) ? [sourceNodeId, ...referenceNodeIds].filter((id): id is string => Boolean(id && snapshot.nodes.some((node) => node.id === id))) : [];
+        const promptReferenceNodeIds = uniqueStrings([...externalReferenceNodeIds, ...stageReferenceNodeIds]);
+        const prompt = withNodeReferenceTokens(item.prompt(brief), promptReferenceNodeIds);
         const metadata: CanvasNodeData["metadata"] = cleanRecord({
             content: "",
             prompt,
@@ -1185,7 +1267,7 @@ function workflowCardOps(input: Record<string, unknown>, snapshot: CanvasAgentSn
             count: item.count,
             seconds: item.seconds || config.videoSeconds,
             vquality: item.vquality || config.vquality,
-            references: index === 0 ? referenceNodeIds : undefined,
+            references: promptReferenceNodeIds.length ? promptReferenceNodeIds : undefined,
         }) as CanvasNodeData["metadata"];
         return {
             type: "add_node",
@@ -1199,10 +1281,83 @@ function workflowCardOps(input: Record<string, unknown>, snapshot: CanvasAgentSn
         };
     });
     const connectionOps: CanvasAgentOp[] = [];
-    if (sourceNodeId && snapshot.nodes.some((node) => node.id === sourceNodeId)) connectionOps.push({ type: "connect_nodes", fromNodeId: sourceNodeId, toNodeId: nodeIds[0] });
-    referenceNodeIds.filter((id) => snapshot.nodes.some((node) => node.id === id)).forEach((id) => connectionOps.push({ type: "connect_nodes", fromNodeId: id, toNodeId: nodeIds[0] }));
-    nodeIds.slice(0, -1).forEach((fromNodeId, index) => connectionOps.push({ type: "connect_nodes", fromNodeId, toNodeId: nodeIds[index + 1] }));
+    const pushConnection = (fromNodeId: string | undefined, toNodeId: string | undefined) => {
+        if (!fromNodeId || !toNodeId || fromNodeId === toNodeId) return;
+        if (connectionOps.some((op) => op.type === "connect_nodes" && op.fromNodeId === fromNodeId && op.toNodeId === toNodeId)) return;
+        connectionOps.push({ type: "connect_nodes", fromNodeId, toNodeId });
+    };
+    if (sourceNodeId && snapshot.nodes.some((node) => node.id === sourceNodeId)) pushConnection(sourceNodeId, nodeIds[0]);
+    referenceNodeIds.filter((id) => snapshot.nodes.some((node) => node.id === id)).forEach((id) => pushConnection(id, nodeIds[0]));
+    nodeIds.slice(0, -1).forEach((fromNodeId, index) => pushConnection(fromNodeId, nodeIds[index + 1]));
+    stages.forEach((item, index) => {
+        workflowStageReferenceKeys(intent, item.key)
+            .map((key) => nodeIdByStageKey.get(key))
+            .forEach((fromNodeId) => pushConnection(fromNodeId, nodeIds[index]));
+        if (workflowStageUsesExternalReferences(intent, item.key, index)) {
+            if (sourceNodeId && snapshot.nodes.some((node) => node.id === sourceNodeId)) pushConnection(sourceNodeId, nodeIds[index]);
+            referenceNodeIds.filter((id) => snapshot.nodes.some((node) => node.id === id)).forEach((id) => pushConnection(id, nodeIds[index]));
+        }
+    });
     return [...ops, ...connectionOps, { type: "select_nodes", ids: [nodeIds[0]] }];
+}
+
+function withNodeReferenceTokens(prompt: string, nodeIds: string[]) {
+    if (!nodeIds.length) return prompt;
+    return `${prompt.trim()}\n\n上游引用：\n${nodeIds.map((id) => `@[node:${id}]`).join("\n")}`;
+}
+
+function workflowStageReferenceKeys(intent: VisualWorkflowIntent, key: string) {
+    const map: Partial<Record<VisualWorkflowIntent, Record<string, string[]>>> = {
+        "fragment-video": {
+            "character-source": ["brief"],
+            character: ["brief", "character-source"],
+            turnaround: ["character"],
+            scene: ["brief"],
+            style: ["brief", "character", "turnaround", "scene"],
+            storyboard: ["brief", "character-source", "turnaround", "scene", "style"],
+            keyframe: ["storyboard", "turnaround", "scene", "style"],
+            video: ["keyframe", "turnaround", "scene", "style", "storyboard"],
+            "asset-archive": ["brief", "character", "turnaround", "scene", "style", "storyboard", "keyframe", "video"],
+        },
+        "full-script": {
+            characters: ["script"],
+            scenes: ["script"],
+            storyboard: ["script", "characters", "scenes"],
+            keyframe: ["storyboard", "characters", "scenes"],
+            video: ["keyframe", "storyboard", "characters", "scenes"],
+            "asset-archive": ["script", "characters", "scenes", "storyboard", "keyframe", "video"],
+        },
+        character: {
+            "character-image": ["character-brief"],
+            turnaround: ["character-brief", "character-image"],
+        },
+        scene: {
+            "scene-image": ["scene-brief"],
+        },
+        storyboard: {
+            keyframe: ["storyboard"],
+            video: ["storyboard", "keyframe"],
+            "asset-archive": ["storyboard", "keyframe", "video"],
+        },
+        "image-to-video": {
+            motion: ["image-analysis"],
+            video: ["image-analysis", "motion"],
+        },
+        "general-visual": {
+            image: ["brief"],
+        },
+    };
+    return map[intent]?.[key] || [];
+}
+
+function workflowStageUsesExternalReferences(intent: VisualWorkflowIntent, key: string, index: number) {
+    if (index === 0) return true;
+    if (intent === "image-to-video" && key === "video") return true;
+    return false;
+}
+
+function uniqueStrings(values: string[]) {
+    return Array.from(new Set(values));
 }
 
 function referenceAnalysisOps(input: Record<string, unknown>, snapshot: CanvasAgentSnapshot): CanvasAgentOp[] {
@@ -1556,21 +1711,37 @@ function buildAssistantReferences(nodes: CanvasNodeData[], selectedNodeIds: Set<
 
 async function buildToolAgentMessages(snapshot: CanvasAgentSnapshot, history: CanvasAssistantMessage[], userMessage: CanvasAssistantMessage): Promise<ResponseInputMessage[]> {
     const refs = userMessage.references || [];
+    const contextText = [
+        `页面状态：当前在 SceneFlow 画布。节点 ${snapshot.nodes.length} 个，连线 ${snapshot.connections.length} 条，选中 ${snapshot.selectedNodeIds.length} 个节点。`,
+        "如果只是聊天、咨询、写剧情或写提示词，请直接回答；只有需要操作画布时才调用工具读取完整画布。",
+        `用户需求：${safeMessageText(userMessage.text)}`,
+    ].join("\n");
     return [
         { role: "system", content: ONLINE_AGENT_PROMPT },
         ...history
             .filter((message): message is CanvasAssistantMessage & { role: "user" | "assistant" | "system" } => message.role === "user" || message.role === "assistant" || message.role === "system")
             .slice(-8)
-            .map((message): ResponseInputMessage => ({ role: message.role, content: message.text })),
+            .map((message): ResponseInputMessage => ({ role: message.role, content: safeMessageText(message.text) })),
         {
             role: "user",
             content: [
-                ...refs.flatMap((item) => (item.text ? [{ type: "text" as const, text: `选中节点 ${item.title}：${item.text}` }] : [])),
-                { type: "text", text: `当前画布：${JSON.stringify(compactSnapshot(snapshot))}\n\n用户需求：${userMessage.text}` },
+                ...refs.flatMap((item) => (item.text ? [{ type: "text" as const, text: `选中节点 ${safeMessageText(item.title)}：${safeMessageText(item.text)}` }] : [])),
+                { type: "text", text: contextText },
                 ...(await Promise.all(refs.filter((item) => item.dataUrl).map(async (item) => ({ type: "image_url" as const, image_url: { url: await imageToDataUrl(item) } })))),
             ],
         },
     ];
+}
+
+function safeMessageText(value: unknown) {
+    if (typeof value === "string") return value;
+    if (value == null) return "";
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return "";
+    }
 }
 
 function compactSnapshot(snapshot: CanvasAgentSnapshot) {
