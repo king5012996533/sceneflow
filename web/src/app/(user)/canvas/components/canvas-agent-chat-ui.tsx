@@ -411,12 +411,18 @@ function parseTableRow(line: string) {
 }
 
 function renderInlineMarkdown(text: string) {
-    const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
-    return parts.map((part, index) => {
-        if (/^\*\*[^*]+\*\*$/.test(part)) return <strong key={index}>{part.slice(2, -2)}</strong>;
-        if (/^`[^`]+`$/.test(part)) return <code key={index} className="rounded bg-black/5 px-1 py-0.5 text-[.92em]">{part.slice(1, -1)}</code>;
-        return <span key={index}>{part}</span>;
-    });
+    const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+    const parts: { text: string; bold?: boolean; code?: boolean }[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) parts.push({ text: text.slice(lastIndex, match.index) });
+        if (match[1].startsWith("**")) parts.push({ text: match[1].slice(2, -2), bold: true });
+        else parts.push({ text: match[1].slice(1, -1), code: true });
+        lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < text.length) parts.push({ text: text.slice(lastIndex) });
+    return <>{parts.map((p, i) => p.bold ? <strong key={i}>{p.text}</strong> : p.code ? <code key={i} className="rounded bg-black/5 px-1 py-0.5 text-[.92em]">{p.text}</code> : <span key={i}>{p.text}</span>)}</>;
 }
 
 function toolCardState(title: string, text: string, detail?: unknown) {
