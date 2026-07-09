@@ -59,6 +59,7 @@ assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "M
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "workflowStageReferenceKeys", "workflow cards must keep stage dependency references.");
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "withNodeReferenceTokens", "workflow prompts must include @node references for upstream assets.");
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "safeMessageText", "the online agent must stringify message content safely.");
+assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "isPollutedAgentMessage", "the online agent must filter polluted object-placeholder history.");
 assertNotMatches("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", /toolChoice:\s*"required"/, "the online agent must not force tool calls for normal chat.");
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "runCanvasPipeline", "pipeline execution must stay connected to the unified node generator.");
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "assetAutoArchived", "generated reusable assets must automatically return to the asset library.");
@@ -70,6 +71,9 @@ assertIncludes("src/app/(user)/pricing/page.tsx", "申请开通联系管理员",
 assertNotMatches("src/app/(user)/image/page.tsx", /请升级套餐继续使用/, "image quota copy should route users to manual opening, not nonexistent online upgrade.");
 assertNotMatches("src/app/(user)/video/page.tsx", /请升级套餐继续使用/, "video quota copy should route users to manual opening, not nonexistent online upgrade.");
 assertNotMatches("src/app/(user)/canvas/[id]/canvas-client-page.tsx", /请升级套餐继续使用|申请内测或升级套餐/, "canvas quota copy should avoid misleading upgrade/beta wording.");
+assertIncludes("src/components/layout/app-top-nav.tsx", "enrichExperienceApiDraft", "experience officer must complete model grouping after parsing API config.");
+assertIncludes("src/components/layout/app-top-nav.tsx", "recommendedModelsForProvider", "experience officer should recommend provider-specific models when users omit model names.");
+assertIncludes("src/components/layout/app-top-nav.tsx", "defaultVideoModel", "experience officer should show and apply default video model configuration.");
 
 if (failures.length) {
     console.error("Regression guards failed:");

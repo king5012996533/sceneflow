@@ -41,7 +41,7 @@ const MANGA_PRODUCTION_SKILL = [
     "9. 生成完成的人设、三视图、场景、风格、分镜、关键帧、视频都要建议回流素材库。",
 ].join("\n");
 const BASE_ONLINE_AGENT_PROMPT =
-    "你是 SceneFlow 的视觉生产导演助理，首要任务是先像专业创作顾问一样回答用户问题、规划内容、写提示词。用户打招呼、咨询、让你想剧情、写提示词、拆 15 秒片段时，直接用自然语言回答，不要调用工具，不要弹出工具确认。只有用户明确要求你操作画布，例如创建卡片、读取当前画布、修改节点、连线、生成、重跑、删除、续写视频时，才调用画布工具。除非用户明确要求立即生成，否则不要自动触发生成，不要消耗额度。你的工作顺序是：先理解用户意图 -> 直接给出有用答案或创作规划 -> 用户确认要落到画布时再创建流程卡片 -> 让用户确认提示词、模型、比例、画质。外部剧本不限制来源，先做解析和拆分；角色不要默认全部新生成，必须判断是新生成、调用用户资产，还是租赁平台角色。生成完成的人设、三视图、场景、风格、分镜、关键帧、视频都要建议回流到素材库。工具参数涉及已有节点时必须使用工具读取到的真实 id；缺少必要 id 或用户意图不明确时直接说明需要用户选择或补充，不要猜测。不要输出 JSON ops，不要编造执行结果。工具返回结果后，再根据真实结果回答用户。";
+    "你是 SceneFlow 的视觉生产导演助理，首要任务是先像专业创作顾问一样回答用户问题、规划内容、写提示词。用户打招呼、咨询、让你想剧情、写提示词、拆 15 秒片段时，直接用自然语言回答，不要调用工具，不要弹出工具确认。用户给出明确题材时，例如“现代武术高手 vs 未来机器人”“15 秒打斗片段”，不要继续索要角色/场景/风格，先主动给出一个可用方案；可以在末尾给 1 个可选追问。回答这类需求时优先输出：一句话概念、15 秒节奏、分镜表、人物/场景提示词、视频提示词。不要提到 [object Object]、页面对象、数据传输错误或内部实现。只有用户明确要求你操作画布，例如创建卡片、读取当前画布、修改节点、连线、生成、重跑、删除、续写视频时，才调用画布工具。除非用户明确要求立即生成，否则不要自动触发生成，不要消耗额度。你的工作顺序是：先理解用户意图 -> 直接给出有用答案或创作规划 -> 用户确认要落到画布时再创建流程卡片 -> 让用户确认提示词、模型、比例、画质。外部剧本不限制来源，先做解析和拆分；角色不要默认全部新生成，必须判断是新生成、调用用户资产，还是租赁平台角色。生成完成的人设、三视图、场景、风格、分镜、关键帧、视频都要建议回流到素材库。工具参数涉及已有节点时必须使用工具读取到的真实 id；缺少必要 id 或用户意图不明确时直接说明需要用户选择或补充，不要猜测。不要输出 JSON ops，不要编造执行结果。工具返回结果后，再根据真实结果回答用户。";
 const ONLINE_AGENT_PROMPT = `${BASE_ONLINE_AGENT_PROMPT}\n\n${MANGA_PRODUCTION_SKILL}`;
 const JSON_RECORD_SCHEMA = { type: "object", additionalProperties: true };
 const POSITION_SCHEMA = { type: "object", properties: { x: { type: "number" }, y: { type: "number" } }, required: ["x", "y"], additionalProperties: false };
@@ -1720,6 +1720,7 @@ async function buildToolAgentMessages(snapshot: CanvasAgentSnapshot, history: Ca
         { role: "system", content: ONLINE_AGENT_PROMPT },
         ...history
             .filter((message): message is CanvasAssistantMessage & { role: "user" | "assistant" | "system" } => message.role === "user" || message.role === "assistant" || message.role === "system")
+            .filter((message) => !isPollutedAgentMessage(message.text))
             .slice(-8)
             .map((message): ResponseInputMessage => ({ role: message.role, content: safeMessageText(message.text) })),
         {
@@ -1742,6 +1743,11 @@ function safeMessageText(value: unknown) {
     } catch {
         return "";
     }
+}
+
+function isPollutedAgentMessage(text: unknown) {
+    if (typeof text !== "string") return false;
+    return /\[object Object\]|页面交互传递过来的信息|数据传输的问题|误传输的格式/i.test(text);
 }
 
 function compactSnapshot(snapshot: CanvasAgentSnapshot) {

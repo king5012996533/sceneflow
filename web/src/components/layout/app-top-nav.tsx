@@ -30,6 +30,19 @@ type ExperienceApiDraft = {
     models: string[];
     apiFormat: ApiCallFormat;
     providerHint: string;
+    inferredModels?: boolean;
+    defaultImageModel?: string;
+    defaultVideoModel?: string;
+    defaultTextModel?: string;
+    defaultAudioModel?: string;
+    videoDefaults?: {
+        seconds: string;
+        resolution: string;
+        ratio: string;
+        generateAudio: string;
+        watermark: string;
+    };
+    notes?: string[];
 };
 
 type ExperienceChatMessage = {
@@ -167,7 +180,7 @@ function ExperienceOfficerModal({ open, onClose, onOpenConfig }: { open: boolean
     ]);
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
-    const quickQuestions = ["Seedance 2.0 怎么配置？", "API Key 格式不正确怎么办？", "我有一段剧本怎么开始？", "帮我填 API 配置"];
+    const quickQuestions = ["帮我完成 API 配置", "Seedance 2.0 怎么配置？", "模型名应该填哪个？", "API Key 格式不正确怎么办？", "我有一段剧本怎么开始？"];
 
     const sendQuestion = async (value = input) => {
         const text = value.trim();
@@ -213,7 +226,7 @@ function ExperienceOfficerModal({ open, onClose, onOpenConfig }: { open: boolean
             ...current,
             {
                 role: "assistant",
-                content: "已填入 API 配置。我已经打开配置窗口，你确认模型分组是否正确后直接关闭即可。建议先用一个简单提示词测试生图或视频。",
+                content: "已填入 API 配置，并同步设置了模型分组、默认模型和视频基础参数。我已经打开配置窗口，你确认一下模型名是否和供应商/中转平台一致；如果一致，可以直接关闭并用一个简单提示词测试生图或视频。",
             },
         ]);
         antdMessage.success("已填入 API 配置");
@@ -247,6 +260,19 @@ function ExperienceOfficerModal({ open, onClose, onOpenConfig }: { open: boolean
                                         <div className="mt-1 break-all">Base URL：{message.apiDraft.baseUrl}</div>
                                         <div className="break-all">API Key：{maskApiKey(message.apiDraft.apiKey)}</div>
                                         <div className="break-all">模型：{message.apiDraft.models.join("、")}</div>
+                                        <div className="mt-2 grid gap-1">
+                                            {message.apiDraft.defaultTextModel ? <div>文本默认：{message.apiDraft.defaultTextModel}</div> : null}
+                                            {message.apiDraft.defaultImageModel ? <div>图片默认：{message.apiDraft.defaultImageModel}</div> : null}
+                                            {message.apiDraft.defaultVideoModel ? <div>视频默认：{message.apiDraft.defaultVideoModel}</div> : null}
+                                            {message.apiDraft.defaultAudioModel ? <div>音频默认：{message.apiDraft.defaultAudioModel}</div> : null}
+                                        </div>
+                                        {message.apiDraft.videoDefaults ? (
+                                            <div className="mt-2 rounded-lg bg-[#f7f5ff] px-2 py-1.5">
+                                                视频参数：{message.apiDraft.videoDefaults.resolution} · {message.apiDraft.videoDefaults.ratio} · {message.apiDraft.videoDefaults.seconds}s
+                                                {message.apiDraft.videoDefaults.generateAudio === "true" ? " · 生成音频" : ""}
+                                            </div>
+                                        ) : null}
+                                        {message.apiDraft.notes?.length ? <div className="mt-2 text-[#7a6472]">{message.apiDraft.notes.join(" ")}</div> : null}
                                         <Button className="mt-2" size="small" type="primary" onClick={() => applyApiDraft(message.apiDraft!)}>
                                             填入 API 配置
                                         </Button>
@@ -327,15 +353,21 @@ function buildApiHelpReply(text: string): ExperienceChatMessage | null {
 function parseApiDraft(text: string): ExperienceApiDraft | null {
     const baseUrl = extractBaseUrl(text);
     const apiKey = extractApiKey(text);
-    const models = extractModelNames(text);
-    if (!baseUrl || !apiKey || !models.length) return null;
-    return {
+    const explicitModels = extractModelNames(text);
+    if (!baseUrl || !apiKey) return null;
+    const provider = providerHint(baseUrl, explicitModels);
+    const recommended = recommendedModelsForProvider(provider, baseUrl, text);
+    const models = uniqueRawModels(explicitModels.length ? explicitModels : recommended.models);
+    if (!models.length) return null;
+    return enrichExperienceApiDraft({
         baseUrl,
         apiKey,
         models,
         apiFormat: /gemini|generativelanguage\.googleapis/i.test(baseUrl) ? "gemini" : "openai",
-        providerHint: providerHint(baseUrl, models),
-    };
+        providerHint: provider,
+        inferredModels: !explicitModels.length,
+        notes: explicitModels.length ? [] : recommended.notes,
+    });
 }
 
 function extractBaseUrl(text: string) {
@@ -368,9 +400,64 @@ function providerHint(baseUrl: string, models: string[]) {
     return "OpenAI 兼容接口 / 第三方中转";
 }
 
+function recommendedModelsForProvider(provider: string, baseUrl: string, text: string) {
+    const value = `${provider} ${baseUrl} ${text}`.toLowerCase();
+    if (value.includes("volces") || value.includes("seedance") || value.includes("seedream") || value.includes("doubao")) {
+        return {
+            models: ["doubao-seedance-2-0-260128", "doubao-seedream-3-0-t2i-250415", "doubao-1-5-pro-32k-250115"],
+            notes: ["未识别到模型名，已先填入火山/豆包常用模型；如果你的控制台显示不同模型名，请以后端或中转平台提供的为准。"],
+        };
+    }
+    if (provider === "Gemini") {
+        return {
+            models: ["gemini-2.5-pro", "gemini-2.5-flash", "imagen-4.0-generate-preview-06-06"],
+            notes: ["未识别到模型名，已先填入 Gemini 常用文本/图像模型；视频模型请按你开通的平台名称补充。"],
+        };
+    }
+    if (provider === "OpenAI") {
+        return {
+            models: ["gpt-4o", "gpt-image-1"],
+            notes: ["未识别到模型名，已先填入 OpenAI 常用文本/图像模型；视频模型需要你按实际开通情况补充。"],
+        };
+    }
+    return {
+        models: [],
+        notes: ["没有识别到模型名。请把中转平台提供的模型列表也粘贴给我，例如 doubao-seedance-2-0-260128、seedream、gpt-image 等。"],
+    };
+}
+
+function enrichExperienceApiDraft(draft: ExperienceApiDraft): ExperienceApiDraft {
+    const imageModel = draft.models.find((model) => filterModelsByCapability([model], "image").length);
+    const videoModel = draft.models.find((model) => filterModelsByCapability([model], "video").length);
+    const textModel = draft.models.find((model) => filterModelsByCapability([model], "text").length);
+    const audioModel = draft.models.find((model) => filterModelsByCapability([model], "audio").length);
+    return {
+        ...draft,
+        defaultImageModel: imageModel,
+        defaultVideoModel: videoModel,
+        defaultTextModel: textModel,
+        defaultAudioModel: audioModel,
+        videoDefaults: videoModel
+            ? {
+                  seconds: /seedance-2-0/.test(videoModel) ? "15" : "6",
+                  resolution: "720",
+                  ratio: "16:9",
+                  generateAudio: "true",
+                  watermark: "false",
+              }
+            : undefined,
+        notes: [
+            ...(draft.notes || []),
+            !imageModel ? "未识别到图片模型，生图前需要补一个图片模型名。" : "",
+            !videoModel ? "未识别到视频模型，图生视频前需要补一个视频模型名。" : "",
+            !textModel ? "未识别到文本模型，体验官和文本生成建议补一个对话模型。" : "",
+        ].filter(Boolean),
+    };
+}
+
 function buildApiDraftReply(draft: ExperienceApiDraft) {
     const keyWarning = /volces|ark\.cn|seedance|doubao/i.test(`${draft.baseUrl} ${draft.models.join(" ")}`) && !/^sk-|^apikey-/i.test(draft.apiKey) ? "\n\n注意：如果你用的是火山官方直连，Key 通常不是 AK/SK，也不要带 Bearer；如果是第三方中转，以中转站给你的 Key 为准。" : "";
-    return `我识别到了 API 配置，可以帮你自动填入。\n\n类型：${draft.providerHint}\n调用格式：${draft.apiFormat === "gemini" ? "Gemini" : "OpenAI 兼容"}\n模型数量：${draft.models.length}${keyWarning}`;
+    return `我识别到了 API 配置，可以帮你自动填入并完成模型分组。\n\n类型：${draft.providerHint}\n调用格式：${draft.apiFormat === "gemini" ? "Gemini" : "OpenAI 兼容"}\n模型数量：${draft.models.length}${draft.inferredModels ? "\n模型名：未粘贴，我先按供应商推荐补齐，后续可在配置里改。" : ""}${keyWarning}`;
 }
 
 function maskApiKey(apiKey: string) {
@@ -399,6 +486,10 @@ function applyExperienceApiDraft(config: AiConfig, draft: ExperienceApiDraft): A
     const textModels = filterModelsByCapability(models, "text");
     const audioModels = filterModelsByCapability(models, "audio");
     const encodedDraftModels = channel.models.map((model) => encodeChannelModel(channel.id, model));
+    const encodedImageModel = draft.defaultImageModel ? encodeChannelModel(channel.id, draft.defaultImageModel) : "";
+    const encodedVideoModel = draft.defaultVideoModel ? encodeChannelModel(channel.id, draft.defaultVideoModel) : "";
+    const encodedTextModel = draft.defaultTextModel ? encodeChannelModel(channel.id, draft.defaultTextModel) : "";
+    const encodedAudioModel = draft.defaultAudioModel ? encodeChannelModel(channel.id, draft.defaultAudioModel) : "";
 
     return {
         ...config,
@@ -412,11 +503,16 @@ function applyExperienceApiDraft(config: AiConfig, draft: ExperienceApiDraft): A
         videoModels,
         textModels,
         audioModels,
-        model: pickDefaultModel(config.model, encodedDraftModels, models),
-        imageModel: pickDefaultModel(config.imageModel, imageModels, models),
-        videoModel: pickDefaultModel(config.videoModel, videoModels, models),
-        textModel: pickDefaultModel(config.textModel, textModels, models),
-        audioModel: pickDefaultModel(config.audioModel, audioModels, models),
+        model: encodedImageModel || encodedTextModel || pickDefaultModel(config.model, encodedDraftModels, models),
+        imageModel: encodedImageModel || pickDefaultModel(config.imageModel, imageModels, models),
+        videoModel: encodedVideoModel || pickDefaultModel(config.videoModel, videoModels, models),
+        textModel: encodedTextModel || pickDefaultModel(config.textModel, textModels, models),
+        audioModel: encodedAudioModel || pickDefaultModel(config.audioModel, audioModels, models),
+        size: draft.videoDefaults?.ratio || config.size,
+        videoSeconds: draft.videoDefaults?.seconds || config.videoSeconds,
+        vquality: draft.videoDefaults?.resolution || config.vquality,
+        videoGenerateAudio: draft.videoDefaults?.generateAudio || config.videoGenerateAudio,
+        videoWatermark: draft.videoDefaults?.watermark || config.videoWatermark,
     };
 }
 
