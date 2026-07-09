@@ -27,6 +27,7 @@ model User {
   subscriptions Subscription[]
   orders        Order[]
   usageRecords  UsageRecord[]
+  generationJobs GenerationJob[]
   auditLogs     AdminAuditLog[] @relation("AdminAuditActor")
 }
 
@@ -98,6 +99,26 @@ model UsageRecord {
 
   @@unique([userId, metric, period])
   @@index([metric])
+}
+
+model GenerationJob {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestKey     String   @unique
+  kind           String   // image | video | audio | text | tool
+  count          Int      @default(1)
+  status         String   @default("running") // running | succeeded | failed | cancelled
+  error          String?
+  metadata       Json?
+  quotaRefunded  Boolean  @default(false)
+  startedAt      DateTime @default(now())
+  finishedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, createdAt])
 }
 
 model Order {

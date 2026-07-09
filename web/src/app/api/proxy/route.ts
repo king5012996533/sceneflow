@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireCurrentUser } from "@/lib/current-user";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,9 @@ const PROXY_TIMEOUT_MS = 120_000;
 const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "x-api-key", "x-request-id"]);
 
 export async function POST(req: NextRequest) {
+    const user = await requireCurrentUser(req);
+    if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
+
     const contentLength = Number(req.headers.get("content-length") || 0);
     if (contentLength > MAX_PROXY_REQUEST_BYTES) {
         return NextResponse.json({ error: "请求内容过大，请减少参考素材数量或改用公网素材 URL。" }, { status: 413 });

@@ -191,6 +191,22 @@ exports.Prisma.UsageRecordScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.GenerationJobScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  requestKey: 'requestKey',
+  kind: 'kind',
+  count: 'count',
+  status: 'status',
+  error: 'error',
+  metadata: 'metadata',
+  quotaRefunded: 'quotaRefunded',
+  startedAt: 'startedAt',
+  finishedAt: 'finishedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.OrderScalarFieldEnum = {
   id: 'id',
   orderNo: 'orderNo',
@@ -310,6 +326,7 @@ exports.Prisma.ModelName = {
   Entitlement: 'Entitlement',
   Subscription: 'Subscription',
   UsageRecord: 'UsageRecord',
+  GenerationJob: 'GenerationJob',
   Order: 'Order',
   PaymentEvent: 'PaymentEvent',
   AdminAuditLog: 'AdminAuditLog',

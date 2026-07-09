@@ -46,7 +46,17 @@ assertIncludes("src/services/api/video.ts", "compressSeedanceImageDataUrl", "See
 assertIncludes("src/services/api/video.ts", "SEEDANCE_PROXY_IMAGE_MAX_BYTES = 420 * 1024", "Seedance reference image payload guard should stay under the online gateway limit.");
 assertIncludes("src/services/api/proxy-client.ts", "status === 413", "proxy client must translate 413 into a clear user-facing message.");
 assertIncludes("src/lib/generation/generation-request.ts", "requestGeneratedImages", "generation requests must keep a unified app-facing entry.");
+assertIncludes("src/lib/generation/generation-request.ts", "runGuardedGeneration", "all unified generation requests must pass through the backend job guard.");
+assertIncludes("src/lib/generation/generation-jobs.server.ts", "pg_advisory_xact_lock", "generation quota and concurrency checks must serialize per user.");
+assertIncludes("src/lib/generation/generation-jobs.server.ts", "quotaRefunded", "failed generation jobs must refund reserved quota.");
+assertIncludes("src/app/api/proxy/route.ts", "requireCurrentUser", "the upstream proxy must reject anonymous callers.");
+assertIncludes("prisma/schema.prisma", "model GenerationJob", "generation lifecycle logs must remain persisted.");
 assertNoAppDirectGenerationApiImports();
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-ops.ts", 'type: "run_pipeline"', "the canvas agent must keep an executable pipeline operation.");
+assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "canvas_run_pipeline", "the online creation agent must expose pipeline execution.");
+assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "canvas_continue_video", "the creation agent must expose tail-frame continuation.");
+assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "runCanvasPipeline", "pipeline execution must stay connected to the unified node generator.");
+assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "assetAutoArchived", "generated reusable assets must automatically return to the asset library.");
 
 assertNotMatches("src/app/(user)/pricing/page.tsx", /暂不收款|不收款|可以免费|免费开通权益/, "pricing copy must not imply beta packages are free.");
 assertIncludes("src/app/(user)/pricing/page.tsx", "付费手动开通权益", "pricing copy must keep paid manual opening clear.");

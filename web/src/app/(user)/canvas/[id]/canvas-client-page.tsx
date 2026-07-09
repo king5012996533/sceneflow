@@ -106,6 +106,7 @@ const NODE_STATUS_IDLE = "idle" as const;
 const NODE_STATUS_LOADING = "loading" as const;
 const NODE_STATUS_SUCCESS = "success" as const;
 const NODE_STATUS_ERROR = "error" as const;
+const AUTO_ARCHIVE_CATEGORIES = new Set<AssetCategory>(["character", "character-turnaround", "scene", "style", "storyboard", "keyframe", "video-shot", "template"]);
 const IMAGE_PROMPT_REVERSE_PRESET = `请根据参考图片反推一段适合用于 AI 生图的提示词。
 
 要求：
@@ -138,19 +139,60 @@ function nodeAssetTags(node: CanvasNodeData): string[] {
     return Array.from(tags);
 }
 
-function nodeAssetMetadata(node: CanvasNodeData): AssetMetadata {
+function nodeAssetMetadata(node: CanvasNodeData, projectId?: string): AssetMetadata {
     return {
         source: "canvas",
         origin: node.metadata?.assetSource === "platform-rental" ? "platform-rental" : node.metadata?.assetSource === "user-asset" ? "user-upload" : "canvas-generated",
         license: node.metadata?.assetLicense || (node.metadata?.assetSource === "platform-rental" ? "rented" : "private"),
         category: assetCategoryFromNode(node),
         nodeId: node.id,
+        projectId,
         pipelineKind: node.metadata?.pipelineKind,
         prompt: node.metadata?.prompt,
         reusablePrompt: node.metadata?.composerContent || node.metadata?.prompt || node.metadata?.content,
         consistencyNotes: node.metadata?.consistencyNotes || node.metadata?.pipelineDescription,
         commercialUse: node.metadata?.assetSource !== "platform-rental",
     };
+}
+
+function archiveCanvasNode(node: CanvasNodeData, projectId: string, addAsset: ReturnType<typeof useAssetStore.getState>["addAsset"]) {
+    const tags = nodeAssetTags(node);
+    const metadata = nodeAssetMetadata(node, projectId);
+    if (node.type === CanvasNodeType.Text) {
+        const content = node.metadata?.content?.trim();
+        if (!content) return null;
+        return addAsset({ kind: "text", title: node.title || node.metadata?.prompt?.slice(0, 24) || "画布文本", coverUrl: "", tags, source: "Canvas", data: { content }, metadata });
+    }
+    if (node.type === CanvasNodeType.Video) {
+        if (!node.metadata?.content) return null;
+        return addAsset({
+            kind: "video",
+            title: node.title || node.metadata?.prompt?.slice(0, 24) || "画布视频",
+            coverUrl: "",
+            tags,
+            source: "Canvas",
+            data: { url: node.metadata.content, storageKey: node.metadata.storageKey, width: node.width, height: node.height, bytes: node.metadata.bytes || 0, mimeType: node.metadata.mimeType || "video/mp4" },
+            metadata,
+        });
+    }
+    if (node.type !== CanvasNodeType.Image || !node.metadata?.content) return null;
+    const dataUrl = node.metadata.storageKey ? "" : node.metadata.content;
+    return addAsset({
+        kind: "image",
+        title: node.title || node.metadata?.prompt?.slice(0, 24) || "画布图片",
+        coverUrl: node.metadata.content,
+        tags,
+        source: "Canvas",
+        data: {
+            dataUrl,
+            storageKey: node.metadata.storageKey,
+            width: node.metadata.naturalWidth || node.width,
+            height: node.metadata.naturalHeight || node.height,
+            bytes: node.metadata.bytes || getDataUrlByteSize(dataUrl),
+            mimeType: node.metadata.mimeType || "image/png",
+        },
+        metadata,
+    });
 }
 
 function createCanvasNode(type: CanvasNodeType, position: Position, metadata?: CanvasNodeMetadata): CanvasNodeData {
@@ -368,6 +410,7 @@ function InfiniteCanvasPage() {
     const selectedNodeIdsRef = useRef(selectedNodeIds);
     const viewportRef = useRef(viewport);
     const generateNodeRef = useRef<((nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => Promise<void>) | null>(null);
+    const continueVideoRef = useRef<((node: CanvasNodeData) => Promise<void>) | null>(null);
     const connectingParamsRef = useRef(connectingParams);
     const connectionTargetNodeIdRef = useRef(connectionTargetNodeId);
     const selectionBoxRef = useRef(selectionBox);
@@ -583,6 +626,30 @@ function InfiniteCanvasPage() {
     useLayoutEffect(() => {
         selectionBoxRef.current = selectionBox;
     }, [selectionBox]);
+
+    useEffect(() => {
+        if (!projectLoaded) return;
+        const archived = new Map<string, string>();
+        nodes.forEach((node) => {
+            const category = assetCategoryFromNode(node);
+            const shouldArchive =
+                node.metadata?.status === NODE_STATUS_SUCCESS &&
+                !node.metadata?.assetLibraryId &&
+                !node.metadata?.assetAutoArchived &&
+                node.metadata?.assetSource !== "platform-rental" &&
+                (node.metadata?.assetReusable === true || AUTO_ARCHIVE_CATEGORIES.has(category));
+            if (!shouldArchive) return;
+            const assetId = archiveCanvasNode(node, projectId, addAsset);
+            if (assetId) archived.set(node.id, assetId);
+        });
+        if (!archived.size) return;
+        setNodes((previous) =>
+            previous.map((node) => {
+                const assetId = archived.get(node.id);
+                return assetId ? { ...node, metadata: { ...node.metadata, assetLibraryId: assetId, assetAutoArchived: true, assetReusable: true } } : node;
+            }),
+        );
+    }, [addAsset, nodes, projectId, projectLoaded]);
 
     useEffect(() => {
         const el = containerRef.current;
@@ -817,7 +884,9 @@ function InfiniteCanvasPage() {
             const safeOps = Array.isArray(ops) ? ops.filter((op) => op?.type) : [];
             const before = { projectId, title: currentProject?.title || "未命名画布", nodes: nodesRef.current, connections: connectionsRef.current, selectedNodeIds: Array.from(selectedNodeIdsRef.current), viewport: viewportRef.current };
             const generationOps = safeOps.filter((op): op is Extract<CanvasAgentOp, { type: "run_generation" }> => op.type === "run_generation" && Boolean(op.nodeId));
-            const next = applyCanvasAgentOps(before, safeOps.filter((op) => op.type !== "run_generation"));
+            const pipelineOps = safeOps.filter((op): op is Extract<CanvasAgentOp, { type: "run_pipeline" }> => op.type === "run_pipeline" && op.nodeIds.length > 0);
+            const continuationOps = safeOps.filter((op): op is Extract<CanvasAgentOp, { type: "continue_video" }> => op.type === "continue_video" && Boolean(op.nodeId));
+            const next = applyCanvasAgentOps(before, safeOps.filter((op) => op.type !== "run_generation" && op.type !== "run_pipeline" && op.type !== "continue_video"));
             nodesRef.current = next.nodes;
             connectionsRef.current = next.connections;
             selectedNodeIdsRef.current = new Set(next.selectedNodeIds);
@@ -838,9 +907,24 @@ function InfiniteCanvasPage() {
                     }),
                 );
             }
+            if (pipelineOps.length) {
+                queueMicrotask(() => {
+                    pipelineOps.forEach((op) => {
+                        void runCanvasPipeline(op.nodeIds, op.resume !== false, nodesRef, connectionsRef, setNodes, generateNodeRef, message);
+                    });
+                });
+            }
+            if (continuationOps.length) {
+                queueMicrotask(() => {
+                    continuationOps.forEach((op) => {
+                        const node = nodesRef.current.find((item) => item.id === op.nodeId);
+                        if (node && continueVideoRef.current) void continueVideoRef.current(node);
+                    });
+                });
+            }
             return { ...next, projectId, title: currentProject?.title || "未命名画布" };
         },
-        [currentProject?.title, projectId],
+        [currentProject?.title, message, projectId],
     );
     const undoAgentOps = useCallback(() => {
         if (!agentUndoSnapshot) return null;
@@ -1461,6 +1545,7 @@ function InfiniteCanvasPage() {
                         prompt: "上一段视频尾帧，用于下一镜头连续叙事参考。",
                         assetCategory: "keyframe",
                         assetSource: "generate",
+                        assetReusable: true,
                         pipelineKind: "continuity-tail-frame",
                         tailFrameSourceNodeId: node.id,
                     },
@@ -1496,6 +1581,7 @@ function InfiniteCanvasPage() {
                         references: [uploaded.storageKey || uploaded.url].filter(Boolean),
                         assetCategory: "video-shot",
                         assetSource: "generate",
+                        assetReusable: true,
                         pipelineKind: "continuity-video",
                         continuitySourceNodeId: node.id,
                     },
@@ -1521,6 +1607,9 @@ function InfiniteCanvasPage() {
         },
         [effectiveConfig, message],
     );
+    useEffect(() => {
+        continueVideoRef.current = createContinuationFromVideo;
+    }, [createContinuationFromVideo]);
 
     const createAudioFileNode = useCallback(async (file: File, position: Position) => {
         const audio = await uploadMediaFile(file, "audio");
@@ -1764,42 +1853,19 @@ function InfiniteCanvasPage() {
 
     const saveNodeAsset = useCallback(
         async (node: CanvasNodeData) => {
-            const tags = nodeAssetTags(node);
-            const metadata = nodeAssetMetadata(node);
-            if (node.type === CanvasNodeType.Text) {
-                const content = node.metadata?.content?.trim();
-                if (!content) return message.error("没有可保存的文本");
-                addAsset({ kind: "text", title: node.title || node.metadata?.prompt?.slice(0, 24) || "画布文本", coverUrl: "", tags, source: "Canvas", data: { content }, metadata });
-                message.success("已加入我的素材");
+            if (node.metadata?.assetLibraryId) {
+                message.info("该内容已经在我的素材中");
                 return;
             }
-            if (node.type === CanvasNodeType.Video) {
-                if (!node.metadata?.content) return message.error("没有可保存的视频");
-                addAsset({ kind: "video", title: node.title || node.metadata?.prompt?.slice(0, 24) || "画布视频", coverUrl: "", tags, source: "Canvas", data: { url: node.metadata.content, storageKey: node.metadata.storageKey, width: node.width, height: node.height, bytes: node.metadata.bytes || 0, mimeType: node.metadata.mimeType || "video/mp4" }, metadata });
-                message.success("已加入我的素材");
+            const assetId = archiveCanvasNode(node, projectId, addAsset);
+            if (!assetId) {
+                message.error("当前节点没有可保存的内容");
                 return;
             }
-            if (!node.metadata?.content) return message.error("没有可保存的图片");
-            const dataUrl = node.metadata.storageKey ? "" : node.metadata.content;
-            addAsset({
-                kind: "image",
-                title: node.title || node.metadata?.prompt?.slice(0, 24) || "画布图片",
-                coverUrl: node.metadata.content,
-                tags,
-                source: "Canvas",
-                data: {
-                    dataUrl,
-                    storageKey: node.metadata.storageKey,
-                    width: node.metadata.naturalWidth || node.width,
-                    height: node.metadata.naturalHeight || node.height,
-                    bytes: node.metadata.bytes || getDataUrlByteSize(dataUrl),
-                    mimeType: node.metadata.mimeType || "image/png",
-                },
-                metadata,
-            });
+            setNodes((previous) => previous.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, assetLibraryId: assetId, assetAutoArchived: true, assetReusable: true } } : item)));
             message.success("已加入我的素材");
         },
-        [addAsset, message],
+        [addAsset, message, projectId],
     );
 
     const createImageReversePromptNodes = useCallback(
@@ -3593,6 +3659,90 @@ function getInputSummary(inputs: NodeGenerationInput[]) {
 
 function buildGenerationConfig(config: AiConfig, node: CanvasNodeData | undefined, mode: CanvasNodeGenerationMode): AiConfig {
     return buildNodeGenerationConfig(config, node, mode);
+}
+
+async function runCanvasPipeline(
+    requestedNodeIds: string[],
+    resume: boolean,
+    nodesRef: { current: CanvasNodeData[] },
+    connectionsRef: { current: CanvasConnection[] },
+    setNodes: (value: CanvasNodeData[] | ((previous: CanvasNodeData[]) => CanvasNodeData[])) => void,
+    generateNodeRef: { current: ((nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => Promise<void>) | null },
+    message: { loading: (options: { key: string; content: string; duration: number }) => unknown; success: (options: { key: string; content: string }) => unknown; error: (options: { key: string; content: string }) => unknown },
+) {
+    const runId = `pipeline-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const orderedIds = orderPipelineNodes(requestedNodeIds, nodesRef.current, connectionsRef.current);
+    const key = `pipeline-run-${runId}`;
+    message.loading({ key, content: `正在执行创作流水线（0/${orderedIds.length}）`, duration: 0 });
+
+    const patchNode = (nodeId: string, patch: CanvasNodeMetadata) => {
+        const apply = (items: CanvasNodeData[]) => items.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, ...patch } } : node));
+        nodesRef.current = apply(nodesRef.current);
+        setNodes(apply);
+    };
+
+    for (let index = 0; index < orderedIds.length; index += 1) {
+        const nodeId = orderedIds[index];
+        const node = nodesRef.current.find((item) => item.id === nodeId);
+        if (!node) continue;
+        if (resume && node.metadata?.pipelineRunStatus === "completed") {
+            continue;
+        }
+
+        const mode = node.metadata?.generationMode || generationModeFromNodeType(node.type);
+        const prompt = node.metadata?.composerContent || node.metadata?.prompt || "";
+        patchNode(nodeId, { pipelineRunId: runId, pipelineRunStatus: "running", errorDetails: undefined });
+        message.loading({ key, content: `正在执行：${node.metadata?.pipelineLabel || node.title}（${index + 1}/${orderedIds.length}）`, duration: 0 });
+
+        try {
+            if (!generateNodeRef.current) throw new Error("生成执行器尚未就绪");
+            await generateNodeRef.current(nodeId, mode, prompt);
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+            const completed = nodesRef.current.find((item) => item.id === nodeId);
+            if (completed?.metadata?.status === NODE_STATUS_ERROR) throw new Error(completed.metadata.errorDetails || "节点生成失败");
+            patchNode(nodeId, { pipelineRunId: runId, pipelineRunStatus: "completed", pipelineCompletedAt: new Date().toISOString() });
+        } catch (error) {
+            const text = error instanceof Error ? error.message : "流水线执行失败";
+            patchNode(nodeId, { pipelineRunId: runId, pipelineRunStatus: "failed", errorDetails: text });
+            message.error({ key, content: `${node.metadata?.pipelineLabel || node.title}失败，流水线已停在当前节点：${text}` });
+            return;
+        }
+    }
+
+    message.success({ key, content: "创作流水线执行完成，生成资产已自动回流素材库" });
+}
+
+function orderPipelineNodes(requestedNodeIds: string[], nodes: CanvasNodeData[], connections: CanvasConnection[]) {
+    const requested = new Set(requestedNodeIds.filter((id) => nodes.some((node) => node.id === id)));
+    const indegree = new Map(Array.from(requested, (id) => [id, 0]));
+    const outgoing = new Map<string, string[]>();
+    connections.forEach((connection) => {
+        if (!requested.has(connection.fromNodeId) || !requested.has(connection.toNodeId)) return;
+        indegree.set(connection.toNodeId, (indegree.get(connection.toNodeId) || 0) + 1);
+        outgoing.set(connection.fromNodeId, [...(outgoing.get(connection.fromNodeId) || []), connection.toNodeId]);
+    });
+    const queue = requestedNodeIds.filter((id) => requested.has(id) && indegree.get(id) === 0);
+    const result: string[] = [];
+    while (queue.length) {
+        const id = queue.shift()!;
+        if (result.includes(id)) continue;
+        result.push(id);
+        (outgoing.get(id) || []).forEach((nextId) => {
+            indegree.set(nextId, (indegree.get(nextId) || 0) - 1);
+            if (indegree.get(nextId) === 0) queue.push(nextId);
+        });
+    }
+    requestedNodeIds.forEach((id) => {
+        if (requested.has(id) && !result.includes(id)) result.push(id);
+    });
+    return result;
+}
+
+function generationModeFromNodeType(type: CanvasNodeType): CanvasNodeGenerationMode {
+    if (type === CanvasNodeType.Image) return "image";
+    if (type === CanvasNodeType.Video) return "video";
+    if (type === CanvasNodeType.Audio) return "audio";
+    return "text";
 }
 
 function resetInterruptedGeneration(nodes: CanvasNodeData[]) {

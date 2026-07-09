@@ -53,7 +53,7 @@ const GENERATION_OPTION_PROPERTIES = {
 const CANVAS_OP_SCHEMA = {
     type: "object",
     properties: {
-        type: { type: "string", enum: ["add_node", "update_node", "delete_node", "delete_connections", "connect_nodes", "set_viewport", "select_nodes", "run_generation"] },
+        type: { type: "string", enum: ["add_node", "update_node", "delete_node", "delete_connections", "connect_nodes", "set_viewport", "select_nodes", "run_generation", "run_pipeline", "continue_video"] },
         id: { type: "string" },
         ids: { type: "array", items: { type: "string" } },
         nodeType: NODE_TYPE_SCHEMA,
@@ -72,6 +72,8 @@ const CANVAS_OP_SCHEMA = {
         nodeId: { type: "string" },
         mode: GENERATION_MODE_SCHEMA,
         prompt: { type: "string" },
+        nodeIds: { type: "array", items: { type: "string" } },
+        resume: { type: "boolean" },
     },
     required: ["type"],
     additionalProperties: false,
@@ -150,6 +152,13 @@ const ONLINE_AGENT_TOOLS: ResponseFunctionTool[] = [
     toolDefinition("canvas_select_nodes", "设置当前选中节点。", { ids: { type: "array", items: { type: "string" } } }, ["ids"]),
     toolDefinition("canvas_set_viewport", "调整画布视口。", { viewport: VIEWPORT_SCHEMA }, ["viewport"]),
     toolDefinition("canvas_run_generation", "触发指定节点生成，通常用于配置节点或文本/图片/视频/音频节点。", { nodeId: { type: "string" }, mode: GENERATION_MODE_SCHEMA, prompt: { type: "string" } }, ["nodeId"]),
+    toolDefinition(
+        "canvas_run_pipeline",
+        "按顺序执行一组已确认的流程节点。已成功节点会跳过，失败时停止，再次调用可从断点继续。该工具会消耗生成额度，只有用户明确要求执行时才能调用。",
+        { nodeIds: { type: "array", items: { type: "string" }, minItems: 1 }, resume: { type: "boolean" } },
+        ["nodeIds"],
+    ),
+    toolDefinition("canvas_continue_video", "提取指定视频节点的尾帧，并创建已连接的下一镜头视频节点。需要用户确认后执行。", { nodeId: { type: "string" } }, ["nodeId"]),
 ];
 type OnlineAgentTab = "setup" | "chat" | "history" | "log";
 type OnlineAgentLog = { id: string; time: string; title: string; data?: unknown };
@@ -1023,6 +1032,8 @@ function onlineToolToOps(name: string, input: Record<string, unknown>, snapshot:
     if (name === "canvas_select_nodes") return [{ type: "select_nodes", ids: requireStringArray(input.ids, "ids") }];
     if (name === "canvas_set_viewport") return [{ type: "set_viewport", viewport: requireViewport(input.viewport) }];
     if (name === "canvas_run_generation") return [runGenerationOp(requireString(input.nodeId, "nodeId"), generationMode(input.mode), stringOptional(input.prompt))];
+    if (name === "canvas_run_pipeline") return [{ type: "run_pipeline", nodeIds: requireStringArray(input.nodeIds, "nodeIds"), resume: input.resume !== false }];
+    if (name === "canvas_continue_video") return [{ type: "continue_video", nodeId: requireString(input.nodeId, "nodeId") }];
     throw new Error(`不支持的工具：${name}`);
 }
 
@@ -1084,6 +1095,9 @@ const workflowPresets: Record<VisualWorkflowIntent, WorkflowStage[]> = {
         stage("characters", "角色表", CanvasNodeType.Text, "text", "角色资产规划", "列出角色和需要的设定图/三视图。", (brief) => `基于剧本解析输出角色资产表。剧本：${brief}\n\n字段：角色名、年龄气质、外貌、服装、道具、关系、需要的参考资产。`),
         stage("scenes", "场景表", CanvasNodeType.Text, "text", "场景资产规划", "列出可复用场景。", (brief) => `基于剧本解析输出场景资产表。剧本：${brief}\n\n字段：地点、时间、天气、空间层次、出现频次、所需画面资产。`),
         stage("storyboard", "重点片段分镜", CanvasNodeType.Text, "text", "镜头规划", "先拆最值得制作的一段。", (brief) => `从剧本中选择最适合先制作的 15-30 秒片段并输出分镜表。剧本：${brief}`),
+        stage("keyframe", "重点片段关键帧", CanvasNodeType.Image, "image", "关键帧", "根据分镜和角色场景信息生成视频首帧。", (brief) => `根据剧本解析、角色表、场景表和重点片段分镜生成关键帧：${brief}\n\n要求：角色身份、服装、场景和构图稳定，画面适合继续生成视频。`, { size: "1824x1024", quality: "high", count: 1 }),
+        stage("video", "重点片段视频", CanvasNodeType.Video, "video", "镜头成片", "将关键帧生成首段视频。", (brief) => `根据上游关键帧和分镜生成视频：${brief}\n\n保持角色、服装、场景和镜头方向一致，动作自然，不要突然切换身份。`, { size: "16:9", seconds: "6", vquality: "720p" }),
+        stage("asset-archive", "资产入库", CanvasNodeType.Text, "text", "资产回流", "整理并沉淀本次剧本生产资产。", (brief) => `整理本次剧本生产可复用资产：${brief}\n\n按角色、场景、分镜模板、关键帧和镜头视频分类，补充标签、授权状态和复用建议。`, { assetCategory: "template", assetSource: "manual", assetReusable: true }),
     ],
     character: [
         stage("character-brief", "角色设定说明", CanvasNodeType.Text, "text", "角色说明", "整理角色文字设定。", (brief) => `整理角色设定：${brief}\n\n输出：外貌、发型、服装、配饰、气质、禁忌变化、提示词。`),
@@ -1097,6 +1111,8 @@ const workflowPresets: Record<VisualWorkflowIntent, WorkflowStage[]> = {
     storyboard: [
         stage("storyboard", "分镜表", CanvasNodeType.Text, "text", "镜头规划", "把内容拆成镜头表。", (brief) => `请把内容拆成分镜表：${brief}\n\n字段：镜头编号、景别、画面描述、角色动作、台词/旁白、镜头运动、预计秒数、所需参考资产。`),
         stage("keyframe", "关键帧生成", CanvasNodeType.Image, "image", "关键帧", "为分镜生成关键画面。", (brief) => `基于上游分镜生成关键帧。内容：${brief}\n\n要求：构图明确、动作准确、适合转视频。`, { size: "1824x1024", quality: "high", count: 1 }),
+        stage("video", "镜头视频", CanvasNodeType.Video, "video", "镜头成片", "根据关键帧生成视频。", (brief) => `基于上游分镜和关键帧生成视频：${brief}\n\n保持主体、场景、服装和镜头方向一致。`, { size: "16:9", seconds: "6", vquality: "720p" }),
+        stage("asset-archive", "资产入库", CanvasNodeType.Text, "text", "资产回流", "沉淀分镜、关键帧和视频。", (brief) => `整理本次分镜生产中的可复用资产：${brief}`, { assetCategory: "template", assetSource: "manual", assetReusable: true }),
     ],
     "image-to-video": [
         stage("image-analysis", "参考图分析", CanvasNodeType.Text, "text", "图像理解", "先分析首帧/参考图。", (brief) => `分析选中参考图并整理图生视频要求。补充说明：${brief}\n\n输出：主体、场景、风格、可动区域、禁止改变项、推荐镜头运动。`),
@@ -1150,10 +1166,11 @@ function workflowCardOps(input: Record<string, unknown>, snapshot: CanvasAgentSn
     const ops: CanvasAgentOp[] = stages.map((item, index) => {
         const prompt = item.prompt(brief);
         const metadata: CanvasNodeData["metadata"] = cleanRecord({
-            content: item.type === CanvasNodeType.Text ? prompt : "",
+            content: "",
             prompt,
-            composerContent: item.type === CanvasNodeType.Text ? "" : prompt,
-            status: item.type === CanvasNodeType.Text ? "success" : "idle",
+            composerContent: prompt,
+            status: "idle",
+            pipelineRunStatus: "waiting",
             generationMode: item.mode,
             pipelineKind: item.key,
             pipelineLabel: item.label,
@@ -1363,6 +1380,8 @@ function toolCallLabel(name: string) {
     if (name === "canvas_select_nodes") return "选择节点";
     if (name === "canvas_set_viewport") return "调整视口";
     if (name === "canvas_run_generation") return "触发生成";
+    if (name === "canvas_run_pipeline") return "执行创作流水线";
+    if (name === "canvas_continue_video") return "创建连续镜头";
     return name;
 }
 

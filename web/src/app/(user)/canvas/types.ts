@@ -27,12 +27,16 @@ export type CanvasNodeMetadata = {
     pipelineKind?: string;
     pipelineLabel?: string;
     pipelineDescription?: string;
+    pipelineRunStatus?: "waiting" | "running" | "completed" | "failed";
+    pipelineRunId?: string;
+    pipelineCompletedAt?: string;
     assetCategory?: CanvasAssetCategory;
     assetSource?: CanvasAssetSource;
     assetLibraryId?: string;
     assetRentalId?: string;
     assetLicense?: "private" | "rented" | "platform" | "unknown";
     assetReusable?: boolean;
+    assetAutoArchived?: boolean;
     consistencyNotes?: string;
     content?: string;
     composerContent?: string;

@@ -1,5 +1,4 @@
 import { type ClientEntitlements } from "./client-entitlements";
-import { apiPath } from "./app-paths";
 
 const USAGE_KEY = "sceneflow:generation_usage:daily";
 const FREE_DAILY_LIMIT = 3;
@@ -13,11 +12,9 @@ function currentPeriod() {
 
 function getCurrentUsage(): UsageRecord {
     const period = currentPeriod();
-
     try {
         const raw = localStorage.getItem(USAGE_KEY);
         if (!raw) return { ...period, count: 0 };
-
         const parsed = JSON.parse(raw) as UsageRecord;
         if (parsed.year !== period.year || parsed.month !== period.month || parsed.day !== period.day) return { ...period, count: 0 };
         return parsed;
@@ -39,8 +36,6 @@ export function getGenerationCount(): number {
 export function getGenerationLimit(entitlements: ClientEntitlements | null, userRole?: string): number | null {
     if (userRole === "admin") return null;
     if (!entitlements) return FREE_DAILY_LIMIT;
-
-    // Generation count is not stored as a plan entitlement yet; free users get a small trial quota.
     if (entitlements.projects !== null && entitlements.projects <= 3) return FREE_DAILY_LIMIT;
     return null;
 }
@@ -49,7 +44,6 @@ export function checkGenerationQuota(entitlements: ClientEntitlements | null, co
     const usage = getCurrentUsage();
     const limit = getGenerationLimit(entitlements, userRole);
     if (limit === null) return { allowed: true, remaining: -1, limit: null };
-
     const remaining = limit - usage.count;
     return { allowed: remaining >= count, remaining, limit };
 }
@@ -62,19 +56,7 @@ export function recordGeneration(count = 1): number {
 }
 
 export async function reserveGenerationQuota(count = 1) {
-    const res = await fetch(apiPath("/api/billing/usage/generation"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ count }),
-    });
-    const data = await res.json().catch(() => null);
-
-    if (!res.ok) {
-        const message = typeof data?.error === "string" ? data.error : "生成额度检查失败";
-        throw new Error(message);
-    }
-
-    recordGeneration(count);
-    return data?.usage as { allowed: boolean; used: number; reserved: number; remaining: number; limit: number | null } | undefined;
+    // Compatibility shim. The unified generation layer now performs the
+    // authoritative reservation atomically in /api/generation/jobs.
+    return { allowed: true, used: getGenerationCount(), reserved: count, remaining: -1, limit: null };
 }
