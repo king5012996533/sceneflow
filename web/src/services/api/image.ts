@@ -180,6 +180,36 @@ function resolveRequestSize(quality: string | undefined, size: string) {
     throw new Error("图像尺寸格式不支持，请使用 auto、9:16 或 1024x1024");
 }
 
+function resolveRequestAspect(size: string, requestSize?: string) {
+    const value = size.trim();
+    if (!value || value.toLowerCase() === "auto") return undefined;
+    if (value.includes(":")) return value;
+    const dimensions = parseImageDimensions(requestSize || value);
+    if (!dimensions) return undefined;
+    const divisor = gcd(dimensions.width, dimensions.height);
+    return `${Math.round(dimensions.width / divisor)}:${Math.round(dimensions.height / divisor)}`;
+}
+
+function withImageSizeInstruction(prompt: string, size: string, requestSize?: string) {
+    const aspect = resolveRequestAspect(size, requestSize);
+    if (!aspect && !requestSize) return prompt;
+    const parts = ["画幅必须严格遵守用户选择"];
+    if (aspect) parts.push(`宽高比 ${aspect}`);
+    if (requestSize) parts.push(`输出尺寸 ${requestSize}px`);
+    return `${parts.join("，")}。不要改成竖图、横图或其他比例。\n\n${prompt}`;
+}
+
+function gcd(a: number, b: number): number {
+    let x = Math.abs(Math.round(a));
+    let y = Math.abs(Math.round(b));
+    while (y) {
+        const next = x % y;
+        x = y;
+        y = next;
+    }
+    return x || 1;
+}
+
 function resolveImageDataUrl(item: Record<string, unknown>) {
     if (typeof item.b64_json === "string" && item.b64_json) {
         return `data:image/png;base64,${item.b64_json}`;
@@ -678,7 +708,10 @@ function parseGeminiToolResponse(payload: GeminiPayload): ToolResponseResult {
 }
 
 async function requestGeminiImages(config: AiConfig, prompt: string, references: ReferenceImage[], count: number, options?: RequestOptions) {
-    const requests = Array.from({ length: count }, () => requestGeminiImagesOnce(config, prompt, references, options));
+    const quality = normalizeQuality(config.quality);
+    const requestSize = resolveRequestSize(quality, config.size);
+    const requestPrompt = withImageSizeInstruction(prompt, config.size, requestSize);
+    const requests = Array.from({ length: count }, () => requestGeminiImagesOnce(config, requestPrompt, references, options));
     return (await Promise.all(requests)).flat();
 }
 
@@ -726,12 +759,13 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     }
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
+    const requestPrompt = withImageSizeInstruction(prompt, config.size, requestSize);
     try {
         const response = await axios.post<ImageApiResponse>(
             aiApiUrl(requestConfig, "/images/generations"),
             {
                 model: requestConfig.model,
-                prompt: withSystemPrompt(requestConfig, prompt),
+                prompt: withSystemPrompt(requestConfig, requestPrompt),
                 n,
                 ...(quality ? { quality } : {}),
                 ...(requestSize ? { size: requestSize } : {}),
@@ -753,7 +787,9 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
 export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], mask?: ReferenceImage, options?: RequestOptions) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
-    const requestPrompt = buildImageReferencePromptText(prompt, references);
+    const quality = normalizeQuality(config.quality);
+    const requestSize = resolveRequestSize(quality, config.size);
+    const requestPrompt = withImageSizeInstruction(buildImageReferencePromptText(prompt, references), config.size, requestSize);
     if (requestConfig.apiFormat === "gemini") {
         if (mask) throw new Error("Gemini 调用格式暂不支持蒙版编辑");
         try {
@@ -762,8 +798,6 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
             throw new Error(readAxiosError(error, "请求失败"));
         }
     }
-    const quality = normalizeQuality(config.quality);
-    const requestSize = resolveRequestSize(quality, config.size);
     const formData = new FormData();
     formData.set("model", requestConfig.model);
     formData.set("prompt", withSystemPrompt(requestConfig, requestPrompt));
