@@ -23,6 +23,29 @@ export type CanvasImageGenerationType = "generation" | "edit";
 export type CanvasAssetCategory = "character" | "character-turnaround" | "scene" | "style" | "storyboard" | "keyframe" | "video-shot" | "prompt" | "template" | "reference" | "general";
 export type CanvasAssetSource = "generate" | "user-asset" | "platform-rental" | "platform-preset" | "manual";
 
+export type CanvasShotPackLayout = "auto" | "grid-2" | "grid-3" | "horizontal" | "vertical" | "strip";
+
+export type CanvasShotPackShot = {
+    id: string;
+    title: string;
+    description?: string;
+    duration?: number;
+    camera?: string;
+    imageUrl: string;
+    storageKey?: string;
+    naturalWidth?: number;
+    naturalHeight?: number;
+};
+
+export type CanvasShotPack = {
+    shots: CanvasShotPackShot[];
+    layout: CanvasShotPackLayout;
+    showIndex: boolean;
+    showCaption: boolean;
+    sourceGrid?: { rows: number; cols: number; sourceNodeId?: string };
+    composedAt?: string;
+};
+
 export type CanvasNodeMetadata = {
     pipelineKind?: string;
     pipelineLabel?: string;
@@ -74,6 +97,7 @@ export type CanvasNodeMetadata = {
     durationMs?: number;
     tailFrameSourceNodeId?: string;
     continuitySourceNodeId?: string;
+    shotPack?: CanvasShotPack;
 };
 
 export type CanvasNodeData = {

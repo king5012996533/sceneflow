@@ -43,6 +43,8 @@ import { Minimap } from "../components/canvas-mini-map";
 import { CanvasNode } from "../components/canvas-node";
 import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "../components/canvas-node-prompt-panel";
 import { CanvasToolbar } from "../components/canvas-toolbar";
+import { ShotPackNodeContent } from "../components/shot-pack-node-content";
+import { ShotPackPanel } from "../components/shot-pack-panel";
 import { AssetPickerModal, type InsertAssetPayload } from "../components/asset-picker-modal";
 import { CanvasZoomControls } from "../components/canvas-zoom-controls";
 import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
@@ -51,6 +53,7 @@ import { useCanvasStore } from "../stores/use-canvas-store";
 import { applyCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import { buildCanvasResourceReferences, buildNodeMentionReferences } from "../utils/canvas-resource-references";
 import { createMangaWorkflow } from "../utils/manga-workflow";
+import { composeShotPackBlob, splitImageGrid } from "../utils/shot-pack-image";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     CanvasNodeType,
@@ -60,6 +63,8 @@ import {
     type CanvasImageGenerationType,
     type CanvasNodeData,
     type CanvasNodeMetadata,
+    type CanvasShotPack,
+    type CanvasShotPackShot,
     type ConnectionHandle,
     type ContextMenuState,
     type Position,
@@ -377,6 +382,7 @@ function InfiniteCanvasPage() {
     const [showImageInfo, setShowImageInfo] = useState(false);
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
     const [assetPickerOpen, setAssetPickerOpen] = useState(false);
+    const [shotPackBusyNodeId, setShotPackBusyNodeId] = useState<string | null>(null);
     const [projectLoaded, setProjectLoaded] = useState(false);
     const [toolbarNodeId, setToolbarNodeId] = useState<string | null>(null);
     const [nodeImageSettingsOpen, setNodeImageSettingsOpen] = useState(false);
@@ -960,6 +966,170 @@ function InfiniteCanvasPage() {
             if (type !== CanvasNodeType.Text && type !== CanvasNodeType.Audio) setDialogNodeId(newNode.id);
         },
         [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, getCanvasCenter],
+    );
+
+    const createShotPackNode = useCallback(() => {
+        const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
+        const center = getCanvasCenter();
+        const id = `shot-pack-${nanoid()}`;
+        const node: CanvasNodeData = {
+            id,
+            type: CanvasNodeType.Image,
+            title: "镜头包",
+            position: { x: center.x - 220, y: center.y - 160 },
+            width: 440,
+            height: 320,
+            metadata: {
+                content: "",
+                status: NODE_STATUS_IDLE,
+                pipelineKind: "shot-pack",
+                pipelineLabel: "镜头包",
+                pipelineDescription: "把散图或九宫格分镜整理成一张视频参考图",
+                assetCategory: "storyboard",
+                assetSource: "manual",
+                assetReusable: true,
+                shotPack: { shots: [], layout: "grid-3", showIndex: true, showCaption: false },
+            },
+        };
+        node.metadata = { ...node.metadata, naturalWidth: spec.width, naturalHeight: spec.height };
+        setNodes((prev) => [...prev, node]);
+        setSelectedNodeIds(new Set([id]));
+        setSelectedConnectionId(null);
+        setDialogNodeId(id);
+    }, [getCanvasCenter]);
+
+    const patchShotPack = useCallback((nodeId: string, updater: (pack: CanvasShotPack) => CanvasShotPack, extraMetadata?: Partial<CanvasNodeMetadata>) => {
+        setNodes((prev) =>
+            prev.map((node) => {
+                if (node.id !== nodeId) return node;
+                const current: CanvasShotPack = {
+                    shots: node.metadata?.shotPack?.shots || [],
+                    layout: node.metadata?.shotPack?.layout || "grid-3",
+                    showIndex: node.metadata?.shotPack?.showIndex ?? true,
+                    showCaption: node.metadata?.shotPack?.showCaption ?? false,
+                    sourceGrid: node.metadata?.shotPack?.sourceGrid,
+                    composedAt: node.metadata?.shotPack?.composedAt,
+                };
+                return { ...node, metadata: { ...node.metadata, ...extraMetadata, shotPack: updater(current) } };
+            }),
+        );
+    }, []);
+
+    const addShotToPack = useCallback(
+        (packNodeId: string, source: CanvasNodeData) => {
+            if (source.type !== CanvasNodeType.Image || !source.metadata?.content) return;
+            const shot: CanvasShotPackShot = {
+                id: `shot-${nanoid()}`,
+                title: source.title || `镜头 ${(nodesRef.current.find((node) => node.id === packNodeId)?.metadata?.shotPack?.shots.length || 0) + 1}`,
+                description: source.metadata?.prompt || source.metadata?.pipelineDescription || "",
+                imageUrl: source.metadata.content,
+                storageKey: source.metadata.storageKey,
+                naturalWidth: source.metadata.naturalWidth,
+                naturalHeight: source.metadata.naturalHeight,
+            };
+            patchShotPack(packNodeId, (pack) => ({ ...pack, shots: [...pack.shots, shot] }));
+        },
+        [patchShotPack],
+    );
+
+    const updateShotInPack = useCallback(
+        (packNodeId: string, shotId: string, patch: Partial<CanvasShotPackShot>) => {
+            patchShotPack(packNodeId, (pack) => ({ ...pack, shots: pack.shots.map((shot) => (shot.id === shotId ? { ...shot, ...patch } : shot)) }));
+        },
+        [patchShotPack],
+    );
+
+    const moveShotInPack = useCallback(
+        (packNodeId: string, shotId: string, direction: -1 | 1) => {
+            patchShotPack(packNodeId, (pack) => {
+                const index = pack.shots.findIndex((shot) => shot.id === shotId);
+                const nextIndex = index + direction;
+                if (index < 0 || nextIndex < 0 || nextIndex >= pack.shots.length) return pack;
+                const shots = [...pack.shots];
+                [shots[index], shots[nextIndex]] = [shots[nextIndex], shots[index]];
+                return { ...pack, shots };
+            });
+        },
+        [patchShotPack],
+    );
+
+    const removeShotFromPack = useCallback(
+        (packNodeId: string, shotId: string) => {
+            patchShotPack(packNodeId, (pack) => ({ ...pack, shots: pack.shots.filter((shot) => shot.id !== shotId) }));
+        },
+        [patchShotPack],
+    );
+
+    const splitImageIntoShotPack = useCallback(
+        async (packNodeId: string, source: CanvasNodeData, rows: number, cols: number) => {
+            if (source.type !== CanvasNodeType.Image || !source.metadata?.content) return;
+            setShotPackBusyNodeId(packNodeId);
+            try {
+                const pieces = await splitImageGrid(source.metadata.content, rows, cols);
+                const uploaded = await Promise.all(pieces.map((blob) => uploadImage(blob)));
+                const shots: CanvasShotPackShot[] = uploaded.map((image, index) => ({
+                    id: `shot-${nanoid()}`,
+                    title: `镜头 ${String(index + 1).padStart(2, "0")}`,
+                    description: "",
+                    imageUrl: image.url,
+                    storageKey: image.storageKey,
+                    naturalWidth: image.width,
+                    naturalHeight: image.height,
+                }));
+                patchShotPack(packNodeId, (pack) => ({ ...pack, shots: [...pack.shots, ...shots], sourceGrid: { rows, cols, sourceNodeId: source.id } }));
+                message.success(`已拆分为 ${shots.length} 个镜头`);
+            } catch (error) {
+                message.error(error instanceof Error ? error.message : "九宫格切分失败");
+            } finally {
+                setShotPackBusyNodeId(null);
+            }
+        },
+        [message, patchShotPack],
+    );
+
+    const composeShotPackNode = useCallback(
+        async (node: CanvasNodeData) => {
+            const pack = node.metadata?.shotPack;
+            if (!pack?.shots.length) {
+                message.warning("请先加入镜头图");
+                return;
+            }
+            setShotPackBusyNodeId(node.id);
+            try {
+                const blob = await composeShotPackBlob(pack.shots, { layout: pack.layout, showIndex: pack.showIndex, showCaption: pack.showCaption, title: node.title || "镜头包参考图" });
+                const image = await uploadImage(blob);
+                const size = fitNodeSize(image.width, image.height, 520, 360);
+                setNodes((prev) =>
+                    prev.map((item) =>
+                        item.id === node.id
+                            ? {
+                                  ...item,
+                                  width: size.width,
+                                  height: size.height,
+                                  position: { x: item.position.x + item.width / 2 - size.width / 2, y: item.position.y + item.height / 2 - size.height / 2 },
+                                  metadata: {
+                                      ...item.metadata,
+                                      ...imageMetadata(image),
+                                      pipelineKind: "shot-pack",
+                                      pipelineLabel: "镜头包",
+                                      assetCategory: "storyboard",
+                                      assetSource: "manual",
+                                      assetReusable: true,
+                                      prompt: buildShotPackPrompt(pack.shots),
+                                      shotPack: { ...pack, composedAt: new Date().toISOString() },
+                                  },
+                              }
+                            : item,
+                    ),
+                );
+                message.success("镜头包合集图已生成，可直接连到视频节点作为参考图");
+            } catch (error) {
+                message.error(error instanceof Error ? error.message : "镜头包合成失败");
+            } finally {
+                setShotPackBusyNodeId(null);
+            }
+        },
+        [message],
     );
 
     const createMangaWorkflowNodes = useCallback(() => {
@@ -2927,7 +3097,21 @@ function InfiniteCanvasPage() {
                             resourceLabel={resourceReferenceByNodeId.get(node.id)}
                             mentionReferences={mentionReferencesByNodeId.get(node.id) || []}
                             renderPanel={(panelNode) =>
-                                panelNode.type === CanvasNodeType.Config ? (
+                                panelNode.metadata?.pipelineKind === "shot-pack" ? (
+                                    <ShotPackPanel
+                                        node={panelNode}
+                                        imageNodes={nodes}
+                                        busy={shotPackBusyNodeId === panelNode.id}
+                                        onClose={() => setDialogNodeId(null)}
+                                        onAddShot={(source) => addShotToPack(panelNode.id, source)}
+                                        onSplitGrid={(source, rows, cols) => void splitImageIntoShotPack(panelNode.id, source, rows, cols)}
+                                        onUpdateShot={(shotId, patch) => updateShotInPack(panelNode.id, shotId, patch)}
+                                        onMoveShot={(shotId, direction) => moveShotInPack(panelNode.id, shotId, direction)}
+                                        onRemoveShot={(shotId) => removeShotFromPack(panelNode.id, shotId)}
+                                        onPatchPack={(patch) => patchShotPack(panelNode.id, (pack) => ({ ...pack, ...patch }))}
+                                        onCompose={() => void composeShotPackNode(panelNode)}
+                                    />
+                                ) : panelNode.type === CanvasNodeType.Config ? (
                                     <CanvasConfigComposer
                                         value={panelNode.metadata?.composerContent ?? panelNode.metadata?.prompt ?? ""}
                                         inputs={configInputsById.get(panelNode.id) || []}
@@ -2950,20 +3134,24 @@ function InfiniteCanvasPage() {
                                     />
                                 )
                             }
-                            renderNodeContent={(contentNode) => (
-                                <CanvasConfigNodePanel
-                                    node={contentNode}
-                                    isRunning={runningNodeId === contentNode.id}
-                                    inputSummary={getInputSummary(configInputsById.get(contentNode.id) || [])}
-                                    onConfigChange={handleConfigNodeChange}
-                                    onComposerToggle={() => setDialogNodeId((current) => (current === contentNode.id ? null : contentNode.id))}
-                                    onStop={confirmStopGeneration}
-                                    onGenerate={(nodeId) => {
-                                        const target = nodesRef.current.find((item) => item.id === nodeId);
-                                        void handleGenerateNode(nodeId, target?.metadata?.generationMode || "image", target?.metadata?.composerContent ?? target?.metadata?.prompt ?? "");
-                                    }}
-                                />
-                            )}
+                            renderNodeContent={(contentNode) =>
+                                contentNode.metadata?.pipelineKind === "shot-pack" ? (
+                                    <ShotPackNodeContent node={contentNode} />
+                                ) : (
+                                    <CanvasConfigNodePanel
+                                        node={contentNode}
+                                        isRunning={runningNodeId === contentNode.id}
+                                        inputSummary={getInputSummary(configInputsById.get(contentNode.id) || [])}
+                                        onConfigChange={handleConfigNodeChange}
+                                        onComposerToggle={() => setDialogNodeId((current) => (current === contentNode.id ? null : contentNode.id))}
+                                        onStop={confirmStopGeneration}
+                                        onGenerate={(nodeId) => {
+                                            const target = nodesRef.current.find((item) => item.id === nodeId);
+                                            void handleGenerateNode(nodeId, target?.metadata?.generationMode || "image", target?.metadata?.composerContent ?? target?.metadata?.prompt ?? "");
+                                        }}
+                                    />
+                                )
+                            }
                             onMouseDown={handleNodeMouseDown}
                             onHoverStart={(nodeId) => {
                                 if (nodeDraggingRef.current) return;
@@ -3045,6 +3233,7 @@ function InfiniteCanvasPage() {
                     onAddAudio={() => createNode(CanvasNodeType.Audio)}
                     onAddText={() => createNode(CanvasNodeType.Text)}
                     onAddConfig={() => createNode(CanvasNodeType.Config)}
+                    onAddShotPack={createShotPackNode}
                     onCreateMangaWorkflow={createMangaWorkflowNodes}
                     onUndo={undoCanvas}
                     onRedo={redoCanvas}
@@ -3537,6 +3726,17 @@ function videoMetadata(video: UploadedFile): CanvasNodeMetadata {
 
 function audioMetadata(audio: UploadedFile): CanvasNodeMetadata {
     return { content: audio.url, storageKey: audio.storageKey, status: "success", bytes: audio.bytes, mimeType: audio.mimeType || "audio/mpeg", durationMs: audio.durationMs };
+}
+
+function buildShotPackPrompt(shots: CanvasShotPackShot[]) {
+    const lines = shots.map((shot, index) => {
+        const parts = [`${String(index + 1).padStart(2, "0")} ${shot.title || "未命名镜头"}`];
+        if (shot.description) parts.push(shot.description);
+        if (shot.camera) parts.push(`镜头: ${shot.camera}`);
+        if (shot.duration) parts.push(`时长: ${shot.duration}s`);
+        return parts.join(" / ");
+    });
+    return [`参考图是一组连续分镜，请按从左到右、从上到下的顺序理解镜头变化，保持角色、服装、场景一致。`, ...lines].join("\n");
 }
 
 function buildImageGenerationMetadata(type: CanvasImageGenerationType, config: AiConfig, count: number, references: ReferenceImage[]): CanvasNodeMetadata {
