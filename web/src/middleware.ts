@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// 公开路径（免登录）
 const PUBLIC_PATHS = [
-    "/",
     "/login",
     "/register",
     "/pricing",
@@ -21,28 +19,53 @@ const PUBLIC_PATHS = [
     "/showcase",
 ];
 
-// 静态资源前缀
-const STATIC_PREFIXES = ["/_next", "/favicon", "/icon.png", "/apple-icon", "/opengraph-image", "/logo.svg", "/robots.txt", "/sitemap.xml"];
+const STATIC_PREFIXES = [
+    "/_next",
+    "/canvas/_next",
+    "/favicon",
+    "/icon.png",
+    "/apple-icon",
+    "/opengraph-image",
+    "/logo.svg",
+    "/robots.txt",
+    "/sitemap.xml",
+    "/hero-frame.png",
+    "/character-asset.png",
+    "/commerce-visual.png",
+    "/brand-visual.png",
+    "/canvas/logo.svg",
+    "/canvas/robots.txt",
+    "/canvas/sitemap.xml",
+    "/canvas/hero-frame.png",
+    "/canvas/character-asset.png",
+    "/canvas/commerce-visual.png",
+    "/canvas/brand-visual.png",
+    "/canvas/showcase",
+];
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
-    // 公开路径放行
-    if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
+    // The app is deployed under basePath "/canvas"; that external path maps to
+    // the public landing page. Keep "/canvas/canvas" and product pages protected.
+    if (pathname === "/" || pathname === "/canvas") {
         return NextResponse.next();
     }
-    // 静态资源放行
-    if (STATIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+
+    if (PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
+        return NextResponse.next();
+    }
+
+    if (STATIC_PREFIXES.some((path) => pathname === path || pathname.startsWith(`${path}/`))) {
         return NextResponse.next();
     }
 
     const token = request.cookies.get("ic_token")?.value;
     if (!token || token.length < 20) {
-        // API 请求返回 JSON 错误
-        if (pathname.startsWith("/api/")) {
+        if (pathname.startsWith("/api/") || pathname.startsWith("/canvas/api/")) {
             return NextResponse.json({ error: "请先登录" }, { status: 401 });
         }
-        // 页面请求跳转登录
+
         const loginUrl = new URL("/canvas/login", request.url);
         loginUrl.searchParams.set("from", pathname);
         return NextResponse.redirect(loginUrl);
