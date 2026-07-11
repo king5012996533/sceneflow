@@ -40,9 +40,23 @@ const MANGA_PRODUCTION_SKILL = [
     "8. 用户上传外部剧本或片段不限制来源，先解析和拆分；角色来源必须判断是新生成、用户资产复用，还是平台租赁。",
     "9. 生成完成的人设、三视图、场景、风格、分镜、关键帧、视频都要建议回流素材库。",
 ].join("\n");
-const BASE_ONLINE_AGENT_PROMPT =
-    "你是 SceneFlow 的视觉生产导演助理，首要任务是先像专业创作顾问一样回答用户问题、规划内容、写提示词。用户打招呼、咨询、让你想剧情、写提示词、拆 15 秒片段时，直接用自然语言回答，不要调用工具，不要弹出工具确认。用户给出明确题材时，例如“现代武术高手 vs 未来机器人”“15 秒打斗片段”，不要继续索要角色/场景/风格，先主动给出一个可用方案；可以在末尾给 1 个可选追问。回答这类需求时优先输出：一句话概念、15 秒节奏、分镜清单、人物/场景提示词、视频提示词。聊天面板较窄，优先用短标题、编号列表和分段清单；除非用户明确要表格，否则不要输出宽 Markdown 表格。不要提到 [object Object]、页面对象、数据传输错误或内部实现。只有用户明确要求你操作画布，例如创建卡片、读取当前画布、修改节点、连线、生成、重跑、删除、续写视频时，才调用画布工具。除非用户明确要求立即生成，否则不要自动触发生成，不要消耗额度。你的工作顺序是：先理解用户意图 -> 直接给出有用答案或创作规划 -> 用户确认要落到画布时再创建流程卡片 -> 让用户确认提示词、模型、比例、画质。外部剧本不限制来源，先做解析和拆分；角色不要默认全部新生成，必须判断是新生成、调用用户资产，还是租赁平台角色。生成完成的人设、三视图、场景、风格、分镜、关键帧、视频都要建议回流到素材库。工具参数涉及已有节点时必须使用工具读取到的真实 id；缺少必要 id 或用户意图不明确时直接说明需要用户选择或补充，不要猜测。不要输出 JSON ops，不要编造执行结果。工具返回结果后，再根据真实结果回答用户。";
+const BASE_ONLINE_AGENT_PROMPT = [
+    "你是 SceneFlow 的创作陪跑官，不是冷冰冰的工具调度器。你的第一目标是让用户觉得“这个 AI 真懂我、能陪我把作品做出来”。",
+    "默认先聊天、共情、分析、规划、写提示词。用户打招呼、吐槽、问怎么做、发图让你看、说“我需要提示词”、让你想 15 秒片段或分镜时，直接自然语言回答，不调用工具。",
+    "用户情绪低落、困惑、说产品难用或创作卡住时，先接住情绪，再给一个很小的下一步。不要说教，不要把问题推回给用户。",
+    "用户给出明确题材时，例如“现代武术高手 vs 未来机器人”“15 秒打斗片段”，不要继续索要角色/场景/风格，先主动给出一个可用方案；末尾最多给 1 个可选追问。",
+    "用户发图片并说“帮我看一下/我需要提示词/怎么优化”时，按：画面判断、可改进点、可直接复制的提示词、下一步建议 来回答。不要把图片或页面对象说成 [object Object]。",
+    "回答创作需求时优先输出：一句话概念、15 秒节奏、分镜清单、人物/场景提示词、视频提示词。聊天面板较窄，优先用短标题、编号列表和分段清单；除非用户明确要表格，否则不要输出宽 Markdown 表格。",
+    "只有用户明确要求你操作画布，例如创建卡片、放到画布、读取当前画布、修改节点、连线、生成、重跑、删除、续写视频时，才调用画布工具。除非用户明确要求立即生成，否则不要自动触发生成，不要消耗额度。",
+    "不要提到 [object Object]、页面对象、数据传输错误、误传输格式或内部实现。遇到不清晰输入时，用正常人的方式说：我先按你现在给的信息理解为……",
+    "你的工作顺序是：先理解用户意图 -> 直接给出有用答案或创作规划 -> 用户确认要落到画布时再创建流程卡片 -> 让用户确认提示词、模型、比例、画质。",
+    "外部剧本不限制来源，先做解析和拆分；角色不要默认全部新生成，必须判断是新生成、调用用户资产，还是租赁平台角色。生成完成的人设、三视图、场景、风格、分镜、关键帧、视频都要建议回流到素材库。",
+    "工具参数涉及已有节点时必须使用工具读取到的真实 id；缺少必要 id 或用户意图不明确时直接说明需要用户选择或补充，不要猜测。不要输出 JSON ops，不要编造执行结果。工具返回结果后，再根据真实结果回答用户。",
+].join("\n");
 const ONLINE_AGENT_PROMPT = `${BASE_ONLINE_AGENT_PROMPT}\n\n${MANGA_PRODUCTION_SKILL}`;
+const CANVAS_TOOL_INTENT_PATTERN =
+    /(创建|新建|放到画布|落到画布|生成节点|创建卡片|连线|连接|读取画布|当前画布|看一下画布|选中|删除|移动|调整节点|修改节点|执行|运行|重跑|重新生成|续写|尾帧|帮我操作|改画布|更新节点|开始生成|立即生成|生成图片|生成视频|生成音频|图生视频)/;
+const CHAT_ONLY_INTENT_PATTERN = /(提示词|想法|建议|规划|剧本|剧情|片段|分镜|怎么看|帮我看|分析|优化|怎么做|怎么开始|聊|在吗|你好|谢谢|难用|不会|卡住)/;
 const JSON_RECORD_SCHEMA = { type: "object", additionalProperties: true };
 const POSITION_SCHEMA = { type: "object", properties: { x: { type: "number" }, y: { type: "number" } }, required: ["x", "y"], additionalProperties: false };
 const VIEWPORT_SCHEMA = { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, k: { type: "number" } }, required: ["x", "y", "k"], additionalProperties: false };
@@ -349,9 +363,10 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
         try {
             setIsRunning(true);
             const messages = await buildToolAgentMessages(snapshotRef.current, history, userMessage);
-            addOnlineLog(`Agent Loop ${loop.step} 开始`, { toolChoice: "auto" });
+            const toolsForTurn = shouldExposeCanvasTools(userMessage.text) ? ONLINE_AGENT_TOOLS : [];
+            addOnlineLog(`Agent Loop ${loop.step} 开始`, { toolChoice: toolsForTurn.length ? "auto" : "none", toolCount: toolsForTurn.length });
             let streamed = "";
-            const result = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages, tools: ONLINE_AGENT_TOOLS, toolChoice: "auto", onDelta: (text) => {
+            const result = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages, tools: toolsForTurn, toolChoice: "auto", onDelta: (text) => {
                 streamed = text;
                 if (text.trim()) upsertMessage(sessionId, { id: assistantId, role: "assistant", text });
             } });
@@ -650,7 +665,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                     <AgentChatComposer
                         prompt={prompt}
                         sending={isRunning}
-                        placeholder="描述你想让 Agent 如何操作画布"
+                        placeholder="直接问我：看图、写提示词、拆分镜、规划 15 秒片段"
                         theme={theme}
                         onPromptChange={setPrompt}
                         onSubmit={submit}
@@ -1762,6 +1777,15 @@ function safeMessageText(value: unknown) {
 function isPollutedAgentMessage(text: unknown) {
     if (typeof text !== "string") return false;
     return /\[object Object\]|页面交互传递过来的信息|数据传输的问题|误传输的格式/i.test(text);
+}
+
+function shouldExposeCanvasTools(text: unknown) {
+    if (typeof text !== "string") return false;
+    const value = text.trim();
+    if (!value || !CANVAS_TOOL_INTENT_PATTERN.test(value)) return false;
+    const actionHint = /(放到画布|落到画布|创建卡片|创建节点|读取画布|当前画布|操作画布|开始生成|立即生成|生成图片|生成视频|图生视频)/.test(value);
+    const adviceOnlyHint = CHAT_ONLY_INTENT_PATTERN.test(value);
+    return actionHint || !adviceOnlyHint;
 }
 
 function compactSnapshot(snapshot: CanvasAgentSnapshot) {

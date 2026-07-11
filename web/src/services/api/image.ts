@@ -848,14 +848,18 @@ export async function requestToolResponse(config: AiConfig, messages: ResponseIn
     const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
     try {
         if (requestConfig.apiFormat === "gemini") {
-            return await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, toGeminiToolOptions(tools, toolChoice)), onDelta, options);
+            return await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, tools.length ? toGeminiToolOptions(tools, toolChoice) : undefined), onDelta, options);
         }
         return await requestStreamingResponse(requestConfig, {
             model: requestConfig.model,
             input: toResponseInput(withSystemMessage(requestConfig, messages)),
-            tools: tools.map(toResponseTool),
-            tool_choice: toolChoice,
-            parallel_tool_calls: false,
+            ...(tools.length
+                ? {
+                      tools: tools.map(toResponseTool),
+                      tool_choice: toolChoice,
+                      parallel_tool_calls: false,
+                  }
+                : {}),
         }, onDelta, options);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
