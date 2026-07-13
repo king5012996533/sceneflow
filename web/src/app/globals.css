@@ -649,8 +649,9 @@
     overflow-y: auto;
     background: var(--sf-paper);
     color: var(--sf-ink);
-    font-family: Arial, "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    font-family: "SF Pro Text", "Inter", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
     -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
 }
 
 .sf-landing a {
@@ -664,12 +665,17 @@
 }
 
 .sf-landing-header {
-    height: 76px;
+    height: 72px;
     padding: 0 4vw;
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     border-bottom: 1px solid var(--sf-line);
+    background: rgba(239, 237, 232, 0.82);
+    backdrop-filter: blur(18px);
+    position: sticky;
+    top: 0;
+    z-index: 20;
 }
 
 .sf-logo {
@@ -714,11 +720,12 @@
     border-bottom: 1px solid var(--sf-ink);
     font-size: 10px;
     font-weight: 700;
+    letter-spacing: 0.08em;
 }
 
 .sf-hero {
-    min-height: 900px;
-    padding: 145px 7vw 42px;
+    min-height: 840px;
+    padding: 125px 7vw 42px;
     display: grid;
     grid-template-columns: 17% 60% 23%;
     align-content: start;
@@ -750,11 +757,11 @@
 .sf-hero h1 {
     grid-column: 2 / 4;
     margin: 0;
-    font-family: Georgia, "Songti SC", serif;
-    font-size: clamp(68px, 6.5vw, 104px);
+    font-family: Georgia, "Times New Roman", "Songti SC", "STSong", serif;
+    font-size: clamp(72px, 6.8vw, 112px);
     font-weight: 400;
-    letter-spacing: -0.075em;
-    line-height: 0.98;
+    letter-spacing: -0.065em;
+    line-height: 0.96;
 }
 
 .sf-hero h1 em,
@@ -766,15 +773,42 @@
 .sf-hero-note {
     grid-column: 2;
     max-width: 610px;
-    margin: 55px 0 0;
+    margin: 52px 0 0;
     color: var(--sf-muted);
     font-size: 14px;
     line-height: 1.9;
 }
 
+.sf-hero-actions {
+    grid-column: 3;
+    align-self: end;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin: 52px 0 0 auto;
+    min-width: 190px;
+}
+
+.sf-hero-actions a {
+    align-items: center;
+    border-bottom: 1px solid rgba(23, 23, 21, 0.5);
+    display: flex;
+    font-size: 10px;
+    font-weight: 800;
+    justify-content: space-between;
+    letter-spacing: 0.12em;
+    padding-bottom: 9px;
+    text-transform: uppercase;
+}
+
+.sf-hero-actions a:hover {
+    border-color: var(--sf-red);
+    color: var(--sf-red);
+}
+
 .sf-metrics {
     grid-column: 2 / 4;
-    margin-top: 95px;
+    margin-top: 88px;
     padding-top: 22px;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -812,7 +846,7 @@
 
 .sf-evidence,
 .sf-visual-range {
-    padding: 150px 4vw 170px;
+    padding: 135px 4vw 160px;
     background: var(--sf-light);
 }
 
@@ -843,11 +877,11 @@
 
 .sf-canvas-frame {
     width: 92%;
-    height: 720px;
+    height: 700px;
     margin: 0 auto;
     border: 1px solid var(--sf-ink);
     background: #f9f9f6;
-    box-shadow: 22px 22px 0 #dbd7cf;
+    box-shadow: 18px 18px 0 #dbd7cf;
 }
 
 .sf-canvas-bar {
@@ -1042,7 +1076,7 @@
 }
 
 .sf-assets {
-    min-height: 960px;
+    min-height: 900px;
     display: grid;
     grid-template-columns: 8% 46% 46%;
     background: var(--sf-ink);
@@ -1122,7 +1156,7 @@
 
 .sf-range-gallery {
     width: 92%;
-    height: 760px;
+    height: 720px;
     margin: 0 auto;
     display: grid;
     grid-template-columns: 1.12fr 0.88fr 0.88fr;
@@ -1163,7 +1197,7 @@
 }
 
 .sf-process {
-    padding: 150px 7vw 170px;
+    padding: 140px 7vw 155px;
     background: #dedad3;
 }
 
@@ -1219,8 +1253,8 @@
 }
 
 .sf-cta {
-    min-height: 780px;
-    padding: 145px 7vw 45px;
+    min-height: 720px;
+    padding: 130px 7vw 45px;
     display: flex;
     flex-direction: column;
     background: var(--sf-paper);
@@ -1228,7 +1262,7 @@
 
 .sf-cta h2 {
     max-width: 1100px;
-    margin: 70px 0 55px;
+    margin: 66px 0 55px;
     font-size: clamp(70px, 8vw, 128px);
     line-height: 0.98;
 }
@@ -1282,6 +1316,7 @@
     .sf-kicker,
     .sf-hero h1,
     .sf-hero-note,
+    .sf-hero-actions,
     .sf-metrics,
     .sf-scroll {
         grid-column: 1;
@@ -1289,6 +1324,9 @@
     .sf-hero h1 {
         margin-top: 38px;
         font-size: clamp(64px, 11vw, 94px);
+    }
+    .sf-hero-actions {
+        margin-left: 0;
     }
     .sf-section-head,
     .sf-process-intro,
