@@ -16,6 +16,8 @@ const PUBLIC_PATHS = [
     "/api/payments/callback",
     "/api/prompts",
     "/api/experience-agent",
+    "/api/agent-lab",
+    "/agent-lab",
     "/showcase",
 ];
 

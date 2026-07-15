@@ -297,7 +297,7 @@ export function AgentModeSwitch({ value, theme, onChange }: { value: CanvasAgent
         <div className="inline-flex shrink-0 rounded-lg border p-0.5 text-xs" style={{ borderColor: theme.node.stroke }}>
             {(["online", "local"] as const).map((item) => (
                 <button key={item} type="button" className="rounded-md px-2 py-1 transition" style={{ background: value === item ? theme.node.fill : "transparent", color: value === item ? theme.node.text : theme.node.muted }} onClick={() => onChange(item)}>
-                    {item === "online" ? "网站" : "本机"}
+                    {item === "online" ? "创作" : "本机"}
                 </button>
             ))}
         </div>

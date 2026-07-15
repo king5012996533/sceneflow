@@ -19,6 +19,7 @@ import { DiaTextReveal } from "@/components/ui/dia-text-reveal";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { CanvasPromptLibrary } from "./canvas-prompt-library";
 import { AgentChatComposer, AgentChatMessage, AgentModeSwitch, AgentPanelTabs, AgentWorkingMessage, type CanvasAgentChatMessage, type CanvasAgentMode } from "./canvas-agent-chat-ui";
+import { CanvasCreativeAgentPanel } from "./canvas-creative-agent-panel";
 import { CanvasLocalAgentPanel } from "./canvas-local-agent-panel";
 import { NODE_DEFAULT_SIZE } from "../constants";
 import { CanvasNodeType, type CanvasAssistantMessage, type CanvasAssistantReference, type CanvasAssistantSession, type CanvasNodeData } from "../types";
@@ -735,10 +736,12 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                         <AgentModeSwitch value={agentMode} theme={theme} onChange={onAgentModeChange} />
-                        <label className="flex items-center gap-1.5 text-xs" style={{ color: theme.node.muted }}>
-                            <Switch size="small" checked={confirmTools} onChange={(confirmTools) => setAgentState({ confirmTools })} />
-                            工具确认
-                        </label>
+                        {agentMode === "local" ? (
+                            <label className="flex items-center gap-1.5 text-xs" style={{ color: theme.node.muted }}>
+                                <Switch size="small" checked={confirmTools} onChange={(confirmTools) => setAgentState({ confirmTools })} />
+                                工具确认
+                            </label>
+                        ) : null}
                         <Tooltip title="收起对话">
                             <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<PanelRightClose className="size-4" />} onClick={collapse} />
                         </Tooltip>
@@ -754,7 +757,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                         autoConnect={autoConnectLocal}
                     />
                 ) : (
-                    onlineContent
+                    <CanvasCreativeAgentPanel snapshot={snapshot} config={effectiveConfig} />
                 )}
             </motion.aside>
         </motion.div>
