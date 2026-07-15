@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import copyToClipboard from "copy-to-clipboard";
 import { App, Button, Tag } from "antd";
-import { Copy, LoaderCircle, Send } from "lucide-react";
+import { Copy, LoaderCircle, Plus, Send, Trash2 } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
 import type { AgentLabArtifact, AgentLabMessage, AgentLabResponse } from "@/lib/agent-lab/types";
@@ -21,14 +21,14 @@ type CanvasCreativeAgentPanelProps = {
     onApplyOps: (ops: CanvasAgentOp[]) => CanvasAgentSnapshot;
 };
 
+const DEFAULT_AGENT_MESSAGE: AgentLabMessage = {
+    role: "assistant",
+    content: "我是 SceneFlow 创作 Agent。你可以直接告诉我你要做什么，我先帮你判断流程、拆步骤、写提示词和分镜建议。现在我不会直接操作画布，确认方案后再进入创建卡片。",
+};
+
 export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: CanvasCreativeAgentPanelProps) {
     const { message } = App.useApp();
-    const [messages, setMessages] = useState<AgentLabMessage[]>([
-        {
-            role: "assistant",
-            content: "我是 SceneFlow 创作 Agent。你可以直接告诉我你要做什么，我先帮你判断流程、拆步骤、写提示词和分镜建议。现在我不会直接操作画布，确认方案后再进入创建卡片。",
-        },
-    ]);
+    const [messages, setMessages] = useState<AgentLabMessage[]>([DEFAULT_AGENT_MESSAGE]);
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [artifact, setArtifact] = useState<AgentLabArtifact | null>(null);
@@ -113,6 +113,25 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
     function copyText(text: string, successText = "已复制") {
         copyToClipboard(text);
         message.success(successText);
+    }
+
+    function resetConversation() {
+        setMessages([DEFAULT_AGENT_MESSAGE]);
+        setDraft("");
+        setArtifact(null);
+        setAppliedActionIds(new Set());
+        setActionNodeIds({});
+        setGeneratedActionIds(new Set());
+        message.success("已新建会话");
+    }
+
+    function clearConversation() {
+        setMessages([DEFAULT_AGENT_MESSAGE]);
+        setArtifact(null);
+        setAppliedActionIds(new Set());
+        setActionNodeIds({});
+        setGeneratedActionIds(new Set());
+        message.success("已清空当前会话");
     }
 
     function applyToolAction(action: AgentToolAction) {
@@ -222,9 +241,17 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
                     <div className="truncate text-sm font-semibold">创作 Agent</div>
                     <div className="truncate text-xs text-black/45">先规划，不直接执行画布操作</div>
                 </div>
-                <Tag bordered={false} color={channel.apiKey ? "green" : "default"}>
-                    {modelLabel}
-                </Tag>
+                <div className="flex shrink-0 items-center gap-1.5">
+                    <Tag bordered={false} color={channel.apiKey ? "green" : "default"}>
+                        {modelLabel}
+                    </Tag>
+                    <Button size="small" type="text" icon={<Plus className="size-3.5" />} onClick={resetConversation}>
+                        新建
+                    </Button>
+                    <Button size="small" type="text" icon={<Trash2 className="size-3.5" />} onClick={clearConversation}>
+                        清空
+                    </Button>
+                </div>
             </div>
 
             <div ref={scrollRef} className="thin-scrollbar min-h-0 flex-1 space-y-5 overflow-auto px-4 py-5">
