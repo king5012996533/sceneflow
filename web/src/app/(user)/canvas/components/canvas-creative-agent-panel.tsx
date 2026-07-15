@@ -8,17 +8,20 @@ import { Copy, LoaderCircle, Send } from "lucide-react";
 import { apiPath } from "@/lib/app-paths";
 import type { AgentLabArtifact, AgentLabMessage, AgentLabResponse } from "@/lib/agent-lab/types";
 import { modelOptionName, resolveModelChannel, type AiConfig } from "@/stores/use-config-store";
-import type { CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
+import { CanvasNodeType } from "../types";
+import type { CanvasAgentOp, CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 
 const QUICK_PROMPTS = ["一部漫剧应该怎么做？", "我要一个 15 秒打斗片段", "帮我写一个古风女主三视图提示词", "我直接做三视图可以吗？"];
 const STORAGE_KEY = "sceneflow:canvas-creative-agent:messages";
+type AgentToolAction = NonNullable<AgentLabArtifact["toolActions"]>[number];
 
 type CanvasCreativeAgentPanelProps = {
     snapshot: CanvasAgentSnapshot;
     config: AiConfig;
+    onApplyOps: (ops: CanvasAgentOp[]) => CanvasAgentSnapshot;
 };
 
-export function CanvasCreativeAgentPanel({ snapshot, config }: CanvasCreativeAgentPanelProps) {
+export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: CanvasCreativeAgentPanelProps) {
     const { message } = App.useApp();
     const [messages, setMessages] = useState<AgentLabMessage[]>([
         {
@@ -29,6 +32,9 @@ export function CanvasCreativeAgentPanel({ snapshot, config }: CanvasCreativeAge
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [artifact, setArtifact] = useState<AgentLabArtifact | null>(null);
+    const [appliedActionIds, setAppliedActionIds] = useState<Set<string>>(new Set());
+    const [actionNodeIds, setActionNodeIds] = useState<Record<string, string>>({});
+    const [generatedActionIds, setGeneratedActionIds] = useState<Set<string>>(new Set());
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const activeModel = config.textModel || config.model;
@@ -93,6 +99,9 @@ export function CanvasCreativeAgentPanel({ snapshot, config }: CanvasCreativeAge
             if (!response.ok) throw new Error(data.error || "Agent 请求失败");
             setMessages((current) => [...current, { role: "assistant", content: data.answer }]);
             setArtifact(data.artifact || null);
+            setAppliedActionIds(new Set());
+            setActionNodeIds({});
+            setGeneratedActionIds(new Set());
         } catch (error) {
             const text = error instanceof Error ? error.message : "Agent 请求失败";
             setMessages((current) => [...current, { role: "assistant", content: `这次没有连上主模型：${text}\n\n你可以先检查文本模型、Base URL 和 API Key。` }]);
@@ -104,6 +113,106 @@ export function CanvasCreativeAgentPanel({ snapshot, config }: CanvasCreativeAge
     function copyText(text: string, successText = "已复制") {
         copyToClipboard(text);
         message.success(successText);
+    }
+
+    function applyToolAction(action: AgentToolAction) {
+        if (action.type === "ask_user") {
+            setMessages((current) => [...current, { role: "assistant", content: `我会先等待你补充：${action.requires.join("、") || action.description || action.title}` }]);
+            return;
+        }
+        if (action.type === "save_asset") {
+            setMessages((current) => [...current, { role: "assistant", content: "资产入库需要接素材库接口，这一步我先记录建议，不会直接写入正式资产库。" }]);
+            return;
+        }
+        const nodeId = createActionNodeId(action, Object.keys(actionNodeIds).length);
+        const ops = toolActionToOps(action, artifact, snapshot, nodeId);
+        if (!ops.length) {
+            message.warning("这个动作暂时还不能转换成画布卡片");
+            return;
+        }
+        onApplyOps(ops);
+        setAppliedActionIds((current) => new Set([...current, action.id]));
+        setActionNodeIds((current) => ({ ...current, [action.id]: nodeId }));
+        setMessages((current) => [
+            ...current,
+            {
+                role: "assistant",
+                content: `已创建草稿卡片：${action.title}\n\n我只是把方案落成画布卡片，没有触发生成。你可以检查提示词、模型、尺寸和引用关系后，再手动生成。`,
+            },
+        ]);
+        message.success("已创建到画布");
+    }
+
+    function applyAllToolActions(actions: AgentToolAction[]) {
+        const pending = actions.filter((action) => !appliedActionIds.has(action.id) && isCreatableAction(action));
+        if (!pending.length) {
+            message.info("没有可创建的新卡片");
+            return;
+        }
+        const built = toolActionsToConnectedOps(pending, artifact, snapshot);
+        const ops = built.ops;
+        if (!ops.length) {
+            message.warning("暂无可创建的卡片");
+            return;
+        }
+        onApplyOps(ops);
+        setAppliedActionIds((current) => new Set([...current, ...pending.map((action) => action.id)]));
+        setActionNodeIds((current) => ({ ...current, ...built.actionNodeIds }));
+        setMessages((current) => [
+            ...current,
+            {
+                role: "assistant",
+                content: `已创建 ${pending.length} 张草稿卡片，并按建议流程连线。\n\n我没有触发生成。你可以先检查每张卡片的提示词、模型、尺寸和上游引用，再手动执行。`,
+            },
+        ]);
+        message.success(`已创建 ${pending.length} 张草稿卡片`);
+    }
+
+    function runActionGeneration(action: AgentToolAction) {
+        const nodeId = actionNodeIds[action.id];
+        if (!nodeId) {
+            message.warning("请先创建这张草稿卡");
+            return;
+        }
+        const mode = actionToGenerationMode(action.type);
+        if (!mode) {
+            message.warning("这张卡不是生成卡，不能直接生成");
+            return;
+        }
+        onApplyOps([{ type: "run_generation", nodeId, mode }]);
+        setGeneratedActionIds((current) => new Set([...current, action.id]));
+        setMessages((current) => [
+            ...current,
+            {
+                role: "assistant",
+                content: `已触发生成：${action.title}\n\n这次生成走 SceneFlow 现有生成入口，会按后端额度、并发和扣费规则执行。`,
+            },
+        ]);
+        message.success("已触发生成");
+    }
+
+    function runAllActionGenerations(actions: AgentToolAction[]) {
+        const generationOps = actions
+            .filter((action) => actionToGenerationMode(action.type) && appliedActionIds.has(action.id) && !generatedActionIds.has(action.id) && actionNodeIds[action.id])
+            .map((action) => ({ type: "run_generation" as const, nodeId: actionNodeIds[action.id], mode: actionToGenerationMode(action.type) || "image" }));
+        if (!generationOps.length) {
+            message.info("没有可生成的已创建卡片");
+            return;
+        }
+        onApplyOps(generationOps);
+        const generatedIds = new Set(generatedActionIds);
+        actions.forEach((action) => {
+            if (actionNodeIds[action.id] && actionToGenerationMode(action.type)) generatedIds.add(action.id);
+        });
+        setGeneratedActionIds(generatedIds);
+        setMessages((current) => [
+            ...current,
+            {
+                role: "assistant",
+                content: `已批量触发 ${generationOps.length} 个生成任务。\n\n这些任务会走 SceneFlow 现有生成入口，并按后端额度、并发和扣费规则执行。`,
+            },
+        ]);
+        message.success(`已触发 ${generationOps.length} 个生成任务`);
     }
 
     return (
@@ -148,7 +257,7 @@ export function CanvasCreativeAgentPanel({ snapshot, config }: CanvasCreativeAge
             </div>
 
             <div className="border-t border-black/10 p-3">
-                {artifact ? <CompactCanvasPlan artifact={artifact} onCopy={copyText} /> : null}
+                {artifact ? <CompactCanvasPlan artifact={artifact} appliedActionIds={appliedActionIds} generatedActionIds={generatedActionIds} onCopy={copyText} onApply={applyToolAction} onApplyAll={applyAllToolActions} onGenerate={runActionGeneration} onGenerateAll={runAllActionGenerations} /> : null}
                 <div className="mb-2 flex flex-wrap gap-2">
                     {QUICK_PROMPTS.map((item) => (
                         <Button key={item} size="small" onClick={() => sendMessage(item)} disabled={sending}>
@@ -189,7 +298,25 @@ function buildCanvasMemory(snapshot: CanvasAgentSnapshot) {
     };
 }
 
-function CompactCanvasPlan({ artifact, onCopy }: { artifact: AgentLabArtifact; onCopy: (text: string, successText?: string) => void }) {
+function CompactCanvasPlan({
+    artifact,
+    appliedActionIds,
+    generatedActionIds,
+    onCopy,
+    onApply,
+    onApplyAll,
+    onGenerate,
+    onGenerateAll,
+}: {
+    artifact: AgentLabArtifact;
+    appliedActionIds: Set<string>;
+    generatedActionIds: Set<string>;
+    onCopy: (text: string, successText?: string) => void;
+    onApply: (action: AgentToolAction) => void;
+    onApplyAll: (actions: AgentToolAction[]) => void;
+    onGenerate: (action: AgentToolAction) => void;
+    onGenerateAll: (actions: AgentToolAction[]) => void;
+}) {
     if (!artifact.plan && !artifact.selfCheck && !artifact.toolActions?.length) return null;
     return (
         <details className="mb-2 rounded-2xl border border-black/10 bg-[#f7f1e8]">
@@ -200,7 +327,48 @@ function CompactCanvasPlan({ artifact, onCopy }: { artifact: AgentLabArtifact; o
             <div className="space-y-3 border-t border-black/10 p-3 text-sm">
                 {artifact.plan?.cards.length ? <MiniList title="建议卡片" items={artifact.plan.cards} /> : null}
                 {artifact.plan?.missingAssets.length ? <MiniList title="缺失素材" items={artifact.plan.missingAssets} /> : null}
-                {artifact.toolActions?.length ? <MiniList title="可确认动作" items={artifact.toolActions.map((item) => item.title)} /> : null}
+                {artifact.toolActions?.length ? (
+                    <div>
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                            <div className="text-xs font-semibold text-black/45">可确认动作</div>
+                            <div className="flex gap-1.5">
+                                <Button size="small" onClick={() => onApplyAll(artifact.toolActions || [])}>
+                                    创建全部
+                                </Button>
+                                <Button size="small" onClick={() => onGenerateAll(artifact.toolActions || [])}>
+                                    生成全部
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            {artifact.toolActions.map((action) => {
+                                const applied = appliedActionIds.has(action.id);
+                                const canGenerate = Boolean(actionToGenerationMode(action.type));
+                                const generated = generatedActionIds.has(action.id);
+                                return (
+                                    <div key={action.id} className="rounded-xl border border-black/10 bg-white/65 px-3 py-2">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <div className="truncate text-sm font-medium">{action.title}</div>
+                                                <div className="mt-0.5 text-xs leading-5 text-black/50">{formatToolType(action.type)} · {action.description || "确认后创建草稿卡片"}</div>
+                                            </div>
+                                            <div className="flex shrink-0 gap-1.5">
+                                                <Button size="small" type={applied ? "default" : "primary"} disabled={applied} onClick={() => onApply(action)}>
+                                                    {applied ? "已创建" : action.type === "ask_user" ? "知道了" : "创建"}
+                                                </Button>
+                                                {canGenerate ? (
+                                                    <Button size="small" disabled={!applied || generated} onClick={() => onGenerate(action)}>
+                                                        {generated ? "已生成" : "生成"}
+                                                    </Button>
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ) : null}
                 {artifact.selfCheck?.risks.length ? <MiniList title="风险" items={artifact.selfCheck.risks} /> : null}
                 <Button size="small" onClick={() => onCopy(JSON.stringify(artifact, null, 2), "已复制执行建议")}>
                     复制完整建议
@@ -208,6 +376,165 @@ function CompactCanvasPlan({ artifact, onCopy }: { artifact: AgentLabArtifact; o
             </div>
         </details>
     );
+}
+
+function toolActionToOps(action: AgentToolAction, artifact: AgentLabArtifact | null, snapshot: CanvasAgentSnapshot, nodeId: string): CanvasAgentOp[] {
+    return [buildActionNodeOp(action, artifact, nextCardPosition(snapshot), nodeId)];
+}
+
+function toolActionsToConnectedOps(actions: AgentToolAction[], artifact: AgentLabArtifact | null, snapshot: CanvasAgentSnapshot): { ops: CanvasAgentOp[]; actionNodeIds: Record<string, string> } {
+    const start = nextCardPosition(snapshot);
+    const actionNodeIds: Record<string, string> = {};
+    const nodes = actions.map((action, index) =>
+        {
+            const nodeId = createActionNodeId(action, index);
+            actionNodeIds[action.id] = nodeId;
+            return buildActionNodeOp(
+                action,
+                artifact,
+                {
+                    x: start.x + index * 420,
+                    y: start.y + (index % 2) * 36,
+                },
+                nodeId,
+            );
+        },
+    );
+    const connections: CanvasAgentOp[] = [];
+    const firstNodeId = nodes[0]?.id;
+    if (firstNodeId) {
+        snapshot.selectedNodeIds.slice(0, 6).forEach((sourceId) => {
+            connections.push({ type: "connect_nodes", fromNodeId: sourceId, toNodeId: firstNodeId });
+        });
+    }
+    for (let index = 0; index < nodes.length - 1; index += 1) {
+        const fromNodeId = nodes[index]?.id;
+        const toNodeId = nodes[index + 1]?.id;
+        if (fromNodeId && toNodeId) connections.push({ type: "connect_nodes", fromNodeId, toNodeId });
+    }
+    return { ops: [...nodes, ...connections], actionNodeIds };
+}
+
+function buildActionNodeOp(action: AgentToolAction, artifact: AgentLabArtifact | null, position: { x: number; y: number }, id?: string): Extract<CanvasAgentOp, { type: "add_node" }> {
+    const mode = actionToGenerationMode(action.type);
+    const nodeType = mode ? CanvasNodeType.Config : CanvasNodeType.Text;
+    const prompt = extractActionPrompt(action, artifact);
+    const content = [
+        action.title,
+        action.description ? `说明：${action.description}` : "",
+        action.requires.length ? `依赖：${action.requires.join("、")}` : "",
+        prompt ? `\n${prompt}` : "",
+    ]
+        .filter(Boolean)
+        .join("\n");
+    const metadata = mode
+        ? {
+              content,
+              composerContent: prompt || content,
+              prompt: prompt || content,
+              generationMode: mode,
+              status: "idle" as const,
+              pipelineKind: action.type,
+              pipelineLabel: formatToolType(action.type),
+              pipelineDescription: action.description || action.title,
+              assetCategory: actionToAssetCategory(action.type),
+              assetSource: "manual" as const,
+              assetReusable: true,
+          }
+        : {
+              content,
+              status: "idle" as const,
+              fontSize: 14,
+              pipelineKind: action.type,
+              pipelineLabel: formatToolType(action.type),
+              pipelineDescription: action.description || action.title,
+          };
+    return {
+        type: "add_node",
+        id,
+        nodeType,
+        title: action.title || formatToolType(action.type),
+        position,
+        width: nodeType === CanvasNodeType.Text ? 380 : 360,
+        height: nodeType === CanvasNodeType.Text ? 260 : 280,
+        metadata,
+    };
+}
+
+function isCreatableAction(action: AgentToolAction) {
+    return action.type !== "ask_user" && action.type !== "save_asset";
+}
+
+function safeId(value: string) {
+    return value.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 40) || "action";
+}
+
+function createActionNodeId(action: AgentToolAction, index: number) {
+    return `agent-${Date.now()}-${index}-${safeId(action.id)}`;
+}
+
+function nextCardPosition(snapshot: CanvasAgentSnapshot) {
+    const k = Number.isFinite(snapshot.viewport.k) && snapshot.viewport.k > 0 ? snapshot.viewport.k : 1;
+    const baseX = Math.round((-snapshot.viewport.x + 140) / k);
+    const baseY = Math.round((-snapshot.viewport.y + 140) / k);
+    const offset = Math.min(snapshot.nodes.length % 8, 7) * 36;
+    return { x: baseX + offset, y: baseY + offset };
+}
+
+function extractActionPrompt(action: AgentToolAction, artifact: AgentLabArtifact | null) {
+    const payload = action.payload || {};
+    const payloadPrompt = firstString(payload.prompt, payload.positivePrompt, payload.content, payload.text, payload.description);
+    if (payloadPrompt) return payloadPrompt;
+    const deliverables = artifact?.deliverables || [];
+    const matched = deliverables.find((item) => {
+        const haystack = `${item.type} ${item.title}`.toLowerCase();
+        if (action.type === "create_portrait_card") return /portrait|立绘|人物/.test(haystack);
+        if (action.type === "create_turnaround_card") return /turnaround|三视图/.test(haystack);
+        if (action.type === "create_storyboard_card") return /storyboard|分镜/.test(haystack);
+        if (action.type === "create_scene_card") return /scene|场景/.test(haystack);
+        if (action.type === "create_keyframe_card") return /keyframe|关键帧/.test(haystack);
+        if (action.type === "create_video_card") return /video|视频/.test(haystack);
+        return false;
+    });
+    return matched?.content || firstString(artifact?.summary, action.description, action.title);
+}
+
+function firstString(...values: unknown[]) {
+    for (const value of values) {
+        if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return "";
+}
+
+function actionToGenerationMode(type: AgentToolAction["type"]) {
+    if (type === "create_storyboard_card") return undefined;
+    if (type === "create_video_card") return "video" as const;
+    if (type === "create_portrait_card" || type === "create_turnaround_card" || type === "create_scene_card" || type === "create_keyframe_card") return "image" as const;
+    return undefined;
+}
+
+function actionToAssetCategory(type: AgentToolAction["type"]) {
+    if (type === "create_portrait_card") return "character" as const;
+    if (type === "create_turnaround_card") return "character-turnaround" as const;
+    if (type === "create_scene_card") return "scene" as const;
+    if (type === "create_storyboard_card") return "storyboard" as const;
+    if (type === "create_keyframe_card") return "keyframe" as const;
+    if (type === "create_video_card") return "video-shot" as const;
+    return "general" as const;
+}
+
+function formatToolType(type: AgentToolAction["type"]) {
+    const labels: Record<AgentToolAction["type"], string> = {
+        create_portrait_card: "人物立绘卡",
+        create_turnaround_card: "三视图卡",
+        create_storyboard_card: "分镜卡",
+        create_scene_card: "场景卡",
+        create_keyframe_card: "关键帧卡",
+        create_video_card: "视频卡",
+        save_asset: "资产入库",
+        ask_user: "追问用户",
+    };
+    return labels[type] || type;
 }
 
 function MiniList({ title, items }: { title: string; items: string[] }) {

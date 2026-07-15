@@ -757,7 +757,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                         autoConnect={autoConnectLocal}
                     />
                 ) : (
-                    <CanvasCreativeAgentPanel snapshot={snapshot} config={effectiveConfig} />
+                    <CanvasCreativeAgentPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} />
                 )}
             </motion.aside>
         </motion.div>
