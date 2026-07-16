@@ -6,6 +6,7 @@ import { App, Button, Tag } from "antd";
 import { Copy, LoaderCircle, Plus, Send, Trash2 } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
+import { scopedStorageKey } from "@/lib/user-data-scope";
 import type { AgentLabArtifact, AgentLabMessage, AgentLabResponse } from "@/lib/agent-lab/types";
 import { modelOptionName, resolveModelChannel, type AiConfig } from "@/stores/use-config-store";
 import { CanvasNodeType } from "../types";
@@ -42,7 +43,7 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
     const modelLabel = activeModel ? modelOptionName(activeModel) : "未配置模型";
 
     useEffect(() => {
-        const saved = window.localStorage.getItem(STORAGE_KEY);
+        const saved = window.localStorage.getItem(scopedStorageKey(STORAGE_KEY));
         if (!saved) return;
         try {
             const parsed = JSON.parse(saved) as AgentLabMessage[];
@@ -54,7 +55,7 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
     }, []);
 
     useEffect(() => {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(messages.slice(-40)));
+        window.localStorage.setItem(scopedStorageKey(STORAGE_KEY), JSON.stringify(messages.slice(-40)));
     }, [messages]);
 
     useEffect(() => {

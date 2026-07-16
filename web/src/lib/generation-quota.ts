@@ -1,4 +1,5 @@
 import { type ClientEntitlements } from "./client-entitlements";
+import { scopedStorageKey } from "@/lib/user-data-scope";
 
 const USAGE_KEY = "sceneflow:generation_usage:daily";
 const FREE_DAILY_LIMIT = 3;
@@ -13,7 +14,7 @@ function currentPeriod() {
 function getCurrentUsage(): UsageRecord {
     const period = currentPeriod();
     try {
-        const raw = localStorage.getItem(USAGE_KEY);
+        const raw = localStorage.getItem(scopedStorageKey(USAGE_KEY));
         if (!raw) return { ...period, count: 0 };
         const parsed = JSON.parse(raw) as UsageRecord;
         if (parsed.year !== period.year || parsed.month !== period.month || parsed.day !== period.day) return { ...period, count: 0 };
@@ -25,7 +26,7 @@ function getCurrentUsage(): UsageRecord {
 
 function saveUsage(record: UsageRecord) {
     try {
-        localStorage.setItem(USAGE_KEY, JSON.stringify(record));
+        localStorage.setItem(scopedStorageKey(USAGE_KEY), JSON.stringify(record));
     } catch {}
 }
 

@@ -51,7 +51,7 @@ export function UserStatusActions({ showConfig = true, showThemeToggle = true, v
                             <Shield className="size-4" />
                         </a>
                     ) : null}
-                    <button type="button" className={naturalIconClass} style={iconStyle} onClick={() => { clearSession(); router.push("/canvas/login"); }} title="退出登录">
+                    <button type="button" className={naturalIconClass} style={iconStyle} onClick={() => { void clearSession().finally(() => router.push("/canvas/login")); }} title="退出登录">
                         <LogOut className="size-4" />
                     </button>
                 </>

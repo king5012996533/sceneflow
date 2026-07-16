@@ -1,7 +1,7 @@
 // GET /api/auth/github/callback — GitHub OAuth 回调
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/ic-prisma";
-import { signToken } from "@/lib/auth";
+import { setAuthCookie, signToken } from "@/lib/auth";
 
 // 从请求头构造外部 base URL（standalone 模式下 req.url 是 localhost）
 function getExternalBase(req: NextRequest): string {
@@ -83,14 +83,7 @@ export async function GET(req: NextRequest) {
     const token = signToken({ userId: user.id, email: user.email });
     const base = getExternalBase(req);
     const response = NextResponse.redirect(new URL("/canvas", base));
-    response.cookies.set("ic_token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 604800,
-      path: "/",
-    });
-    return response;
+    return setAuthCookie(response, token);
   } catch (err: unknown) {
     console.error("GitHub OAuth error:", err);
     return NextResponse.redirect(new URL("/canvas?error=github_failed", getExternalBase(req)));

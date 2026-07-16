@@ -1,20 +1,25 @@
 // GET /api/auth/session — 获取当前用户会话
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/ic-prisma";
-import { verifyToken } from "@/lib/auth";
+import { applyPrivateNoStore, AUTH_COOKIE_NAME, clearAuthCookie, verifyToken } from "@/lib/auth";
+
+function sessionResponse(body: unknown, clearCookie = false) {
+  const response = NextResponse.json(body);
+  return clearCookie ? clearAuthCookie(response) : applyPrivateNoStore(response);
+}
 
 export async function GET(req: NextRequest) {
   try {
-    if (!prisma) return NextResponse.json({ user: null });
+    if (!prisma) return sessionResponse({ user: null });
 
-    const token = req.cookies.get("ic_token")?.value;
+    const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
     if (!token) {
-      return NextResponse.json({ user: null });
+      return sessionResponse({ user: null });
     }
 
     const payload = verifyToken(token);
     if (!payload) {
-      return NextResponse.json({ user: null });
+      return sessionResponse({ user: null }, true);
     }
 
     const user = await prisma.user.findUnique({
@@ -23,11 +28,11 @@ export async function GET(req: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ user: null });
+      return sessionResponse({ user: null }, true);
     }
 
-    return NextResponse.json({ user });
+    return sessionResponse({ user });
   } catch {
-    return NextResponse.json({ user: null });
+    return sessionResponse({ user: null }, true);
   }
 }

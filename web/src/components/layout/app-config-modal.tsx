@@ -69,6 +69,7 @@ export function AppConfigModal() {
     const webdav = useConfigStore((state) => state.webdav);
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const updateWebdavConfig = useConfigStore((state) => state.updateWebdavConfig);
+    const resetWebdavConfig = useConfigStore((state) => state.resetWebdavConfig);
     const isConfigOpen = useConfigStore((state) => state.isConfigOpen);
     const shouldPromptContinue = useConfigStore((state) => state.shouldPromptContinue);
     const setConfigDialogOpen = useConfigStore((state) => state.setConfigDialogOpen);
@@ -205,6 +206,13 @@ export function AppConfigModal() {
         } finally {
             setSyncingWebdav(false);
         }
+    };
+
+    const clearWebdavConfig = () => {
+        resetWebdavConfig();
+        setWebdavSyncStatus("");
+        setWebdavDomainProgress(createWebdavDomainProgress());
+        message.success("WebDAV 配置已清空");
     };
 
     return (
@@ -386,7 +394,7 @@ export function AppConfigModal() {
                                                 <Cloud className="size-4" />
                                                 WebDAV 同步
                                             </div>
-                                            <div className="mt-1 text-xs text-stone-500">同步画布、我的素材、生成记录和本地媒体文件，不包含 AI API Key；服务不支持 CORS 时可走 Next.js 转发。</div>
+                                            <div className="mt-1 text-xs text-stone-500">同步画布、我的素材、生成记录和本地媒体文件，不包含 AI API Key；WebDAV 用户名和密码仅本次会话使用，不会保存到本地。</div>
                                         </div>
                                         <div className="text-xs text-stone-500">{webdav.lastSyncedAt ? `上次同步 ${formatWebdavTime(webdav.lastSyncedAt)}` : "尚未同步"}</div>
                                     </div>
@@ -408,11 +416,11 @@ export function AppConfigModal() {
                                         <Form.Item label="远程目录" extra={`会在该目录下分业务目录保存，每个目录包含 ${WEBDAV_MANIFEST_FILE_NAME} 和 files/`} className="mb-4">
                                             <Input value={webdav.directory} placeholder="infinite-canvas" onChange={(event) => updateWebdavConfig("directory", event.target.value)} />
                                         </Form.Item>
-                                        <Form.Item label="用户名" className="mb-0">
-                                            <Input value={webdav.username} autoComplete="username" onChange={(event) => updateWebdavConfig("username", event.target.value)} />
+                                        <Form.Item label="用户名" extra="敏感信息不会持久化保存，刷新后需要重新输入。" className="mb-0">
+                                            <Input value={webdav.username} autoComplete="off" onChange={(event) => updateWebdavConfig("username", event.target.value)} />
                                         </Form.Item>
-                                        <Form.Item label="密码 / 应用密码" className="mb-0">
-                                            <Input.Password value={webdav.password} autoComplete="current-password" onChange={(event) => updateWebdavConfig("password", event.target.value)} />
+                                        <Form.Item label="密码 / 应用密码" extra="建议使用 WebDAV 应用密码，不要使用主账号密码。" className="mb-0">
+                                            <Input.Password value={webdav.password} autoComplete="new-password" onChange={(event) => updateWebdavConfig("password", event.target.value)} />
                                         </Form.Item>
                                     </div>
                                     <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -421,6 +429,9 @@ export function AppConfigModal() {
                                         </Button>
                                         <Button type="primary" icon={<RefreshCw className="size-4" />} disabled={!webdavReady || testingWebdav} loading={syncingWebdav} onClick={() => void syncWebdav()}>
                                             {syncingWebdav ? "同步中" : "立即同步"}
+                                        </Button>
+                                        <Button danger icon={<Trash2 className="size-4" />} disabled={testingWebdav || syncingWebdav} onClick={clearWebdavConfig}>
+                                            清空 WebDAV 配置
                                         </Button>
                                         {webdavSyncStatus ? <span className="text-xs text-stone-500">{webdavSyncStatus}</span> : null}
                                     </div>

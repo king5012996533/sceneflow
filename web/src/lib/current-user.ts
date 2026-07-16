@@ -1,12 +1,12 @@
 import type { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/ic-prisma";
-import { verifyToken } from "@/lib/auth";
+import { AUTH_COOKIE_NAME, verifyToken } from "@/lib/auth";
 
 export async function getCurrentUser(req: NextRequest) {
     if (!prisma) return null;
 
-    const token = req.cookies.get("ic_token")?.value;
+    const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
     if (!token) return null;
 
     const payload = verifyToken(token);

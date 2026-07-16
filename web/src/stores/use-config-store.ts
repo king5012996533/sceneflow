@@ -2,8 +2,10 @@
 
 import { useMemo } from "react";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import { nanoid } from "nanoid";
+
+import { scopedStorageKey } from "@/lib/user-data-scope";
 
 export type ApiCallFormat = "openai" | "gemini";
 
@@ -111,6 +113,54 @@ export const defaultWebdavSyncConfig: WebdavSyncConfig = {
     lastSyncedAt: "",
 };
 
+function sanitizePersistedWebdavConfig(webdav: WebdavSyncConfig): WebdavSyncConfig {
+    return {
+        ...webdav,
+        username: "",
+        password: "",
+    };
+}
+
+function sanitizeHydratedWebdavConfig(webdav: Partial<WebdavSyncConfig>): WebdavSyncConfig {
+    return sanitizePersistedWebdavConfig({ ...defaultWebdavSyncConfig, ...webdav });
+}
+
+const configStorage: StateStorage = {
+    getItem: (name) => {
+        if (typeof window === "undefined") return null;
+        const key = scopedStorageKey(name);
+        const scopedValue = window.localStorage.getItem(key);
+        const legacyValue = window.localStorage.getItem(name);
+        const value = scopedValue || legacyValue;
+        const sanitized = sanitizePersistedConfigStorageValue(value);
+        if (sanitized) window.localStorage.setItem(key, sanitized);
+        if (legacyValue) window.localStorage.removeItem(name);
+        return sanitized;
+    },
+    setItem: (name, value) => {
+        if (typeof window === "undefined") return;
+        window.localStorage.setItem(scopedStorageKey(name), sanitizePersistedConfigStorageValue(value) || value);
+        window.localStorage.removeItem(name);
+    },
+    removeItem: (name) => {
+        if (typeof window === "undefined") return;
+        window.localStorage.removeItem(scopedStorageKey(name));
+        window.localStorage.removeItem(name);
+    },
+};
+
+function sanitizePersistedConfigStorageValue(value: string | null) {
+    if (!value) return value;
+    try {
+        const payload = JSON.parse(value) as { state?: Partial<ConfigStore> };
+        if (!payload.state?.webdav) return value;
+        payload.state.webdav = sanitizePersistedWebdavConfig({ ...defaultWebdavSyncConfig, ...payload.state.webdav });
+        return JSON.stringify(payload);
+    } catch {
+        return value;
+    }
+}
+
 type ConfigStore = {
     config: AiConfig;
     webdav: WebdavSyncConfig;
@@ -118,6 +168,7 @@ type ConfigStore = {
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
     updateWebdavConfig: <K extends keyof WebdavSyncConfig>(key: K, value: WebdavSyncConfig[K]) => void;
+    resetWebdavConfig: () => void;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
@@ -190,6 +241,7 @@ export const useConfigStore = create<ConfigStore>()(
                         [key]: value,
                     },
                 })),
+            resetWebdavConfig: () => set({ webdav: defaultWebdavSyncConfig }),
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
             openConfigDialog: (shouldPromptContinue = false) => set({ isConfigOpen: true, shouldPromptContinue }),
             setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
@@ -197,7 +249,8 @@ export const useConfigStore = create<ConfigStore>()(
         }),
         {
             name: CONFIG_STORE_KEY,
-            partialize: (state) => ({ config: state.config, webdav: state.webdav }),
+            storage: createJSONStorage(() => configStorage),
+            partialize: (state) => ({ config: state.config, webdav: sanitizePersistedWebdavConfig(state.webdav) }),
             merge: (persisted, current) => {
                 const persistedState = (persisted || {}) as Partial<ConfigStore>;
                 const persistedConfig = (persistedState.config || {}) as Partial<AiConfig>;
@@ -208,7 +261,7 @@ export const useConfigStore = create<ConfigStore>()(
                 const models = modelOptionsFromChannels(channels);
                 return {
                     ...current,
-                    webdav: { ...defaultWebdavSyncConfig, ...persistedWebdav },
+                    webdav: sanitizeHydratedWebdavConfig(persistedWebdav),
                     config: {
                         ...config,
                         channelMode: "local",

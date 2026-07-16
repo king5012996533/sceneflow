@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { scopedStorageKey } from "@/lib/user-data-scope";
 import type { CanvasAgentOp } from "../utils/canvas-agent-ops";
 
 export type AgentChatRole = "user" | "assistant" | "system" | "tool" | "error";
@@ -38,9 +39,9 @@ type CanvasAgentStore = {
 };
 
 export const useCanvasAgentStore = create<CanvasAgentStore>((set) => ({
-    width: typeof window === "undefined" ? 440 : Number(localStorage.getItem("canvas-agent-panel-width")) || 440,
-    url: typeof window === "undefined" ? "http://127.0.0.1:17371" : localStorage.getItem("canvas-agent-url") || "http://127.0.0.1:17371",
-    token: typeof window === "undefined" ? "" : localStorage.getItem("canvas-agent-token") || "",
+    width: typeof window === "undefined" ? 440 : Number(localStorage.getItem(scopedStorageKey("canvas-agent-panel-width"))) || 440,
+    url: typeof window === "undefined" ? "http://127.0.0.1:17371" : localStorage.getItem(scopedStorageKey("canvas-agent-url")) || "http://127.0.0.1:17371",
+    token: typeof window === "undefined" ? "" : localStorage.getItem(scopedStorageKey("canvas-agent-token")) || "",
     connected: false,
     enabled: false,
     prompt: "",

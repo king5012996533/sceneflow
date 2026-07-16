@@ -6,6 +6,7 @@ import { App, Button, Input, Tag } from "antd";
 import copyToClipboard from "copy-to-clipboard";
 
 import { apiPath } from "@/lib/app-paths";
+import { scopedStorageKey } from "@/lib/user-data-scope";
 import type { AgentLabArtifact, AgentLabMemory, AgentLabMessage, AgentLabResponse } from "@/lib/agent-lab/types";
 
 const STORAGE_KEY = "sceneflow:agent-lab:provider";
@@ -94,7 +95,7 @@ export default function AgentLabPage() {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const saved = window.localStorage.getItem(STORAGE_KEY);
+        const saved = window.localStorage.getItem(scopedStorageKey(STORAGE_KEY));
         if (!saved) return;
         try {
             const data = JSON.parse(saved) as Partial<ProviderForm>;
@@ -109,7 +110,7 @@ export default function AgentLabPage() {
     }, []);
 
     useEffect(() => {
-        const saved = window.localStorage.getItem(SESSIONS_STORAGE_KEY);
+        const saved = window.localStorage.getItem(scopedStorageKey(SESSIONS_STORAGE_KEY));
         const loaded = parseSavedSessions(saved);
         const nextSessions = loaded.length ? loaded : [createAgentLabSession()];
         const active = nextSessions[0];
@@ -123,11 +124,11 @@ export default function AgentLabPage() {
     }, []);
 
     useEffect(() => {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(provider));
+        window.localStorage.setItem(scopedStorageKey(STORAGE_KEY), JSON.stringify(provider));
     }, [provider]);
 
     useEffect(() => {
-        if (sessions.length) window.localStorage.setItem(SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+        if (sessions.length) window.localStorage.setItem(scopedStorageKey(SESSIONS_STORAGE_KEY), JSON.stringify(sessions));
     }, [sessions]);
 
     useEffect(() => {
