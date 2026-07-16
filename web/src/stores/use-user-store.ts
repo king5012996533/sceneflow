@@ -38,12 +38,17 @@ export const useUserStore = create<UserStore>()((set) => ({
           return;
         }
       } else {
-        setActiveLocalUserId(null);
+        const changed = setActiveLocalUserId(null);
+        if (changed && !isAuthPage()) {
+          window.location.reload();
+          return;
+        }
       }
       set({ user: data.user });
     } catch {
       set({ user: null });
-      setActiveLocalUserId(null);
+      const changed = setActiveLocalUserId(null);
+      if (changed && !isAuthPage()) window.location.reload();
     }
   },
 }));

@@ -2,15 +2,27 @@ const { PrismaClient } = require("../src/generated/ic-prisma/client");
 const bcrypt = require("bcryptjs");
 
 async function main() {
+  const email = process.env.SEED_ADMIN_EMAIL;
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  const name = process.env.SEED_ADMIN_NAME || "Admin";
+
+  if (!email || !password) {
+    throw new Error("SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD are required to seed an admin account.");
+  }
+
+  if (password.length < 12) {
+    throw new Error("SEED_ADMIN_PASSWORD must be at least 12 characters.");
+  }
+
   const prisma = new PrismaClient();
-  const hashed = await bcrypt.hash("admin123", 10);
+  const hashed = await bcrypt.hash(password, 10);
   const user = await prisma.user.upsert({
-    where: { email: "admin@xingtuai.cn" },
+    where: { email },
     update: {},
     create: {
-      email: "admin@xingtuai.cn",
+      email,
       password: hashed,
-      name: "管理员",
+      name,
       role: "admin",
     },
   });
@@ -18,4 +30,7 @@ async function main() {
   await prisma.$disconnect();
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -8,6 +8,7 @@ import { Copy, FolderOpen, History, KeyRound, Link2, LoaderCircle, PlugZap, Plus
 import { motion } from "motion/react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
+import { scopedStorageKey } from "@/lib/user-data-scope";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { useCanvasAgentStore, type AgentAttachment, type AgentChatItem, type AgentEventLog, type AgentPanelTab, type AgentPendingToolCall, type AgentThreadSummary } from "../stores/use-canvas-agent-store";
@@ -103,8 +104,8 @@ export function CanvasLocalAgentPanel({ snapshot, canUndoOps, collapsed, embedde
 
     useEffect(() => {
         if (!enabled || !token.trim()) return;
-        localStorage.setItem("canvas-agent-url", endpoint);
-        localStorage.setItem("canvas-agent-token", token);
+        localStorage.setItem(scopedStorageKey("canvas-agent-url"), endpoint);
+        localStorage.setItem(scopedStorageKey("canvas-agent-token"), token);
         const clientId = clientIdRef.current;
         const source = new EventSource(`${endpoint}/events?token=${encodeURIComponent(token)}&clientId=${encodeURIComponent(clientId)}`);
         source.addEventListener("hello", () => {
@@ -428,7 +429,7 @@ export function CanvasLocalAgentPanel({ snapshot, canUndoOps, collapsed, embedde
             setAgentState({ width: nextWidth });
         };
         const onUp = () => {
-            localStorage.setItem("canvas-agent-panel-width", String(nextWidth));
+            localStorage.setItem(scopedStorageKey("canvas-agent-panel-width"), String(nextWidth));
             window.removeEventListener("pointermove", onMove);
             window.removeEventListener("pointerup", onUp);
             setResizing(false);

@@ -5,6 +5,7 @@ import { App, Modal, Segmented, Tooltip } from "antd";
 import { Download, Ellipsis, FolderPlus, Image as ImageIcon, Info, MessageSquare, Minus, Music2, Pencil, Plus, RefreshCw, Settings2, Trash2, Upload, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
+import { scopedStorageKey } from "@/lib/user-data-scope";
 import { formatBytes, getDataUrlByteSize } from "@/lib/image-utils";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { useThemeStore } from "@/stores/use-theme-store";
@@ -88,14 +89,14 @@ export function CanvasNodeHoverToolbar({
 
     useEffect(() => {
         try {
-            const stored = window.localStorage.getItem(IMAGE_QUICK_TOOLS_STORAGE_KEY);
+            const stored = window.localStorage.getItem(scopedStorageKey(IMAGE_QUICK_TOOLS_STORAGE_KEY));
             if (!stored) return;
             const parsed = JSON.parse(stored) as unknown;
             const config = readImageQuickToolsConfig(parsed);
             setQuickImageToolIds(config.ids);
             setShowImageToolLabels(config.showLabels);
         } catch {
-            window.localStorage.removeItem(IMAGE_QUICK_TOOLS_STORAGE_KEY);
+            window.localStorage.removeItem(scopedStorageKey(IMAGE_QUICK_TOOLS_STORAGE_KEY));
         }
     }, []);
 
@@ -176,7 +177,7 @@ export function CanvasNodeHoverToolbar({
         const config = { ids: draftImageToolIds, showLabels: draftShowImageToolLabels };
         setQuickImageToolIds(config.ids);
         setShowImageToolLabels(config.showLabels);
-        window.localStorage.setItem(IMAGE_QUICK_TOOLS_STORAGE_KEY, JSON.stringify(config));
+        window.localStorage.setItem(scopedStorageKey(IMAGE_QUICK_TOOLS_STORAGE_KEY), JSON.stringify(config));
         closeImageToolSettings();
     };
 
