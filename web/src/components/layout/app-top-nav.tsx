@@ -92,8 +92,8 @@ export function AppTopNav() {
         <>
             {!hideHeader ? (
                 <header className={cn("sceneflow-top-nav sticky top-0 z-20 h-16 shrink-0 border-b", useDarkHome ? "border-white/10 bg-[#090a0c]" : "border-[#beb2a3] bg-[#fffefa] shadow-[0_1px_0_rgba(255,255,255,1)_inset,0_14px_34px_rgba(35,28,20,0.16)]")}>
-                    <div className="mx-auto flex h-full max-w-7xl items-stretch justify-between gap-4 px-6">
-                        <div className="flex min-w-0 items-center">
+                    <div className="mx-auto flex h-full max-w-7xl items-stretch gap-4 px-6">
+                        <div className="flex min-w-0 flex-1 items-center">
                             <Link href="/" className={cn("flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight transition", useDarkHome ? "text-white hover:text-white/72" : "text-[#050816] hover:text-[#2432c9]")}>
                                 <span
                                     className="size-5 shrink-0 bg-current"
@@ -115,7 +115,7 @@ export function AppTopNav() {
                                 <Menu className="size-5" />
                             </button>
 
-                            <nav className="hide-scrollbar ml-7 hidden h-16 min-w-0 items-center gap-4 overflow-x-auto md:flex">
+                            <nav className="hide-scrollbar ml-7 hidden h-16 min-w-0 flex-1 items-center gap-3 overflow-x-auto md:flex">
                                 {visibleTools.map((tool) => {
                                     const Icon = tool.icon;
                                     const active = tool.slug === activeToolSlug;
@@ -135,7 +135,7 @@ export function AppTopNav() {
                                             )}
                                         >
                                             <Icon className="size-4" />
-                                            <span className="truncate">{tool.label}</span>
+                                            <span>{tool.label}</span>
                                         </Link>
                                     );
                                 })}

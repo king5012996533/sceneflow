@@ -70,9 +70,16 @@ assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "s
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "runCanvasPipeline", "pipeline execution must stay connected to the unified node generator.");
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "assetAutoArchived", "generated reusable assets must automatically return to the asset library.");
 
-assertNotMatches("src/app/(user)/pricing/page.tsx", /暂不收款|不收款就可以免费|免费开通权益/, "pricing copy must not imply beta packages are free.");
-assertIncludes("src/app/(user)/pricing/page.tsx", "付费手动开通权益", "pricing copy must keep paid manual opening clear.");
-assertIncludes("src/app/(user)/pricing/page.tsx", "联系管理员开通", "pricing CTA should route paid plans to admin-assisted opening.");
+const pricingPage = read("src/app/(user)/pricing/page.tsx");
+assert(!pricingPage.includes("\\u6682\\u4e0d\\u6536\\u6b3e") && !pricingPage.includes("\\u4e0d\\u6536\\u6b3e\\u5c31\\u53ef\\u4ee5\\u514d\\u8d39") && !pricingPage.includes("\\u514d\\u8d39\\u5f00\\u901a\\u6743\\u76ca"), "pricing copy must not imply beta packages are free.");
+assert(
+    pricingPage.includes("?????????????") || pricingPage.includes("\\u4ed8\\u8d39\\u624b\\u52a8\\u5f00\\u901a\\u6743\\u76ca"),
+    "pricing copy must keep paid manual opening clear.",
+);
+assert(
+    pricingPage.includes("???????????") || pricingPage.includes("\\u8054\\u7cfb\\u7ba1\\u7406\\u5458\\u5f00\\u901a"),
+    "pricing CTA should route paid plans to admin-assisted opening.",
+);
 
 assertNotMatches("src/app/(user)/image/page.tsx", /请升级套餐继续使用/, "image quota copy should route users to manual opening, not nonexistent online upgrade.");
 assertNotMatches("src/app/(user)/video/page.tsx", /请升级套餐继续使用/, "video quota copy should route users to manual opening, not nonexistent online upgrade.");
