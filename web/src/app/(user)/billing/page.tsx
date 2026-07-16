@@ -132,16 +132,25 @@ export default function BillingPage() {
                                 const limit = Number(item.value);
                                 const hasNumericLimit = Number.isFinite(limit);
                                 const percent = hasNumericLimit && limit > 0 ? Math.min(100, Math.round(((usage?.used || 0) / limit) * 100)) : 0;
+                                const valueLabel =
+                                    item.value === "true"
+                                        ? "支持"
+                                        : item.value === "false"
+                                          ? "暂不支持"
+                                          : item.value === "unlimited"
+                                            ? "不限"
+                                            : item.value === "custom"
+                                              ? "定制"
+                                              : hasNumericLimit
+                                                ? `${usage?.used || 0} / ${item.value}${item.unit}`
+                                                : `${item.value}${item.unit}`;
                                 return (
                                     <div key={item.id} className="rounded-xl border border-[#eadfce] bg-[#fffaf2] p-4">
                                         <div className="mb-2 flex items-center justify-between gap-3 text-sm">
                                             <span className="font-medium">{item.label}</span>
-                                            <span className="text-[#8a7f91]">
-                                                {usage?.used || 0} / {item.value}
-                                                {item.unit}
-                                            </span>
+                                            <span className="text-right text-[#8a7f91]">{valueLabel}</span>
                                         </div>
-                                        <Progress percent={percent} showInfo={false} />
+                                        {hasNumericLimit ? <Progress percent={percent} showInfo={false} /> : null}
                                     </div>
                                 );
                             })}

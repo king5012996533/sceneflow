@@ -5,7 +5,7 @@ import Link from "next/link";
 import { App, Button, Segmented, Tag } from "antd";
 import { ArrowRight, Check, Crown, Sparkles, Users, Zap } from "lucide-react";
 
-import { apiPath } from "@/lib/app-paths";
+import { apiPath, publicPath } from "@/lib/app-paths";
 import { cn } from "@/lib/utils";
 
 type Plan = {
@@ -28,7 +28,7 @@ const planIcons = {
 
 function formatPrice(amount: number) {
     if (amount <= 0) return "免费";
-    return `¥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
+    return `￥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
 }
 
 function formatEntitlement(value: string, unit: string) {
@@ -40,10 +40,11 @@ function formatEntitlement(value: string, unit: string) {
 }
 
 export default function PricingPage() {
-    const { message } = App.useApp();
+    const { message, modal } = App.useApp();
     const [plans, setPlans] = useState<Plan[]>([]);
     const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+    const paymentQrSrc = publicPath("/wechat-payment-qr.jpg");
 
     useEffect(() => {
         void fetch(apiPath("/api/billing/plans"))
@@ -57,7 +58,7 @@ export default function PricingPage() {
 
     const sortedPlans = useMemo(() => plans, [plans]);
 
-    async function applyBeta(plan: Plan) {
+    async function applyPlan(plan: Plan) {
         if (plan.id === "free") {
             message.info("免费版登录后即可使用。");
             return;
@@ -68,13 +69,27 @@ export default function PricingPage() {
             const res = await fetch(apiPath("/api/billing/orders"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ planId: plan.id, billingCycle: cycle, provider: "manual", intent: "beta_application" }),
+                body: JSON.stringify({ planId: plan.id, billingCycle: cycle, provider: "manual", intent: "manual_payment" }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "申请开通失败");
-            message.success(`已申请开通 ${plan.name}，管理员会联系确认使用场景、套餐周期和开通方式。`);
+            if (!res.ok) throw new Error(data.error || "提交开通申请失败");
+
+            message.success(`已提交 ${plan.name} 开通申请，请完成付款并联系管理员。`);
+            modal.info({
+                title: "扫码付款后联系管理员开通",
+                width: 420,
+                okText: "知道了",
+                content: (
+                    <div className="space-y-3">
+                        <p className="text-sm leading-6 text-stone-600">
+                            已提交 {plan.name} 开通申请。当前阶段暂不接在线收银台，请先使用微信扫码付款，然后联系管理员确认账号、套餐和周期。
+                        </p>
+                        <img src={paymentQrSrc} alt="微信收款码" className="mx-auto w-64 rounded-2xl border border-stone-200 bg-white p-2" />
+                    </div>
+                ),
+            });
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "申请开通失败");
+            message.error(error instanceof Error ? error.message : "提交开通申请失败");
         } finally {
             setLoadingPlan(null);
         }
@@ -83,7 +98,7 @@ export default function PricingPage() {
     return (
         <main className="h-full overflow-y-auto bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#eef4ff_100%)] px-6 py-12 text-[#172033]">
             <div className="mx-auto max-w-7xl">
-                <div className="mb-10 grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+                <div className="mb-10 grid gap-6 lg:grid-cols-[1fr_280px] lg:items-end">
                     <div>
                         <div className="mb-3 flex flex-wrap items-center gap-2">
                             <span className="text-xs font-medium tracking-[0.18em] text-[#8a7f91]">BETA ACCESS</span>
@@ -91,17 +106,24 @@ export default function PricingPage() {
                         </div>
                         <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">选择适合你的生产规模</h1>
                         <p className="mt-4 max-w-2xl text-base leading-7 text-[#6d6472]">
-                            当前阶段暂不接入在线收银台，套餐仍按所选权益开通。请联系管理员付费手动开通权益；点击申请后，管理员会联系确认使用场景、套餐周期和开通方式。
+                            当前阶段暂不接入在线收银台，套餐仍按所选权益付费手动开通权益。请先扫码付款，再提交开通申请；管理员会联系确认账号、使用场景、套餐周期和开通方式。
                         </p>
                     </div>
-                    <Segmented
-                        value={cycle}
-                        onChange={(value) => setCycle(value as "monthly" | "yearly")}
-                        options={[
-                            { label: "月度权益", value: "monthly" },
-                            { label: "年度权益", value: "yearly" },
-                        ]}
-                    />
+
+                    <div className="rounded-2xl border border-[#eadfce] bg-white/84 p-4 shadow-[0_18px_56px_rgba(57,48,34,0.08)]">
+                        <Segmented
+                            className="mb-4 w-full"
+                            value={cycle}
+                            onChange={(value) => setCycle(value as "monthly" | "yearly")}
+                            options={[
+                                { label: "月度权益", value: "monthly" },
+                                { label: "年度权益", value: "yearly" },
+                            ]}
+                        />
+                        <div className="text-sm font-semibold text-[#172033]">微信扫码付款</div>
+                        <p className="mt-1 text-xs leading-5 text-[#6d6472]">付款后提交开通申请，管理员会按账号手动开通套餐权益。</p>
+                        <img src={paymentQrSrc} alt="微信收款码" className="mt-3 w-full rounded-xl border border-[#eadfce] bg-white p-1" />
+                    </div>
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-4">
@@ -112,7 +134,7 @@ export default function PricingPage() {
                             <section
                                 key={plan.id}
                                 className={cn(
-                                    "relative flex min-h-[520px] flex-col rounded-2xl border bg-white/78 p-5 shadow-[0_24px_70px_rgba(66,56,38,0.07)]",
+                                    "relative flex min-h-[560px] flex-col rounded-2xl border bg-white/78 p-5 shadow-[0_24px_70px_rgba(66,56,38,0.07)]",
                                     plan.isPopular ? "border-[#4f5dff] ring-2 ring-[#4f5dff]/10" : "border-[#eadfce]",
                                 )}
                             >
@@ -136,9 +158,10 @@ export default function PricingPage() {
                                         </div>
                                     ))}
                                 </div>
-                                <div className="mt-auto pt-8">
-                                    <Button type={plan.isPopular ? "primary" : "default"} block size="large" loading={loadingPlan === plan.id} onClick={() => void applyBeta(plan)}>
-                                        {plan.id === "free" ? "免费开始" : "申请开通联系管理员"}
+                                <div className="mt-auto space-y-2 pt-8">
+                                    {plan.id !== "free" ? <div className="text-center text-xs text-stone-500">先扫码付款，再提交申请</div> : null}
+                                    <Button type={plan.isPopular ? "primary" : "default"} block size="large" loading={loadingPlan === plan.id} onClick={() => void applyPlan(plan)}>
+                                        {plan.id === "free" ? "免费开始" : "扫码付款并提交开通申请"}
                                     </Button>
                                 </div>
                             </section>
@@ -147,7 +170,7 @@ export default function PricingPage() {
                 </div>
 
                 <div className="mt-8 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/70 bg-white/78 p-4 shadow-[0_20px_70px_rgba(57,48,34,0.08)] backdrop-blur">
-                    <span className="text-sm text-stone-500">申请开通不是免费开通。管理员会根据你的创作场景确认套餐、周期和开通方式，并完成权益开通。</span>
+                    <span className="text-sm text-stone-500">提交开通申请不等于免费开通。管理员会根据付款记录和账号信息完成套餐权益开通。</span>
                     <Link href="/billing" className="inline-flex items-center gap-2 text-sm font-medium text-stone-950">
                         查看当前套餐
                         <ArrowRight className="size-4" />

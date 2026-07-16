@@ -53,6 +53,7 @@ assertIncludes("src/lib/generation/generation-jobs.server.ts", "quotaRefunded", 
 assertIncludes("src/app/api/proxy/route.ts", "requireCurrentUser", "the upstream proxy must reject anonymous callers.");
 assertIncludes("prisma/schema.prisma", "model GenerationJob", "generation lifecycle logs must remain persisted.");
 assertNoAppDirectGenerationApiImports();
+
 assertIncludes("src/app/(user)/canvas/utils/canvas-agent-ops.ts", 'type: "run_pipeline"', "the canvas agent must keep an executable pipeline operation.");
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "canvas_run_pipeline", "the online creation agent must expose pipeline execution.");
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "canvas_continue_video", "the creation agent must expose tail-frame continuation.");
@@ -69,9 +70,9 @@ assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "s
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "runCanvasPipeline", "pipeline execution must stay connected to the unified node generator.");
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "assetAutoArchived", "generated reusable assets must automatically return to the asset library.");
 
-assertNotMatches("src/app/(user)/pricing/page.tsx", /暂不收款|不收款|可以免费|免费开通权益/, "pricing copy must not imply beta packages are free.");
+assertNotMatches("src/app/(user)/pricing/page.tsx", /暂不收款|不收款就可以免费|免费开通权益/, "pricing copy must not imply beta packages are free.");
 assertIncludes("src/app/(user)/pricing/page.tsx", "付费手动开通权益", "pricing copy must keep paid manual opening clear.");
-assertIncludes("src/app/(user)/pricing/page.tsx", "申请开通联系管理员", "pricing CTA should route paid plans to admin-assisted opening.");
+assertIncludes("src/app/(user)/pricing/page.tsx", "联系管理员开通", "pricing CTA should route paid plans to admin-assisted opening.");
 
 assertNotMatches("src/app/(user)/image/page.tsx", /请升级套餐继续使用/, "image quota copy should route users to manual opening, not nonexistent online upgrade.");
 assertNotMatches("src/app/(user)/video/page.tsx", /请升级套餐继续使用/, "video quota copy should route users to manual opening, not nonexistent online upgrade.");

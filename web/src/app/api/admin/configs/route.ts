@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { ensureDefaultPlans } from "@/lib/billing";
+import { ensureDefaultPlans, sortPlanEntitlements } from "@/lib/billing";
 import { requireAdminUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 
@@ -19,7 +19,11 @@ export async function GET(req: NextRequest) {
             prisma.operationConfig.findMany({ orderBy: { key: "asc" } }),
         ]);
 
-        return NextResponse.json({ plans, modelConfigs, operationConfigs });
+        return NextResponse.json({
+            plans: plans.map((plan) => ({ ...plan, entitlements: sortPlanEntitlements(plan.entitlements) })),
+            modelConfigs,
+            operationConfigs,
+        });
     } catch (error) {
         console.error("[admin/configs:get]", error);
         return NextResponse.json({ error: "获取配置失败" }, { status: 500 });

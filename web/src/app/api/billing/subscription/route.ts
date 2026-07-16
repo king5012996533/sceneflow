@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { activateSubscription, ensureDefaultPlans } from "@/lib/billing";
+import { activateSubscription, ensureDefaultPlans, sortPlanEntitlements } from "@/lib/billing";
 import { requireCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 
@@ -42,7 +42,12 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({
             user: { id: user.id, role: user.role },
-            subscription,
+            subscription: subscription
+                ? {
+                      ...subscription,
+                      plan: subscription.plan ? { ...subscription.plan, entitlements: sortPlanEntitlements(subscription.plan.entitlements) } : subscription.plan,
+                  }
+                : subscription,
             usage,
             orders,
         });
@@ -78,7 +83,12 @@ export async function PATCH(req: NextRequest) {
             include: { plan: { include: { entitlements: true } } },
         });
 
-        return NextResponse.json({ subscription: updated });
+        return NextResponse.json({
+            subscription: {
+                ...updated,
+                plan: updated.plan ? { ...updated.plan, entitlements: sortPlanEntitlements(updated.plan.entitlements) } : updated.plan,
+            },
+        });
     } catch (error) {
         console.error("[billing/subscription:patch]", error);
         return NextResponse.json({ error: "更新订阅失败" }, { status: 500 });
