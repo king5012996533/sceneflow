@@ -20,8 +20,9 @@ type SeedanceTask = {
 type ApiEnvelope<T> = T | { code?: number; data?: T | null; msg?: string };
 type RequestOptions = { signal?: AbortSignal };
 
-const SEEDANCE_PROXY_IMAGE_MAX_BYTES = 420 * 1024;
-const SEEDANCE_PROXY_IMAGE_MAX_SIDE = 960;
+const SEEDANCE_PROXY_IMAGE_MAX_BYTES = 260 * 1024;
+const SEEDANCE_PROXY_IMAGE_MAX_SIDE = 768;
+const SEEDANCE_PROXY_IMAGE_URL_BUDGET_BYTES = 2_800_000;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
 export type VideoGenerationTask = { id: string; provider: "openai" | "seedance"; model: string };
@@ -195,10 +196,18 @@ function seedanceApiUrl(config: AiConfig, taskId?: string) {
 
 async function buildSeedanceContent(config: AiConfig, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[]) {
     const content: Array<Record<string, unknown>> = [];
-    const text = buildSeedancePromptText(prompt, references, videoReferences, audioReferences);
+    const resolvedImages = await resolveSeedanceImageUrls(config, references.slice(0, SEEDANCE_REFERENCE_LIMITS.images));
+    const usedImageRefs = references.slice(0, resolvedImages.urls.length);
+    const droppedImageCount = Math.max(0, Math.min(references.length, SEEDANCE_REFERENCE_LIMITS.images) - resolvedImages.urls.length);
+    const text = [
+        buildSeedancePromptText(prompt, usedImageRefs, videoReferences, audioReferences),
+        droppedImageCount ? `注意：为避免请求内容过大，本次仅使用前 ${resolvedImages.urls.length} 张参考图，已忽略后续 ${droppedImageCount} 张。若需要更多镜头参考，请先用“分镜容器/拼图”合成一张参考图，或使用公网素材 URL。` : "",
+    ]
+        .filter(Boolean)
+        .join("\n\n");
     if (text) content.push({ type: "text", text });
-    for (const image of references.slice(0, SEEDANCE_REFERENCE_LIMITS.images)) {
-        content.push({ type: "image_url", image_url: { url: await resolveSeedanceImageUrl(config, image) }, role: "reference_image" });
+    for (const url of resolvedImages.urls) {
+        content.push({ type: "image_url", image_url: { url }, role: "reference_image" });
     }
     for (const video of videoReferences.slice(0, SEEDANCE_REFERENCE_LIMITS.videos)) {
         content.push({ type: "video_url", video_url: { url: await resolveSeedanceVideoUrl(video) }, role: "reference_video" });
@@ -207,6 +216,19 @@ async function buildSeedanceContent(config: AiConfig, prompt: string, references
         content.push({ type: "audio_url", audio_url: { url: await resolveSeedanceAudioUrl(audio) }, role: "reference_audio" });
     }
     return content;
+}
+
+async function resolveSeedanceImageUrls(config: AiConfig, references: ReferenceImage[]) {
+    const urls: string[] = [];
+    let totalBytes = 0;
+    for (const image of references) {
+        const url = await resolveSeedanceImageUrl(config, image);
+        const byteLength = new TextEncoder().encode(url).byteLength;
+        if (urls.length && totalBytes + byteLength > SEEDANCE_PROXY_IMAGE_URL_BUDGET_BYTES) break;
+        urls.push(url);
+        totalBytes += byteLength;
+    }
+    return { urls, totalBytes };
 }
 
 async function resolveSeedanceImageUrl(config: AiConfig, image: ReferenceImage) {

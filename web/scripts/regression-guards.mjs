@@ -43,7 +43,8 @@ assertIncludes("src/app/api/auth/send-code/route.ts", "storeCode", "send-code mu
 assertIncludes("src/app/api/auth/verify-code/route.ts", "verifyCode", "verify-code must validate saved codes.");
 
 assertIncludes("src/services/api/video.ts", "compressSeedanceImageDataUrl", "Seedance local reference images must be compressed before proxying.");
-assertIncludes("src/services/api/video.ts", "SEEDANCE_PROXY_IMAGE_MAX_BYTES = 420 * 1024", "Seedance reference image payload guard should stay under the online gateway limit.");
+assertIncludes("src/services/api/video.ts", "SEEDANCE_PROXY_IMAGE_MAX_BYTES = 260 * 1024", "Seedance reference images should stay aggressively compressed before proxying.");
+assertIncludes("src/services/api/video.ts", "SEEDANCE_PROXY_IMAGE_URL_BUDGET_BYTES = 2_800_000", "Seedance reference image payload guard should reserve room under the online gateway limit.");
 assertIncludes("src/services/api/proxy-client.ts", "status === 413", "proxy client must translate 413 into a clear user-facing message.");
 assertIncludes("src/lib/generation/generation-request.ts", "requestGeneratedImages", "generation requests must keep a unified app-facing entry.");
 assertIncludes("src/lib/generation/generation-request.ts", "runGuardedGeneration", "all unified generation requests must pass through the backend job guard.");

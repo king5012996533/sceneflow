@@ -13,7 +13,7 @@ export interface ProxyRequestOptions {
 export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Promise<T> {
     const payload = JSON.stringify(options);
     if (payload.length > PROXY_WARNING_BYTES) {
-        throw new Error("请求内容过大，请减少参考素材数量，或先压缩图片/视频后再生成。");
+        throw new Error("请求内容过大：参考图过多或图片体积过大。请减少参考素材，或先把多张分镜/角色图拼成一张容器图后再生成视频。");
     }
     const res = await fetch(PROXY_PATH, {
         method: "POST",
@@ -36,7 +36,7 @@ export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Pro
 }
 
 function proxyStatusMessage(status: number) {
-    if (status === 413) return "请求内容过大，请减少参考素材数量，或先压缩图片/视频后再生成。";
+    if (status === 413) return "请求内容过大：参考图过多或图片体积过大。请减少参考素材，或先把多张分镜/角色图拼成一张容器图后再生成视频。";
     if (status === 401 || status === 403) return "鉴权失败，请检查 API Key、模型权限或套餐权限。";
     if (status === 429) return "请求被限流或额度不足，请稍后重试。";
     return `请求失败: ${status}`;
