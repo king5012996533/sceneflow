@@ -30,7 +30,7 @@ export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Pro
     const data = await res.json().catch(() => null);
     if (!res.ok) {
         const msg = proxyErrorMessage(data) || proxyStatusMessage(res.status);
-        throw new Error(msg);
+        throw new Error(normalizeUpstreamError(msg));
     }
     return data as T;
 }
@@ -56,4 +56,17 @@ function proxyErrorMessage(data: unknown): string {
     if (typeof payload.code === "string" && payload.code) return payload.code;
     if (typeof payload.code === "number") return `请求失败: ${payload.code}`;
     return "";
+}
+
+function normalizeUpstreamError(message: string) {
+    if (!message) return message;
+    const requestId = message.match(/request id:\s*([a-z0-9]+)/i)?.[1];
+    const suffix = requestId ? ` Request id: ${requestId}` : "";
+    if (/input image/i.test(message) && /real person/i.test(message)) {
+        return `上游安全策略拦截：参考图可能包含真实人物，当前模型不允许用这张图生成视频。请换成二次元/虚拟角色图、三视图设定稿，或降低照片真实感后重试。${suffix}`;
+    }
+    if (/content policy|safety|moderation/i.test(message)) {
+        return `上游安全策略拦截：当前输入或参考素材没有通过模型审核，请调整提示词或更换参考素材后重试。${suffix}`;
+    }
+    return message;
 }

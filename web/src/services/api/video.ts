@@ -318,16 +318,29 @@ function readAxiosError(error: unknown, fallback: string) {
     if (axios.isCancel(error)) return "请求已取消";
     if (axios.isAxiosError<{ error?: { message?: string }; msg?: string; code?: number }>(error)) {
         const responseData = error.response?.data;
-        return responseData?.msg || responseData?.error?.message || statusMessage(error.response?.status, fallback);
+        return normalizeUpstreamError(responseData?.msg || responseData?.error?.message || statusMessage(error.response?.status, fallback));
     }
     if (error instanceof DOMException && error.name === "AbortError") return "请求已取消";
-    return error instanceof Error ? error.message : fallback;
+    return normalizeUpstreamError(error instanceof Error ? error.message : fallback);
 }
 
 function statusMessage(status: number | undefined, fallback: string) {
     if (status === 401 || status === 403) return "鉴权失败，请检查 API Key、套餐权限或模型权限";
     if (status === 429) return "请求被限流或额度不足，请稍后重试";
     return status ? `${fallback}（${status}）` : fallback;
+}
+
+function normalizeUpstreamError(message: string) {
+    if (!message) return message;
+    const requestId = message.match(/request id:\s*([a-z0-9]+)/i)?.[1];
+    const suffix = requestId ? ` Request id: ${requestId}` : "";
+    if (/input image/i.test(message) && /real person/i.test(message)) {
+        return `上游安全策略拦截：参考图可能包含真实人物，当前模型不允许用这张图生成视频。请换成二次元/虚拟角色图、三视图设定稿，或降低照片真实感后重试。${suffix}`;
+    }
+    if (/content policy|safety|moderation/i.test(message)) {
+        return `上游安全策略拦截：当前输入或参考素材没有通过模型审核，请调整提示词或更换参考素材后重试。${suffix}`;
+    }
+    return message;
 }
 
 async function assertVideoBlob(blob: Blob) {

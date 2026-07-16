@@ -9,6 +9,7 @@ import { formatBytes, getDataUrlByteSize } from "@/lib/image-utils";
 import { useCopyText } from "@/hooks/use-copy-text";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasNodeType, type CanvasNodeData, type ViewportTransform } from "../types";
+import { summarizeCanvasGenerationError } from "../utils/canvas-generation-error";
 import { ImageToolSettingsModal, type ImageToolbarSettingsTool } from "./canvas-image-toolbar-settings-modal";
 import { IMAGE_QUICK_TOOLS_STORAGE_KEY, buildImageToolbarTools, defaultImageQuickToolIds, readImageQuickToolsConfig, type ImageQuickToolId } from "./canvas-image-toolbar-tools";
 
@@ -217,6 +218,7 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
     const [view, setView] = useState<"info" | "json">("info");
     const imageBytes = node?.type === CanvasNodeType.Image && node.metadata?.content ? getDataUrlByteSize(node.metadata.content) : 0;
     const batchCount = node?.type === CanvasNodeType.Image ? node.metadata?.batchChildIds?.length || 0 : 0;
+    const errorView = summarizeCanvasGenerationError(node?.metadata?.errorDetails);
     const json = useMemo(() => {
         if (!node) return "";
         return JSON.stringify(
@@ -266,8 +268,13 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
                             {node.metadata?.prompt ? <InfoRow label="提示词" value={node.metadata.prompt} /> : null}
                             {imageBytes ? <InfoRow label="图片大小" value={formatBytes(imageBytes)} /> : null}
                             {node.metadata?.errorDetails ? (
-                                <div className="rounded-lg border p-3 text-red-400" style={{ borderColor: theme.node.stroke }}>
-                                    {node.metadata.errorDetails}
+                                <div className="space-y-3 rounded-lg border p-3" style={{ borderColor: theme.node.stroke }}>
+                                    <div className="space-y-1 text-red-400">
+                                        <div className="font-medium">{errorView.title}</div>
+                                        <div className="text-xs leading-5 opacity-80">{errorView.hint}</div>
+                                        {errorView.requestId ? <div className="text-xs opacity-60">Request id: {errorView.requestId}</div> : null}
+                                    </div>
+                                    <pre className="thin-scrollbar max-h-28 overflow-auto whitespace-pre-wrap break-words rounded-md bg-black/5 p-2 text-xs leading-5 opacity-70">{node.metadata.errorDetails}</pre>
                                 </div>
                             ) : null}
                         </div>

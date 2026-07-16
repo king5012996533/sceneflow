@@ -9,6 +9,7 @@ import { formatBytes } from "@/lib/image-utils";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasNodeType, type CanvasNodeData, type Position } from "../types";
+import { summarizeCanvasGenerationError } from "../utils/canvas-generation-error";
 import type { CanvasResourceReference } from "../utils/canvas-resource-references";
 
 type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
@@ -372,9 +373,14 @@ function LoadingContent({ theme }: Pick<NodeContentRendererProps, "theme">) {
 }
 
 function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "node" | "theme" | "onRetry">) {
+    const errorView = summarizeCanvasGenerationError(node.metadata?.errorDetails);
     return (
-        <div className="flex max-w-[260px] flex-col items-center gap-3 px-5 text-center">
-            <div className="text-xs leading-5 text-red-300">{node.metadata?.errorDetails || "生成失败"}</div>
+        <div className="flex max-w-[280px] flex-col items-center gap-3 px-5 text-center">
+            <div className="space-y-1 text-xs leading-5 text-red-300">
+                <div className="font-medium">{errorView.title}</div>
+                <div className="opacity-90">{errorView.hint}</div>
+                {errorView.requestId ? <div className="truncate text-[10px] opacity-60">Request id: {errorView.requestId}</div> : null}
+            </div>
             <button
                 type="button"
                 className="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition hover:scale-[1.02]"

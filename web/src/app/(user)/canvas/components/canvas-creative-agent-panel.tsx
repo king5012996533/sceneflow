@@ -64,6 +64,10 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
     async function sendMessage(text = draft) {
         const content = text.trim();
         if (!content || sending) return;
+        if (handleLocalExecutionCommand(content)) {
+            setDraft("");
+            return;
+        }
         const nextMessages: AgentLabMessage[] = [...messages, { role: "user", content }];
         setMessages(nextMessages);
         setDraft("");
@@ -113,6 +117,22 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
     function copyText(text: string, successText = "已复制") {
         copyToClipboard(text);
         message.success(successText);
+    }
+
+    function handleLocalExecutionCommand(content: string) {
+        const actions = artifact?.toolActions || [];
+        if (!actions.length) return false;
+        const wantsCreate = /(创建|新建|放到画布|落到画布|生成卡片|建卡|卡片创建|创建到画布)/.test(content);
+        const wantsGenerate = /(执行|运行|开始生成|立即生成|直接生成|全部生成|生成全部|一键生成|一键执行)/.test(content);
+        if (!wantsCreate && !wantsGenerate) return false;
+
+        setMessages((current) => [...current, { role: "user", content }]);
+        if (wantsGenerate) {
+            executeAllToolActions(actions);
+        } else {
+            applyAllToolActions(actions);
+        }
+        return true;
     }
 
     function resetConversation() {
@@ -187,6 +207,50 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
         message.success(`已创建 ${pending.length} 张草稿卡片`);
     }
 
+    function executeAllToolActions(actions: AgentToolAction[]) {
+        const creatableActions = actions.filter(isCreatableAction);
+        const pending = creatableActions.filter((action) => !appliedActionIds.has(action.id));
+        const built = pending.length ? toolActionsToConnectedOps(pending, artifact, snapshot) : { ops: [], actionNodeIds: {} as Record<string, string> };
+        const nextActionNodeIds = { ...actionNodeIds, ...built.actionNodeIds };
+        const generationOps = creatableActions
+            .filter((action) => actionToGenerationMode(action.type) && nextActionNodeIds[action.id] && !generatedActionIds.has(action.id))
+            .map((action) => ({ type: "run_generation" as const, nodeId: nextActionNodeIds[action.id], mode: actionToGenerationMode(action.type) || "image" }));
+
+        if (!built.ops.length && !generationOps.length) {
+            message.info("没有可执行的新任务");
+            return;
+        }
+
+        onApplyOps([...built.ops, ...generationOps]);
+
+        if (pending.length) {
+            setAppliedActionIds((current) => new Set([...current, ...pending.map((action) => action.id)]));
+        }
+        if (Object.keys(built.actionNodeIds).length) {
+            setActionNodeIds(nextActionNodeIds);
+        }
+        if (generationOps.length) {
+            const generatedIds = new Set(generatedActionIds);
+            creatableActions.forEach((action) => {
+                if (nextActionNodeIds[action.id] && actionToGenerationMode(action.type)) {
+                    generatedIds.add(action.id);
+                }
+            });
+            setGeneratedActionIds(generatedIds);
+        }
+
+        const createdLine = pending.length ? `已创建 ${pending.length} 张草稿卡片，并按建议流程连线。` : "已使用上一次创建的卡片。";
+        const generationLine = generationOps.length ? `已触发 ${generationOps.length} 个生成任务。` : "没有可生成的卡片，或这些卡片已经触发过生成。";
+        setMessages((current) => [
+            ...current,
+            {
+                role: "assistant",
+                content: `${createdLine}\n\n${generationLine}\n\n这些任务会走 SceneFlow 现有生成入口，并按后端额度、并发和扣费规则执行。`,
+            },
+        ]);
+        message.success(`已执行 ${pending.length + generationOps.length} 个动作`);
+    }
+
     function runActionGeneration(action: AgentToolAction) {
         const nodeId = actionNodeIds[action.id];
         if (!nodeId) {
@@ -211,27 +275,7 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
     }
 
     function runAllActionGenerations(actions: AgentToolAction[]) {
-        const generationOps = actions
-            .filter((action) => actionToGenerationMode(action.type) && appliedActionIds.has(action.id) && !generatedActionIds.has(action.id) && actionNodeIds[action.id])
-            .map((action) => ({ type: "run_generation" as const, nodeId: actionNodeIds[action.id], mode: actionToGenerationMode(action.type) || "image" }));
-        if (!generationOps.length) {
-            message.info("没有可生成的已创建卡片");
-            return;
-        }
-        onApplyOps(generationOps);
-        const generatedIds = new Set(generatedActionIds);
-        actions.forEach((action) => {
-            if (actionNodeIds[action.id] && actionToGenerationMode(action.type)) generatedIds.add(action.id);
-        });
-        setGeneratedActionIds(generatedIds);
-        setMessages((current) => [
-            ...current,
-            {
-                role: "assistant",
-                content: `已批量触发 ${generationOps.length} 个生成任务。\n\n这些任务会走 SceneFlow 现有生成入口，并按后端额度、并发和扣费规则执行。`,
-            },
-        ]);
-        message.success(`已触发 ${generationOps.length} 个生成任务`);
+        executeAllToolActions(actions);
     }
 
     return (

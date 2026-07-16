@@ -51,6 +51,7 @@ import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
 import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
 import { useCanvasStore } from "../stores/use-canvas-store";
 import { applyCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
+import { canvasGenerationErrorToast } from "../utils/canvas-generation-error";
 import { buildCanvasResourceReferences, buildNodeMentionReferences } from "../utils/canvas-resource-references";
 import { createMangaWorkflow } from "../utils/manga-workflow";
 import { composeShotPackBlob, splitImageGrid } from "../utils/shot-pack-image";
@@ -2194,7 +2195,7 @@ function InfiniteCanvasPage() {
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
                 const errorDetails = error instanceof Error ? error.message : "局部修改失败";
-                message.error(errorDetails);
+                message.error(canvasGenerationErrorToast(errorDetails));
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {
                 finishGenerationRequest(childId, controller);
@@ -2729,7 +2730,7 @@ function InfiniteCanvasPage() {
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
                 const errorDetails = error instanceof Error ? error.message : "生成失败";
-                message.error(errorDetails);
+                message.error(canvasGenerationErrorToast(errorDetails));
                 setNodes((prev) =>
                     prev.map((node) => (node.id === nodeId || pendingChildIds.includes(node.id) ? (node.id === nodeId && !markSourceStatus ? node : { ...node, metadata: { ...node.metadata, status: NODE_STATUS_ERROR, errorDetails } }) : node)),
                 );
@@ -2839,7 +2840,7 @@ function InfiniteCanvasPage() {
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
                 const errorDetails = error instanceof Error ? error.message : "生成失败";
-                message.error(errorDetails);
+                message.error(canvasGenerationErrorToast(errorDetails));
                 setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {
                 finishGenerationRequest(node.id, controller);
@@ -3905,7 +3906,7 @@ async function runCanvasPipeline(
         } catch (error) {
             const text = error instanceof Error ? error.message : "流水线执行失败";
             patchNode(nodeId, { pipelineRunId: runId, pipelineRunStatus: "failed", errorDetails: text });
-            message.error({ key, content: `${node.metadata?.pipelineLabel || node.title}失败，流水线已停在当前节点：${text}` });
+            message.error({ key, content: `${node.metadata?.pipelineLabel || node.title}失败，流水线已停在当前节点：${canvasGenerationErrorToast(text)}` });
             return;
         }
     }
