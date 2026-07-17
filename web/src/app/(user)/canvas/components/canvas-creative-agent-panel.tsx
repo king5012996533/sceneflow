@@ -3,17 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import copyToClipboard from "copy-to-clipboard";
 import { App, Button, Tag } from "antd";
-import { Copy, LoaderCircle, Plus, Send, Trash2 } from "lucide-react";
+import { Copy, FileText, LoaderCircle, Plus, Send, Trash2 } from "lucide-react";
 
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { apiPath } from "@/lib/app-paths";
 import { scopedStorageKey } from "@/lib/user-data-scope";
 import type { AgentLabArtifact, AgentLabMessage, AgentLabResponse } from "@/lib/agent-lab/types";
-import { modelOptionName, resolveModelChannel, type AiConfig } from "@/stores/use-config-store";
+import { modelOptionName, resolveModelChannel, selectableModelsByCapability, useConfigStore, type AiConfig } from "@/stores/use-config-store";
 import { CanvasNodeType } from "../types";
 import type { CanvasAgentOp, CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 
 const QUICK_PROMPTS = ["一部漫剧应该怎么做？", "我要一个 15 秒打斗片段", "帮我写一个古风女主三视图提示词", "我直接做三视图可以吗？"];
 const STORAGE_KEY = "sceneflow:canvas-creative-agent:messages";
+const MAX_SCRIPT_CHARS = 30000;
 type AgentToolAction = NonNullable<AgentLabArtifact["toolActions"]>[number];
 
 type CanvasCreativeAgentPanelProps = {
@@ -37,10 +39,11 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
     const [actionNodeIds, setActionNodeIds] = useState<Record<string, string>>({});
     const [generatedActionIds, setGeneratedActionIds] = useState<Set<string>>(new Set());
     const scrollRef = useRef<HTMLDivElement>(null);
+    const scriptInputRef = useRef<HTMLInputElement>(null);
+    const updateConfig = useConfigStore((state) => state.updateConfig);
 
     const activeModel = config.textModel || config.model;
     const channel = useMemo(() => resolveModelChannel(config, activeModel), [config, activeModel]);
-    const modelLabel = activeModel ? modelOptionName(activeModel) : "未配置模型";
 
     useEffect(() => {
         const saved = window.localStorage.getItem(scopedStorageKey(STORAGE_KEY));
@@ -118,6 +121,43 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
     function copyText(text: string, successText = "已复制") {
         copyToClipboard(text);
         message.success(successText);
+    }
+
+    async function handleScriptFile(file?: File | null) {
+        if (!file) return;
+        const lowerName = file.name.toLowerCase();
+        const isTextLike = /\.(txt|md|markdown|json|csv|srt|ass)$/i.test(lowerName) || file.type.startsWith("text/") || file.type === "application/json";
+        if (!isTextLike) {
+            message.warning("暂时只支持上传 txt、md、json、csv、srt、ass 等文本剧本文件");
+            return;
+        }
+        try {
+            const text = await file.text();
+            const trimmed = text.trim();
+            if (!trimmed) {
+                message.warning("这个文件没有可读取的文本内容");
+                return;
+            }
+            const clipped = trimmed.length > MAX_SCRIPT_CHARS;
+            const content = clipped ? trimmed.slice(0, MAX_SCRIPT_CHARS) : trimmed;
+            setDraft(
+                [
+                    `我上传了一个剧本文件《${file.name}》，请先帮我拆解，不要直接生成。`,
+                    "请输出：故事概览、主要角色、场景清单、适合先做的 15-30 秒片段、资产需求、下一步建议。",
+                    clipped ? `注意：文件较长，这里先读取前 ${MAX_SCRIPT_CHARS} 个字符，请先按当前片段拆。` : "",
+                    "",
+                    "剧本内容：",
+                    content,
+                ]
+                    .filter(Boolean)
+                    .join("\n"),
+            );
+            message.success(clipped ? "剧本已读取，内容较长，已截取前半段放入输入框" : "剧本已读取，已放入输入框");
+        } catch {
+            message.error("读取剧本失败，请换成 UTF-8 文本文件再试");
+        } finally {
+            if (scriptInputRef.current) scriptInputRef.current.value = "";
+        }
     }
 
     function handleLocalExecutionCommand(content: string) {
@@ -253,23 +293,28 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
     }
 
     function runActionGeneration(action: AgentToolAction) {
-        const nodeId = actionNodeIds[action.id];
-        if (!nodeId) {
-            message.warning("请先创建这张草稿卡");
-            return;
-        }
         const mode = actionToGenerationMode(action.type);
         if (!mode) {
             message.warning("这张卡不是生成卡，不能直接生成");
             return;
         }
-        onApplyOps([{ type: "run_generation", nodeId, mode }]);
+        const existingNodeId = actionNodeIds[action.id];
+        const nodeId = existingNodeId || createActionNodeId(action, Object.keys(actionNodeIds).length);
+        const ops: CanvasAgentOp[] = existingNodeId
+            ? [{ type: "run_generation", nodeId, mode }]
+            : [...toolActionToOps(action, artifact, snapshot, nodeId), { type: "run_generation", nodeId, mode }];
+
+        onApplyOps(ops);
+        if (!existingNodeId) {
+            setAppliedActionIds((current) => new Set([...current, action.id]));
+            setActionNodeIds((current) => ({ ...current, [action.id]: nodeId }));
+        }
         setGeneratedActionIds((current) => new Set([...current, action.id]));
         setMessages((current) => [
             ...current,
             {
                 role: "assistant",
-                content: `已触发生成：${action.title}\n\n这次生成走 SceneFlow 现有生成入口，会按后端额度、并发和扣费规则执行。`,
+                content: `${existingNodeId ? "已触发生成" : "已创建卡片并触发生成"}：${action.title}\n\n这次生成走 SceneFlow 现有生成入口，会按后端额度、并发和扣费规则执行。`,
             },
         ]);
         message.success("已触发生成");
@@ -287,9 +332,12 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
                     <div className="truncate text-xs text-black/45">先规划，不直接执行画布操作</div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
-                    <Tag bordered={false} color={channel.apiKey ? "green" : "default"}>
-                        {modelLabel}
-                    </Tag>
+                    <CreativeModelPicker config={config} value={activeModel} onChange={(model) => updateConfig("textModel", model)} />
+                    {!channel.apiKey ? (
+                        <Tag bordered={false} color="default">
+                            未配置 Key
+                        </Tag>
+                    ) : null}
                     <Button size="small" type="text" icon={<Plus className="size-3.5" />} onClick={resetConversation}>
                         新建
                     </Button>
@@ -331,6 +379,10 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
             <div className="border-t border-black/10 p-3">
                 {artifact ? <CompactCanvasPlan artifact={artifact} appliedActionIds={appliedActionIds} generatedActionIds={generatedActionIds} onCopy={copyText} onApply={applyToolAction} onApplyAll={applyAllToolActions} onGenerate={runActionGeneration} onGenerateAll={runAllActionGenerations} /> : null}
                 <div className="mb-2 flex flex-wrap gap-2">
+                    <input ref={scriptInputRef} type="file" className="hidden" accept=".txt,.md,.markdown,.json,.csv,.srt,.ass,text/*,application/json" onChange={(event) => void handleScriptFile(event.target.files?.[0])} />
+                    <Button size="small" icon={<FileText className="size-3.5" />} onClick={() => scriptInputRef.current?.click()} disabled={sending}>
+                        上传剧本
+                    </Button>
                     {QUICK_PROMPTS.map((item) => (
                         <Button key={item} size="small" onClick={() => sendMessage(item)} disabled={sending}>
                             {item}
@@ -354,6 +406,39 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
                 </div>
             </div>
         </div>
+    );
+}
+
+function CreativeModelPicker({ config, value, onChange }: { config: AiConfig; value: string; onChange: (model: string) => void }) {
+    const options = useMemo(() => Array.from(new Set([value, ...selectableModelsByCapability(config, "text")].filter(Boolean))), [config, value]);
+    const current = value || "";
+    return (
+        <Select value={current} onValueChange={onChange}>
+            <SelectTrigger
+                className="h-7 max-w-[180px] border-black/10 bg-white/70 px-2 text-xs shadow-none"
+                title={current ? `${modelOptionName(current)} · ${resolveModelChannel(config, current).name}` : "选择模型"}
+                onMouseDown={(event) => event.stopPropagation()}
+                onPointerDown={(event) => event.stopPropagation()}
+            >
+                <span className="min-w-0 truncate">{current ? modelOptionName(current) : "选择模型"}</span>
+            </SelectTrigger>
+            <SelectContent data-canvas-no-zoom className="z-[1200] w-72 max-w-[calc(100vw-24px)]" position="popper" align="end" sideOffset={6} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
+                {options.length ? (
+                    options.map((model) => (
+                        <SelectItem key={model} value={model} textValue={`${modelOptionName(model)} ${resolveModelChannel(config, model).name}`}>
+                            <span className="flex min-w-0 items-center gap-2">
+                                <span className="min-w-0 flex-1 truncate">{modelOptionName(model)}</span>
+                                <span className="shrink-0 text-xs opacity-55">{resolveModelChannel(config, model).name}</span>
+                            </span>
+                        </SelectItem>
+                    ))
+                ) : (
+                    <SelectItem value="__empty_text_model__" disabled>
+                        暂无文本模型
+                    </SelectItem>
+                )}
+            </SelectContent>
+        </Select>
     );
 }
 
@@ -391,11 +476,11 @@ function CompactCanvasPlan({
 }) {
     if (!artifact.plan && !artifact.selfCheck && !artifact.toolActions?.length) return null;
     return (
-        <details className="mb-2 rounded-2xl border border-black/10 bg-[#f7f1e8]">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm">
+        <div className="mb-2 rounded-2xl border border-black/10 bg-[#f7f1e8]">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span className="min-w-0 truncate font-medium">执行建议：{artifact.title}</span>
                 {artifact.selfCheck ? <Tag color={artifact.selfCheck.score >= 80 ? "green" : artifact.selfCheck.score >= 60 ? "orange" : "red"}>{artifact.selfCheck.score}</Tag> : null}
-            </summary>
+            </div>
             <div className="space-y-3 border-t border-black/10 p-3 text-sm">
                 {artifact.plan?.cards.length ? <MiniList title="建议卡片" items={artifact.plan.cards} /> : null}
                 {artifact.plan?.missingAssets.length ? <MiniList title="缺失素材" items={artifact.plan.missingAssets} /> : null}
@@ -408,7 +493,7 @@ function CompactCanvasPlan({
                                     创建全部
                                 </Button>
                                 <Button size="small" onClick={() => onGenerateAll(artifact.toolActions || [])}>
-                                    生成全部
+                                    创建并生成
                                 </Button>
                             </div>
                         </div>
@@ -429,8 +514,8 @@ function CompactCanvasPlan({
                                                     {applied ? "已创建" : action.type === "ask_user" ? "知道了" : "创建"}
                                                 </Button>
                                                 {canGenerate ? (
-                                                    <Button size="small" disabled={!applied || generated} onClick={() => onGenerate(action)}>
-                                                        {generated ? "已生成" : "生成"}
+                                                    <Button size="small" disabled={generated} onClick={() => onGenerate(action)}>
+                                                        {generated ? "已生成" : applied ? "生成" : "创建并生成"}
                                                     </Button>
                                                 ) : null}
                                             </div>
@@ -446,7 +531,7 @@ function CompactCanvasPlan({
                     复制完整建议
                 </Button>
             </div>
-        </details>
+        </div>
     );
 }
 
@@ -579,7 +664,7 @@ function firstString(...values: unknown[]) {
 }
 
 function actionToGenerationMode(type: AgentToolAction["type"]) {
-    if (type === "create_storyboard_card") return undefined;
+    if (type === "create_storyboard_card") return "text" as const;
     if (type === "create_video_card") return "video" as const;
     if (type === "create_portrait_card" || type === "create_turnaround_card" || type === "create_scene_card" || type === "create_keyframe_card") return "image" as const;
     return undefined;
