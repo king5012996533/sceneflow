@@ -92,7 +92,7 @@ export function AppTopNav() {
         <>
             {!hideHeader ? (
                 <header className={cn("sceneflow-top-nav sticky top-0 z-20 h-16 shrink-0 border-b", useDarkHome ? "border-white/10 bg-[#090a0c]" : "border-[#beb2a3] bg-[#fffefa] shadow-[0_1px_0_rgba(255,255,255,1)_inset,0_14px_34px_rgba(35,28,20,0.16)]")}>
-                    <div className="mx-auto flex h-full max-w-7xl items-stretch gap-4 px-6">
+                    <div className="flex h-full w-full items-stretch gap-3 px-4 2xl:px-8">
                         <div className="flex min-w-0 flex-1 items-center">
                             <Link href="/" className={cn("flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight transition", useDarkHome ? "text-white hover:text-white/72" : "text-[#050816] hover:text-[#2432c9]")}>
                                 <span
@@ -115,7 +115,7 @@ export function AppTopNav() {
                                 <Menu className="size-5" />
                             </button>
 
-                            <nav className="hide-scrollbar ml-7 hidden h-16 min-w-0 flex-1 items-center gap-3 overflow-x-auto md:flex">
+                            <nav className="hide-scrollbar ml-6 hidden h-16 min-w-0 flex-1 items-center gap-2 overflow-x-auto pr-2 md:flex">
                                 {visibleTools.map((tool) => {
                                     const Icon = tool.icon;
                                     const active = tool.slug === activeToolSlug;
@@ -139,18 +139,18 @@ export function AppTopNav() {
                                         </Link>
                                     );
                                 })}
+                                <button
+                                    type="button"
+                                    className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-[#ded3c4] bg-[#fffefa] px-2.5 text-sm font-semibold leading-6 text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] transition hover:border-[#cfc5ff] hover:bg-[#f5f2ff] hover:text-[#4f5dff]"
+                                    onClick={() => setExperienceOpen(true)}
+                                >
+                                    <Bot className="size-4" />
+                                    <span>体验官</span>
+                                </button>
                             </nav>
                         </div>
 
-                        <div className="my-auto ml-auto flex h-9 shrink-0 items-center justify-end gap-2 border-l border-[#e6dccd] pl-3 whitespace-nowrap">
-                            <button
-                                type="button"
-                                className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-[#ded3c4] bg-[#fffefa] px-3 text-sm font-medium text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] transition hover:border-[#cfc5ff] hover:bg-[#f5f2ff] hover:text-[#4f5dff]"
-                                onClick={() => setExperienceOpen(true)}
-                            >
-                                <Bot className="size-4" />
-                                体验官
-                            </button>
+                        <div className="my-auto ml-auto flex h-9 min-w-0 shrink-0 items-center justify-end gap-1.5 border-l border-[#e6dccd] pl-3 whitespace-nowrap">
                             <UserStatusActions variant={useDarkHome ? "home" : "default"} showThemeToggle={false} />
                         </div>
                     </div>

@@ -39,12 +39,12 @@ export function UserStatusActions({ showConfig = true, showThemeToggle = true, v
     useEffect(() => { fetchSession(); }, []);
 
     return (
-        <div className="inline-flex shrink-0 items-center gap-1.5">
+        <div className="inline-flex min-w-0 shrink-0 items-center gap-1.5">
             {user ? (
                 <>
-                    <span className={cn("inline-flex items-center gap-1.5 px-2 py-1 text-xs", variant === "home" ? "text-white/72" : "text-[#1f2937]")}>
-                        <User className="size-3.5" />
-                        {user.name || user.email}
+                    <span className={cn("inline-flex max-w-[132px] items-center gap-1.5 truncate px-2 py-1 text-xs", variant === "home" ? "text-white/72" : "text-[#1f2937]")} title={user.name || user.email}>
+                        <User className="size-3.5 shrink-0" />
+                        <span className="truncate">{user.name || user.email}</span>
                     </span>
                     {user.role === "admin" ? (
                         <a href={publicPath("/admin")} className={naturalIconClass} style={iconStyle} aria-label="管理后台" title="管理后台">
