@@ -81,6 +81,13 @@ type CanvasClipboard = {
     connections: CanvasConnection[];
 };
 
+type DirectorPanoramaPayload = {
+    edgeId: string;
+    sourceNodeId: string;
+    imageUrl: string;
+    fileName: string;
+};
+
 type PendingConnectionCreate = {
     connection: ConnectionHandle;
     position: Position;
@@ -1166,6 +1173,44 @@ function InfiniteCanvasPage() {
         );
     }, []);
 
+    const getDirectorPanoramaPayload = useCallback((targetNode: CanvasNodeData): DirectorPanoramaPayload | null => {
+        for (const incomingConnection of connectionsRef.current) {
+            if (incomingConnection.toNodeId !== targetNode.id) continue;
+
+            const sourceNode = nodesRef.current.find((node) => node.id === incomingConnection.fromNodeId);
+            if (!sourceNode || sourceNode.type !== CanvasNodeType.Image) continue;
+
+            const imageUrl = typeof sourceNode.metadata?.content === "string" ? sourceNode.metadata.content : "";
+            if (!imageUrl) continue;
+
+            return {
+                edgeId: incomingConnection.id,
+                sourceNodeId: sourceNode.id,
+                imageUrl,
+                fileName: `${sourceNode.title || "canvas-image"}.png`,
+            };
+        }
+
+        return null;
+    }, []);
+
+    const postDirectorPanorama = useCallback(
+        (targetNode: CanvasNodeData) => {
+            if (!directorIframeRef.current?.contentWindow) return;
+            const panorama = getDirectorPanoramaPayload(targetNode);
+            if (!panorama) return;
+
+            directorIframeRef.current.contentWindow.postMessage(
+                {
+                    type: "storyai:director-desk-panorama",
+                    payload: panorama,
+                },
+                directorDeskOrigin || "*",
+            );
+        },
+        [directorDeskOrigin, getDirectorPanoramaPayload],
+    );
+
     const postDirectorSession = useCallback(() => {
         if (!directorNode || !directorIframeRef.current?.contentWindow) return;
         directorIframeRef.current.contentWindow.postMessage(
@@ -1179,7 +1224,8 @@ function InfiniteCanvasPage() {
             },
             directorDeskOrigin || "*",
         );
-    }, [colorTheme, directorDeskOrigin, directorNode]);
+        postDirectorPanorama(directorNode);
+    }, [colorTheme, directorDeskOrigin, directorNode, postDirectorPanorama]);
 
     useEffect(() => {
         if (!directorNode) return;
@@ -1202,6 +1248,14 @@ function InfiniteCanvasPage() {
             }
             if (type === "storyai:director-desk-project-changed") {
                 persistDirectorProject(activeDirectorNode, event.data?.payload);
+                return;
+            }
+            if (type === "storyai:director-desk-panorama-removed") {
+                const edgeId = typeof event.data?.payload?.edgeId === "string" ? event.data.payload.edgeId : "";
+                if (edgeId) {
+                    setConnections((prev) => prev.filter((connection) => connection.id !== edgeId));
+                    setSelectedConnectionId((current) => (current === edgeId ? null : current));
+                }
             }
         }
 

@@ -28,15 +28,22 @@ SceneFlow opens the Director in an iframe and passes:
 
 - `theme`
 - `hostOrigin`
-- `storyai:director-desk-session` with a per-node `instanceId`
+- `storyai:director-desk-session` with a per-node `instanceId` and the saved `directorProject`
+- `storyai:director-desk-panorama` when an image node is connected into a `DirectorShot` node
 
 The Director can post back:
 
 - `storyai:director-desk-ready`
 - `storyai:director-desk-close`
 - `storyai:director-desk-captures-sent`
+- `storyai:director-desk-project-changed`
+- `storyai:director-desk-panorama-removed`
 
 `storyai:director-desk-captures-sent` creates SceneFlow image nodes and connects them to the source `DirectorShot` node.
+
+`storyai:director-desk-project-changed` stores the Director scene JSON in the `DirectorShot` node metadata, so reopening that node restores its 3D scene, cameras, and timeline. Binary capture data is omitted by the Director snapshot protocol; captured stills remain separate SceneFlow image nodes.
+
+When an upstream SceneFlow image node is connected into a `DirectorShot`, SceneFlow sends it as a host panorama/background input on open. If the user removes that panorama inside Director, SceneFlow removes the matching canvas connection.
 
 ## Current Boundary
 
