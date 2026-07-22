@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { create } from "zustand";
 import { createJSONStorage, persist, type StateStorage } from "zustand/middleware";
 import { nanoid } from "nanoid";
@@ -289,7 +288,7 @@ export const useConfigStore = create<ConfigStore>()(
                     webdav: sanitizeHydratedWebdavConfig(persistedWebdav),
                     config: {
                         ...config,
-                        channelMode: "local",
+                        channelMode: persistedConfig.channelMode || config.channelMode,
                         apiFormat: normalizeApiFormat(config.apiFormat),
                         channels,
                         models,
@@ -325,8 +324,7 @@ function normalizeModelList(models: string[], channels: ModelChannel[]) {
 }
 
 export function useEffectiveConfig() {
-    const config = useConfigStore((state) => state.config);
-    return useMemo(() => ({ ...config, channelMode: "local" as const }), [config]);
+    return useConfigStore((state) => state.config);
 }
 
 export function createModelChannel(channel?: Partial<ModelChannel>): ModelChannel {
@@ -378,8 +376,8 @@ export function normalizeModelOptionValue(value: string | undefined, channels: M
         const channel = channels.find((item) => item.id === decoded.channelId);
         return channel && channel.models.includes(decoded.model) ? model : "";
     }
-    const channel = channels.find((item) => item.models.includes(decoded?.model || model)) || channels[0];
-    return channel && channel.models.includes(decoded?.model || model) ? encodeChannelModel(channel.id, decoded?.model || model) : model;
+    const channel = channels.find((item) => item.models.includes(model)) || channels[0];
+    return channel && channel.models.includes(model) ? encodeChannelModel(channel.id, model) : model;
 }
 
 export function resolveModelChannel(config: AiConfig, value: string) {

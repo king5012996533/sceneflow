@@ -11,6 +11,9 @@ export type AgentPendingToolCall = { requestId: string; name: string; input?: { 
 export type AgentThreadSummary = { id: string; preview: string; name?: string | null; cwd?: string; status?: string; source?: unknown; createdAt?: number; updatedAt?: number };
 export type AgentPanelTab = "chat" | "setup" | "history" | "log";
 
+const DEFAULT_AGENT_WIDTH = 440;
+const DEFAULT_AGENT_URL = "http://127.0.0.1:17371";
+
 type CanvasAgentStore = {
     width: number;
     url: string;
@@ -32,16 +35,17 @@ type CanvasAgentStore = {
     activity: string;
     connectError: string;
     pendingTool: AgentPendingToolCall | null;
-    setAgentState: (patch: Partial<Omit<CanvasAgentStore, "setAgentState" | "addMessage" | "addEventLog" | "clearEventLogs">>) => void;
+    hydrateFromStorage: () => void;
+    setAgentState: (patch: Partial<Omit<CanvasAgentStore, "hydrateFromStorage" | "setAgentState" | "addMessage" | "addEventLog" | "clearEventLogs">>) => void;
     addMessage: (item: AgentChatItem) => void;
     addEventLog: (item: AgentEventLog) => void;
     clearEventLogs: () => void;
 };
 
 export const useCanvasAgentStore = create<CanvasAgentStore>((set) => ({
-    width: typeof window === "undefined" ? 440 : Number(localStorage.getItem(scopedStorageKey("canvas-agent-panel-width"))) || 440,
-    url: typeof window === "undefined" ? "http://127.0.0.1:17371" : localStorage.getItem(scopedStorageKey("canvas-agent-url")) || "http://127.0.0.1:17371",
-    token: typeof window === "undefined" ? "" : localStorage.getItem(scopedStorageKey("canvas-agent-token")) || "",
+    width: DEFAULT_AGENT_WIDTH,
+    url: DEFAULT_AGENT_URL,
+    token: "",
     connected: false,
     enabled: false,
     prompt: "",
@@ -59,6 +63,14 @@ export const useCanvasAgentStore = create<CanvasAgentStore>((set) => ({
     activity: "就绪",
     connectError: "",
     pendingTool: null,
+    hydrateFromStorage: () => {
+        if (typeof window === "undefined") return;
+        set({
+            width: Number(localStorage.getItem(scopedStorageKey("canvas-agent-panel-width"))) || DEFAULT_AGENT_WIDTH,
+            url: localStorage.getItem(scopedStorageKey("canvas-agent-url")) || DEFAULT_AGENT_URL,
+            token: localStorage.getItem(scopedStorageKey("canvas-agent-token")) || "",
+        });
+    },
     setAgentState: (patch) => set(patch),
     addMessage: (item) => set((state) => ({ messages: [...state.messages.slice(-120), item] })),
     addEventLog: (item) => set((state) => ({ eventLogs: [...state.eventLogs.slice(-160), item] })),

@@ -48,6 +48,7 @@ export function CanvasLocalAgentPanel({ snapshot, canUndoOps, collapsed, embedde
     const { message, modal } = App.useApp();
     const searchParams = useSearchParams();
     const { width, url, token, connected, enabled, prompt, attachments, sending, waiting, messages, eventLogs, threads, activeThreadId, workspacePath, loadingThreads, activeTab, confirmTools, activity, connectError, pendingTool, setAgentState, addMessage: pushMessage, addEventLog: pushEventLog, clearEventLogs } = useCanvasAgentStore();
+    const hydrateAgentFromStorage = useCanvasAgentStore((state) => state.hydrateFromStorage);
     const [resizing, setResizing] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
     const snapshotRef = useRef(snapshot);
@@ -61,6 +62,11 @@ export function CanvasLocalAgentPanel({ snapshot, canUndoOps, collapsed, embedde
     const clientIdRef = useRef(typeof crypto === "undefined" ? `${Date.now()}` : crypto.randomUUID());
     const endpoint = useMemo(() => url.trim().replace(/\/$/, ""), [url]);
     const urlAgentAutoConnect = searchParams.has("agentUrl") && searchParams.has("agentToken");
+    useEffect(() => {
+        if (urlAgentAutoConnect) return;
+        hydrateAgentFromStorage();
+    }, [hydrateAgentFromStorage, urlAgentAutoConnect]);
+
     const loadThreads = useCallback(async () => {
         const projectId = snapshotRef.current.projectId;
         if ((!connectedRef.current && !useCanvasAgentStore.getState().connected) || !projectId) return;

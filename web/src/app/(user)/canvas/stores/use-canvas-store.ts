@@ -37,6 +37,11 @@ const CANVAS_STORE_KEY = "infinite-canvas:canvas_store";
 type PersistedCanvasState = Pick<CanvasStore, "projects">;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let queuedPersistState: PersistedCanvasState | null = null;
+let queuedPersistSignature = "";
+
+function projectsSignature(projects: CanvasProject[] | undefined) {
+    return JSON.stringify(projects || []);
+}
 
 const canvasStorage: PersistStorage<CanvasStore> = {
     getItem: async (name) => {
@@ -44,12 +49,15 @@ const canvasStorage: PersistStorage<CanvasStore> = {
         if (!value) return null;
         const parsed = JSON.parse(value) as StorageValue<CanvasStore>;
         queuedPersistState = parsed.state as PersistedCanvasState;
+        queuedPersistSignature = projectsSignature(queuedPersistState.projects);
         return parsed;
     },
     setItem: (name, value) => {
         const nextState = value.state as PersistedCanvasState;
-        if (queuedPersistState && queuedPersistState.projects === nextState.projects) return;
+        const nextSignature = projectsSignature(nextState.projects);
+        if (queuedPersistSignature === nextSignature) return;
         queuedPersistState = nextState;
+        queuedPersistSignature = nextSignature;
         if (saveTimer) clearTimeout(saveTimer);
         saveTimer = setTimeout(() => {
             saveTimer = null;
