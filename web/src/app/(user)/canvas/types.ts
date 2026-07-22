@@ -15,6 +15,7 @@ export enum CanvasNodeType {
     Config = "config",
     Video = "video",
     Audio = "audio",
+    DirectorShot = "director-shot",
 }
 
 export type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
@@ -98,6 +99,10 @@ export type CanvasNodeMetadata = {
     tailFrameSourceNodeId?: string;
     continuitySourceNodeId?: string;
     shotPack?: CanvasShotPack;
+    directorSessionId?: string;
+    directorUrl?: string;
+    directorLastCaptureAt?: string;
+    directorCaptureCount?: number;
 };
 
 export type CanvasNodeData = {

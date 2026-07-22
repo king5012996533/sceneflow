@@ -13,7 +13,7 @@ import { defaultConfig, type AiConfig, useConfigStore, useEffectiveConfig } from
 import { resolveImageUrl, uploadImage, type UploadedImage } from "@/services/image-storage";
 import { resolveMediaUrl, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
-import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
+import { dataUrlToFile, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { fetchClientEntitlements, isOverLimit, type ClientEntitlements } from "@/lib/client-entitlements";
 import { checkGenerationQuota, reserveGenerationQuota } from "@/lib/generation-quota";
@@ -43,6 +43,7 @@ import { Minimap } from "../components/canvas-mini-map";
 import { CanvasNode } from "../components/canvas-node";
 import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "../components/canvas-node-prompt-panel";
 import { CanvasToolbar } from "../components/canvas-toolbar";
+import { DirectorShotNodeContent } from "../components/director-shot-node-content";
 import { ShotPackNodeContent } from "../components/shot-pack-node-content";
 import { ShotPackPanel } from "../components/shot-pack-panel";
 import { AssetPickerModal, type InsertAssetPayload } from "../components/asset-picker-modal";
@@ -112,6 +113,7 @@ const NODE_STATUS_IDLE = "idle" as const;
 const NODE_STATUS_LOADING = "loading" as const;
 const NODE_STATUS_SUCCESS = "success" as const;
 const NODE_STATUS_ERROR = "error" as const;
+const DIRECTOR_DESK_URL = process.env.NEXT_PUBLIC_DIRECTOR_DESK_URL || "http://127.0.0.1:5173/";
 const AUTO_ARCHIVE_CATEGORIES = new Set<AssetCategory>(["character", "character-turnaround", "scene", "style", "storyboard", "keyframe", "video-shot", "template"]);
 const IMAGE_PROMPT_REVERSE_PRESET = `请根据参考图片反推一段适合用于 AI 生图的提示词。
 
@@ -319,6 +321,7 @@ function InfiniteCanvasPage() {
     const localAgentActivity = useCanvasAgentStore((state) => state.activity);
     const localAgentEnabled = useCanvasAgentStore((state) => state.enabled);
     const containerRef = useRef<HTMLDivElement>(null);
+    const directorIframeRef = useRef<HTMLIFrameElement>(null);
     const imageInputRef = useRef<HTMLInputElement>(null);
     const uploadTargetRef = useRef<{ nodeId?: string; position?: Position } | null>(null);
     const clipboardRef = useRef<CanvasClipboard | null>(null);
@@ -360,7 +363,8 @@ function InfiniteCanvasPage() {
     const renameProject = useCanvasStore((state) => state.renameProject);
     const deleteProjects = useCanvasStore((state) => state.deleteProjects);
     const currentProject = useCanvasStore((state) => state.projects.find((project) => project.id === projectId));
-    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const colorTheme = useThemeStore((state) => state.theme);
+    const theme = canvasThemes[colorTheme];
     const [nodes, setNodes] = useState<CanvasNodeData[]>([]);
     const [connections, setConnections] = useState<CanvasConnection[]>([]);
     const [chatSessions, setChatSessions] = useState<CanvasAssistantSession[]>([]);
@@ -398,6 +402,7 @@ function InfiniteCanvasPage() {
     const [superResolveNodeId, setSuperResolveNodeId] = useState<string | null>(null);
     const [angleNodeId, setAngleNodeId] = useState<string | null>(null);
     const [previewNodeId, setPreviewNodeId] = useState<string | null>(null);
+    const [directorNodeId, setDirectorNodeId] = useState<string | null>(null);
     const [assistantCollapsed, setAssistantCollapsed] = useState(true);
     const [assistantMounted, setAssistantMounted] = useState(false);
     const [assistantClosing, setAssistantClosing] = useState(false);
@@ -827,6 +832,25 @@ function InfiniteCanvasPage() {
     const superResolveNode = superResolveNodeId ? nodeById.get(superResolveNodeId) || null : null;
     const angleNode = angleNodeId ? nodeById.get(angleNodeId) || null : null;
     const previewNode = previewNodeId ? nodeById.get(previewNodeId) || null : null;
+    const directorNode = directorNodeId ? nodeById.get(directorNodeId) || null : null;
+    const directorDeskOrigin = useMemo(() => {
+        try {
+            return new URL(DIRECTOR_DESK_URL).origin;
+        } catch {
+            return "";
+        }
+    }, []);
+    const directorDeskSrc = useMemo(() => {
+        if (!directorNode) return "";
+        try {
+            const url = new URL(directorNode.metadata?.directorUrl || DIRECTOR_DESK_URL);
+            url.searchParams.set("theme", colorTheme);
+            if (typeof window !== "undefined") url.searchParams.set("hostOrigin", window.location.origin);
+            return url.toString();
+        } catch {
+            return DIRECTOR_DESK_URL;
+        }
+    }, [colorTheme, directorNode]);
     const hasMultipleSelectedNodes = selectedNodeIds.size > 1;
     const activeNodeId = hasMultipleSelectedNodes ? null : hoveredNodeId || (selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null);
     const batchChildCountById = useMemo(() => {
@@ -998,6 +1022,164 @@ function InfiniteCanvasPage() {
         setSelectedConnectionId(null);
         setDialogNodeId(id);
     }, [getCanvasCenter]);
+
+    const openDirectorShot = useCallback((node: CanvasNodeData) => {
+        setSelectedNodeIds(new Set([node.id]));
+        setSelectedConnectionId(null);
+        setDialogNodeId(null);
+        setDirectorNodeId(node.id);
+    }, []);
+
+    const createDirectorShotNode = useCallback(() => {
+        const center = getCanvasCenter();
+        const id = `director-shot-${nanoid()}`;
+        const node: CanvasNodeData = {
+            id,
+            type: CanvasNodeType.DirectorShot,
+            title: "3D 镜头",
+            position: { x: center.x - 210, y: center.y - 140 },
+            width: 420,
+            height: 280,
+            metadata: {
+                content: "",
+                status: NODE_STATUS_IDLE,
+                pipelineKind: "director-shot",
+                pipelineLabel: "3D 镜头",
+                pipelineDescription: "用 3D 导演台控制场景、角色、机位和关键帧",
+                assetCategory: "storyboard",
+                assetSource: "manual",
+                assetReusable: true,
+                directorSessionId: `${projectId}:${id}`,
+                directorUrl: DIRECTOR_DESK_URL,
+                directorCaptureCount: 0,
+            },
+        };
+        node.title = "3D Shot";
+        node.metadata = {
+            ...node.metadata,
+            pipelineLabel: "3D Shot",
+            pipelineDescription: "Scene, character, camera and keyframe control from the 3D Director.",
+        };
+        setNodes((prev) => [...prev, node]);
+        setSelectedNodeIds(new Set([id]));
+        setSelectedConnectionId(null);
+        setDialogNodeId(null);
+        setDirectorNodeId(id);
+    }, [getCanvasCenter, projectId]);
+
+    const importDirectorCaptures = useCallback(
+        async (sourceNode: CanvasNodeData, payload: unknown) => {
+            const captures = Array.isArray((payload as { captures?: unknown[] })?.captures) ? ((payload as { captures: unknown[] }).captures) : [];
+            const normalizedCaptures = captures
+                .map((capture, index) => {
+                    const item = capture as { dataUrl?: unknown; fileName?: unknown };
+                    return {
+                        dataUrl: typeof item.dataUrl === "string" ? item.dataUrl : "",
+                        fileName: typeof item.fileName === "string" && item.fileName.trim() ? item.fileName.trim() : `director-shot-${index + 1}.png`,
+                    };
+                })
+                .filter((capture) => capture.dataUrl);
+            if (!normalizedCaptures.length) return;
+
+            const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
+            const uploaded = await Promise.all(normalizedCaptures.map((capture) => uploadImage(dataUrlToFile({ id: nanoid(), name: capture.fileName, type: "image/png", dataUrl: capture.dataUrl }))));
+            const createdAt = new Date().toISOString();
+            const childNodes = uploaded.map((image, index) => {
+                const size = fitNodeSize(image.width, image.height, imageConfig.width, imageConfig.height);
+                const id = `image-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`;
+                return {
+                    id,
+                    type: CanvasNodeType.Image,
+                    title: normalizedCaptures[index]?.fileName.replace(/\.[^.]+$/, "") || `3D 镜头截图 ${index + 1}`,
+                    position: {
+                        x: sourceNode.position.x + sourceNode.width + 96 + (index % 2) * (imageConfig.width + 36),
+                        y: sourceNode.position.y + Math.floor(index / 2) * (imageConfig.height + 36),
+                    },
+                    width: size.width,
+                    height: size.height,
+                    metadata: {
+                        ...imageMetadata(image),
+                        assetCategory: "keyframe",
+                        assetSource: "manual",
+                        assetReusable: true,
+                        pipelineKind: "director-shot-capture",
+                        pipelineLabel: "3D 截图",
+                        pipelineDescription: `来自 ${sourceNode.title || "3D 镜头"}`,
+                    },
+                } satisfies CanvasNodeData;
+            });
+            childNodes.forEach((node, index) => {
+                node.title = normalizedCaptures[index]?.fileName.replace(/\.[^.]+$/, "") || `3D capture ${index + 1}`;
+                node.metadata = {
+                    ...node.metadata,
+                    pipelineLabel: "3D Capture",
+                    pipelineDescription: `From ${sourceNode.title || "3D Shot"}`,
+                };
+            });
+
+            setNodes((prev) => [
+                ...prev.map((node) =>
+                    node.id === sourceNode.id
+                        ? {
+                              ...node,
+                              metadata: {
+                                  ...node.metadata,
+                                  content: uploaded[0]?.url || node.metadata?.content,
+                                  status: NODE_STATUS_SUCCESS,
+                                  directorLastCaptureAt: createdAt,
+                                  directorCaptureCount: (node.metadata?.directorCaptureCount || 0) + uploaded.length,
+                              },
+                          }
+                        : node,
+                ),
+                ...childNodes,
+            ]);
+            setConnections((prev) => [...prev, ...childNodes.map((child) => ({ id: nanoid(), fromNodeId: sourceNode.id, toNodeId: child.id }))]);
+            setSelectedNodeIds(new Set(childNodes.map((node) => node.id)));
+            setSelectedConnectionId(null);
+            setDialogNodeId(null);
+            message.success(`已回写 ${childNodes.length} 张 3D 镜头截图`);
+        },
+        [message],
+    );
+
+    const postDirectorSession = useCallback(() => {
+        if (!directorNode || !directorIframeRef.current?.contentWindow) return;
+        directorIframeRef.current.contentWindow.postMessage(
+            {
+                type: "storyai:director-desk-session",
+                payload: {
+                    instanceId: directorNode.metadata?.directorSessionId || directorNode.id,
+                    theme: colorTheme,
+                },
+            },
+            directorDeskOrigin || "*",
+        );
+    }, [colorTheme, directorDeskOrigin, directorNode]);
+
+    useEffect(() => {
+        if (!directorNode) return;
+        const activeDirectorNode = directorNode;
+
+        function handleDirectorMessage(event: MessageEvent) {
+            if (directorDeskOrigin && event.origin !== directorDeskOrigin) return;
+            const type = typeof event.data?.type === "string" ? event.data.type : "";
+            if (type === "storyai:director-desk-ready") {
+                postDirectorSession();
+                return;
+            }
+            if (type === "storyai:director-desk-close") {
+                setDirectorNodeId(null);
+                return;
+            }
+            if (type === "storyai:director-desk-captures-sent") {
+                void importDirectorCaptures(activeDirectorNode, event.data?.payload);
+            }
+        }
+
+        window.addEventListener("message", handleDirectorMessage);
+        return () => window.removeEventListener("message", handleDirectorMessage);
+    }, [directorDeskOrigin, directorNode, importDirectorCaptures, postDirectorSession]);
 
     const patchShotPack = useCallback((nodeId: string, updater: (pack: CanvasShotPack) => CanvasShotPack, extraMetadata?: Partial<CanvasNodeMetadata>) => {
         setNodes((prev) =>
@@ -3098,7 +3280,7 @@ function InfiniteCanvasPage() {
                             resourceLabel={resourceReferenceByNodeId.get(node.id)}
                             mentionReferences={mentionReferencesByNodeId.get(node.id) || []}
                             renderPanel={(panelNode) =>
-                                panelNode.metadata?.pipelineKind === "shot-pack" ? (
+                                panelNode.metadata?.pipelineKind === "director-shot" ? null : panelNode.metadata?.pipelineKind === "shot-pack" ? (
                                     <ShotPackPanel
                                         node={panelNode}
                                         imageNodes={nodes}
@@ -3136,7 +3318,9 @@ function InfiniteCanvasPage() {
                                 )
                             }
                             renderNodeContent={(contentNode) =>
-                                contentNode.metadata?.pipelineKind === "shot-pack" ? (
+                                contentNode.metadata?.pipelineKind === "director-shot" ? (
+                                    <DirectorShotNodeContent node={contentNode} onOpen={openDirectorShot} />
+                                ) : contentNode.metadata?.pipelineKind === "shot-pack" ? (
                                     <ShotPackNodeContent node={contentNode} />
                                 ) : (
                                     <CanvasConfigNodePanel
@@ -3234,6 +3418,7 @@ function InfiniteCanvasPage() {
                     onAddAudio={() => createNode(CanvasNodeType.Audio)}
                     onAddText={() => createNode(CanvasNodeType.Text)}
                     onAddConfig={() => createNode(CanvasNodeType.Config)}
+                    onAddDirectorShot={createDirectorShotNode}
                     onAddShotPack={createShotPackNode}
                     onCreateMangaWorkflow={createMangaWorkflowNodes}
                     onUndo={undoCanvas}
@@ -3272,6 +3457,28 @@ function InfiniteCanvasPage() {
                         }}
                     />
                 ) : null}
+
+                <Modal
+                    title={directorNode?.title || "3D 镜头导演台"}
+                    open={Boolean(directorNode)}
+                    centered
+                    width="96vw"
+                    footer={null}
+                    destroyOnClose
+                    onCancel={() => setDirectorNodeId(null)}
+                    styles={{ body: { height: "82vh", padding: 0, overflow: "hidden", background: "#090909" } }}
+                >
+                    {directorDeskSrc ? (
+                        <iframe
+                            ref={directorIframeRef}
+                            title="3D 镜头导演台"
+                            src={directorDeskSrc}
+                            className="block h-full w-full border-0"
+                            allow="clipboard-read; clipboard-write"
+                            onLoad={postDirectorSession}
+                        />
+                    ) : null}
+                </Modal>
 
                 <input ref={imageInputRef} type="file" accept="image/*,video/*,audio/mpeg,audio/wav,audio/x-wav,.mp3,.wav" className="hidden" onChange={handleImageInputChange} />
 
