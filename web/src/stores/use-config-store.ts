@@ -173,6 +173,7 @@ type ConfigStore = {
     openConfigDialog: (shouldPromptContinue?: boolean) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
     clearPromptContinue: () => void;
+    hydrateFromServer: () => Promise<void>;
 };
 
 function isVideoModelName(model: string) {
@@ -227,25 +228,49 @@ export const useConfigStore = create<ConfigStore>()(
             webdav: defaultWebdavSyncConfig,
             isConfigOpen: false,
             shouldPromptContinue: false,
-            updateConfig: (key, value) =>
-                set((state) => ({
-                    config: {
-                        ...state.config,
-                        [key]: value,
-                    },
-                })),
-            updateWebdavConfig: (key, value) =>
-                set((state) => ({
-                    webdav: {
-                        ...state.webdav,
-                        [key]: value,
-                    },
-                })),
+            updateConfig: (key, value) => {
+                set((state) => {
+                    const newConfig = { ...state.config, [key]: value };
+                    // 异步同步到服务器，不阻塞 UI
+                    syncConfigToServer(newConfig, state.webdav);
+                    return { config: newConfig };
+                });
+            },
+            updateWebdavConfig: (key, value) => {
+                set((state) => {
+                    const newWebdav = { ...state.webdav, [key]: value };
+                    syncConfigToServer(state.config, newWebdav);
+                    return { webdav: newWebdav };
+                });
+            },
             resetWebdavConfig: () => set({ webdav: defaultWebdavSyncConfig }),
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
             openConfigDialog: (shouldPromptContinue = false) => set({ isConfigOpen: true, shouldPromptContinue }),
             setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
             clearPromptContinue: () => set({ shouldPromptContinue: false }),
+            hydrateFromServer: async () => {
+                const serverData = await loadConfigFromServer();
+                if (!serverData?.config) return;
+                const serverConfig = serverData.config as Partial<AiConfig>;
+                const serverWebdav = serverData.webdav as Partial<WebdavSyncConfig>;
+                set((state) => {
+                    const mergedConfig = { ...state.config, ...serverConfig };
+                    const channels = normalizeChannels(mergedConfig);
+                    const models = modelOptionsFromChannels(channels);
+                    return {
+                        config: {
+                            ...mergedConfig,
+                            channels,
+                            models,
+                            imageModels: Array.isArray(serverConfig.imageModels) ? serverConfig.imageModels : filterModelsByCapability(models, "image"),
+                            videoModels: Array.isArray(serverConfig.videoModels) ? serverConfig.videoModels : filterModelsByCapability(models, "video"),
+                            textModels: Array.isArray(serverConfig.textModels) ? serverConfig.textModels : filterModelsByCapability(models, "text"),
+                            audioModels: Array.isArray(serverConfig.audioModels) ? serverConfig.audioModels : filterModelsByCapability(models, "audio"),
+                        },
+                        webdav: sanitizeHydratedWebdavConfig(serverWebdav),
+                    };
+                });
+            },
         }),
         {
             name: CONFIG_STORE_KEY,
@@ -446,5 +471,32 @@ function normalizeArkPlanBaseUrl(baseUrl: string) {
         return url.toString().replace(/\/+$/, "");
     } catch {
         return baseUrl;
+    }
+}
+
+// ========== 服务器同步 ==========
+import { apiPath } from "@/lib/app-paths";
+
+export async function syncConfigToServer(config: AiConfig, webdav: WebdavSyncConfig) {
+    try {
+        await fetch(apiPath("/api/user-config"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ config, webdav: sanitizePersistedWebdavConfig(webdav) }),
+        });
+    } catch {
+        // 静默失败，不影响用户体验
+    }
+}
+
+export async function loadConfigFromServer(): Promise<{ config?: AiConfig; webdav?: WebdavSyncConfig } | null> {
+    try {
+        const res = await fetch(apiPath("/api/user-config"), { credentials: "include" });
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.data || null;
+    } catch {
+        return null;
     }
 }

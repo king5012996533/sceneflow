@@ -3,6 +3,7 @@
 import { create } from "zustand";
 
 import { isAuthPage, setActiveLocalUserId } from "@/lib/user-data-scope";
+import { useConfigStore } from "./use-config-store";
 
 export type LocalUser = {
   id: string;
@@ -45,6 +46,10 @@ export const useUserStore = create<UserStore>()((set) => ({
         }
       }
       set({ user: data.user });
+      // 登录成功后从服务器加载配置
+      if (data.user?.id) {
+        useConfigStore.getState().hydrateFromServer();
+      }
     } catch {
       set({ user: null });
       const changed = setActiveLocalUserId(null);

@@ -29,6 +29,17 @@ model User {
   usageRecords  UsageRecord[]
   generationJobs GenerationJob[]
   auditLogs     AdminAuditLog[] @relation("AdminAuditActor")
+  config        UserConfig?
+}
+
+// 用户配置（API Key、模型设置等，跨设备同步）
+model UserConfig {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  config    Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Plan {
