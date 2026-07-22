@@ -1143,6 +1143,29 @@ function InfiniteCanvasPage() {
         [message],
     );
 
+    const persistDirectorProject = useCallback((sourceNode: CanvasNodeData, payload: unknown) => {
+        const data = (payload || {}) as { project?: unknown; revision?: unknown; updatedAt?: unknown };
+        if (!data.project || typeof data.project !== "object") return;
+
+        const revision = typeof data.revision === "string" ? data.revision : "";
+        const updatedAt = typeof data.updatedAt === "string" ? data.updatedAt : new Date().toISOString();
+        setNodes((prev) =>
+            prev.map((node) => {
+                if (node.id !== sourceNode.id) return node;
+                if (revision && node.metadata?.directorProjectRevision === revision) return node;
+                return {
+                    ...node,
+                    metadata: {
+                        ...node.metadata,
+                        directorProject: data.project,
+                        directorProjectRevision: revision || node.metadata?.directorProjectRevision,
+                        directorProjectUpdatedAt: updatedAt,
+                    },
+                };
+            }),
+        );
+    }, []);
+
     const postDirectorSession = useCallback(() => {
         if (!directorNode || !directorIframeRef.current?.contentWindow) return;
         directorIframeRef.current.contentWindow.postMessage(
@@ -1151,6 +1174,7 @@ function InfiniteCanvasPage() {
                 payload: {
                     instanceId: directorNode.metadata?.directorSessionId || directorNode.id,
                     theme: colorTheme,
+                    project: directorNode.metadata?.directorProject,
                 },
             },
             directorDeskOrigin || "*",
@@ -1174,12 +1198,16 @@ function InfiniteCanvasPage() {
             }
             if (type === "storyai:director-desk-captures-sent") {
                 void importDirectorCaptures(activeDirectorNode, event.data?.payload);
+                return;
+            }
+            if (type === "storyai:director-desk-project-changed") {
+                persistDirectorProject(activeDirectorNode, event.data?.payload);
             }
         }
 
         window.addEventListener("message", handleDirectorMessage);
         return () => window.removeEventListener("message", handleDirectorMessage);
-    }, [directorDeskOrigin, directorNode, importDirectorCaptures, postDirectorSession]);
+    }, [directorDeskOrigin, directorNode, importDirectorCaptures, persistDirectorProject, postDirectorSession]);
 
     const patchShotPack = useCallback((nodeId: string, updater: (pack: CanvasShotPack) => CanvasShotPack, extraMetadata?: Partial<CanvasNodeMetadata>) => {
         setNodes((prev) =>

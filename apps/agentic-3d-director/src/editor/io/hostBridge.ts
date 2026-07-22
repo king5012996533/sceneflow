@@ -1,5 +1,7 @@
 import { useDirectorStore } from "../store/directorStore";
 import { executeDirectorAgentCommand, isDirectorAgentCommandName } from "../agent/directorAgentCommands";
+import { createDirectorAgentSnapshot, getDirectorProjectRevision } from "../agent/directorAgentProtocol";
+import type { DirectorProject } from "../schema/directorProject";
 
 interface HostPanoramaPayload {
   edgeId?: unknown;
@@ -11,6 +13,7 @@ interface HostPanoramaPayload {
 interface HostSessionPayload {
   instanceId?: unknown;
   theme?: unknown;
+  project?: unknown;
 }
 
 interface HostAgentCommandPayload {
@@ -36,13 +39,17 @@ interface HostConnectedPanorama {
 let initialized = false;
 let hostConnectedPanorama: HostConnectedPanorama | null = null;
 let removeUnsubscribe: (() => void) | null = null;
+let projectSyncUnsubscribe: (() => void) | null = null;
+let projectSyncTimer: ReturnType<typeof window.setTimeout> | null = null;
+let lastProjectRevision = "";
 let suppressNextPanoramaRemovalNotice = false;
+let suppressNextProjectSyncNotice = false;
 
 function normalizeString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function getHostOrigin() {
+export function getDirectorDeskHostOrigin() {
   try {
     const hostOrigin = new URLSearchParams(window.location.search).get("hostOrigin");
     if (hostOrigin) return hostOrigin;
@@ -54,6 +61,18 @@ function getHostOrigin() {
 
 function normalizeTheme(value: unknown): "dark" | "light" | null {
   return value === "light" || value === "dark" ? value : null;
+}
+
+function isHostProjectPayload(value: unknown): value is DirectorProject {
+  if (!value || typeof value !== "object") return false;
+  const project = value as Partial<DirectorProject>;
+  return (
+    project.version === 1 &&
+    Boolean(project.scene) &&
+    Array.isArray(project.assets) &&
+    Array.isArray(project.objects) &&
+    Array.isArray(project.cameras)
+  );
 }
 
 function applyDirectorDeskTheme(theme: "dark" | "light") {
@@ -79,7 +98,7 @@ function notifyPanoramaRemoved() {
       type: "storyai:director-desk-panorama-removed",
       payload: hostConnectedPanorama,
     },
-    getHostOrigin()
+    getDirectorDeskHostOrigin()
   );
   hostConnectedPanorama = null;
 }
@@ -103,6 +122,52 @@ function subscribeToPanoramaRemoval() {
     }
 
     previousPanoramaAssetId = nextPanoramaAssetId;
+  });
+}
+
+function postProjectChanged() {
+  const snapshot = createDirectorAgentSnapshot(useDirectorStore.getState());
+  lastProjectRevision = snapshot.revision;
+  window.parent?.postMessage(
+    {
+      type: "storyai:director-desk-project-changed",
+      payload: {
+        project: snapshot.project,
+        revision: snapshot.revision,
+        updatedAt: new Date().toISOString(),
+      },
+    },
+    getDirectorDeskHostOrigin()
+  );
+}
+
+function subscribeToProjectSync() {
+  if (projectSyncUnsubscribe) {
+    return;
+  }
+
+  lastProjectRevision = getDirectorProjectRevision(useDirectorStore.getState().project);
+  projectSyncUnsubscribe = useDirectorStore.subscribe((state) => {
+    const nextRevision = getDirectorProjectRevision(state.project);
+
+    if (nextRevision === lastProjectRevision) {
+      return;
+    }
+
+    if (suppressNextProjectSyncNotice) {
+      suppressNextProjectSyncNotice = false;
+      lastProjectRevision = nextRevision;
+      return;
+    }
+
+    if (projectSyncTimer) {
+      window.clearTimeout(projectSyncTimer);
+    }
+
+    projectSyncTimer = window.setTimeout(() => {
+      projectSyncTimer = null;
+      postProjectChanged();
+    }, 250);
   });
 }
 
@@ -133,9 +198,18 @@ function openHostSession(payload: HostSessionPayload) {
     applyDirectorDeskTheme(theme);
   }
   suppressNextPanoramaRemovalNotice = Boolean(useDirectorStore.getState().project.panoramaAssetId);
+  suppressNextProjectSyncNotice = true;
   useDirectorStore.getState().openScopedScene(instanceId || null);
+  suppressNextProjectSyncNotice = false;
   suppressNextPanoramaRemovalNotice = false;
   hostConnectedPanorama = null;
+
+  if (isHostProjectPayload(payload.project)) {
+    suppressNextProjectSyncNotice = true;
+    useDirectorStore.getState().replaceProject(payload.project);
+    suppressNextProjectSyncNotice = false;
+    lastProjectRevision = getDirectorProjectRevision(useDirectorStore.getState().project);
+  }
 }
 
 export function postDirectorDeskCapturesToHost(
@@ -169,12 +243,12 @@ export function postDirectorDeskCapturesToHost(
         captures: normalizedCaptures,
       },
     },
-    getHostOrigin()
+    getDirectorDeskHostOrigin()
   );
 }
 
 function handleHostMessage(event: MessageEvent) {
-  if (event.origin !== getHostOrigin()) {
+  if (event.origin !== getDirectorDeskHostOrigin()) {
     return;
   }
 
@@ -198,7 +272,7 @@ function handleHostMessage(event: MessageEvent) {
       const result = executeDirectorAgentCommand(name, payload.arguments);
       window.parent?.postMessage(
         { type: "storyai:director-agent-result", payload: { requestId, ok: true, result } },
-        getHostOrigin()
+        getDirectorDeskHostOrigin()
       );
     } catch (reason) {
       window.parent?.postMessage(
@@ -210,7 +284,7 @@ function handleHostMessage(event: MessageEvent) {
             error: reason instanceof Error ? reason.message : String(reason),
           },
         },
-        getHostOrigin()
+        getDirectorDeskHostOrigin()
       );
     }
   }
@@ -225,6 +299,7 @@ export function initDirectorDeskHostBridge() {
   applyDirectorDeskTheme(getInitialHostTheme() ?? "dark");
   window.addEventListener("message", handleHostMessage);
   subscribeToPanoramaRemoval();
+  subscribeToProjectSync();
 }
 
 export function clearDirectorDeskHostBridge() {
@@ -235,7 +310,15 @@ export function clearDirectorDeskHostBridge() {
   initialized = false;
   hostConnectedPanorama = null;
   suppressNextPanoramaRemovalNotice = false;
+  suppressNextProjectSyncNotice = false;
   window.removeEventListener("message", handleHostMessage);
+  if (projectSyncTimer) {
+    window.clearTimeout(projectSyncTimer);
+    projectSyncTimer = null;
+  }
   removeUnsubscribe?.();
   removeUnsubscribe = null;
+  projectSyncUnsubscribe?.();
+  projectSyncUnsubscribe = null;
+  lastProjectRevision = "";
 }

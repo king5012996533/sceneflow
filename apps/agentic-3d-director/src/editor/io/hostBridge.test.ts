@@ -37,6 +37,7 @@ beforeEach(() => {
 
 afterEach(() => {
   clearDirectorDeskHostBridge();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -119,6 +120,55 @@ it("switches director store persistence when the host sends a card session", () 
   );
 
   expect(useDirectorStore.getState().project.scene.backgroundColor).toBe("#151515");
+});
+
+it("restores a host project into the active card session", () => {
+  initDirectorDeskHostBridge();
+  const project = {
+    ...useDirectorStore.getState().project,
+    scene: {
+      ...useDirectorStore.getState().project.scene,
+      backgroundColor: "#445566",
+    },
+  };
+
+  window.dispatchEvent(
+    new MessageEvent("message", {
+      data: {
+        type: "storyai:director-desk-session",
+        payload: {
+          instanceId: "node_director_restore",
+          project,
+        },
+      },
+      origin: window.location.origin,
+    })
+  );
+
+  expect(useDirectorStore.getState().project.scene.backgroundColor).toBe("#445566");
+});
+
+it("notifies the host canvas when the director project changes", () => {
+  vi.useFakeTimers();
+  const postMessage = vi.spyOn(window.parent, "postMessage").mockImplementation(() => undefined);
+  initDirectorDeskHostBridge();
+
+  useDirectorStore.getState().updateScene({ backgroundColor: "#101820" });
+  vi.advanceTimersByTime(250);
+
+  expect(postMessage).toHaveBeenCalledWith(
+    {
+      type: "storyai:director-desk-project-changed",
+      payload: expect.objectContaining({
+        project: expect.objectContaining({
+          scene: expect.objectContaining({ backgroundColor: "#101820" }),
+        }),
+        revision: expect.stringMatching(/^p-[0-9a-f]{8}$/),
+        updatedAt: expect.any(String),
+      }),
+    },
+    window.location.origin
+  );
 });
 
 it("applies the light theme sent by the host session to the director desk document", () => {

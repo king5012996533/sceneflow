@@ -101,6 +101,9 @@ export type CanvasNodeMetadata = {
     shotPack?: CanvasShotPack;
     directorSessionId?: string;
     directorUrl?: string;
+    directorProject?: unknown;
+    directorProjectRevision?: string;
+    directorProjectUpdatedAt?: string;
     directorLastCaptureAt?: string;
     directorCaptureCount?: number;
 };

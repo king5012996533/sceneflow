@@ -8,7 +8,7 @@ import {
   initDirectorAgentBrowserBridge,
 } from "./editor/agent/directorAgentBrowserBridge";
 import { DirectorCanvas } from "./editor/canvas/DirectorCanvas";
-import { clearDirectorDeskHostBridge, initDirectorDeskHostBridge } from "./editor/io/hostBridge";
+import { clearDirectorDeskHostBridge, getDirectorDeskHostOrigin, initDirectorDeskHostBridge } from "./editor/io/hostBridge";
 import { useDirectorStore } from "./editor/store/directorStore";
 import { AnimationTimelinePanel } from "./editor/timeline/AnimationTimelinePanel";
 
@@ -28,7 +28,7 @@ export default function App() {
   useEffect(() => {
     initDirectorDeskHostBridge();
     initDirectorAgentBrowserBridge();
-    window.parent?.postMessage({ type: "storyai:director-desk-ready" }, window.location.origin);
+    window.parent?.postMessage({ type: "storyai:director-desk-ready" }, getDirectorDeskHostOrigin());
 
     return () => {
       clearDirectorAgentBrowserBridge();
@@ -37,7 +37,7 @@ export default function App() {
   }, []);
 
   function handleClose() {
-    window.parent?.postMessage({ type: "storyai:director-desk-close" }, window.location.origin);
+    window.parent?.postMessage({ type: "storyai:director-desk-close" }, getDirectorDeskHostOrigin());
   }
 
   useEffect(() => {
