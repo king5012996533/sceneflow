@@ -196,6 +196,7 @@ export function InfiniteCanvas({ containerRef, viewport, backgroundMode = "lines
 }
 
 function shouldAllowNativeWheel(target: Element | null) {
+    const activeElement = typeof document === "undefined" ? null : document.activeElement;
     return Boolean(
         target?.closest(
             [
@@ -211,7 +212,17 @@ function shouldAllowNativeWheel(target: Element | null) {
                 ".ant-select-dropdown",
                 ".ant-picker-dropdown",
             ].join(","),
-        ),
+        ) ||
+            (activeElement instanceof Element &&
+                activeElement.closest(
+                    [
+                        "textarea",
+                        "input",
+                        "select",
+                        "[contenteditable='true']",
+                        "[data-canvas-scroll]",
+                    ].join(","),
+                )),
     );
 }
 
