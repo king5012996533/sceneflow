@@ -88,6 +88,16 @@ type DirectorPanoramaPayload = {
     fileName: string;
 };
 
+function resolveDirectorDeskUrl(value: string) {
+    if (typeof window === "undefined") return null;
+
+    try {
+        return new URL(value, window.location.origin);
+    } catch {
+        return null;
+    }
+}
+
 type PendingConnectionCreate = {
     connection: ConnectionHandle;
     position: Position;
@@ -840,24 +850,18 @@ function InfiniteCanvasPage() {
     const angleNode = angleNodeId ? nodeById.get(angleNodeId) || null : null;
     const previewNode = previewNodeId ? nodeById.get(previewNodeId) || null : null;
     const directorNode = directorNodeId ? nodeById.get(directorNodeId) || null : null;
-    const directorDeskOrigin = useMemo(() => {
-        try {
-            return new URL(DIRECTOR_DESK_URL).origin;
-        } catch {
-            return "";
-        }
-    }, []);
-    const directorDeskSrc = useMemo(() => {
+    const directorDeskUrl = useMemo(() => {
         if (!directorNode) return "";
-        try {
-            const url = new URL(directorNode.metadata?.directorUrl || DIRECTOR_DESK_URL);
-            url.searchParams.set("theme", colorTheme);
-            if (typeof window !== "undefined") url.searchParams.set("hostOrigin", window.location.origin);
-            return url.toString();
-        } catch {
-            return DIRECTOR_DESK_URL;
-        }
-    }, [colorTheme, directorNode]);
+        return resolveDirectorDeskUrl(directorNode.metadata?.directorUrl || DIRECTOR_DESK_URL);
+    }, [directorNode]);
+    const directorDeskOrigin = directorDeskUrl?.origin || "";
+    const directorDeskSrc = useMemo(() => {
+        if (!directorDeskUrl) return "";
+        const url = new URL(directorDeskUrl.toString());
+        url.searchParams.set("theme", colorTheme);
+        if (typeof window !== "undefined") url.searchParams.set("hostOrigin", window.location.origin);
+        return url.toString();
+    }, [colorTheme, directorDeskUrl]);
     const hasMultipleSelectedNodes = selectedNodeIds.size > 1;
     const activeNodeId = hasMultipleSelectedNodes ? null : hoveredNodeId || (selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null);
     const batchChildCountById = useMemo(() => {

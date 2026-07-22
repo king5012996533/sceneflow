@@ -22,6 +22,23 @@ Default ports:
 
 SceneFlow uses `NEXT_PUBLIC_DIRECTOR_DESK_URL` when set. If it is not set, it falls back to `http://127.0.0.1:5173/`.
 
+## Production Build
+
+For a single SceneFlow deployment, build and copy the vendored Director app into Next.js public assets:
+
+```bash
+cd web
+npm run build:with-director
+```
+
+Set:
+
+```bash
+NEXT_PUBLIC_DIRECTOR_DESK_URL=/director-desk/
+```
+
+`build:with-director` runs the Director Vite build, syncs `apps/agentic-3d-director/dist` into `web/public/director-desk`, then runs `next build --webpack`. The generated `web/public/director-desk` directory is ignored by git.
+
 ## Host Bridge
 
 SceneFlow opens the Director in an iframe and passes:

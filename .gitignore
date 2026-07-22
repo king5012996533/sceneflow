@@ -4,6 +4,7 @@ node_modules/
 .env*
 !.env.example
 data/
+web/public/director-desk/
 *.log
 *.tsbuildinfo
 .DS_Store
