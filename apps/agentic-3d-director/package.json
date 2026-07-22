@@ -1,0 +1,54 @@
+{
+  "name": "agentic-3d-director",
+  "version": "0.0.1",
+  "description": "An agent-enabled browser 3D director with MCP control, animation timelines, trajectories, and video export.",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "3d",
+    "director",
+    "threejs",
+    "react-three-fiber",
+    "vite",
+    "storyboard",
+    "agent",
+    "mcp",
+    "animation"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "agent": "node agent-service/index.mjs --http 4319",
+    "agent:mcp": "node agent-service/index.mjs",
+    "agent:mcp:probe": "node scripts/probe-agent-mcp.mjs",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "test:agent": "node --test agent-service/*.test.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.17.14",
+    "camera-controls": "^2.9.0",
+    "lucide-react": "^0.469.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.184.0",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^26.1.1",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@types/three": "^0.184.1",
+    "@vitejs/plugin-react": "^4.6.0",
+    "jsdom": "^29.0.1",
+    "typescript": "~5.7.3",
+    "vite": "^6.1.0",
+    "vitest": "^4.1.2"
+  }
+}
