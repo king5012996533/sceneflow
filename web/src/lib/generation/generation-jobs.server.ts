@@ -94,7 +94,7 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
     });
 }
 
-export async function finishGenerationJob(userId: string, jobId: string, status: "succeeded" | "failed" | "cancelled", error?: string) {
+export async function finishGenerationJob(userId: string, jobId: string, status: "succeeded" | "failed" | "cancelled", error?: string, resultUrl?: string) {
     if (!prisma) throw new Error("Database unavailable");
 
     return prisma.$transaction(async (tx) => {
@@ -116,6 +116,7 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
             data: {
                 status,
                 error: error?.slice(0, 1000),
+                resultUrl: resultUrl || undefined,
                 quotaRefunded: status !== "succeeded",
                 finishedAt: new Date(),
             },

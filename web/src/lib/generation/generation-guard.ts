@@ -22,12 +22,12 @@ export async function beginClientGeneration(kind: ClientGenerationKind, count = 
     return payload?.job as GenerationJob;
 }
 
-export async function finishClientGeneration(jobId: string, status: "succeeded" | "failed" | "cancelled", error?: unknown) {
+export async function finishClientGeneration(jobId: string, status: "succeeded" | "failed" | "cancelled", error?: unknown, resultUrl?: string) {
     const response = await fetch(apiPath(`/api/generation/jobs/${encodeURIComponent(jobId)}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ status, error: errorMessage(error) }),
+        body: JSON.stringify({ status, error: errorMessage(error), resultUrl }),
     });
     const payload = await response.json().catch(() => null);
     if (!response.ok) throw new Error(readError(payload, "生成任务结算失败"));
@@ -43,7 +43,8 @@ export async function runGuardedGeneration<T>(
     const job = await beginClientGeneration(kind, count, metadata);
     try {
         const result = await run(job);
-        await finishClientGeneration(job.id, "succeeded");
+        const resultUrl = extractResultUrl(result);
+        await finishClientGeneration(job.id, "succeeded", undefined, resultUrl);
         recordGeneration(count);
         return result;
     } catch (error) {
@@ -67,4 +68,14 @@ function readError(payload: unknown, fallback: string) {
 
 function errorMessage(error: unknown) {
     return error instanceof Error ? error.message.slice(0, 1000) : String(error || "").slice(0, 1000);
+}
+
+function extractResultUrl(result: unknown): string | undefined {
+    if (!result || typeof result !== "object") return undefined;
+    const r = result as Record<string, unknown>;
+    if (typeof r.url === "string") return r.url;
+    if (r.data && typeof r.data === "object" && typeof (r.data as Record<string, unknown>).url === "string") {
+        return (r.data as Record<string, unknown>).url as string;
+    }
+    return undefined;
 }

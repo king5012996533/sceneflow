@@ -122,6 +122,7 @@ model GenerationJob {
   status         String   @default("running") // running | succeeded | failed | cancelled
   error          String?
   metadata       Json?
+  resultUrl      String?                       // 生成结果 URL（图片/视频）
   quotaRefunded  Boolean  @default(false)
   startedAt      DateTime @default(now())
   finishedAt     DateTime?

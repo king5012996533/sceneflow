@@ -67,9 +67,9 @@ type GenerationJob = {
     id: string;
     user: { email: string; name: string } | null;
     status: string;
-    type: string;
-    model: string;
-    prompt: string | null;
+    kind: string;
+    metadata: Record<string, unknown> | null;
+    resultUrl: string | null;
     createdAt: string;
 };
 
@@ -433,7 +433,7 @@ export default function AdminPage() {
                                                 <th className="py-3 font-medium">类型</th>
                                                 <th className="py-3 font-medium">模型</th>
                                                 <th className="py-3 font-medium">状态</th>
-                                                <th className="py-3 font-medium">提示词</th>
+                                                <th className="py-3 font-medium">预览</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -441,14 +441,22 @@ export default function AdminPage() {
                                                 <tr key={job.id} className="border-b border-stone-100">
                                                     <td className="py-3 text-sm text-stone-600">{formatDateTime(job.createdAt)}</td>
                                                     <td className="py-3 text-sm">{job.user?.email || "-"}</td>
-                                                    <td className="py-3"><Tag>{job.type}</Tag></td>
-                                                    <td className="py-3 text-sm">{job.model}</td>
+                                                    <td className="py-3"><Tag>{job.kind}</Tag></td>
+                                                    <td className="py-3 text-sm">{String(job.metadata?.model || job.metadata?.imageModel || job.metadata?.videoModel || "-")}</td>
                                                     <td className="py-3">
-                                                        <Tag color={job.status === "completed" ? "green" : job.status === "failed" ? "red" : "blue"}>
+                                                        <Tag color={job.status === "succeeded" ? "green" : job.status === "failed" ? "red" : "blue"}>
                                                             {job.status}
                                                         </Tag>
                                                     </td>
-                                                    <td className="py-3 text-xs text-stone-400 max-w-[200px] truncate">{job.prompt || "-"}</td>
+                                                    <td className="py-3">
+                                                        {job.resultUrl ? (
+                                                            <a href={job.resultUrl} target="_blank" rel="noopener noreferrer">
+                                                                <img src={job.resultUrl} alt="生成结果" className="h-12 w-12 rounded object-cover border border-stone-200" />
+                                                            </a>
+                                                        ) : (
+                                                            <span className="text-xs text-stone-400">-</span>
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
