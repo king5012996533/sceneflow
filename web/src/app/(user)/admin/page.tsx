@@ -334,6 +334,7 @@ export default function AdminPage() {
                                                 <th className="py-3 font-medium">套餐</th>
                                                 <th className="py-3 font-medium">参考金额</th>
                                                 <th className="py-3 font-medium">来源</th>
+                                                <th className="py-3 font-medium">时间</th>
                                                 <th className="py-3 font-medium">状态</th>
                                             </tr>
                                         </thead>
@@ -345,6 +346,10 @@ export default function AdminPage() {
                                                     <td className="py-3">{order.plan.name}</td>
                                                     <td className="py-3">{formatPrice(order.amount)}</td>
                                                     <td className="py-3">{order.provider === "manual" ? "开通申请" : order.provider}</td>
+                                                    <td className="py-3 text-sm text-stone-600">
+                                                        <div>{formatDateTime(order.createdAt)}</div>
+                                                        <div className="text-xs text-stone-400">{formatRelativeTime(order.createdAt)}</div>
+                                                    </td>
                                                     <td className="py-3">
                                                         <Select
                                                             value={order.status}
