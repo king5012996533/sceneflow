@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { App, Button, Empty, Input, Select, Tabs, Tag } from "antd";
-import { Ban, Boxes, CreditCard, Database, Settings, Shield, Users } from "lucide-react";
+import { Ban, Boxes, CreditCard, Database, FileText, History, Settings, Shield, Users } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
 import { useUserStore } from "@/stores/use-user-store";
@@ -53,6 +53,26 @@ type AdminConfig = {
     operationConfigs: Array<{ id: string; key: string; value: unknown; description: string }>;
 };
 
+type AuditLog = {
+    id: string;
+    actor: { email: string; name: string } | null;
+    action: string;
+    target: string;
+    targetId: string;
+    metadata: unknown;
+    createdAt: string;
+};
+
+type GenerationJob = {
+    id: string;
+    user: { email: string; name: string } | null;
+    status: string;
+    type: string;
+    model: string;
+    prompt: string | null;
+    createdAt: string;
+};
+
 function formatPrice(amount: number) {
     return `¥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
 }
@@ -87,6 +107,8 @@ export default function AdminPage() {
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [orders, setOrders] = useState<AdminOrder[]>([]);
     const [config, setConfig] = useState<AdminConfig | null>(null);
+    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+    const [generationJobs, setGenerationJobs] = useState<GenerationJob[]>([]);
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
     const [checkingAccess, setCheckingAccess] = useState(true);
@@ -103,16 +125,20 @@ export default function AdminPage() {
     async function loadAll() {
         setLoading(true);
         try {
-            const [overviewData, usersData, ordersData, configData] = await Promise.all([
+            const [overviewData, usersData, ordersData, configData, auditData, jobsData] = await Promise.all([
                 requestJson<{ metrics: Overview }>(apiPath("/api/admin/overview")),
                 requestJson<{ users: AdminUser[] }>(apiPath(`/api/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`)),
                 requestJson<{ orders: AdminOrder[] }>(apiPath("/api/admin/orders")),
                 requestJson<AdminConfig>(apiPath("/api/admin/configs")),
+                requestJson<{ logs: AuditLog[] }>(apiPath("/api/admin/audit-log?take=50")),
+                requestJson<{ jobs: GenerationJob[] }>(apiPath("/api/admin/generation-jobs?take=50")),
             ]);
             setOverview(overviewData.metrics);
             setUsers(usersData.users);
             setOrders(ordersData.orders);
             setConfig(configData);
+            setAuditLogs(auditData.logs);
+            setGenerationJobs(jobsData.jobs);
             setSelectedPlans(Object.fromEntries(usersData.users.map((user) => [user.id, user.subscriptions[0]?.plan?.id || "free"])));
             setSelectedCycles(Object.fromEntries(usersData.users.map((user) => [user.id, "monthly"])));
         } catch (error) {
@@ -346,6 +372,82 @@ export default function AdminPage() {
                             children: (
                                 <section className="rounded-lg border border-stone-200 bg-white p-6">
                                     <Empty description="当前画布项目主要存储在前端/本地持久化，后续接入服务端 Project、CanvasSnapshot、AssetReference 后再做全局检索和异常排查。" />
+                                </section>
+                            ),
+                        },
+                        {
+                            key: "audit",
+                            label: "审计日志",
+                            children: (
+                                <section className="rounded-lg border border-stone-200 bg-white p-5">
+                                    <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
+                                        <History className="size-5" />
+                                        管理员操作记录
+                                    </div>
+                                    <DataTable empty={!auditLogs.length}>
+                                        <thead className="border-b border-stone-200 text-stone-500">
+                                            <tr>
+                                                <th className="py-3 font-medium">时间</th>
+                                                <th className="py-3 font-medium">操作人</th>
+                                                <th className="py-3 font-medium">操作</th>
+                                                <th className="py-3 font-medium">目标</th>
+                                                <th className="py-3 font-medium">目标ID</th>
+                                                <th className="py-3 font-medium">详情</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {auditLogs.map((log) => (
+                                                <tr key={log.id} className="border-b border-stone-100">
+                                                    <td className="py-3 text-sm text-stone-600">{formatDateTime(log.createdAt)}</td>
+                                                    <td className="py-3 text-sm">{log.actor?.email || "-"}</td>
+                                                    <td className="py-3"><Tag>{log.action}</Tag></td>
+                                                    <td className="py-3 text-sm">{log.target}</td>
+                                                    <td className="py-3 font-mono text-xs text-stone-500">{log.targetId.slice(0, 12)}...</td>
+                                                    <td className="py-3 text-xs text-stone-400 max-w-[200px] truncate">{JSON.stringify(log.metadata)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </DataTable>
+                                </section>
+                            ),
+                        },
+                        {
+                            key: "jobs",
+                            label: "生成记录",
+                            children: (
+                                <section className="rounded-lg border border-stone-200 bg-white p-5">
+                                    <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
+                                        <FileText className="size-5" />
+                                        AI 生成任务
+                                    </div>
+                                    <DataTable empty={!generationJobs.length}>
+                                        <thead className="border-b border-stone-200 text-stone-500">
+                                            <tr>
+                                                <th className="py-3 font-medium">时间</th>
+                                                <th className="py-3 font-medium">用户</th>
+                                                <th className="py-3 font-medium">类型</th>
+                                                <th className="py-3 font-medium">模型</th>
+                                                <th className="py-3 font-medium">状态</th>
+                                                <th className="py-3 font-medium">提示词</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {generationJobs.map((job) => (
+                                                <tr key={job.id} className="border-b border-stone-100">
+                                                    <td className="py-3 text-sm text-stone-600">{formatDateTime(job.createdAt)}</td>
+                                                    <td className="py-3 text-sm">{job.user?.email || "-"}</td>
+                                                    <td className="py-3"><Tag>{job.type}</Tag></td>
+                                                    <td className="py-3 text-sm">{job.model}</td>
+                                                    <td className="py-3">
+                                                        <Tag color={job.status === "completed" ? "green" : job.status === "failed" ? "red" : "blue"}>
+                                                            {job.status}
+                                                        </Tag>
+                                                    </td>
+                                                    <td className="py-3 text-xs text-stone-400 max-w-[200px] truncate">{job.prompt || "-"}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </DataTable>
                                 </section>
                             ),
                         },
