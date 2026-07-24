@@ -8,7 +8,7 @@ import { canvasThemes } from "@/lib/canvas-theme";
 import type { LocalUser } from "@/stores/use-user-store";
 
 export type CanvasAgentChatAttachment = { id: string; name: string; url: string };
-export type CanvasAgentMode = "online" | "local";
+export type CanvasAgentMode = "online" | "local" | "orchestrator";
 export type CanvasAgentChatMessage = {
     id: string;
     role: "user" | "assistant" | "system" | "tool" | "error";
@@ -295,9 +295,9 @@ export function AgentChatComposer({
 export function AgentModeSwitch({ value, theme, onChange }: { value: CanvasAgentMode; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onChange: (value: CanvasAgentMode) => void }) {
     return (
         <div className="inline-flex shrink-0 rounded-lg border p-0.5 text-xs" style={{ borderColor: theme.node.stroke }}>
-            {(["online", "local"] as const).map((item) => (
+            {(["online", "orchestrator", "local"] as const).map((item) => (
                 <button key={item} type="button" className="rounded-md px-2 py-1 transition" style={{ background: value === item ? theme.node.fill : "transparent", color: value === item ? theme.node.text : theme.node.muted }} onClick={() => onChange(item)}>
-                    {item === "online" ? "创作" : "本机"}
+                    {item === "online" ? "创作" : item === "orchestrator" ? "全自动" : "本机"}
                 </button>
             ))}
         </div>

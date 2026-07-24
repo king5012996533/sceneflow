@@ -21,6 +21,7 @@ import { CanvasPromptLibrary } from "./canvas-prompt-library";
 import { AgentChatComposer, AgentChatMessage, AgentModeSwitch, AgentPanelTabs, AgentWorkingMessage, type CanvasAgentChatMessage, type CanvasAgentMode } from "./canvas-agent-chat-ui";
 import { CanvasCreativeAgentPanel } from "./canvas-creative-agent-panel";
 import { CanvasLocalAgentPanel } from "./canvas-local-agent-panel";
+import { CanvasOrchestratorPanel } from "./canvas-orchestrator-panel";
 import { NODE_DEFAULT_SIZE } from "../constants";
 import { CanvasNodeType, type CanvasAssistantMessage, type CanvasAssistantReference, type CanvasAssistantSession, type CanvasNodeData } from "../types";
 import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
@@ -765,6 +766,8 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                         onUndoOps={onUndoOps}
                         autoConnect={autoConnectLocal}
                     />
+                ) : agentMode === "orchestrator" ? (
+                    <CanvasOrchestratorPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} onToolCall={executeOnlineTool} />
                 ) : (
                     <CanvasCreativeAgentPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} />
                 )}
