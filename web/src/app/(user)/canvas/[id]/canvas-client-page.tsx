@@ -422,8 +422,7 @@ function InfiniteCanvasPage() {
     const [angleNodeId, setAngleNodeId] = useState<string | null>(null);
     const [previewNodeId, setPreviewNodeId] = useState<string | null>(null);
     const [directorNodeId, setDirectorNodeId] = useState<string | null>(null);
-    const [quotaModalOpen, setQuotaModalOpen] = useState(false);
-    const [quotaInfo, setQuotaInfo] = useState<{ remaining: number; limit: number | null }>({ remaining: -1, limit: null });
+    const quotaModalRef = useRef<{ open: (remaining: number, limit: number | null) => void }>(null);
     const [assistantCollapsed, setAssistantCollapsed] = useState(true);
     const [assistantMounted, setAssistantMounted] = useState(false);
     const [assistantClosing, setAssistantClosing] = useState(false);
@@ -484,8 +483,7 @@ function InfiniteCanvasPage() {
             }
             const quota = checkGenerationQuota(entitlements, safeCount, user?.role);
             if (!quota.allowed) {
-                setQuotaInfo({ remaining: quota.remaining, limit: quota.limit });
-                setQuotaModalOpen(true);
+                quotaModalRef.current?.open(quota.remaining, quota.limit);
                 throw new QuotaExceededError(`今日免费生成次数已用完（${quota.limit} 次/天）`);
             }
             if (quota.remaining > 0 && quota.remaining <= safeCount) {
@@ -2436,7 +2434,7 @@ function InfiniteCanvasPage() {
             try {
                 await reserveCanvasGenerationQuota(1);
             } catch (error) {
-                if (error instanceof QuotaExceededError) { setQuotaInfo({ remaining: 0, limit: null }); setQuotaModalOpen(true); }
+                if (error instanceof QuotaExceededError) quotaModalRef.current?.open(0, null);
                 else if (error instanceof Error) message.warning(error.message);
                 return;
             }
@@ -2523,7 +2521,7 @@ function InfiniteCanvasPage() {
             try {
                 await reserveCanvasGenerationQuota(1);
             } catch (error) {
-                if (error instanceof QuotaExceededError) { setQuotaInfo({ remaining: 0, limit: null }); setQuotaModalOpen(true); }
+                if (error instanceof QuotaExceededError) quotaModalRef.current?.open(0, null);
                 else if (error instanceof Error) message.warning(error.message);
                 return;
             }
@@ -2704,7 +2702,7 @@ function InfiniteCanvasPage() {
             try {
                 await reserveCanvasGenerationQuota(plannedGenerationCount);
             } catch (error) {
-                if (error instanceof QuotaExceededError) { setQuotaInfo({ remaining: 0, limit: null }); setQuotaModalOpen(true); }
+                if (error instanceof QuotaExceededError) quotaModalRef.current?.open(0, null);
                 else if (error instanceof Error) message.warning(error.message);
                 return;
             }
@@ -3063,7 +3061,7 @@ function InfiniteCanvasPage() {
             try {
                 await reserveCanvasGenerationQuota(1);
             } catch (error) {
-                if (error instanceof QuotaExceededError) { setQuotaInfo({ remaining: 0, limit: null }); setQuotaModalOpen(true); }
+                if (error instanceof QuotaExceededError) quotaModalRef.current?.open(0, null);
                 else if (error instanceof Error) message.warning(error.message);
                 return;
             }
@@ -3800,7 +3798,7 @@ function CanvasTopBar({
                     <Shortcut keys={["拖入图片/视频/音频"]} value="上传到画布" />
                 </div>
             </Modal>
-            <QuotaExceededModal open={quotaModalOpen} onClose={() => setQuotaModalOpen(false)} remaining={quotaInfo.remaining} limit={quotaInfo.limit} />
+            <QuotaExceededModal ref={quotaModalRef} />
         </>
     );
 }

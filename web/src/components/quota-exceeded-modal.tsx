@@ -1,23 +1,32 @@
 "use client";
 
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
 import { Button, Modal } from "antd";
 import { useRouter } from "next/navigation";
 import { Lock } from "lucide-react";
 
-type Props = {
-    open: boolean;
-    onClose: () => void;
-    remaining: number;
-    limit: number | null;
+export type QuotaExceededModalHandle = {
+    open: (remaining: number, limit: number | null) => void;
 };
 
-export function QuotaExceededModal({ open, onClose, remaining, limit }: Props) {
+export const QuotaExceededModal = forwardRef<QuotaExceededModalHandle>((_props, ref) => {
     const router = useRouter();
+    const [open, setOpen] = useState(false);
+    const [remaining, setRemaining] = useState(0);
+    const [limit, setLimit] = useState<number | null>(null);
+
+    const handleOpen = useCallback((r: number, l: number | null) => {
+        setRemaining(r);
+        setLimit(l);
+        setOpen(true);
+    }, []);
+
+    useImperativeHandle(ref, () => ({ open: handleOpen }), [handleOpen]);
 
     return (
         <Modal
             open={open}
-            onCancel={onClose}
+            onCancel={() => setOpen(false)}
             footer={null}
             centered
             width={420}
@@ -35,7 +44,7 @@ export function QuotaExceededModal({ open, onClose, remaining, limit }: Props) {
             </p>
 
             <div className="flex gap-3">
-                <Button block onClick={onClose}>
+                <Button block onClick={() => setOpen(false)}>
                     稍后再说
                 </Button>
                 <Button block type="primary" onClick={() => router.push("/canvas/pricing")}>
@@ -44,4 +53,6 @@ export function QuotaExceededModal({ open, onClose, remaining, limit }: Props) {
             </div>
         </Modal>
     );
-}
+});
+
+QuotaExceededModal.displayName = "QuotaExceededModal";
