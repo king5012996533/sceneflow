@@ -1,6 +1,13 @@
 import { apiPath } from "@/lib/app-paths";
 import { recordGeneration } from "@/lib/generation-quota";
 
+export class QuotaExceededError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "QuotaExceededError";
+    }
+}
+
 export type ClientGenerationKind = "image" | "video" | "audio" | "text" | "tool";
 
 type GenerationJob = {
@@ -18,7 +25,11 @@ export async function beginClientGeneration(kind: ClientGenerationKind, count = 
         body: JSON.stringify({ requestKey, kind, count, metadata }),
     });
     const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(readError(payload, "生成权限检查失败"));
+    if (!response.ok) {
+        const msg = readError(payload, "生成权限检查失败");
+        if (response.status === 403 || msg.includes("已用完")) throw new QuotaExceededError(msg);
+        throw new Error(msg);
+    }
     return payload?.job as GenerationJob;
 }
 
