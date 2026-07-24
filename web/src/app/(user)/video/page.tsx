@@ -25,7 +25,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
-import { QuotaExceededModal } from "@/components/quota-exceeded-modal";
+import { QuotaExceededModal, type QuotaExceededModalHandle } from "@/components/quota-exceeded-modal";
 import { QuotaExceededError } from "@/lib/generation/generation-guard";
 import { createScopedLocalForageStore } from "@/lib/user-data-scope";
 
@@ -103,8 +103,7 @@ export default function VideoPage() {
     const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
     const [previewLog, setPreviewLog] = useState<GenerationLog | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-    const [quotaModalOpen, setQuotaModalOpen] = useState(false);
-    const [quotaInfo, setQuotaInfo] = useState<{ remaining: number; limit: number | null }>({ remaining: -1, limit: null });
+    const quotaModalRef = useRef<QuotaExceededModalHandle>(null);
 
     const model = effectiveConfig.videoModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
@@ -182,8 +181,7 @@ export default function VideoPage() {
         // 配额检查
         const { allowed, remaining, limit } = checkGenerationQuota(entitlements, 1, user?.role);
         if (!allowed) {
-            setQuotaInfo({ remaining, limit });
-            setQuotaModalOpen(true);
+            quotaModalRef.current?.open(remaining, limit);
             return;
         }
         if (remaining > 0 && remaining <= 1) {
@@ -209,8 +207,7 @@ export default function VideoPage() {
             void pollGenerationLog(log, snapshot.config);
         } catch (error) {
             if (error instanceof QuotaExceededError) {
-                setQuotaInfo({ remaining: 0, limit: null });
-                setQuotaModalOpen(true);
+                quotaModalRef.current?.open(0, null);
                 setRunning(false);
                 return;
             }
@@ -554,7 +551,7 @@ export default function VideoPage() {
             <Modal title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除选中的 {selectedLogIds.length} 条生成记录吗？
             </Modal>
-            <QuotaExceededModal open={quotaModalOpen} onClose={() => setQuotaModalOpen(false)} remaining={quotaInfo.remaining} limit={quotaInfo.limit} />
+            <QuotaExceededModal ref={quotaModalRef} />
         </div>
     );
 }

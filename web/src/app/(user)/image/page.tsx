@@ -327,8 +327,7 @@ export default function ImagePage() {
             return nextImage;
         } catch (error) {
             if (error instanceof QuotaExceededError) {
-                setQuotaInfo({ remaining: 0, limit: null });
-                setQuotaModalOpen(true);
+                quotaModalRef.current?.open(0, null);
                 setResults((value) => updateResultAt(value, index, { status: "failed", error: error.message }));
                 return undefined;
             }
@@ -514,7 +513,7 @@ export default function ImagePage() {
             <Modal title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除选中的 {selectedLogIds.length} 条生成记录吗？
             </Modal>
-            <QuotaExceededModal open={quotaModalOpen} onClose={() => setQuotaModalOpen(false)} remaining={quotaInfo.remaining} limit={quotaInfo.limit} />
+            <QuotaExceededModal ref={quotaModalRef} />
         </div>
     );
 }
