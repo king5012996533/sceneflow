@@ -3650,6 +3650,7 @@ function InfiniteCanvasPage() {
                     onCollapse={closeAgent}
                 />
             ) : null}
+            <QuotaExceededModal ref={quotaModalRef} />
         </main>
     );
 }
@@ -3798,7 +3799,6 @@ function CanvasTopBar({
                     <Shortcut keys={["拖入图片/视频/音频"]} value="上传到画布" />
                 </div>
             </Modal>
-            <QuotaExceededModal ref={quotaModalRef} />
         </>
     );
 }
