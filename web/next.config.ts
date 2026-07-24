@@ -13,9 +13,8 @@ export default function nextConfig(phase: string): NextConfig {
     const isDev = phase === PHASE_DEVELOPMENT_SERVER;
     const releases = parseChangelog(localChangelog);
 
-    return {
+return {
         output: "standalone",
-        outputFileTracingRoot: webDir,
         basePath: "/canvas",
         allowedDevOrigins: isDev ? ["*.*.*.*"] : [],
         typescript: {

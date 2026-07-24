@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     try {
         if (!prisma) return NextResponse.json({ allowed: true, remaining: -1, limit: null });
 
-        const user = await getCurrentUser();
+        const user = await getCurrentUser(req);
         if (!user) return NextResponse.json({ allowed: true, remaining: -1, limit: null });
 
         if (user.role === "admin") return NextResponse.json({ allowed: true, remaining: -1, limit: null });
