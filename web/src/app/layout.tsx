@@ -32,6 +32,9 @@ export const metadata: Metadata = {
         index: true,
         follow: true,
     },
+    other: {
+        "app-version": Date.now().toString(),
+    },
 };
 
 export default function RootLayout({
@@ -40,7 +43,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="zh-CN" suppressHydrationWarning className="font-sans">
+        <html lang="zh-CN" suppressHydrationWarning className="font-sans" data-build={Date.now()}>
             <body
                 className="bg-background text-foreground antialiased"
                 style={{

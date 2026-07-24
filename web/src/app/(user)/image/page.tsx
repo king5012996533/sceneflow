@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, LoaderCircle, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Tooltip, Typography } from "antd";
 import { saveAs } from "file-saver";
 
@@ -22,6 +22,8 @@ import { fetchClientEntitlements, type ClientEntitlements } from "@/lib/client-e
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
+import { QuotaExceededModal, type QuotaExceededModalHandle } from "@/components/quota-exceeded-modal";
+import { QuotaExceededError } from "@/lib/generation/generation-guard";
 import { createScopedLocalForageStore } from "@/lib/user-data-scope";
 
 type GeneratedImage = {
@@ -96,6 +98,7 @@ export default function ImagePage() {
     const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
     const [previewLog, setPreviewLog] = useState<GenerationLog | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const quotaModalRef = useRef<QuotaExceededModalHandle>(null);
 
     const model = effectiveConfig.imageModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
@@ -152,7 +155,7 @@ export default function ImagePage() {
         // 配额检查
         const { allowed, remaining, limit } = checkGenerationQuota(entitlements, generationCount, user?.role);
         if (!allowed) {
-            message.warning(`今日免费生成次数已用完（${limit} 次/天），请联系管理员申请开通套餐权益。`);
+            quotaModalRef.current?.open(remaining, limit);
             return;
         }
         if (remaining > 0 && remaining <= 1) {
@@ -189,7 +192,10 @@ export default function ImagePage() {
         const tasks = Array.from({ length: generationCount }, (_, index) => runGenerationSlot(index, snapshot));
 
         const result = await Promise.allSettled(tasks);
-        const successImages = result.filter((item): item is PromiseFulfilledResult<GeneratedImage> => item.status === "fulfilled").map((item) => item.value);
+        const successImages = result
+            .filter((item): item is PromiseFulfilledResult<GeneratedImage> => item.status === "fulfilled")
+            .map((item) => item.value)
+            .filter((v): v is GeneratedImage => v !== undefined);
         const successCount = successImages.length;
         const failCount = generationCount - successCount;
         const failed = result.find((item): item is PromiseRejectedResult => item.status === "rejected");
@@ -309,7 +315,7 @@ export default function ImagePage() {
         return { text, config: { ...effectiveConfig, model, count: "1" }, references: [...references] };
     };
 
-    const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }) => {
+    const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }): Promise<GeneratedImage | undefined> => {
         const itemStartedAt = performance.now();
         try {
             const result = await requestGeneratedImages({ config: snapshot.config, prompt: snapshot.text, references: snapshot.references });
@@ -320,6 +326,12 @@ export default function ImagePage() {
             setResults((value) => updateResultAt(value, index, { status: "success", image: nextImage }));
             return nextImage;
         } catch (error) {
+            if (error instanceof QuotaExceededError) {
+                setQuotaInfo({ remaining: 0, limit: null });
+                setQuotaModalOpen(true);
+                setResults((value) => updateResultAt(value, index, { status: "failed", error: error.message }));
+                return undefined;
+            }
             setResults((value) => updateResultAt(value, index, { status: "failed", error: error instanceof Error ? error.message : "生成失败" }));
             throw error;
         }
@@ -502,6 +514,7 @@ export default function ImagePage() {
             <Modal title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除选中的 {selectedLogIds.length} 条生成记录吗？
             </Modal>
+            <QuotaExceededModal open={quotaModalOpen} onClose={() => setQuotaModalOpen(false)} remaining={quotaInfo.remaining} limit={quotaInfo.limit} />
         </div>
     );
 }

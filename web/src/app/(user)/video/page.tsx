@@ -25,6 +25,8 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
+import { QuotaExceededModal } from "@/components/quota-exceeded-modal";
+import { QuotaExceededError } from "@/lib/generation/generation-guard";
 import { createScopedLocalForageStore } from "@/lib/user-data-scope";
 
 type GeneratedVideo = {
@@ -101,6 +103,8 @@ export default function VideoPage() {
     const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
     const [previewLog, setPreviewLog] = useState<GenerationLog | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [quotaModalOpen, setQuotaModalOpen] = useState(false);
+    const [quotaInfo, setQuotaInfo] = useState<{ remaining: number; limit: number | null }>({ remaining: -1, limit: null });
 
     const model = effectiveConfig.videoModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
@@ -178,7 +182,8 @@ export default function VideoPage() {
         // 配额检查
         const { allowed, remaining, limit } = checkGenerationQuota(entitlements, 1, user?.role);
         if (!allowed) {
-            message.warning(`今日免费生成次数已用完（${limit} 次/天），请联系管理员申请开通套餐权益。`);
+            setQuotaInfo({ remaining, limit });
+            setQuotaModalOpen(true);
             return;
         }
         if (remaining > 0 && remaining <= 1) {
@@ -203,6 +208,12 @@ export default function VideoPage() {
             await saveLog(log);
             void pollGenerationLog(log, snapshot.config);
         } catch (error) {
+            if (error instanceof QuotaExceededError) {
+                setQuotaInfo({ remaining: 0, limit: null });
+                setQuotaModalOpen(true);
+                setRunning(false);
+                return;
+            }
             const errorMessage = error instanceof Error ? error.message : "生成失败";
             setResults([{ id: nanoid(), status: "failed", error: errorMessage }]);
             await saveLog(buildLog({ prompt: snapshot.text, model, config: snapshot.config, references: snapshot.references, videoReferences: snapshot.videoReferences, audioReferences: snapshot.audioReferences, durationMs: performance.now() - batchStartedAt, status: "失败", error: errorMessage }));
@@ -543,6 +554,7 @@ export default function VideoPage() {
             <Modal title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除选中的 {selectedLogIds.length} 条生成记录吗？
             </Modal>
+            <QuotaExceededModal open={quotaModalOpen} onClose={() => setQuotaModalOpen(false)} remaining={quotaInfo.remaining} limit={quotaInfo.limit} />
         </div>
     );
 }
