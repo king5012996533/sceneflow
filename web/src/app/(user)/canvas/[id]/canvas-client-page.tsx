@@ -4,7 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { ChangeEvent as ReactChangeEvent, DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Bot, Home, ImageIcon, Images, List, Menu, Music2, Plus, Redo2, Settings2, Trash2, Undo2, Upload, Video } from "lucide-react";
-import { saveAs } from "file-saver";
 
 import { requestGeneratedImages } from "@/lib/generation/generation-request";
 import { QuotaExceededError } from "@/lib/generation/generation-guard";
@@ -23,7 +22,7 @@ import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
-import { cropDataUrl, splitDataUrl, upscaleDataUrl } from "../utils/canvas-image-data";
+import { cropDataUrl, splitDataUrl } from "../utils/canvas-image-data";
 import { fitNodeSize } from "../utils/canvas-node-size";
 import { App, Button, Dropdown, Modal } from "antd";
 import { NODE_DEFAULT_SIZE, getNodeSpec } from "../constants";
@@ -79,6 +78,7 @@ import { useCanvasTextGeneration } from "../hooks/use-canvas-text-generation";
 import { useCanvasAudioGeneration } from "../hooks/use-canvas-audio-generation";
 import { useCanvasRetryGeneration } from "../hooks/use-canvas-retry-generation";
 import { useCanvasPipelineRunner } from "../hooks/use-canvas-pipeline-runner";
+import { useCanvasImageTools } from "../hooks/use-canvas-image-tools";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     DirectorPanoramaPayload,
@@ -95,7 +95,6 @@ import {
     NODE_STATUS_ERROR,
     DIRECTOR_DESK_URL,
     AUTO_ARCHIVE_CATEGORIES,
-    IMAGE_PROMPT_REVERSE_PRESET,
     resolveDirectorDeskUrl,
     assetCategoryFromNode,
     nodeAssetTags,
@@ -114,15 +113,11 @@ import {
     getConnectionTargetAnchor,
     normalizeConnection,
     getInputSummary,
-    buildAngleLabel,
-    buildAnglePrompt,
     resetInterruptedGeneration,
     isGenerationCanceled,
     isAudioFile,
     isHiddenBatchChild,
     isHiddenBatchConnectionEndpoint,
-    imageExtension,
-    audioExtension,
 } from "../utils/canvas-utils";
 import {
     CanvasNodeType,
@@ -792,6 +787,30 @@ function InfiniteCanvasPage() {
         message,
     });
 
+    const {
+        downloadNodeImage,
+        createImageReversePromptNodes,
+        generateUpscaledImage,
+        generateAngleImage,
+    } = useCanvasImageTools({
+        effectiveConfig,
+        setNodes,
+        setConnections,
+        setSelectedNodeIds,
+        setSelectedConnectionId,
+        setDialogNodeId,
+        setRunningNodeId,
+        setAngleNodeId,
+        startGenerationRequest,
+        finishGenerationRequest,
+        reserveCanvasGenerationQuota,
+        isAiConfigReady,
+        openConfigDialog,
+        buildGenCfg,
+        message,
+        quotaModalRef,
+    });
+
     const visibleNodes = useMemo(() => {
         const padding = 280;
         const rect = containerRef.current?.getBoundingClientRect();
@@ -1300,58 +1319,6 @@ function InfiniteCanvasPage() {
         setEditRequestNonce((value) => value + 1);
     }, []);
 
-    const downloadNodeImage = useCallback((node: CanvasNodeData) => {
-        if ((node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Audio) || !node.metadata?.content) return;
-        saveAs(node.metadata.content, `canvas-${node.type}-${node.id}.${node.type === CanvasNodeType.Video ? "mp4" : node.type === CanvasNodeType.Audio ? audioExtension(node.metadata.mimeType) : imageExtension(node.metadata.content)}`);
-    }, []);
-
-    const createImageReversePromptNodes = useCallback(
-        (node: CanvasNodeData) => {
-            if (node.type !== CanvasNodeType.Image || !node.metadata?.content) {
-                message.warning("图片节点为空，无法反推提示词");
-                return;
-            }
-
-            const gap = 96;
-            const textSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Text];
-            const configSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Config];
-            const centerY = node.position.y + node.height / 2;
-            const textNode = {
-                ...createCanvasNode(
-                    CanvasNodeType.Text,
-                    { x: node.position.x + node.width + gap + textSpec.width / 2, y: centerY },
-                    { content: IMAGE_PROMPT_REVERSE_PRESET, prompt: IMAGE_PROMPT_REVERSE_PRESET, status: NODE_STATUS_SUCCESS, fontSize: 14 },
-                ),
-                title: "反推提示词",
-            };
-            const configNode = {
-                ...createCanvasNode(
-                    CanvasNodeType.Config,
-                    { x: textNode.position.x + textNode.width + gap + configSpec.width / 2, y: centerY },
-                    {
-                        generationMode: "text",
-                        model: effectiveConfig.textModel || effectiveConfig.model || defaultConfig.textModel,
-                        count: 1,
-                        composerContent: `参考图片：@[node:${node.id}]\n任务说明：@[node:${textNode.id}]`,
-                    },
-                ),
-                title: "反推提示词配置",
-            };
-
-            setNodes((prev) => [...prev, textNode, configNode]);
-            setConnections((prev) => [
-                ...prev,
-                { id: nanoid(), fromNodeId: node.id, toNodeId: configNode.id },
-                { id: nanoid(), fromNodeId: textNode.id, toNodeId: configNode.id },
-            ]);
-            setSelectedNodeIds(new Set([configNode.id]));
-            setSelectedConnectionId(null);
-            setDialogNodeId(configNode.id);
-            setContextMenu(null);
-        },
-        [effectiveConfig.model, effectiveConfig.textModel, message],
-    );
-
     const cropImageNode = useCallback(async (node: CanvasNodeData, crop: CanvasImageCropRect) => {
         if (!node.metadata?.content) return;
         const cropped = await cropDataUrl(node.metadata.content, crop);
@@ -1463,90 +1430,6 @@ function InfiniteCanvasPage() {
                 if (isGenerationCanceled(error)) return;
                 const errorDetails = error instanceof Error ? error.message : "局部修改失败";
                 message.error(canvasGenerationErrorToast(errorDetails));
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
-            } finally {
-                finishGenerationRequest(childId, controller);
-                setRunningNodeId(null);
-            }
-        },
-        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, reserveCanvasGenerationQuota, startGenerationRequest],
-    );
-
-    const upscaleImageNode = useCallback(async (node: CanvasNodeData, params: CanvasImageUpscaleParams) => {
-        if (!node.metadata?.content) return;
-        setUpscaleNodeId(null);
-        const upscaled = await upscaleDataUrl(node.metadata.content, params);
-        const image = await uploadImage(upscaled);
-        const size = fitNodeSize(image.width, image.height);
-        const childId = nanoid();
-        const child: CanvasNodeData = {
-            id: childId,
-            type: CanvasNodeType.Image,
-            title: "Upscaled Image",
-            position: { x: node.position.x + node.width + 96, y: node.position.y },
-            width: size.width,
-            height: size.height,
-            metadata: {
-                ...imageMetadata(image),
-                prompt: node.metadata?.prompt,
-            },
-        };
-        setNodes((prev) => [...prev, child]);
-        setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
-        setSelectedNodeIds(new Set([childId]));
-        setDialogNodeId(childId);
-    }, []);
-
-    const generateAngleNode = useCallback(
-        async (node: CanvasNodeData, params: CanvasImageAngleParams) => {
-            if (!node.metadata?.content) return;
-            const generationConfig = { ...buildGenCfg(node, "image"), count: "1" };
-            if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
-                return;
-            }
-            const childId = nanoid();
-            const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
-            const title = buildAngleLabel(params);
-            const prompt = buildAnglePrompt(params);
-            const generationMetadata = buildImageGenerationMetadata("edit", generationConfig, 1, [
-                { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey },
-            ]);
-            try {
-                await reserveCanvasGenerationQuota(1);
-            } catch (error) {
-                if (error instanceof QuotaExceededError) quotaModalRef.current?.open(0, null);
-                else if (error instanceof Error) message.warning(error.message);
-                return;
-            }
-            setAngleNodeId(null);
-            setRunningNodeId(childId);
-            setNodes((prev) => [
-                ...prev,
-                {
-                    id: childId,
-                    type: CanvasNodeType.Image,
-                    title,
-                    position: { x: node.position.x + node.width + 96, y: node.position.y },
-                    width: imageConfig.width,
-                    height: imageConfig.height,
-                    metadata: { prompt, status: NODE_STATUS_LOADING, ...generationMetadata },
-                },
-            ]);
-            setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: childId }]);
-            setSelectedNodeIds(new Set([childId]));
-            setDialogNodeId(childId);
-            const controller = await startGenerationRequest(childId, node.id, childId);
-            try {
-                const image = await requestGeneratedImages({ config: generationConfig, prompt, references: [{ id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey }], options: { signal: controller.signal } }).then(
-                    (items) => items[0],
-                );
-                const uploaded = await uploadImage(image.dataUrl);
-                const size = fitNodeSize(uploaded.width, uploaded.height, imageConfig.width, imageConfig.height);
-                setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt, ...generationMetadata } } : item)));
-            } catch (error) {
-                if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : "生成失败";
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {
                 finishGenerationRequest(childId, controller);
@@ -2192,13 +2075,13 @@ function InfiniteCanvasPage() {
 
                 {splitNode?.metadata?.content ? <CanvasNodeSplitDialog dataUrl={splitNode.metadata.content} open={Boolean(splitNode)} onClose={() => setSplitNodeId(null)} onConfirm={(params) => void splitImageNode(splitNode!, params)} /> : null}
 
-                {upscaleNode?.metadata?.content ? <CanvasNodeUpscaleDialog dataUrl={upscaleNode.metadata.content} open={Boolean(upscaleNode)} onClose={() => setUpscaleNodeId(null)} onConfirm={(params) => void upscaleImageNode(upscaleNode!, params)} /> : null}
+                {upscaleNode?.metadata?.content ? <CanvasNodeUpscaleDialog dataUrl={upscaleNode.metadata.content} open={Boolean(upscaleNode)} onClose={() => setUpscaleNodeId(null)} onConfirm={(params) => void generateUpscaledImage(upscaleNode!, params)} /> : null}
 
                 <Modal title="AI 超分" open={Boolean(superResolveNode?.metadata?.content)} centered footer={null} onCancel={() => setSuperResolveNodeId(null)}>
                     <div className="py-8 text-center text-base font-medium">暂未实现</div>
                 </Modal>
 
-                {angleNode?.metadata?.content ? <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} open={Boolean(angleNode)} onClose={() => setAngleNodeId(null)} onConfirm={(params) => void generateAngleNode(angleNode!, params)} /> : null}
+                {angleNode?.metadata?.content ? <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} open={Boolean(angleNode)} onClose={() => setAngleNodeId(null)} onConfirm={(params) => void generateAngleImage(angleNode!, params)} /> : null}
 
                 <Modal
                     title="图片详情"
