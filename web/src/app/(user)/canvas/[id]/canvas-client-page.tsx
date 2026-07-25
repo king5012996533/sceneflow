@@ -69,6 +69,7 @@ import { useCanvasPointerInteractions } from "../hooks/use-canvas-pointer-intera
 import { useCanvasClipboard } from "../hooks/use-canvas-clipboard";
 import { useCanvasConnectionCreation } from "../hooks/use-canvas-connection-creation";
 import { useCanvasNodeDrag } from "../hooks/use-canvas-node-drag";
+import { useCanvasNodeActions } from "../hooks/use-canvas-node-actions";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     DirectorPanoramaPayload,
@@ -685,6 +686,39 @@ function InfiniteCanvasPage() {
         setDialogNodeId,
     });
 
+    const {
+        deleteNodes,
+        deleteConnection,
+        clearCanvas,
+        duplicateNode,
+        updateNodeContent,
+        updateNodePrompt,
+        patchNodeConfig,
+        resizeNode,
+        toggleFreeResize,
+    } = useCanvasNodeActions({
+        nodesRef,
+        cleanupCanvasFiles,
+        projectId,
+        chatSessions,
+        setNodes,
+        setConnections,
+        setSelectedNodeIds,
+        setSelectedConnectionId,
+        setHoveredNodeId,
+        setToolbarNodeId,
+        setDialogNodeId,
+        setEditingNodeId,
+        setInfoNodeId,
+        setCropNodeId,
+        setMaskEditNodeId,
+        setAngleNodeId,
+        setPreviewNodeId,
+        setRunningNodeId,
+        setClearConfirmOpen,
+        setContextMenu,
+    });
+
     const visibleNodes = useMemo(() => {
         const padding = 280;
         const rect = containerRef.current?.getBoundingClientRect();
@@ -877,58 +911,6 @@ function InfiniteCanvasPage() {
         }
     }, [effectiveConfig, entitlements, getCanvasCenter, message]);
 
-    const deleteNodes = useCallback(
-        (ids: Set<string>) => {
-            if (!ids.size) return;
-            const allIds = new Set(ids);
-            nodesRef.current.forEach((node) => {
-                if (ids.has(node.id)) node.metadata?.batchChildIds?.forEach((childId) => allIds.add(childId));
-            });
-            setNodes((prev) => {
-                const next = prev.filter((node) => !allIds.has(node.id));
-                return next.map((node) => {
-                    const childIds = node.metadata?.batchChildIds?.filter((childId) => !allIds.has(childId));
-                    if (!node.metadata?.isBatchRoot || childIds?.length === node.metadata.batchChildIds?.length) return node;
-                    const primaryImageId = childIds?.includes(node.metadata.primaryImageId || "") ? node.metadata.primaryImageId : childIds?.[0];
-                    const primaryNode = next.find((item) => item.id === primaryImageId);
-                    return {
-                        ...node,
-                        metadata: {
-                            ...node.metadata,
-                            batchChildIds: childIds,
-                            primaryImageId,
-                            content: primaryNode?.metadata?.content || node.metadata.content,
-                            naturalWidth: primaryNode?.metadata?.naturalWidth || node.metadata.naturalWidth,
-                            naturalHeight: primaryNode?.metadata?.naturalHeight || node.metadata.naturalHeight,
-                        },
-                    };
-                });
-            });
-            setConnections((prev) => prev.filter((conn) => !allIds.has(conn.fromNodeId) && !allIds.has(conn.toNodeId)));
-            setSelectedNodeIds(new Set());
-            setSelectedConnectionId(null);
-            setHoveredNodeId((current) => (current && allIds.has(current) ? null : current));
-            setToolbarNodeId((current) => (current && allIds.has(current) ? null : current));
-            setDialogNodeId((current) => (current && allIds.has(current) ? null : current));
-            setEditingNodeId((current) => (current && allIds.has(current) ? null : current));
-            setInfoNodeId((current) => (current && allIds.has(current) ? null : current));
-            setCropNodeId((current) => (current && allIds.has(current) ? null : current));
-            setMaskEditNodeId((current) => (current && allIds.has(current) ? null : current));
-            setAngleNodeId((current) => (current && allIds.has(current) ? null : current));
-            setPreviewNodeId((current) => (current && allIds.has(current) ? null : current));
-            setRunningNodeId((current) => (current && allIds.has(current) ? null : current));
-            setContextMenu((current) => (current?.type === "node" && allIds.has(current.nodeId) ? null : current));
-            cleanupCanvasFiles({ projectId, nodes: nodesRef.current.filter((node) => !allIds.has(node.id)), chatSessions });
-        },
-        [chatSessions, cleanupCanvasFiles, projectId],
-    );
-
-    const deleteConnection = useCallback((connectionId: string) => {
-        setConnections((prev) => prev.filter((conn) => conn.id !== connectionId));
-        setSelectedConnectionId((current) => (current === connectionId ? null : current));
-        setContextMenu((current) => (current?.type === "connection" && current.connectionId === connectionId ? null : current));
-    }, []);
-
     const deselectCanvas = useCallback(() => {
         cancelPendingConnectionCreate();
         selectionDeselect();
@@ -937,38 +919,6 @@ function InfiniteCanvasPage() {
         setDialogNodeId(null);
         setEditingNodeId(null);
     }, [cancelPendingConnectionCreate, clearSelectionBox, selectionDeselect]);
-
-    const clearCanvas = useCallback(() => {
-        setNodes([]);
-        setConnections([]);
-        setInfoNodeId(null);
-        setCropNodeId(null);
-        setMaskEditNodeId(null);
-        setAngleNodeId(null);
-        setPreviewNodeId(null);
-        setRunningNodeId(null);
-        deselectCanvas();
-        setClearConfirmOpen(false);
-        cleanupCanvasFiles({ projectId, nodes: [], chatSessions: [] });
-    }, [cleanupCanvasFiles, deselectCanvas, projectId]);
-
-    const duplicateNode = useCallback((nodeId: string) => {
-        const source = nodesRef.current.find((node) => node.id === nodeId);
-        if (!source) return;
-
-        const id = `${source.type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-        const next: CanvasNodeData = {
-            ...source,
-            id,
-            title: `${source.title} Copy`,
-            position: { x: source.position.x + 36, y: source.position.y + 36 },
-        };
-
-        setNodes((prev) => [...prev, next]);
-        setSelectedNodeIds(new Set([id]));
-        setSelectedConnectionId(null);
-        setDialogNodeId(id);
-    }, []);
 
     const handleResetViewport = useCallback(() => {
         vp.resetViewport();
@@ -1332,27 +1282,6 @@ function InfiniteCanvasPage() {
         [screenToCanvas, startConnection],
     );
 
-    const handleNodeResize = useCallback((nodeId: string, width: number, height: number, position?: Position) => {
-        setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, width, height, position: position || node.position } : node)));
-    }, []);
-
-    const toggleNodeFreeResize = useCallback((nodeId: string) => {
-        setNodes((prev) =>
-            prev.map((node) => {
-                if (node.id !== nodeId) return node;
-                const freeResize = !node.metadata?.freeResize;
-                if (freeResize || node.type !== CanvasNodeType.Image) return { ...node, metadata: { ...node.metadata, freeResize } };
-                const ratio = (node.metadata?.naturalWidth || node.width) / (node.metadata?.naturalHeight || node.height || 1);
-                const height = node.width / ratio;
-                return { ...node, height, position: { x: node.position.x, y: node.position.y + node.height / 2 - height / 2 }, metadata: { ...node.metadata, freeResize } };
-            }),
-        );
-    }, []);
-
-    const handleNodeContentChange = useCallback((nodeId: string, content: string) => {
-        setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, content } } : node)));
-    }, []);
-
     const toggleBatchExpanded = useCallback((nodeId: string) => {
         const isExpanded = Boolean(nodesRef.current.find((node) => node.id === nodeId)?.metadata?.imageBatchExpanded);
         if (isExpanded) {
@@ -1413,16 +1342,6 @@ function InfiniteCanvasPage() {
         setDialogNodeId(node.id);
         setEditingNodeId(node.id);
         setEditRequestNonce((value) => value + 1);
-    }, []);
-
-    const handleNodePromptChange = useCallback((nodeId: string, prompt: string) => {
-        setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, prompt } } : node)));
-    }, []);
-
-    const handleConfigNodeChange = useCallback((nodeId: string, patch: Partial<CanvasNodeData["metadata"]>) => {
-        const applyPatch = (items: CanvasNodeData[]) => items.map((node) => (node.id === nodeId ? applyNodeConfigPatch(node, patch) : node));
-        nodesRef.current = applyPatch(nodesRef.current);
-        setNodes((prev) => applyPatch(prev));
     }, []);
 
     const downloadNodeImage = useCallback((node: CanvasNodeData) => {
@@ -2567,7 +2486,7 @@ function InfiniteCanvasPage() {
                                     <CanvasConfigComposer
                                         value={panelNode.metadata?.composerContent ?? panelNode.metadata?.prompt ?? ""}
                                         inputs={configInputsById.get(panelNode.id) || []}
-                                        onChange={(composerContent) => handleConfigNodeChange(panelNode.id, { composerContent })}
+                                        onChange={(composerContent) => patchNodeConfig(panelNode.id, { composerContent })}
                                         onClose={() => setDialogNodeId(null)}
                                     />
                                 ) : (
@@ -2575,8 +2494,8 @@ function InfiniteCanvasPage() {
                                         node={panelNode}
                                         isRunning={runningNodeId === panelNode.id}
                                         mentionReferences={mentionReferencesByNodeId.get(panelNode.id) || []}
-                                        onPromptChange={handleNodePromptChange}
-                                        onConfigChange={handleConfigNodeChange}
+                                        onPromptChange={updateNodePrompt}
+                                        onConfigChange={patchNodeConfig}
                                         onGenerate={handleGenerateNode}
                                         onStop={confirmStopGeneration}
                                         onImageSettingsOpenChange={(open) => {
@@ -2596,7 +2515,7 @@ function InfiniteCanvasPage() {
                                         node={contentNode}
                                         isRunning={runningNodeId === contentNode.id}
                                         inputSummary={getInputSummary(configInputsById.get(contentNode.id) || [])}
-                                        onConfigChange={handleConfigNodeChange}
+                                        onConfigChange={patchNodeConfig}
                                         onComposerToggle={() => setDialogNodeId((current) => (current === contentNode.id ? null : contentNode.id))}
                                         onStop={confirmStopGeneration}
                                         onGenerate={(nodeId) => {
@@ -2617,8 +2536,8 @@ function InfiniteCanvasPage() {
                                 hideNodeToolbar();
                             }}
                             onConnectStart={handleConnectStart}
-                            onResize={handleNodeResize}
-                            onContentChange={handleNodeContentChange}
+                            onResize={resizeNode}
+                            onContentChange={updateNodeContent}
                             onToggleBatch={toggleBatchExpanded}
                             onSetBatchPrimary={setBatchPrimary}
                             onRetry={(node) => void handleRetryNode(node)}
@@ -2672,7 +2591,7 @@ function InfiniteCanvasPage() {
                     onContinueVideo={(node) => void createContinuationFromVideo(node)}
                     onReversePrompt={createImageReversePromptNodes}
                     onRetry={(node) => void handleRetryNode(node)}
-                    onToggleFreeResize={(node) => toggleNodeFreeResize(node.id)}
+                    onToggleFreeResize={(node) => toggleFreeResize(node.id)}
                     onDelete={(node) => deleteNodes(new Set([node.id]))}
                 />
 
