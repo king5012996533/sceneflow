@@ -65,6 +65,7 @@ import { useDirectorShotBridge } from "../hooks/use-director-shot-bridge";
 import { useCanvasFileImport } from "../hooks/use-canvas-file-import";
 import { useCanvasSelection } from "../hooks/use-canvas-selection";
 import { useCanvasViewportState } from "../hooks/use-canvas-viewport-state";
+import { useCanvasPointerInteractions } from "../hooks/use-canvas-pointer-interactions";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     CanvasClipboard,
@@ -135,7 +136,6 @@ import {
     type ConnectionHandle,
     type ContextMenuState,
     type Position,
-    type SelectionBox,
     type ViewportTransform,
 } from "../types";
 import type { ReferenceImage } from "@/types/image";
@@ -209,7 +209,6 @@ function InfiniteCanvasPage() {
     const [connectionTargetNodeId, setConnectionTargetNodeId] = useState<string | null>(null);
     const [pendingConnectionCreate, setPendingConnectionCreate] = useState<PendingConnectionCreate | null>(null);
     const [mouseWorld, setMouseWorld] = useState<Position>({ x: 0, y: 0 });
-    const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
     const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
     const [entitlements, setEntitlements] = useState<ClientEntitlements | null>(null);
@@ -282,13 +281,27 @@ function InfiniteCanvasPage() {
         resetViewport: vpResetViewport,
         setZoomScale: vpSetZoomScale,
     } = vp;
+
     const nodesRef = useRef(nodes);
+
+    const {
+        selectionBox,
+        selectionBoxRef,
+        startSelectionBox,
+        clearSelectionBox,
+        handleGlobalPointerMove,
+    } = useCanvasPointerInteractions({
+        screenToCanvas,
+        nodesRef,
+        selectedNodeIdsRef,
+        setSelectedNodeIds,
+    });
+
     const connectionsRef = useRef(connections);
     const generateNodeRef = useRef<((nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => Promise<void>) | null>(null);
     const continueVideoRef = useRef<((node: CanvasNodeData) => Promise<void>) | null>(null);
     const connectingParamsRef = useRef(connectingParams);
     const connectionTargetNodeIdRef = useRef(connectionTargetNodeId);
-    const selectionBoxRef = useRef(selectionBox);
     const agentCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingConnectionCreateRef = useRef(pendingConnectionCreate);
     const generationRequestsRef = useRef(new Map<string, CanvasGenerationRequest>());
@@ -496,10 +509,6 @@ function InfiniteCanvasPage() {
         connectionTargetNodeIdRef.current = connectionTargetNodeId;
         pendingConnectionCreateRef.current = pendingConnectionCreate;
     }, [nodes, connections, selectedNodeIds, viewport, connectingParams, connectionTargetNodeId, pendingConnectionCreate]);
-
-    useLayoutEffect(() => {
-        selectionBoxRef.current = selectionBox;
-    }, [selectionBox]);
 
     useEffect(() => {
         if (!projectLoaded) return;
@@ -908,11 +917,11 @@ function InfiniteCanvasPage() {
     const deselectCanvas = useCallback(() => {
         cancelPendingConnectionCreate();
         selectionDeselect();
-        setSelectionBox(null);
+        clearSelectionBox();
         setToolbarNodeId(null);
         setDialogNodeId(null);
         setEditingNodeId(null);
-    }, [cancelPendingConnectionCreate, selectionDeselect]);
+    }, [cancelPendingConnectionCreate, clearSelectionBox, selectionDeselect]);
 
     const clearCanvas = useCallback(() => {
         setNodes([]);
@@ -1059,30 +1068,20 @@ function InfiniteCanvasPage() {
             if (event.button !== 0) return;
 
             if (!event.ctrlKey && !event.metaKey) {
-                setSelectionBox(null);
+                clearSelectionBox();
                 setSelectedNodeIds(new Set());
                 setSelectedConnectionId(null);
                 return;
             }
 
-            const world = screenToCanvas(event.clientX, event.clientY);
-            const nextSelectionBox = {
-                startWorldX: world.x,
-                startWorldY: world.y,
-                currentWorldX: world.x,
-                currentWorldY: world.y,
-                additive: event.shiftKey,
-                initialSelectedNodeIds: event.shiftKey ? Array.from(selectedNodeIdsRef.current) : [],
-            };
-            selectionBoxRef.current = nextSelectionBox;
-            setSelectionBox(nextSelectionBox);
+            startSelectionBox(event.clientX, event.clientY, event.shiftKey);
             if (!event.shiftKey) {
                 setSelectedNodeIds(new Set());
             }
 
             setSelectedConnectionId(null);
         },
-        [cancelPendingConnectionCreate, screenToCanvas],
+        [cancelPendingConnectionCreate, clearSelectionBox, startSelectionBox],
     );
 
     const handleNodeMouseDown = useCallback((event: ReactMouseEvent, nodeId: string) => {
@@ -1199,46 +1198,11 @@ function InfiniteCanvasPage() {
         [finishNodeDrag, getConnectionDropTarget, screenToCanvas],
     );
 
-    const handleGlobalPointerMove = useCallback(
-        (event: PointerEvent) => {
-            const currentSelection = selectionBoxRef.current;
-            if (!currentSelection) return;
-
-            if (event.buttons === 0) {
-                selectionBoxRef.current = null;
-                setSelectionBox(null);
-                return;
-            }
-
-            const world = screenToCanvas(event.clientX, event.clientY);
-            const rectX = Math.min(currentSelection.startWorldX, world.x);
-            const rectY = Math.min(currentSelection.startWorldY, world.y);
-            const rectW = Math.abs(world.x - currentSelection.startWorldX);
-            const rectH = Math.abs(world.y - currentSelection.startWorldY);
-            const nextSelected = new Set<string>(currentSelection.additive ? currentSelection.initialSelectedNodeIds : []);
-
-            nodesRef.current
-                .filter((node) => !isHiddenBatchChild(node, nodesRef.current))
-                .forEach((node) => {
-                    const intersects = rectX < node.position.x + node.width && rectX + rectW > node.position.x && rectY < node.position.y + node.height && rectY + rectH > node.position.y;
-
-                    if (intersects) nextSelected.add(node.id);
-                });
-
-            const nextSelectionBox = { ...currentSelection, currentWorldX: world.x, currentWorldY: world.y };
-            selectionBoxRef.current = nextSelectionBox;
-            setSelectionBox(nextSelectionBox);
-            setSelectedNodeIds(nextSelected);
-        },
-        [screenToCanvas],
-    );
-
     const handleGlobalMouseUp = useCallback(
         (event: MouseEvent) => {
             finishNodeDrag(event.clientX, event.clientY);
 
-            selectionBoxRef.current = null;
-            setSelectionBox(null);
+            clearSelectionBox();
 
             if (pendingConnectionCreateRef.current) return;
 
@@ -1495,7 +1459,7 @@ function InfiniteCanvasPage() {
             setSelectedNodeIds(new Set(nodesRef.current.map((node) => node.id)));
             setSelectedConnectionId(null);
             setContextMenu(null);
-            setSelectionBox(null);
+            clearSelectionBox();
         },
         onDelete: () => {
             if (selectedNodeIdsRef.current.size) {
@@ -1512,7 +1476,7 @@ function InfiniteCanvasPage() {
             setSelectedNodeIds(new Set());
             setSelectedConnectionId(null);
             setContextMenu(null);
-            setSelectionBox(null);
+            clearSelectionBox();
             setConnecting(null);
             setHoveredNodeId(null);
             setToolbarNodeId(null);
