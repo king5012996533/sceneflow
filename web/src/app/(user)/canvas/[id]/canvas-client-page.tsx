@@ -67,6 +67,7 @@ import { useCanvasSelection } from "../hooks/use-canvas-selection";
 import { useCanvasViewportState } from "../hooks/use-canvas-viewport-state";
 import { useCanvasPointerInteractions } from "../hooks/use-canvas-pointer-interactions";
 import { useCanvasClipboard } from "../hooks/use-canvas-clipboard";
+import { useCanvasConnectionCreation } from "../hooks/use-canvas-connection-creation";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     DirectorPanoramaPayload,
@@ -204,9 +205,6 @@ function InfiniteCanvasPage() {
     const [connections, setConnections] = useState<CanvasConnection[]>([]);
     const [chatSessions, setChatSessions] = useState<CanvasAssistantSession[]>([]);
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
-    const [connectingParams, setConnectingParams] = useState<ConnectionHandle | null>(null);
-    const [connectionTargetNodeId, setConnectionTargetNodeId] = useState<string | null>(null);
-    const [pendingConnectionCreate, setPendingConnectionCreate] = useState<PendingConnectionCreate | null>(null);
     const [mouseWorld, setMouseWorld] = useState<Position>({ x: 0, y: 0 });
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
     const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
@@ -316,10 +314,7 @@ function InfiniteCanvasPage() {
 
     const generateNodeRef = useRef<((nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => Promise<void>) | null>(null);
     const continueVideoRef = useRef<((node: CanvasNodeData) => Promise<void>) | null>(null);
-    const connectingParamsRef = useRef(connectingParams);
-    const connectionTargetNodeIdRef = useRef(connectionTargetNodeId);
     const agentCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pendingConnectionCreateRef = useRef(pendingConnectionCreate);
     const generationRequestsRef = useRef(new Map<string, CanvasGenerationRequest>());
 
     const {
@@ -521,10 +516,7 @@ function InfiniteCanvasPage() {
     useLayoutEffect(() => {
         nodesRef.current = nodes;
         connectionsRef.current = connections;
-        connectingParamsRef.current = connectingParams;
-        connectionTargetNodeIdRef.current = connectionTargetNodeId;
-        pendingConnectionCreateRef.current = pendingConnectionCreate;
-    }, [nodes, connections, selectedNodeIds, viewport, connectingParams, connectionTargetNodeId, pendingConnectionCreate]);
+    }, [nodes, connections, selectedNodeIds, viewport]);
 
     useEffect(() => {
         if (!projectLoaded) return;
@@ -576,14 +568,6 @@ function InfiniteCanvasPage() {
         setContextMenu,
         showMessage: message.success,
     });
-    const setConnecting = useCallback((next: ConnectionHandle | null) => {
-        connectingParamsRef.current = next;
-        setConnectingParams(next);
-        if (!next) {
-            connectionTargetNodeIdRef.current = null;
-            setConnectionTargetNodeId(null);
-        }
-    }, []);
 
     const keepNodeToolbar = useCallback(
         (nodeId: string) => {
@@ -638,17 +622,9 @@ function InfiniteCanvasPage() {
             setSelectedNodeIds(new Set([newNode.id]));
             setSelectedConnectionId(null);
             if (type !== CanvasNodeType.Text && type !== CanvasNodeType.Audio) setDialogNodeId(newNode.id);
-            setPendingConnectionCreate(null);
-            setConnecting(null);
         },
-        [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, message, setConnecting],
+        [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, message],
     );
-
-    const cancelPendingConnectionCreate = useCallback(() => {
-        setPendingConnectionCreate(null);
-        setConnecting(null);
-    }, [setConnecting]);
-
     const getConnectionDropTarget = useCallback(
         (clientX: number, clientY: number, current: ConnectionHandle): ConnectionDropTarget => {
             const world = screenToCanvas(clientX, clientY);
@@ -685,6 +661,25 @@ function InfiniteCanvasPage() {
         },
         [screenToCanvas],
     );
+
+    const {
+        connectingParams,
+        connectionTargetNodeId,
+        pendingConnectionCreate,
+        connectingParamsRef,
+        connectionTargetNodeIdRef,
+        pendingConnectionCreateRef,
+        startConnection,
+        updateConnectionTarget,
+        finishConnection,
+        cancelConnection,
+        cancelPendingConnectionCreate,
+    } = useCanvasConnectionCreation({
+        nodesRef,
+        screenToCanvas,
+        getConnectionDropTarget,
+        connectNodes,
+    });
 
     const visibleNodes = useMemo(() => {
         const padding = 280;
@@ -1005,7 +1000,7 @@ function InfiniteCanvasPage() {
     const handleCanvasMouseDown = useCallback(
         (event: ReactPointerEvent<HTMLDivElement>) => {
             setContextMenu(null);
-            if (pendingConnectionCreateRef.current) cancelPendingConnectionCreate();
+            cancelPendingConnectionCreate();
             if (event.button !== 0) return;
 
             if (!event.ctrlKey && !event.metaKey) {
@@ -1129,14 +1124,9 @@ function InfiniteCanvasPage() {
                 return;
             }
 
-            if (connectingParamsRef.current && !pendingConnectionCreateRef.current) {
-                const dropTarget = getConnectionDropTarget(event.clientX, event.clientY, connectingParamsRef.current);
-                connectionTargetNodeIdRef.current = dropTarget.nodeId;
-                setConnectionTargetNodeId(dropTarget.nodeId);
-                setMouseWorld(screenToCanvas(event.clientX, event.clientY));
-            }
+            updateConnectionTarget(event.clientX, event.clientY);
         },
-        [finishNodeDrag, getConnectionDropTarget, screenToCanvas],
+        [finishNodeDrag, updateConnectionTarget],
     );
 
     const handleGlobalMouseUp = useCallback(
@@ -1145,23 +1135,9 @@ function InfiniteCanvasPage() {
 
             clearSelectionBox();
 
-            if (pendingConnectionCreateRef.current) return;
-
-            const currentConnection = connectingParamsRef.current;
-            if (currentConnection) {
-                const dropTarget = getConnectionDropTarget(event.clientX, event.clientY, currentConnection);
-                if (dropTarget.nodeId) {
-                    connectNodes(currentConnection, dropTarget.nodeId);
-                    setConnecting(null);
-                } else if (dropTarget.isNearNode) {
-                    setConnecting(null);
-                } else {
-                    setMouseWorld(screenToCanvas(event.clientX, event.clientY));
-                    setPendingConnectionCreate({ connection: currentConnection, position: screenToCanvas(event.clientX, event.clientY) });
-                }
-            }
+            finishConnection(event.clientX, event.clientY);
         },
-        [connectNodes, finishNodeDrag, getConnectionDropTarget, screenToCanvas, setConnecting],
+        [finishNodeDrag, clearSelectionBox, finishConnection],
     );
 
     useEffect(() => {
@@ -1418,7 +1394,7 @@ function InfiniteCanvasPage() {
             setSelectedConnectionId(null);
             setContextMenu(null);
             clearSelectionBox();
-            setConnecting(null);
+            cancelConnection();
             setHoveredNodeId(null);
             setToolbarNodeId(null);
             setDialogNodeId(null);
@@ -1426,7 +1402,7 @@ function InfiniteCanvasPage() {
             setInfoNodeId(null);
             setCropNodeId(null);
             setMaskEditNodeId(null);
-            setPendingConnectionCreate(null);
+            cancelPendingConnectionCreate();
         },
     });
 
@@ -1434,12 +1410,10 @@ function InfiniteCanvasPage() {
         (event: ReactMouseEvent, nodeId: string, handleType: "source" | "target") => {
             event.stopPropagation();
             setMouseWorld(screenToCanvas(event.clientX, event.clientY));
-            setConnecting({ nodeId, handleType });
-            connectionTargetNodeIdRef.current = null;
-            setConnectionTargetNodeId(null);
+            startConnection(event, nodeId, handleType);
             setSelectedConnectionId(null);
         },
-        [screenToCanvas, setConnecting],
+        [screenToCanvas, startConnection],
     );
 
     const handleNodeResize = useCallback((nodeId: string, width: number, height: number, position?: Position) => {
@@ -2755,7 +2729,7 @@ function InfiniteCanvasPage() {
                             }}
                         />
                     ) : null}
-                    {pendingConnectionCreate ? <ConnectionCreateMenu pending={pendingConnectionCreate} onCreate={(type) => createConnectedNode(type, pendingConnectionCreate)} onClose={cancelPendingConnectionCreate} /> : null}
+                    {pendingConnectionCreate ? <ConnectionCreateMenu pending={pendingConnectionCreate} onCreate={(type) => { createConnectedNode(type, pendingConnectionCreate); cancelPendingConnectionCreate(); }} onClose={cancelPendingConnectionCreate} /> : null}
                 </InfiniteCanvas>
 
                 <CanvasNodeHoverToolbar
