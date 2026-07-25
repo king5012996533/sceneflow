@@ -66,9 +66,9 @@ import { useCanvasFileImport } from "../hooks/use-canvas-file-import";
 import { useCanvasSelection } from "../hooks/use-canvas-selection";
 import { useCanvasViewportState } from "../hooks/use-canvas-viewport-state";
 import { useCanvasPointerInteractions } from "../hooks/use-canvas-pointer-interactions";
+import { useCanvasClipboard } from "../hooks/use-canvas-clipboard";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
-    CanvasClipboard,
     DirectorPanoramaPayload,
     PendingConnectionCreate,
     ConnectionDropTarget,
@@ -167,7 +167,6 @@ function InfiniteCanvasPage() {
     const localAgentConnected = useCanvasAgentStore((state) => state.connected);
     const localAgentActivity = useCanvasAgentStore((state) => state.activity);
     const localAgentEnabled = useCanvasAgentStore((state) => state.enabled);
-    const clipboardRef = useRef<CanvasClipboard | null>(null);
     const rafRef = useRef<number | null>(null);
     const toolbarHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const nodeDraggingRef = useRef(false);
@@ -283,6 +282,7 @@ function InfiniteCanvasPage() {
     } = vp;
 
     const nodesRef = useRef(nodes);
+    const connectionsRef = useRef(connections);
 
     const {
         selectionBox,
@@ -297,7 +297,23 @@ function InfiniteCanvasPage() {
         setSelectedNodeIds,
     });
 
-    const connectionsRef = useRef(connections);
+    const {
+        clipboardRef,
+        copySelectedNodes,
+        pasteCopiedNodes,
+    } = useCanvasClipboard({
+        nodesRef,
+        connectionsRef,
+        selectedNodeIdsRef,
+        getCanvasCenter,
+        setNodes,
+        setConnections,
+        setSelectedNodeIds,
+        setSelectedConnectionId,
+        setContextMenu,
+        setDialogNodeId,
+    });
+
     const generateNodeRef = useRef<((nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => Promise<void>) | null>(null);
     const continueVideoRef = useRef<((node: CanvasNodeData) => Promise<void>) | null>(null);
     const connectingParamsRef = useRef(connectingParams);
@@ -954,81 +970,6 @@ function InfiniteCanvasPage() {
         setSelectedConnectionId(null);
         setDialogNodeId(id);
     }, []);
-
-    const copySelectedNodes = useCallback(() => {
-        const selectedIds = selectedNodeIdsRef.current;
-        if (!selectedIds.size) return;
-
-        const copiedNodes = nodesRef.current
-            .filter((node) => selectedIds.has(node.id))
-            .map((node) => ({
-                ...node,
-                position: { ...node.position },
-                metadata: node.metadata ? { ...node.metadata } : undefined,
-            }));
-
-        if (!copiedNodes.length) return;
-
-        clipboardRef.current = {
-            nodes: copiedNodes,
-            connections: connectionsRef.current.filter((connection) => selectedIds.has(connection.fromNodeId) && selectedIds.has(connection.toNodeId)).map((connection) => ({ ...connection })),
-        };
-    }, []);
-
-    const pasteCopiedNodes = useCallback(() => {
-        const clipboard = clipboardRef.current;
-        if (!clipboard?.nodes.length) return false;
-
-        const center = getCanvasCenter();
-        const bounds = clipboard.nodes.reduce(
-            (acc, node) => ({
-                left: Math.min(acc.left, node.position.x),
-                top: Math.min(acc.top, node.position.y),
-                right: Math.max(acc.right, node.position.x + node.width),
-                bottom: Math.max(acc.bottom, node.position.y + node.height),
-            }),
-            { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity },
-        );
-        const dx = center.x - (bounds.left + bounds.right) / 2;
-        const dy = center.y - (bounds.top + bounds.bottom) / 2;
-        const idMap = new Map<string, string>();
-        const nextNodes = clipboard.nodes.map((node, index) => {
-            const id = `${node.type}-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`;
-            idMap.set(node.id, id);
-            return {
-                ...node,
-                id,
-                title: node.title.endsWith(" Copy") ? node.title : `${node.title} Copy`,
-                position: {
-                    x: node.position.x + dx,
-                    y: node.position.y + dy,
-                },
-                metadata: node.metadata ? { ...node.metadata } : undefined,
-            };
-        });
-
-        const nextConnections = clipboard.connections.flatMap((connection, index) => {
-            const fromNodeId = idMap.get(connection.fromNodeId);
-            const toNodeId = idMap.get(connection.toNodeId);
-            if (!fromNodeId || !toNodeId) return [];
-            return [
-                {
-                    ...connection,
-                    id: `conn-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`,
-                    fromNodeId,
-                    toNodeId,
-                },
-            ];
-        });
-
-        setNodes((prev) => [...prev, ...nextNodes]);
-        setConnections((prev) => [...prev, ...nextConnections]);
-        setSelectedNodeIds(new Set(nextNodes.map((node) => node.id)));
-        setSelectedConnectionId(null);
-        setContextMenu(null);
-        setDialogNodeId(nextNodes[0]?.id || null);
-        return true;
-    }, [getCanvasCenter]);
 
     const handleResetViewport = useCallback(() => {
         vp.resetViewport();
