@@ -70,13 +70,13 @@ import { useCanvasClipboard } from "../hooks/use-canvas-clipboard";
 import { useCanvasConnectionCreation } from "../hooks/use-canvas-connection-creation";
 import { useCanvasNodeDrag } from "../hooks/use-canvas-node-drag";
 import { useCanvasNodeActions } from "../hooks/use-canvas-node-actions";
+import { useCanvasGenerationRequests } from "../hooks/use-canvas-generation-requests";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     DirectorPanoramaPayload,
     PendingConnectionCreate,
     ConnectionDropTarget,
     CanvasHistoryEntry,
-    CanvasGenerationRequest,
     VIDEO_NODE_MAX_WIDTH,
     VIDEO_NODE_MAX_HEIGHT,
     CONNECTION_HANDLE_HIT_RADIUS,
@@ -301,7 +301,6 @@ function InfiniteCanvasPage() {
     const generateNodeRef = useRef<((nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => Promise<void>) | null>(null);
     const continueVideoRef = useRef<((node: CanvasNodeData) => Promise<void>) | null>(null);
     const agentCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const generationRequestsRef = useRef(new Map<string, CanvasGenerationRequest>());
 
     const {
         historyRef,
@@ -343,6 +342,19 @@ function InfiniteCanvasPage() {
         void fetchClientEntitlements().then(setEntitlements);
     }, []);
 
+    const {
+        generationRequestsRef,
+        startGenerationRequest,
+        finishGenerationRequest,
+        stopGenerationByRunningId,
+        confirmStopGeneration,
+    } = useCanvasGenerationRequests({
+        entitlements,
+        setRunningNodeId,
+        setNodes,
+        modal,
+    });
+
     const reserveCanvasGenerationQuota = useCallback(
         async (count = 1) => {
             const safeCount = Math.max(1, Math.min(50, Math.floor(Number(count) || 1)));
@@ -362,57 +374,6 @@ function InfiniteCanvasPage() {
             await reserveGenerationQuota(safeCount);
         },
         [entitlements, message, user?.role],
-    );
-
-    const startGenerationRequest = useCallback(async (targetNodeId: string, originNodeId: string, runningId = originNodeId, controller = new AbortController()) => {
-        const previous = generationRequestsRef.current.get(targetNodeId);
-        if (previous?.controller !== controller) previous?.controller.abort();
-        const concurrentLimit = entitlements ? entitlements.concurrentJobs : null;
-        const activeRequests = Array.from(generationRequestsRef.current.values()).filter((request) => request.targetNodeId !== targetNodeId).length;
-        if (isOverLimit(activeRequests, concurrentLimit)) {
-            throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请等待已有任务完成或升级套餐。`);
-        }
-        generationRequestsRef.current.set(targetNodeId, { targetNodeId, originNodeId, runningNodeId: runningId, controller });
-        return controller;
-    }, [entitlements]);
-
-    const finishGenerationRequest = useCallback((targetNodeId: string, controller: AbortController) => {
-        const request = generationRequestsRef.current.get(targetNodeId);
-        if (request?.controller === controller) generationRequestsRef.current.delete(targetNodeId);
-    }, []);
-
-    const stopGenerationByRunningId = useCallback((runningId: string) => {
-        const affectedNodeIds = new Set<string>();
-        generationRequestsRef.current.forEach((request) => {
-            if (request.runningNodeId !== runningId) return;
-            request.controller.abort();
-            generationRequestsRef.current.delete(request.targetNodeId);
-            affectedNodeIds.add(request.targetNodeId);
-            affectedNodeIds.add(request.originNodeId);
-        });
-        setRunningNodeId((current) => (current === runningId ? null : current));
-        if (!affectedNodeIds.size) return;
-        setNodes((prev) =>
-            prev.map((node) =>
-                affectedNodeIds.has(node.id) && node.metadata?.status === NODE_STATUS_LOADING
-                    ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_IDLE, errorDetails: undefined } }
-                    : node,
-            ),
-        );
-    }, []);
-
-    const confirmStopGeneration = useCallback(
-        (nodeId: string) => {
-            modal.confirm({
-                title: "停止生成？",
-                content: "当前生成请求会被中断，已经生成完成的内容会保留。",
-                okText: "停止",
-                cancelText: "继续生成",
-                okButtonProps: { danger: true },
-                onOk: () => stopGenerationByRunningId(nodeId),
-            });
-        },
-        [modal, stopGenerationByRunningId],
     );
 
     useEffect(() => {
