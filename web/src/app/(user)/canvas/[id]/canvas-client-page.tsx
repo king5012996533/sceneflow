@@ -6,7 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Bot, Home, ImageIcon, Images, List, Menu, Music2, Plus, Redo2, Settings2, Trash2, Undo2, Upload, Video } from "lucide-react";
 import { saveAs } from "file-saver";
 
-import { persistGeneratedAudio, persistGeneratedVideo, requestGeneratedAudio, requestGeneratedImages, requestGeneratedText, requestGeneratedVideo } from "@/lib/generation/generation-request";
+import { requestGeneratedImages } from "@/lib/generation/generation-request";
 import { QuotaExceededError } from "@/lib/generation/generation-guard";
 import { QuotaExceededModal } from "@/components/quota-exceeded-modal";
 
@@ -37,7 +37,7 @@ import { CanvasNodeCropDialog, type CanvasImageCropRect } from "../components/ca
 import { CanvasNodeMaskEditDialog, type CanvasImageMaskEditPayload } from "../components/canvas-node-mask-edit-dialog";
 import { CanvasNodeSplitDialog, type CanvasImageSplitParams } from "../components/canvas-node-split-dialog";
 import { CanvasNodeUpscaleDialog, type CanvasImageUpscaleParams } from "../components/canvas-node-upscale-dialog";
-import { buildNodeResponseMessages } from "../components/canvas-node-generation";
+
 import { CanvasNodeHoverToolbar, CanvasNodeInfoModal } from "../components/canvas-node-hover-toolbar";
 import { InfiniteCanvas } from "../components/infinite-canvas";
 import { Minimap } from "../components/canvas-mini-map";
@@ -77,6 +77,7 @@ import { useCanvasImageGeneration } from "../hooks/use-canvas-image-generation";
 import { useCanvasVideoGeneration } from "../hooks/use-canvas-video-generation";
 import { useCanvasTextGeneration } from "../hooks/use-canvas-text-generation";
 import { useCanvasAudioGeneration } from "../hooks/use-canvas-audio-generation";
+import { useCanvasRetryGeneration } from "../hooks/use-canvas-retry-generation";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     DirectorPanoramaPayload,
@@ -762,6 +763,26 @@ function InfiniteCanvasPage() {
         finishGenerationRequest,
         setNodes,
         setConnections,
+    });
+
+    const { retryNode } = useCanvasRetryGeneration({
+        reserveCanvasGenerationQuota,
+        startGenerationRequest,
+        finishGenerationRequest,
+        isGenerationCanceled,
+        retrySourceNode,
+        buildHydratedContext,
+        buildGenCfg,
+        resolveReferences,
+        sourceReferenceImages,
+        isAiConfigReady,
+        openConfigDialog,
+        nodesRef,
+        effectiveConfig,
+        setNodes,
+        setRunningNodeId,
+        message,
+        quotaModalRef,
     });
 
     const visibleNodes = useMemo(() => {
@@ -1811,112 +1832,6 @@ function InfiniteCanvasPage() {
         generateNodeRef.current = handleGenerateNode;
     }, [handleGenerateNode]);
 
-    const handleRetryNode = useCallback(
-        async (node: CanvasNodeData) => {
-            const sourceNode = retrySourceNode(node.id) || node;
-            const batchRoot = node.metadata?.batchRootId ? nodesRef.current.find((item) => item.id === node.metadata?.batchRootId) : null;
-            const savedImageMetadata = node.type === CanvasNodeType.Image ? { ...batchRoot?.metadata, ...node.metadata } : undefined;
-            const hasSavedImageMetadata = Boolean(savedImageMetadata?.generationType);
-            const generationConfig =
-                hasSavedImageMetadata && savedImageMetadata
-                    ? {
-                          ...effectiveConfig,
-                          model: savedImageMetadata.model || effectiveConfig.imageModel || effectiveConfig.model,
-                          quality: savedImageMetadata.quality || effectiveConfig.quality,
-                          size: savedImageMetadata.size || effectiveConfig.size,
-                          count: "1",
-                      }
-                    : { ...buildGenCfg(sourceNode, node.type === CanvasNodeType.Text ? "text" : node.type === CanvasNodeType.Video ? "video" : node.type === CanvasNodeType.Audio ? "audio" : "image"), count: "1" };
-            if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
-                return;
-            }
-
-            const context = hasSavedImageMetadata ? null : await buildHydratedContext(sourceNode.id, sourceNode.metadata?.prompt || node.metadata?.prompt || "");
-            const prompt = (savedImageMetadata?.prompt || context?.prompt || "").trim();
-            if (!prompt) {
-                message.warning("找不到提示词，无法重试");
-                return;
-            }
-            const generationType = savedImageMetadata?.generationType;
-            const useReferenceImages = generationType ? generationType === "edit" : Boolean(context?.referenceImages.length);
-            const retryReferenceImages =
-                hasSavedImageMetadata && savedImageMetadata ? await resolveReferences(savedImageMetadata) : useReferenceImages ? (context?.referenceImages.length ? context.referenceImages : sourceReferenceImages(batchRoot || sourceNode)) : [];
-            if (useReferenceImages && !retryReferenceImages) {
-                message.error("参考图片已丢失，无法继续重试");
-                setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: "参考图片已丢失，无法继续重试" } } : item)));
-                return;
-            }
-            const retryImages = retryReferenceImages || [];
-
-            try {
-                await reserveCanvasGenerationQuota(1);
-            } catch (error) {
-                if (error instanceof QuotaExceededError) quotaModalRef.current?.open(0, null);
-                else if (error instanceof Error) message.warning(error.message);
-                return;
-            }
-
-            setRunningNodeId(node.id);
-            setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_LOADING, errorDetails: undefined } } : item)));
-            const controller = await startGenerationRequest(node.id, sourceNode.id, node.id);
-
-            try {
-                if (node.type === CanvasNodeType.Text) {
-                    if (!context) return;
-                    let streamed = "";
-                    const answer = await requestGeneratedText({ config: generationConfig, messages: buildNodeResponseMessages({ ...context, prompt }), onDelta: (text) => {
-                        streamed = text;
-                        setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, type: CanvasNodeType.Text, metadata: { ...item.metadata, content: text, status: NODE_STATUS_LOADING } } : item)));
-                    }, options: { signal: controller.signal } });
-                    setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, type: CanvasNodeType.Text, metadata: { ...item.metadata, content: answer || streamed, prompt, status: NODE_STATUS_SUCCESS } } : item)));
-                    return;
-                }
-                if (node.type === CanvasNodeType.Video) {
-                    const video = await persistGeneratedVideo(await requestGeneratedVideo({ config: generationConfig, prompt, references: retryImages, videoReferences: context?.referenceVideos || [], audioReferences: context?.referenceAudios || [], options: { signal: controller.signal } }));
-                    const videoSize = fitNodeSize(video.width || node.width, video.height || node.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
-                    setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, width: videoSize.width, height: videoSize.height, position: { x: item.position.x + item.width / 2 - videoSize.width / 2, y: item.position.y + item.height / 2 - videoSize.height / 2 }, metadata: { ...item.metadata, ...videoMetadata(video), prompt, model: generationConfig.model, size: generationConfig.size, seconds: generationConfig.videoSeconds, vquality: generationConfig.vquality, generateAudio: generationConfig.videoGenerateAudio, watermark: generationConfig.videoWatermark } } : item)));
-                    return;
-                }
-                if (node.type === CanvasNodeType.Audio) {
-                    const audio = await persistGeneratedAudio(await requestGeneratedAudio({ config: generationConfig, prompt, options: { signal: controller.signal } }), generationConfig.audioFormat);
-                    setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, ...audioMetadata(audio), prompt, ...buildAudioGenerationMetadata(generationConfig) } } : item)));
-                    return;
-                }
-
-                const image = await requestGeneratedImages({ config: generationConfig, prompt, references: useReferenceImages ? retryImages : [], options: { signal: controller.signal } }).then((items) => items[0]);
-                const uploadedImage = await uploadImage(image.dataUrl);
-                const imageConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
-                const imageSize = fitNodeSize(uploadedImage.width, uploadedImage.height, imageConfig.width, imageConfig.height);
-                const generationMetadata = savedImageMetadata?.generationType
-                    ? { generationType: savedImageMetadata.generationType, model: generationConfig.model, size: generationConfig.size, quality: generationConfig.quality, count: savedImageMetadata.count || 1, references: savedImageMetadata.references }
-                    : buildImageGenerationMetadata(useReferenceImages ? "edit" : "generation", generationConfig, 1, retryImages);
-                setNodes((prev) =>
-                    prev.map((item) =>
-                        item.id === node.id
-                            ? {
-                                  ...item,
-                                  type: CanvasNodeType.Image,
-                                  width: imageSize.width,
-                                  height: imageSize.height,
-                                  metadata: { ...item.metadata, ...imageMetadata(uploadedImage), prompt, ...generationMetadata },
-                              }
-                            : item,
-                    ),
-                );
-            } catch (error) {
-                if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : "生成失败";
-                message.error(canvasGenerationErrorToast(errorDetails));
-                setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
-            } finally {
-                finishGenerationRequest(node.id, controller);
-                setRunningNodeId(null);
-            }
-        },
-        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, reserveCanvasGenerationQuota, startGenerationRequest],
-    );
-
 
     const insertAssistantImage = useCallback(
         async (image: CanvasAssistantImage) => {
@@ -2135,7 +2050,7 @@ function InfiniteCanvasPage() {
                             onContentChange={updateNodeContent}
                             onToggleBatch={toggleBatchExpanded}
                             onSetBatchPrimary={setBatchPrimary}
-                            onRetry={(node) => void handleRetryNode(node)}
+                            onRetry={(node) => void retryNode(node)}
                             onGenerateImage={generateImageFromTextNode}
                             onViewImage={(node) => setPreviewNodeId(node.id)}
                             onContextMenu={(event, id) => {
@@ -2185,7 +2100,7 @@ function InfiniteCanvasPage() {
                     onViewImage={(node) => setPreviewNodeId(node.id)}
                     onContinueVideo={(node) => void createContinuationFromVideo(node)}
                     onReversePrompt={createImageReversePromptNodes}
-                    onRetry={(node) => void handleRetryNode(node)}
+                    onRetry={(node) => void retryNode(node)}
                     onToggleFreeResize={(node) => toggleFreeResize(node.id)}
                     onDelete={(node) => deleteNodes(new Set([node.id]))}
                 />
