@@ -60,6 +60,8 @@ import { composeShotPackBlob, splitImageGrid } from "../utils/shot-pack-image";
 import { CanvasRefreshShell } from "../components/canvas-refresh-shell";
 import { ConnectionCreateMenu } from "../components/connection-create-menu";
 import { CanvasTopBar } from "../components/canvas-top-bar";
+import { useCanvasHistory } from "../hooks/use-canvas-history";
+import { useCanvasKeyboardShortcuts } from "../hooks/use-canvas-keyboard-shortcuts";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     CanvasClipboard,
@@ -168,12 +170,7 @@ function InfiniteCanvasPage() {
     const imageInputRef = useRef<HTMLInputElement>(null);
     const uploadTargetRef = useRef<{ nodeId?: string; position?: Position } | null>(null);
     const clipboardRef = useRef<CanvasClipboard | null>(null);
-    const historyRef = useRef<{ past: CanvasHistoryEntry[]; future: CanvasHistoryEntry[] }>({ past: [], future: [] });
-    const lastHistoryRef = useRef<CanvasHistoryEntry | null>(null);
-    const historyCommitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const viewportSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const applyingHistoryRef = useRef(false);
-    const historyPausedRef = useRef(false);
     const didInitialCenterRef = useRef(false);
     const rafRef = useRef<number | null>(null);
     const toolbarHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -256,7 +253,6 @@ function InfiniteCanvasPage() {
     const codexCompactAgent = codexAutoConnect && searchParams.has("agentUrl");
     const [titleEditing, setTitleEditing] = useState(false);
     const [titleDraft, setTitleDraft] = useState("");
-    const [historyState, setHistoryState] = useState({ canUndo: false, canRedo: false });
     const [collapsingBatchIds, setCollapsingBatchIds] = useState<Set<string>>(new Set());
     const [openingBatchIds, setOpeningBatchIds] = useState<Set<string>>(new Set());
     const [isNodeDragging, setIsNodeDragging] = useState(false);
@@ -274,16 +270,33 @@ function InfiniteCanvasPage() {
     const pendingConnectionCreateRef = useRef(pendingConnectionCreate);
     const generationRequestsRef = useRef(new Map<string, CanvasGenerationRequest>());
 
-    const createHistoryEntry = useCallback(
-        (): CanvasHistoryEntry => ({
-            nodes: nodesRef.current,
-            connections: connectionsRef.current,
-            chatSessions,
-            activeChatId,
-            backgroundMode,
-            showImageInfo,
-        }),
-        [activeChatId, backgroundMode, chatSessions, showImageInfo],
+    const {
+        historyRef,
+        lastHistoryRef,
+        historyCommitTimerRef,
+        applyingHistoryRef,
+        historyPausedRef,
+        historyState,
+        setHistoryState,
+        createHistoryEntry,
+        applyHistory,
+        undoCanvas,
+        redoCanvas,
+        resetHistory,
+        updateLastHistoryEntry,
+    } = useCanvasHistory(
+        { nodes, connections, chatSessions, activeChatId, backgroundMode, showImageInfo },
+        {
+            setNodes,
+            setConnections,
+            setChatSessions,
+            setActiveChatId,
+            setBackgroundMode,
+            setShowImageInfo,
+            setSelectedNodeIds,
+            setSelectedConnectionId,
+            setContextMenu,
+        },
     );
 
     const cleanupCanvasFiles = useCallback(
@@ -388,20 +401,15 @@ function InfiniteCanvasPage() {
             setBackgroundMode(project.backgroundMode);
             setShowImageInfo(project.showImageInfo || false);
             setViewport(project.viewport);
-            historyRef.current = { past: [], future: [] };
-            if (historyCommitTimerRef.current) {
-                clearTimeout(historyCommitTimerRef.current);
-                historyCommitTimerRef.current = null;
-            }
-            lastHistoryRef.current = {
+            resetHistory();
+            updateLastHistoryEntry({
                 nodes: restoredNodes,
                 connections: project.connections,
                 chatSessions: restoredSessions,
                 activeChatId: project.activeChatId || null,
                 backgroundMode: project.backgroundMode,
                 showImageInfo: project.showImageInfo || false,
-            };
-            setHistoryState({ canUndo: false, canRedo: false });
+            });
             setProjectLoaded(true);
         };
         void restore();
@@ -831,36 +839,6 @@ function InfiniteCanvasPage() {
         },
         [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, getCanvasCenter],
     );
-
-    const createShotPackNode = useCallback(() => {
-        const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Image];
-        const center = getCanvasCenter();
-        const id = `shot-pack-${nanoid()}`;
-        const node: CanvasNodeData = {
-            id,
-            type: CanvasNodeType.Image,
-            title: "镜头包",
-            position: { x: center.x - 220, y: center.y - 160 },
-            width: 440,
-            height: 320,
-            metadata: {
-                content: "",
-                status: NODE_STATUS_IDLE,
-                pipelineKind: "shot-pack",
-                pipelineLabel: "镜头包",
-                pipelineDescription: "把散图或九宫格分镜整理成一张视频参考图",
-                assetCategory: "storyboard",
-                assetSource: "manual",
-                assetReusable: true,
-                shotPack: { shots: [], layout: "grid-3", showIndex: true, showCaption: false },
-            },
-        };
-        node.metadata = { ...node.metadata, naturalWidth: spec.width, naturalHeight: spec.height };
-        setNodes((prev) => [...prev, node]);
-        setSelectedNodeIds(new Set([id]));
-        setSelectedConnectionId(null);
-        setDialogNodeId(id);
-    }, [getCanvasCenter]);
 
     const openDirectorShot = useCallback((node: CanvasNodeData) => {
         setSelectedNodeIds(new Set([node.id]));
@@ -1446,43 +1424,6 @@ function InfiniteCanvasPage() {
         [size.height, size.width],
     );
 
-    const applyHistory = useCallback((entry: CanvasHistoryEntry) => {
-        if (historyCommitTimerRef.current) {
-            clearTimeout(historyCommitTimerRef.current);
-            historyCommitTimerRef.current = null;
-        }
-        applyingHistoryRef.current = true;
-        setNodes(entry.nodes);
-        setConnections(entry.connections);
-        setChatSessions(entry.chatSessions);
-        setActiveChatId(entry.activeChatId);
-        setBackgroundMode(entry.backgroundMode);
-        setShowImageInfo(entry.showImageInfo);
-        setSelectedNodeIds(new Set());
-        setSelectedConnectionId(null);
-        setContextMenu(null);
-        setTimeout(() => {
-            lastHistoryRef.current = entry;
-            applyingHistoryRef.current = false;
-            setHistoryState({ canUndo: historyRef.current.past.length > 0, canRedo: historyRef.current.future.length > 0 });
-        });
-    }, []);
-
-    const undoCanvas = useCallback(() => {
-        const previous = historyRef.current.past.pop();
-        const current = lastHistoryRef.current;
-        if (!previous || !current) return;
-        historyRef.current.future.push(current);
-        applyHistory(previous);
-    }, [applyHistory]);
-
-    const redoCanvas = useCallback(() => {
-        const next = historyRef.current.future.pop();
-        const current = lastHistoryRef.current;
-        if (!next || !current) return;
-        historyRef.current.past.push(current);
-        applyHistory(next);
-    }, [applyHistory]);
 
     const createAndOpenProject = useCallback(() => {
         const projects = useCanvasStore.getState().projects;
@@ -1937,76 +1878,42 @@ function InfiniteCanvasPage() {
         if (createTextNodeFromClipboard(text)) message.success("已从剪切板添加文本");
     }, [createImageFileNode, createTextNodeFromClipboard, getCanvasCenter, message]);
 
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            const target = event.target instanceof Element ? event.target : null;
-            if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement || target?.closest("[contenteditable='true'],[data-canvas-no-zoom]")) return;
-
-            const key = event.key.toLowerCase();
-            const isModifierShortcut = event.metaKey || event.ctrlKey;
-
-            if (isModifierShortcut && !event.altKey && key === "z") {
-                event.preventDefault();
-                if (event.shiftKey) redoCanvas();
-                else undoCanvas();
-                return;
+    useCanvasKeyboardShortcuts({
+        onUndo: undoCanvas,
+        onRedo: redoCanvas,
+        onSelectAll: () => {
+            setSelectedNodeIds(new Set(nodesRef.current.map((node) => node.id)));
+            setSelectedConnectionId(null);
+            setContextMenu(null);
+            setSelectionBox(null);
+        },
+        onDelete: () => {
+            if (selectedNodeIdsRef.current.size) {
+                deleteNodes(new Set(selectedNodeIdsRef.current));
+            } else if (selectedConnectionId) {
+                deleteConnection(selectedConnectionId);
             }
-
-            if (isModifierShortcut && !event.altKey && key === "y") {
-                event.preventDefault();
-                redoCanvas();
-                return;
-            }
-
-            if (isModifierShortcut && !event.altKey && key === "a") {
-                event.preventDefault();
-                setSelectedNodeIds(new Set(nodesRef.current.map((node) => node.id)));
-                setSelectedConnectionId(null);
-                setContextMenu(null);
-                setSelectionBox(null);
-                return;
-            }
-
-            if (isModifierShortcut && !event.altKey && key === "c") {
-                event.preventDefault();
-                copySelectedNodes();
-                return;
-            }
-
-            if (isModifierShortcut && !event.altKey && key === "v") {
-                event.preventDefault();
-                if (!pasteCopiedNodes()) void pasteSystemClipboard();
-                return;
-            }
-
-            if (event.key === "Delete" || event.key === "Backspace") {
-                if (selectedNodeIdsRef.current.size) {
-                    deleteNodes(new Set(selectedNodeIdsRef.current));
-                } else if (selectedConnectionId) {
-                    deleteConnection(selectedConnectionId);
-                }
-            }
-
-            if (event.key === "Escape") {
-                setSelectedNodeIds(new Set());
-                setSelectedConnectionId(null);
-                setContextMenu(null);
-                setSelectionBox(null);
-                setConnecting(null);
-                setHoveredNodeId(null);
-                setToolbarNodeId(null);
-                setDialogNodeId(null);
-                setEditingNodeId(null);
-                setInfoNodeId(null);
-                setCropNodeId(null);
-                setMaskEditNodeId(null);
-                setPendingConnectionCreate(null);
-            }
-        };
-
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [copySelectedNodes, deleteConnection, deleteNodes, pasteCopiedNodes, pasteSystemClipboard, redoCanvas, selectedConnectionId, setConnecting, undoCanvas]);
+        },
+        onCopy: copySelectedNodes,
+        onPaste: () => {
+            if (!pasteCopiedNodes()) void pasteSystemClipboard();
+        },
+        onEscape: () => {
+            setSelectedNodeIds(new Set());
+            setSelectedConnectionId(null);
+            setContextMenu(null);
+            setSelectionBox(null);
+            setConnecting(null);
+            setHoveredNodeId(null);
+            setToolbarNodeId(null);
+            setDialogNodeId(null);
+            setEditingNodeId(null);
+            setInfoNodeId(null);
+            setCropNodeId(null);
+            setMaskEditNodeId(null);
+            setPendingConnectionCreate(null);
+        },
+    });
 
     const handleConnectStart = useCallback(
         (event: ReactMouseEvent, nodeId: string, handleType: "source" | "target") => {
@@ -3337,7 +3244,6 @@ function InfiniteCanvasPage() {
                     onAddText={() => createNode(CanvasNodeType.Text)}
                     onAddConfig={() => createNode(CanvasNodeType.Config)}
                     onAddDirectorShot={createDirectorShotNode}
-                    onAddShotPack={createShotPackNode}
                     onCreateMangaWorkflow={createMangaWorkflowNodes}
                     onUndo={undoCanvas}
                     onRedo={redoCanvas}
