@@ -76,6 +76,7 @@ import { useCanvasGenerationContext } from "../hooks/use-canvas-generation-conte
 import { useCanvasImageGeneration } from "../hooks/use-canvas-image-generation";
 import { useCanvasVideoGeneration } from "../hooks/use-canvas-video-generation";
 import { useCanvasTextGeneration } from "../hooks/use-canvas-text-generation";
+import { useCanvasAudioGeneration } from "../hooks/use-canvas-audio-generation";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     DirectorPanoramaPayload,
@@ -750,6 +751,13 @@ function InfiniteCanvasPage() {
     });
 
     const { generateText } = useCanvasTextGeneration({
+        startGenerationRequest,
+        finishGenerationRequest,
+        setNodes,
+        setConnections,
+    });
+
+    const { generateAudio } = useCanvasAudioGeneration({
         startGenerationRequest,
         finishGenerationRequest,
         setNodes,
@@ -1765,29 +1773,13 @@ function InfiniteCanvasPage() {
                 }
 
                 if (mode === "audio") {
-                    const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Audio];
-                    const isEmptyAudioNode = sourceNode?.type === CanvasNodeType.Audio && !sourceNode.metadata?.content;
-                    const audioId = isEmptyAudioNode ? nodeId : nanoid();
-                    const parent = sourceNode?.position || { x: 0, y: 0 };
-                    const audioNode: CanvasNodeData = {
-                        id: audioId,
-                        type: CanvasNodeType.Audio,
-                        title: effectivePrompt.slice(0, 32) || "Generated Audio",
-                        position: isEmptyAudioNode ? sourceNode.position : { x: parent.x + (sourceNode?.width || spec.width) + 96, y: parent.y + ((sourceNode?.height || spec.height) - spec.height) / 2 },
-                        width: isEmptyAudioNode ? sourceNode.width : spec.width,
-                        height: isEmptyAudioNode ? sourceNode.height : spec.height,
-                        metadata: { prompt: effectivePrompt, status: NODE_STATUS_LOADING, ...buildAudioGenerationMetadata(generationConfig) },
-                    };
-                    pendingChildIds = [audioId];
-                    setNodes((prev) => (isEmptyAudioNode ? prev.map((node) => (node.id === nodeId ? { ...node, ...audioNode } : node)) : [...prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node)), audioNode]));
-                    if (!isEmptyAudioNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: audioId }]);
-                    const controller = await startGenerationRequest(audioId, nodeId, nodeId, runController);
-                    try {
-                        const audio = await persistGeneratedAudio(await requestGeneratedAudio({ config: generationConfig, prompt: effectivePrompt, options: { signal: controller.signal } }), generationConfig.audioFormat);
-                        setNodes((prev) => prev.map((node) => (node.id === audioId ? { ...node, metadata: { ...node.metadata, ...audioMetadata(audio), prompt: effectivePrompt, ...buildAudioGenerationMetadata(generationConfig) } } : node)));
-                    } finally {
-                        finishGenerationRequest(audioId, controller);
-                    }
+                    await generateAudio({
+                        nodeId,
+                        sourceNode,
+                        generationConfig,
+                        effectivePrompt,
+                        runController,
+                    });
                     return;
                 }
 
