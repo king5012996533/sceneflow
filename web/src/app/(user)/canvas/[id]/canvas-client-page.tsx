@@ -64,6 +64,7 @@ import { useCanvasHistory } from "../hooks/use-canvas-history";
 import { useCanvasKeyboardShortcuts } from "../hooks/use-canvas-keyboard-shortcuts";
 import { useDirectorShotBridge } from "../hooks/use-director-shot-bridge";
 import { useCanvasFileImport } from "../hooks/use-canvas-file-import";
+import { useCanvasSelection } from "../hooks/use-canvas-selection";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     CanvasClipboard,
@@ -210,9 +211,6 @@ function InfiniteCanvasPage() {
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
     const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, k: 1 });
     const [size, setSize] = useState({ width: 1200, height: 720 });
-    const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
-    const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
-    const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
     const [connectingParams, setConnectingParams] = useState<ConnectionHandle | null>(null);
     const [connectionTargetNodeId, setConnectionTargetNodeId] = useState<string | null>(null);
     const [pendingConnectionCreate, setPendingConnectionCreate] = useState<PendingConnectionCreate | null>(null);
@@ -255,9 +253,26 @@ function InfiniteCanvasPage() {
     const [openingBatchIds, setOpeningBatchIds] = useState<Set<string>>(new Set());
     const [isNodeDragging, setIsNodeDragging] = useState(false);
 
+
+    const selection = useCanvasSelection({
+        setContextMenu,
+    });
+    const {
+        selectedNodeIds,
+        setSelectedNodeIds,
+        selectedConnectionId,
+        setSelectedConnectionId,
+        hoveredNodeId,
+        setHoveredNodeId,
+        selectedNodeIdsRef,
+        activeNodeId,
+        hasMultipleSelectedNodes,
+        deselectCanvas: selectionDeselect,
+        selectSingleNode,
+        toggleNodeSelection,
+    } = selection;
     const nodesRef = useRef(nodes);
     const connectionsRef = useRef(connections);
-    const selectedNodeIdsRef = useRef(selectedNodeIds);
     const viewportRef = useRef(viewport);
     const generateNodeRef = useRef<((nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => Promise<void>) | null>(null);
     const continueVideoRef = useRef<((node: CanvasNodeData) => Promise<void>) | null>(null);
@@ -479,7 +494,6 @@ function InfiniteCanvasPage() {
     useLayoutEffect(() => {
         nodesRef.current = nodes;
         connectionsRef.current = connections;
-        selectedNodeIdsRef.current = selectedNodeIds;
         viewportRef.current = viewport;
         connectingParamsRef.current = connectingParams;
         connectionTargetNodeIdRef.current = connectionTargetNodeId;
@@ -706,8 +720,6 @@ function InfiniteCanvasPage() {
     const superResolveNode = superResolveNodeId ? nodeById.get(superResolveNodeId) || null : null;
     const angleNode = angleNodeId ? nodeById.get(angleNodeId) || null : null;
     const previewNode = previewNodeId ? nodeById.get(previewNodeId) || null : null;
-    const hasMultipleSelectedNodes = selectedNodeIds.size > 1;
-    const activeNodeId = hasMultipleSelectedNodes ? null : hoveredNodeId || (selectedNodeIds.size === 1 ? Array.from(selectedNodeIds)[0] : null);
     const batchChildCountById = useMemo(() => {
         const map = new Map<string, number>();
         nodes.forEach((node) => {
@@ -1064,15 +1076,12 @@ function InfiniteCanvasPage() {
 
     const deselectCanvas = useCallback(() => {
         cancelPendingConnectionCreate();
-        setSelectedNodeIds(new Set());
-        setSelectedConnectionId(null);
-        setContextMenu(null);
+        selectionDeselect();
         setSelectionBox(null);
-        setHoveredNodeId(null);
         setToolbarNodeId(null);
         setDialogNodeId(null);
         setEditingNodeId(null);
-    }, [cancelPendingConnectionCreate]);
+    }, [cancelPendingConnectionCreate, selectionDeselect]);
 
     const clearCanvas = useCallback(() => {
         setNodes([]);
