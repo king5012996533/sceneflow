@@ -78,6 +78,7 @@ import { useCanvasVideoGeneration } from "../hooks/use-canvas-video-generation";
 import { useCanvasTextGeneration } from "../hooks/use-canvas-text-generation";
 import { useCanvasAudioGeneration } from "../hooks/use-canvas-audio-generation";
 import { useCanvasRetryGeneration } from "../hooks/use-canvas-retry-generation";
+import { useCanvasPipelineRunner } from "../hooks/use-canvas-pipeline-runner";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     DirectorPanoramaPayload,
@@ -122,8 +123,6 @@ import {
     isHiddenBatchConnectionEndpoint,
     imageExtension,
     audioExtension,
-    runCanvasPipeline,
-    orderPipelineNodes,
 } from "../utils/canvas-utils";
 import {
     CanvasNodeType,
@@ -785,6 +784,14 @@ function InfiniteCanvasPage() {
         quotaModalRef,
     });
 
+    const { runPipeline } = useCanvasPipelineRunner({
+        nodesRef,
+        connectionsRef,
+        setNodes,
+        generateNodeRef,
+        message,
+    });
+
     const visibleNodes = useMemo(() => {
         const padding = 280;
         const rect = containerRef.current?.getBoundingClientRect();
@@ -888,7 +895,7 @@ function InfiniteCanvasPage() {
             if (pipelineOps.length) {
                 queueMicrotask(() => {
                     pipelineOps.forEach((op) => {
-                        void runCanvasPipeline(op.nodeIds, op.resume !== false, nodesRef, connectionsRef, setNodes, generateNodeRef, message);
+                        void runPipeline(op.nodeIds, op.resume !== false);
                     });
                 });
             }
