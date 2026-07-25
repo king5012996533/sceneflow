@@ -46,7 +46,7 @@ import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "../compone
 import { CanvasToolbar } from "../components/canvas-toolbar";
 import { DirectorShotNodeContent } from "../components/director-shot-node-content";
 import { ShotPackNodeContent } from "../components/shot-pack-node-content";
-import { AssetPickerModal, type InsertAssetPayload } from "../components/asset-picker-modal";
+import { AssetPickerModal } from "../components/asset-picker-modal";
 import { CanvasZoomControls } from "../components/canvas-zoom-controls";
 import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
 import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
@@ -71,6 +71,7 @@ import { useCanvasConnectionCreation } from "../hooks/use-canvas-connection-crea
 import { useCanvasNodeDrag } from "../hooks/use-canvas-node-drag";
 import { useCanvasNodeActions } from "../hooks/use-canvas-node-actions";
 import { useCanvasGenerationRequests } from "../hooks/use-canvas-generation-requests";
+import { useCanvasAssetImportArchive } from "../hooks/use-canvas-asset-import-archive";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     DirectorPanoramaPayload,
@@ -200,7 +201,6 @@ function InfiniteCanvasPage() {
     const [backgroundMode, setBackgroundMode] = useState<CanvasBackgroundMode>("lines");
     const [showImageInfo, setShowImageInfo] = useState(false);
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
-    const [assetPickerOpen, setAssetPickerOpen] = useState(false);
     const [projectLoaded, setProjectLoaded] = useState(false);
     const [toolbarNodeId, setToolbarNodeId] = useState<string | null>(null);
     const [nodeImageSettingsOpen, setNodeImageSettingsOpen] = useState(false);
@@ -678,6 +678,23 @@ function InfiniteCanvasPage() {
         setRunningNodeId,
         setClearConfirmOpen,
         setContextMenu,
+    });
+
+    const {
+        assetPickerOpen,
+        openAssetPicker,
+        closeAssetPicker,
+        saveNodeAsset,
+        handleAssetInsert,
+    } = useCanvasAssetImportArchive({
+        projectId,
+        getCanvasCenter,
+        setNodes,
+        setConnections,
+        setSelectedNodeIds,
+        setSelectedConnectionId,
+        setDialogNodeId,
+        message,
     });
 
     const visibleNodes = useMemo(() => {
@@ -1309,23 +1326,6 @@ function InfiniteCanvasPage() {
         if ((node.type !== CanvasNodeType.Image && node.type !== CanvasNodeType.Video && node.type !== CanvasNodeType.Audio) || !node.metadata?.content) return;
         saveAs(node.metadata.content, `canvas-${node.type}-${node.id}.${node.type === CanvasNodeType.Video ? "mp4" : node.type === CanvasNodeType.Audio ? audioExtension(node.metadata.mimeType) : imageExtension(node.metadata.content)}`);
     }, []);
-
-    const saveNodeAsset = useCallback(
-        async (node: CanvasNodeData) => {
-            if (node.metadata?.assetLibraryId) {
-                message.info("该内容已经在我的素材中");
-                return;
-            }
-            const assetId = archiveCanvasNode(node, projectId, addAsset);
-            if (!assetId) {
-                message.error("当前节点没有可保存的内容");
-                return;
-            }
-            setNodes((previous) => previous.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, assetLibraryId: assetId, assetAutoArchived: true, assetReusable: true } } : item)));
-            message.success("已加入我的素材");
-        },
-        [addAsset, message, projectId],
-    );
 
     const createImageReversePromptNodes = useCallback(
         (node: CanvasNodeData) => {
@@ -2272,58 +2272,6 @@ function InfiniteCanvasPage() {
         [screenToCanvas, size.height, size.width],
     );
 
-    const handleAssetInsert = useCallback(
-        async (payload: InsertAssetPayload) => {
-            const insertedAssetMetadata: CanvasNodeMetadata = {
-                assetLibraryId: payload.assetId,
-                assetCategory: payload.metadata?.category,
-                assetSource: payload.metadata?.origin === "platform-rental" ? "platform-rental" : "user-asset",
-                assetLicense: payload.metadata?.license || "private",
-                assetReusable: true,
-                prompt: payload.metadata?.prompt || payload.metadata?.reusablePrompt,
-                consistencyNotes: payload.metadata?.consistencyNotes,
-            };
-            if (payload.kind === "text") {
-                const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
-                const node = {
-                    ...createCanvasNode(CanvasNodeType.Text, center, { ...insertedAssetMetadata, content: payload.content, status: NODE_STATUS_SUCCESS }),
-                    title: payload.title,
-                };
-                setNodes((prev) => [...prev, node]);
-                setSelectedNodeIds(new Set([node.id]));
-                setSelectedConnectionId(null);
-            } else if (payload.kind === "video") {
-                const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Video];
-                const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
-                const id = `video-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-                const nextSize = fitNodeSize(payload.width || spec.width, payload.height || spec.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
-                setNodes((prev) => [...prev, { id, type: CanvasNodeType.Video, title: payload.title, position: { x: center.x - nextSize.width / 2, y: center.y - nextSize.height / 2 }, width: nextSize.width, height: nextSize.height, metadata: { ...insertedAssetMetadata, content: payload.url, storageKey: payload.storageKey, status: NODE_STATUS_SUCCESS, naturalWidth: payload.width, naturalHeight: payload.height } }]);
-                setSelectedNodeIds(new Set([id]));
-            } else {
-                const storedImage = payload.storageKey ? { url: payload.dataUrl, storageKey: payload.storageKey, width: 1, height: 1, bytes: 0, mimeType: "image/png" } : await uploadImage(payload.dataUrl);
-                const meta = storedImage.width === 1 && storedImage.height === 1 ? await readImageMeta(storedImage.url) : storedImage;
-                const config = fitNodeSize(meta.width, meta.height);
-                const center = screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
-                const id = `image-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-                const node: CanvasNodeData = {
-                    id,
-                    type: CanvasNodeType.Image,
-                    title: payload.title,
-                    position: { x: center.x - config.width / 2, y: center.y - config.height / 2 },
-                    width: config.width,
-                    height: config.height,
-                    metadata: { ...imageMetadata({ ...storedImage, width: meta.width, height: meta.height }), ...insertedAssetMetadata, prompt: insertedAssetMetadata.prompt || payload.title },
-                };
-                setNodes((prev) => [...prev, node]);
-                setSelectedNodeIds(new Set([id]));
-                setSelectedConnectionId(null);
-                setDialogNodeId(id);
-            }
-            setAssetPickerOpen(false);
-        },
-        [screenToCanvas, size.height, size.width],
-    );
-
     const assistantOpen = assistantMounted && !assistantCollapsed;
     const openAgent = (mode: CanvasAgentMode = agentMode) => {
         if (agentCloseTimerRef.current) {
@@ -2577,9 +2525,7 @@ function InfiniteCanvasPage() {
                     onDeselect={deselectCanvas}
                     onBackgroundModeChange={setBackgroundMode}
                     onShowImageInfoChange={setShowImageInfo}
-                    onOpenMyAssets={() => {
-                        setAssetPickerOpen(true);
-                    }}
+                    onOpenMyAssets={openAssetPicker}
                 />
 
                 {isMiniMapOpen ? <Minimap nodes={nodes} viewport={viewport} viewportSize={size} onViewportChange={setViewport} /> : null}
@@ -2681,7 +2627,7 @@ function InfiniteCanvasPage() {
                     <p className="text-sm opacity-60">这会删除当前画布上的所有节点和连线。</p>
                 </Modal>
 
-                <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={() => setAssetPickerOpen(false)} />
+                <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={closeAssetPicker} />
                 {codexCompactAgent && !assistantMounted ? <CanvasLocalAgentPanel headless snapshot={agentSnapshot} canUndoOps={Boolean(agentUndoSnapshot)} onApplyOps={applyAgentOps} onUndoOps={undoAgentOps} autoConnect={codexAutoConnect} /> : null}
             </section>
             {assistantMounted ? (
