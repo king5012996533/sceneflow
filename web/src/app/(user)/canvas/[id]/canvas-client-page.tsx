@@ -46,7 +46,6 @@ import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "../compone
 import { CanvasToolbar } from "../components/canvas-toolbar";
 import { DirectorShotNodeContent } from "../components/director-shot-node-content";
 import { ShotPackNodeContent } from "../components/shot-pack-node-content";
-import { ShotPackPanel } from "../components/shot-pack-panel";
 import { AssetPickerModal, type InsertAssetPayload } from "../components/asset-picker-modal";
 import { CanvasZoomControls } from "../components/canvas-zoom-controls";
 import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
@@ -56,7 +55,7 @@ import { applyCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } fro
 import { canvasGenerationErrorToast } from "../utils/canvas-generation-error";
 import { buildCanvasResourceReferences, buildNodeMentionReferences } from "../utils/canvas-resource-references";
 import { createMangaWorkflow } from "../utils/manga-workflow";
-import { composeShotPackBlob, splitImageGrid } from "../utils/shot-pack-image";
+
 import { CanvasRefreshShell } from "../components/canvas-refresh-shell";
 import { ConnectionCreateMenu } from "../components/connection-create-menu";
 import { CanvasTopBar } from "../components/canvas-top-bar";
@@ -65,6 +64,7 @@ import { useCanvasKeyboardShortcuts } from "../hooks/use-canvas-keyboard-shortcu
 import { useDirectorShotBridge } from "../hooks/use-director-shot-bridge";
 import { useCanvasFileImport } from "../hooks/use-canvas-file-import";
 import { useCanvasSelection } from "../hooks/use-canvas-selection";
+import { useCanvasViewportState } from "../hooks/use-canvas-viewport-state";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     CanvasClipboard,
@@ -105,7 +105,6 @@ import {
     normalizeConnection,
     getInputSummary,
     buildGenerationConfig,
-    buildShotPackPrompt,
     buildContinuationPrompt,
     buildAngleLabel,
     buildAnglePrompt,
@@ -168,10 +167,7 @@ function InfiniteCanvasPage() {
     const localAgentConnected = useCanvasAgentStore((state) => state.connected);
     const localAgentActivity = useCanvasAgentStore((state) => state.activity);
     const localAgentEnabled = useCanvasAgentStore((state) => state.enabled);
-    const containerRef = useRef<HTMLDivElement>(null);
     const clipboardRef = useRef<CanvasClipboard | null>(null);
-    const viewportSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const didInitialCenterRef = useRef(false);
     const rafRef = useRef<number | null>(null);
     const toolbarHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const nodeDraggingRef = useRef(false);
@@ -209,8 +205,6 @@ function InfiniteCanvasPage() {
     const [connections, setConnections] = useState<CanvasConnection[]>([]);
     const [chatSessions, setChatSessions] = useState<CanvasAssistantSession[]>([]);
     const [activeChatId, setActiveChatId] = useState<string | null>(null);
-    const [viewport, setViewport] = useState<ViewportTransform>({ x: 0, y: 0, k: 1 });
-    const [size, setSize] = useState({ width: 1200, height: 720 });
     const [connectingParams, setConnectingParams] = useState<ConnectionHandle | null>(null);
     const [connectionTargetNodeId, setConnectionTargetNodeId] = useState<string | null>(null);
     const [pendingConnectionCreate, setPendingConnectionCreate] = useState<PendingConnectionCreate | null>(null);
@@ -224,7 +218,6 @@ function InfiniteCanvasPage() {
     const [showImageInfo, setShowImageInfo] = useState(false);
     const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
     const [assetPickerOpen, setAssetPickerOpen] = useState(false);
-    const [shotPackBusyNodeId, setShotPackBusyNodeId] = useState<string | null>(null);
     const [projectLoaded, setProjectLoaded] = useState(false);
     const [toolbarNodeId, setToolbarNodeId] = useState<string | null>(null);
     const [nodeImageSettingsOpen, setNodeImageSettingsOpen] = useState(false);
@@ -271,9 +264,26 @@ function InfiniteCanvasPage() {
         selectSingleNode,
         toggleNodeSelection,
     } = selection;
+
+    const vp = useCanvasViewportState({
+        projectId,
+        projectLoaded,
+        updateProject,
+    });
+    const {
+        containerRef,
+        viewport,
+        setViewport,
+        size,
+        setSize,
+        viewportRef,
+        screenToCanvas,
+        getCanvasCenter,
+        resetViewport: vpResetViewport,
+        setZoomScale: vpSetZoomScale,
+    } = vp;
     const nodesRef = useRef(nodes);
     const connectionsRef = useRef(connections);
-    const viewportRef = useRef(viewport);
     const generateNodeRef = useRef<((nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => Promise<void>) | null>(null);
     const continueVideoRef = useRef<((node: CanvasNodeData) => Promise<void>) | null>(null);
     const connectingParamsRef = useRef(connectingParams);
@@ -479,22 +489,9 @@ function InfiniteCanvasPage() {
         if (!dialogNodeId) setNodeImageSettingsOpen(false);
     }, [dialogNodeId]);
 
-    useEffect(() => {
-        if (!projectLoaded) return;
-        if (viewportSaveTimerRef.current) clearTimeout(viewportSaveTimerRef.current);
-        viewportSaveTimerRef.current = setTimeout(() => {
-            updateProject(projectId, { viewport: viewportRef.current });
-            viewportSaveTimerRef.current = null;
-        }, 500);
-        return () => {
-            if (viewportSaveTimerRef.current) clearTimeout(viewportSaveTimerRef.current);
-        };
-    }, [projectId, projectLoaded, updateProject, viewport]);
-
     useLayoutEffect(() => {
         nodesRef.current = nodes;
         connectionsRef.current = connections;
-        viewportRef.current = viewport;
         connectingParamsRef.current = connectingParams;
         connectionTargetNodeIdRef.current = connectionTargetNodeId;
         pendingConnectionCreateRef.current = pendingConnectionCreate;
@@ -528,41 +525,8 @@ function InfiniteCanvasPage() {
         );
     }, [addAsset, nodes, projectId, projectLoaded]);
 
-    useEffect(() => {
-        const el = containerRef.current;
-        if (!el) return;
 
-        const updateSize = () => {
-            const rect = el.getBoundingClientRect();
-            setSize({ width: rect.width, height: rect.height });
-            if (!didInitialCenterRef.current) {
-                didInitialCenterRef.current = true;
-                setViewport({ x: rect.width / 2, y: rect.height / 2, k: 1 });
-            }
-        };
 
-        updateSize();
-        const resizeObserver = new ResizeObserver(updateSize);
-        resizeObserver.observe(el);
-        return () => resizeObserver.disconnect();
-    }, []);
-
-    const screenToCanvas = useCallback((clientX: number, clientY: number) => {
-        const rect = containerRef.current?.getBoundingClientRect();
-        const currentViewport = viewportRef.current;
-        const localX = clientX - (rect?.left || 0);
-        const localY = clientY - (rect?.top || 0);
-
-        return {
-            x: (localX - currentViewport.x) / currentViewport.k,
-            y: (localY - currentViewport.y) / currentViewport.k,
-        };
-    }, []);
-
-    const getCanvasCenter = useCallback(() => {
-        const rect = containerRef.current?.getBoundingClientRect();
-        return screenToCanvas((rect?.left || 0) + (rect?.width || size.width) / 2, (rect?.top || 0) + (rect?.height || size.height) / 2);
-    }, [screenToCanvas, size.height, size.width]);
 
     const {
         directorIframeRef,
@@ -860,139 +824,6 @@ function InfiniteCanvasPage() {
         [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, getCanvasCenter],
     );
 
-    const patchShotPack = useCallback((nodeId: string, updater: (pack: CanvasShotPack) => CanvasShotPack, extraMetadata?: Partial<CanvasNodeMetadata>) => {
-        setNodes((prev) =>
-            prev.map((node) => {
-                if (node.id !== nodeId) return node;
-                const current: CanvasShotPack = {
-                    shots: node.metadata?.shotPack?.shots || [],
-                    layout: node.metadata?.shotPack?.layout || "grid-3",
-                    showIndex: node.metadata?.shotPack?.showIndex ?? true,
-                    showCaption: node.metadata?.shotPack?.showCaption ?? false,
-                    sourceGrid: node.metadata?.shotPack?.sourceGrid,
-                    composedAt: node.metadata?.shotPack?.composedAt,
-                };
-                return { ...node, metadata: { ...node.metadata, ...extraMetadata, shotPack: updater(current) } };
-            }),
-        );
-    }, []);
-
-    const addShotToPack = useCallback(
-        (packNodeId: string, source: CanvasNodeData) => {
-            if (source.type !== CanvasNodeType.Image || !source.metadata?.content) return;
-            const shot: CanvasShotPackShot = {
-                id: `shot-${nanoid()}`,
-                title: source.title || `镜头 ${(nodesRef.current.find((node) => node.id === packNodeId)?.metadata?.shotPack?.shots.length || 0) + 1}`,
-                description: source.metadata?.prompt || source.metadata?.pipelineDescription || "",
-                imageUrl: source.metadata.content,
-                storageKey: source.metadata.storageKey,
-                naturalWidth: source.metadata.naturalWidth,
-                naturalHeight: source.metadata.naturalHeight,
-            };
-            patchShotPack(packNodeId, (pack) => ({ ...pack, shots: [...pack.shots, shot] }));
-        },
-        [patchShotPack],
-    );
-
-    const updateShotInPack = useCallback(
-        (packNodeId: string, shotId: string, patch: Partial<CanvasShotPackShot>) => {
-            patchShotPack(packNodeId, (pack) => ({ ...pack, shots: pack.shots.map((shot) => (shot.id === shotId ? { ...shot, ...patch } : shot)) }));
-        },
-        [patchShotPack],
-    );
-
-    const moveShotInPack = useCallback(
-        (packNodeId: string, shotId: string, direction: -1 | 1) => {
-            patchShotPack(packNodeId, (pack) => {
-                const index = pack.shots.findIndex((shot) => shot.id === shotId);
-                const nextIndex = index + direction;
-                if (index < 0 || nextIndex < 0 || nextIndex >= pack.shots.length) return pack;
-                const shots = [...pack.shots];
-                [shots[index], shots[nextIndex]] = [shots[nextIndex], shots[index]];
-                return { ...pack, shots };
-            });
-        },
-        [patchShotPack],
-    );
-
-    const removeShotFromPack = useCallback(
-        (packNodeId: string, shotId: string) => {
-            patchShotPack(packNodeId, (pack) => ({ ...pack, shots: pack.shots.filter((shot) => shot.id !== shotId) }));
-        },
-        [patchShotPack],
-    );
-
-    const splitImageIntoShotPack = useCallback(
-        async (packNodeId: string, source: CanvasNodeData, rows: number, cols: number) => {
-            if (source.type !== CanvasNodeType.Image || !source.metadata?.content) return;
-            setShotPackBusyNodeId(packNodeId);
-            try {
-                const pieces = await splitImageGrid(source.metadata.content, rows, cols);
-                const uploaded = await Promise.all(pieces.map((blob) => uploadImage(blob)));
-                const shots: CanvasShotPackShot[] = uploaded.map((image, index) => ({
-                    id: `shot-${nanoid()}`,
-                    title: `镜头 ${String(index + 1).padStart(2, "0")}`,
-                    description: "",
-                    imageUrl: image.url,
-                    storageKey: image.storageKey,
-                    naturalWidth: image.width,
-                    naturalHeight: image.height,
-                }));
-                patchShotPack(packNodeId, (pack) => ({ ...pack, shots: [...pack.shots, ...shots], sourceGrid: { rows, cols, sourceNodeId: source.id } }));
-                message.success(`已拆分为 ${shots.length} 个镜头`);
-            } catch (error) {
-                message.error(error instanceof Error ? error.message : "九宫格切分失败");
-            } finally {
-                setShotPackBusyNodeId(null);
-            }
-        },
-        [message, patchShotPack],
-    );
-
-    const composeShotPackNode = useCallback(
-        async (node: CanvasNodeData) => {
-            const pack = node.metadata?.shotPack;
-            if (!pack?.shots.length) {
-                message.warning("请先加入镜头图");
-                return;
-            }
-            setShotPackBusyNodeId(node.id);
-            try {
-                const blob = await composeShotPackBlob(pack.shots, { layout: pack.layout, showIndex: pack.showIndex, showCaption: pack.showCaption, title: node.title || "镜头包参考图" });
-                const image = await uploadImage(blob);
-                const size = fitNodeSize(image.width, image.height, 520, 360);
-                setNodes((prev) =>
-                    prev.map((item) =>
-                        item.id === node.id
-                            ? {
-                                  ...item,
-                                  width: size.width,
-                                  height: size.height,
-                                  position: { x: item.position.x + item.width / 2 - size.width / 2, y: item.position.y + item.height / 2 - size.height / 2 },
-                                  metadata: {
-                                      ...item.metadata,
-                                      ...imageMetadata(image),
-                                      pipelineKind: "shot-pack",
-                                      pipelineLabel: "镜头包",
-                                      assetCategory: "storyboard",
-                                      assetSource: "manual",
-                                      assetReusable: true,
-                                      prompt: buildShotPackPrompt(pack.shots),
-                                      shotPack: { ...pack, composedAt: new Date().toISOString() },
-                                  },
-                              }
-                            : item,
-                    ),
-                );
-                message.success("镜头包合集图已生成，可直接连到视频节点作为参考图");
-            } catch (error) {
-                message.error(error instanceof Error ? error.message : "镜头包合成失败");
-            } finally {
-                setShotPackBusyNodeId(null);
-            }
-        },
-        [message],
-    );
 
     const createMangaWorkflowNodes = useCallback(() => {
         // 先检查角色资产额度
@@ -1190,22 +1021,17 @@ function InfiniteCanvasPage() {
         return true;
     }, [getCanvasCenter]);
 
-    const resetViewport = useCallback(() => {
-        setViewport({ x: size.width / 2, y: size.height / 2, k: 1 });
+    const handleResetViewport = useCallback(() => {
+        vp.resetViewport();
         setContextMenu(null);
-    }, [size.height, size.width]);
+    }, [vp.resetViewport]);
 
-    const setZoomScale = useCallback(
+    const handleSetZoomScale = useCallback(
         (scale: number) => {
-            const nextScale = Math.min(Math.max(scale, 0.05), 5);
-            setViewport((prev) => ({
-                x: size.width / 2 - ((size.width / 2 - prev.x) / prev.k) * nextScale,
-                y: size.height / 2 - ((size.height / 2 - prev.y) / prev.k) * nextScale,
-                k: nextScale,
-            }));
+            vp.setZoomScale(scale);
             setContextMenu(null);
         },
-        [size.height, size.width],
+        [vp.setZoomScale],
     );
 
 
@@ -2942,21 +2768,7 @@ function InfiniteCanvasPage() {
                             resourceLabel={resourceReferenceByNodeId.get(node.id)}
                             mentionReferences={mentionReferencesByNodeId.get(node.id) || []}
                             renderPanel={(panelNode) =>
-                                panelNode.metadata?.pipelineKind === "director-shot" ? null : panelNode.metadata?.pipelineKind === "shot-pack" ? (
-                                    <ShotPackPanel
-                                        node={panelNode}
-                                        imageNodes={nodes}
-                                        busy={shotPackBusyNodeId === panelNode.id}
-                                        onClose={() => setDialogNodeId(null)}
-                                        onAddShot={(source) => addShotToPack(panelNode.id, source)}
-                                        onSplitGrid={(source, rows, cols) => void splitImageIntoShotPack(panelNode.id, source, rows, cols)}
-                                        onUpdateShot={(shotId, patch) => updateShotInPack(panelNode.id, shotId, patch)}
-                                        onMoveShot={(shotId, direction) => moveShotInPack(panelNode.id, shotId, direction)}
-                                        onRemoveShot={(shotId) => removeShotFromPack(panelNode.id, shotId)}
-                                        onPatchPack={(patch) => patchShotPack(panelNode.id, (pack) => ({ ...pack, ...patch }))}
-                                        onCompose={() => void composeShotPackNode(panelNode)}
-                                    />
-                                ) : panelNode.type === CanvasNodeType.Config ? (
+                                panelNode.metadata?.pipelineKind === "director-shot" ? null : panelNode.type === CanvasNodeType.Config ? (
                                     <CanvasConfigComposer
                                         value={panelNode.metadata?.composerContent ?? panelNode.metadata?.prompt ?? ""}
                                         inputs={configInputsById.get(panelNode.id) || []}
@@ -3097,7 +2909,7 @@ function InfiniteCanvasPage() {
 
                 {isMiniMapOpen ? <Minimap nodes={nodes} viewport={viewport} viewportSize={size} onViewportChange={setViewport} /> : null}
 
-                <CanvasZoomControls scale={viewport.k} onScaleChange={setZoomScale} onReset={resetViewport} isMiniMapOpen={isMiniMapOpen} onToggleMiniMap={() => setIsMiniMapOpen((value) => !value)} />
+                <CanvasZoomControls scale={viewport.k} onScaleChange={handleSetZoomScale} onReset={handleResetViewport} isMiniMapOpen={isMiniMapOpen} onToggleMiniMap={() => setIsMiniMapOpen((value) => !value)} />
 
                 {contextMenu ? (
                     <CanvasNodeContextMenu
