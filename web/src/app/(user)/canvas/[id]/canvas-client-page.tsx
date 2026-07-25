@@ -63,6 +63,7 @@ import { CanvasTopBar } from "../components/canvas-top-bar";
 import { useCanvasHistory } from "../hooks/use-canvas-history";
 import { useCanvasKeyboardShortcuts } from "../hooks/use-canvas-keyboard-shortcuts";
 import { useDirectorShotBridge } from "../hooks/use-director-shot-bridge";
+import { useCanvasFileImport } from "../hooks/use-canvas-file-import";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     CanvasClipboard,
@@ -167,8 +168,6 @@ function InfiniteCanvasPage() {
     const localAgentActivity = useCanvasAgentStore((state) => state.activity);
     const localAgentEnabled = useCanvasAgentStore((state) => state.enabled);
     const containerRef = useRef<HTMLDivElement>(null);
-    const imageInputRef = useRef<HTMLInputElement>(null);
-    const uploadTargetRef = useRef<{ nodeId?: string; position?: Position } | null>(null);
     const clipboardRef = useRef<CanvasClipboard | null>(null);
     const viewportSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const didInitialCenterRef = useRef(false);
@@ -2073,97 +2072,150 @@ function InfiniteCanvasPage() {
         setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, fontSize } } : node)));
     }, []);
 
-    const handleUploadRequest = useCallback((nodeId?: string, position?: Position) => {
-        uploadTargetRef.current = { nodeId, position };
-        imageInputRef.current?.click();
-    }, []);
-
-    const handleImageInputChange = useCallback(
-        async (event: ReactChangeEvent<HTMLInputElement>) => {
-            const file = event.target.files?.[0];
-            const target = uploadTargetRef.current;
-            if (!file || (!file.type.startsWith("image/") && !file.type.startsWith("video/") && !isAudioFile(file))) return;
-
+    const {
+        handleUploadRequest,
+        handleImageInputChange,
+        handleDrop,
+        imageInputRef,
+    } = useCanvasFileImport({
+        onFilesSelected: (files, target) => {
+            const file = Array.from(files).find(
+                (item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item),
+            );
+            if (!file) return;
             if (target?.nodeId) {
                 if (isAudioFile(file)) {
-                    const audio = await uploadMediaFile(file, "audio");
-                    const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Audio];
-                    setNodes((prev) => prev.map((node) => (node.id === target.nodeId ? { ...node, type: CanvasNodeType.Audio, title: file.name, position: { x: node.position.x + node.width / 2 - spec.width / 2, y: node.position.y + node.height / 2 - spec.height / 2 }, width: spec.width, height: spec.height, metadata: { ...node.metadata, ...audioMetadata(audio), errorDetails: undefined } } : node)));
-                    setSelectedNodeIds(new Set([target.nodeId]));
-                    setSelectedConnectionId(null);
-                    uploadTargetRef.current = null;
-                    event.target.value = "";
+                    void (async () => {
+                        const audio = await uploadMediaFile(file, "audio");
+                        const spec = NODE_DEFAULT_SIZE[CanvasNodeType.Audio];
+                        setNodes((prev) =>
+                            prev.map((node) =>
+                                node.id === target.nodeId
+                                    ? {
+                                          ...node,
+                                          type: CanvasNodeType.Audio,
+                                          title: file.name,
+                                          position: {
+                                              x: node.position.x + node.width / 2 - spec.width / 2,
+                                              y: node.position.y + node.height / 2 - spec.height / 2,
+                                          },
+                                          width: spec.width,
+                                          height: spec.height,
+                                          metadata: {
+                                              ...node.metadata,
+                                              ...audioMetadata(audio),
+                                              errorDetails: undefined,
+                                          },
+                                      }
+                                    : node,
+                            ),
+                        );
+                        setSelectedNodeIds(new Set([target.nodeId!]));
+                        setSelectedConnectionId(null);
+                    })();
                     return;
                 }
                 if (file.type.startsWith("video/")) {
-                    const video = await uploadMediaFile(file, "video");
-                    const nextSize = fitNodeSize(video.width || 1280, video.height || 720, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
-                    setNodes((prev) => prev.map((node) => (node.id === target.nodeId ? { ...node, type: CanvasNodeType.Video, title: file.name, position: { x: node.position.x + node.width / 2 - nextSize.width / 2, y: node.position.y + node.height / 2 - nextSize.height / 2 }, width: nextSize.width, height: nextSize.height, metadata: { ...node.metadata, ...videoMetadata(video), errorDetails: undefined } } : node)));
-                    setSelectedNodeIds(new Set([target.nodeId]));
-                    setSelectedConnectionId(null);
-                    setDialogNodeId(target.nodeId);
-                    uploadTargetRef.current = null;
-                    event.target.value = "";
+                    void (async () => {
+                        const video = await uploadMediaFile(file, "video");
+                        const nextSize = fitNodeSize(
+                            video.width || 1280,
+                            video.height || 720,
+                            VIDEO_NODE_MAX_WIDTH,
+                            VIDEO_NODE_MAX_HEIGHT,
+                        );
+                        setNodes((prev) =>
+                            prev.map((node) =>
+                                node.id === target.nodeId
+                                    ? {
+                                          ...node,
+                                          type: CanvasNodeType.Video,
+                                          title: file.name,
+                                          position: {
+                                              x: node.position.x + node.width / 2 - nextSize.width / 2,
+                                              y: node.position.y + node.height / 2 - nextSize.height / 2,
+                                          },
+                                          width: nextSize.width,
+                                          height: nextSize.height,
+                                          metadata: {
+                                              ...node.metadata,
+                                              ...videoMetadata(video),
+                                              errorDetails: undefined,
+                                          },
+                                      }
+                                    : node,
+                            ),
+                        );
+                        setSelectedNodeIds(new Set([target.nodeId!]));
+                        setSelectedConnectionId(null);
+                        setDialogNodeId(target.nodeId!);
+                    })();
                     return;
                 }
-                const image = await uploadImage(file);
-                const size = fitNodeSize(image.width, image.height);
-                setNodes((prev) =>
-                    prev.map((node) =>
-                        node.id === target.nodeId
-                            ? {
-                                  ...node,
-                                  type: CanvasNodeType.Image,
-                                  title: file.name,
-                                  width: size.width,
-                                  height: size.height,
-                                  metadata: {
-                                      ...node.metadata,
-                                      ...imageMetadata(image),
-                                      errorDetails: undefined,
-                                      freeResize: false,
-                                      isBatchRoot: undefined,
-                                      batchRootId: undefined,
-                                      batchChildIds: undefined,
-                                      batchUsesReferenceImages: undefined,
-                                      generationType: undefined,
-                                      model: undefined,
-                                      size: undefined,
-                                      quality: undefined,
-                                      count: undefined,
-                                      references: undefined,
-                                      primaryImageId: undefined,
-                                      imageBatchExpanded: undefined,
-                                  },
-                              }
-                            : node,
-                    ),
-                );
-                setSelectedNodeIds(new Set([target.nodeId]));
-                setSelectedConnectionId(null);
-                setDialogNodeId(target.nodeId);
-            } else {
-                const position = target?.position || screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
-                void (isAudioFile(file) ? createAudioFileNode(file, position) : file.type.startsWith("video/") ? createVideoFileNode(file, position) : createImageFileNode(file, position));
+                void (async () => {
+                    const image = await uploadImage(file);
+                    const size = fitNodeSize(image.width, image.height);
+                    setNodes((prev) =>
+                        prev.map((node) =>
+                            node.id === target.nodeId
+                                ? {
+                                      ...node,
+                                      type: CanvasNodeType.Image,
+                                      title: file.name,
+                                      width: size.width,
+                                      height: size.height,
+                                      metadata: {
+                                          ...node.metadata,
+                                          ...imageMetadata(image),
+                                          errorDetails: undefined,
+                                          freeResize: false,
+                                          isBatchRoot: undefined,
+                                          batchRootId: undefined,
+                                          batchChildIds: undefined,
+                                          batchUsesReferenceImages: undefined,
+                                          generationType: undefined,
+                                          model: undefined,
+                                          size: undefined,
+                                          quality: undefined,
+                                          count: undefined,
+                                          references: undefined,
+                                          primaryImageId: undefined,
+                                          imageBatchExpanded: undefined,
+                                      },
+                                  }
+                                : node,
+                        ),
+                    );
+                    setSelectedNodeIds(new Set([target.nodeId!]));
+                    setSelectedConnectionId(null);
+                    setDialogNodeId(target.nodeId!);
+                })();
+                return;
             }
-
-            uploadTargetRef.current = null;
-            event.target.value = "";
+            const position = target?.position || screenToCanvas(
+                (containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2,
+                (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2,
+            );
+            void (isAudioFile(file)
+                ? createAudioFileNode(file, position)
+                : file.type.startsWith("video/")
+                  ? createVideoFileNode(file, position)
+                  : createImageFileNode(file, position));
         },
-        [createAudioFileNode, createImageFileNode, createVideoFileNode, screenToCanvas, size.height, size.width],
-    );
-
-    const handleDrop = useCallback(
-        (event: ReactDragEvent<HTMLDivElement>) => {
-            event.preventDefault();
-            const file = Array.from(event.dataTransfer.files).find((item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item));
+        onFilesDropped: (files, worldPos) => {
+            const file = Array.from(files).find(
+                (item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item),
+            );
             if (!file) return;
-
-            const pos = screenToCanvas(event.clientX, event.clientY);
-            void (isAudioFile(file) ? createAudioFileNode(file, pos) : file.type.startsWith("video/") ? createVideoFileNode(file, pos) : createImageFileNode(file, pos));
+            void (isAudioFile(file)
+                ? createAudioFileNode(file, worldPos)
+                : file.type.startsWith("video/")
+                  ? createVideoFileNode(file, worldPos)
+                  : createImageFileNode(file, worldPos));
         },
-        [createAudioFileNode, createImageFileNode, createVideoFileNode, screenToCanvas],
-    );
+        screenToCanvas,
+    });
+
 
     const pasteAssistantImage = useCallback(
         (file: File) => {
