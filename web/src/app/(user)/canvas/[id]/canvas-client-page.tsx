@@ -68,6 +68,7 @@ import { useCanvasViewportState } from "../hooks/use-canvas-viewport-state";
 import { useCanvasPointerInteractions } from "../hooks/use-canvas-pointer-interactions";
 import { useCanvasClipboard } from "../hooks/use-canvas-clipboard";
 import { useCanvasConnectionCreation } from "../hooks/use-canvas-connection-creation";
+import { useCanvasNodeDrag } from "../hooks/use-canvas-node-drag";
 import type { CanvasAgentMode } from "../components/canvas-agent-chat-ui";
 import {
     DirectorPanoramaPayload,
@@ -168,22 +169,7 @@ function InfiniteCanvasPage() {
     const localAgentConnected = useCanvasAgentStore((state) => state.connected);
     const localAgentActivity = useCanvasAgentStore((state) => state.activity);
     const localAgentEnabled = useCanvasAgentStore((state) => state.enabled);
-    const rafRef = useRef<number | null>(null);
     const toolbarHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const nodeDraggingRef = useRef(false);
-    const dragRef = useRef<{
-        isDraggingNode: boolean;
-        hasMoved: boolean;
-        startX: number;
-        startY: number;
-        initialSelectedNodes: { id: string; x: number; y: number }[];
-    }>({
-        isDraggingNode: false,
-        hasMoved: false,
-        startX: 0,
-        startY: 0,
-        initialSelectedNodes: [],
-    });
 
     const config = useConfigStore((state) => state.config);
     const effectiveConfig = useEffectiveConfig();
@@ -240,7 +226,6 @@ function InfiniteCanvasPage() {
     const [titleDraft, setTitleDraft] = useState("");
     const [collapsingBatchIds, setCollapsingBatchIds] = useState<Set<string>>(new Set());
     const [openingBatchIds, setOpeningBatchIds] = useState<Set<string>>(new Set());
-    const [isNodeDragging, setIsNodeDragging] = useState(false);
 
 
     const selection = useCanvasSelection({
@@ -681,6 +666,25 @@ function InfiniteCanvasPage() {
         connectNodes,
     });
 
+    const {
+        isNodeDragging,
+        nodeDraggingRef,
+        dragRef,
+        handleNodePointerDown,
+        handleNodeDragPointerMove,
+        finishNodeDrag,
+    } = useCanvasNodeDrag({
+        nodesRef,
+        selectedNodeIdsRef,
+        viewportRef,
+        historyPausedRef,
+        setNodes,
+        setSelectedNodeIds,
+        setSelectedConnectionId,
+        setContextMenu,
+        setDialogNodeId,
+    });
+
     const visibleNodes = useMemo(() => {
         const padding = 280;
         const rect = containerRef.current?.getBoundingClientRect();
@@ -1020,113 +1024,25 @@ function InfiniteCanvasPage() {
         [cancelPendingConnectionCreate, clearSelectionBox, startSelectionBox],
     );
 
-    const handleNodeMouseDown = useCallback((event: ReactMouseEvent, nodeId: string) => {
-        event.stopPropagation();
-        setContextMenu(null);
-        setHoveredNodeId(null);
-        setToolbarNodeId(null);
-        setSelectedConnectionId(null);
-
-        const currentSelected = selectedNodeIdsRef.current;
-        const currentNodes = nodesRef.current;
-        const nextSelected = new Set(currentSelected);
-
-        if (event.shiftKey || event.metaKey || event.ctrlKey) {
-            if (nextSelected.has(nodeId)) {
-                nextSelected.delete(nodeId);
-            } else {
-                nextSelected.add(nodeId);
-            }
-        } else if (!nextSelected.has(nodeId)) {
-            nextSelected.clear();
-            nextSelected.add(nodeId);
-        }
-
-        setSelectedNodeIds(nextSelected);
-        const dragIds = new Set(nextSelected);
-        currentNodes.forEach((node) => {
-            if (nextSelected.has(node.id)) node.metadata?.batchChildIds?.forEach((childId) => dragIds.add(childId));
-        });
-        dragRef.current = {
-            isDraggingNode: true,
-            hasMoved: false,
-            startX: event.clientX,
-            startY: event.clientY,
-            initialSelectedNodes: currentNodes.filter((node) => dragIds.has(node.id)).map((node) => ({ id: node.id, x: node.position.x, y: node.position.y })),
-        };
-        historyPausedRef.current = true;
-        nodeDraggingRef.current = true;
-        setIsNodeDragging(true);
-    }, []);
-
-    const finishNodeDrag = useCallback((clientX?: number, clientY?: number) => {
-        if (rafRef.current) {
-            cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-        }
-        if (!dragRef.current.isDraggingNode) return;
-
-        const wasClick = !dragRef.current.hasMoved && dragRef.current.initialSelectedNodes.length === 1;
-        const clickedNodeId = dragRef.current.initialSelectedNodes[0]?.id;
-        const currentViewport = viewportRef.current;
-        const dx = clientX == null ? 0 : (clientX - dragRef.current.startX) / currentViewport.k;
-        const dy = clientY == null ? 0 : (clientY - dragRef.current.startY) / currentViewport.k;
-        const initialPositions = dragRef.current.initialSelectedNodes;
-
-        historyPausedRef.current = false;
-        nodeDraggingRef.current = false;
-        setIsNodeDragging(false);
-        if (dragRef.current.hasMoved && clientX != null && clientY != null) {
-            setNodes((prev) =>
-                prev.map((node) => {
-                    const initial = initialPositions.find((item) => item.id === node.id);
-                    if (!initial) return node;
-                    return { ...node, position: { x: initial.x + dx, y: initial.y + dy } };
-                }),
-            );
-        }
-
-        dragRef.current.isDraggingNode = false;
-        dragRef.current.hasMoved = false;
-        dragRef.current.initialSelectedNodes = [];
-        if (wasClick && clickedNodeId) {
-            const clickedNode = nodesRef.current.find((node) => node.id === clickedNodeId);
-            if (clickedNode?.type === CanvasNodeType.Text) {
-                setDialogNodeId((current) => (current === clickedNodeId ? current : null));
-            } else {
-                setDialogNodeId(clickedNodeId);
-            }
-        }
-    }, []);
+    const handleNodeMouseDown = useCallback(
+        (event: ReactMouseEvent, nodeId: string) => {
+            setHoveredNodeId(null);
+            setToolbarNodeId(null);
+            handleNodePointerDown(event, nodeId);
+        },
+        [handleNodePointerDown],
+    );
 
     const handleGlobalMouseMove = useCallback(
         (event: MouseEvent) => {
-            const currentViewport = viewportRef.current;
-
             if (dragRef.current.isDraggingNode) {
-                const dx = (event.clientX - dragRef.current.startX) / currentViewport.k;
-                const dy = (event.clientY - dragRef.current.startY) / currentViewport.k;
-                const initialPositions = dragRef.current.initialSelectedNodes;
-                if (Math.abs(event.clientX - dragRef.current.startX) > 3 || Math.abs(event.clientY - dragRef.current.startY) > 3) {
-                    dragRef.current.hasMoved = true;
-                }
-
-                if (rafRef.current) cancelAnimationFrame(rafRef.current);
-                rafRef.current = requestAnimationFrame(() => {
-                    setNodes((prev) =>
-                        prev.map((node) => {
-                            const initial = initialPositions.find((item) => item.id === node.id);
-                            return initial ? { ...node, position: { x: initial.x + dx, y: initial.y + dy } } : node;
-                        }),
-                    );
-                    rafRef.current = null;
-                });
+                handleNodeDragPointerMove(event);
                 return;
             }
 
             updateConnectionTarget(event.clientX, event.clientY);
         },
-        [finishNodeDrag, updateConnectionTarget],
+        [handleNodeDragPointerMove, updateConnectionTarget],
     );
 
     const handleGlobalMouseUp = useCallback(
