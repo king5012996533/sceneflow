@@ -30,6 +30,7 @@ export const CANVAS_AGENT_PANEL_MOTION_MS = 500;
 const PANEL_MOTION_SECONDS = CANVAS_AGENT_PANEL_MOTION_MS / 1000;
 const ONLINE_AGENT_MAX_STEPS = 4;
 const REQUIRED_TOOL_CHOICE = "required" as const;
+const ONLINE_AGENT_MAX_TOOL_CALLS_PER_STEP = 8;
 const MANGA_PRODUCTION_SKILL = [
     "SceneFlow 漫剧生产 Skill：",
     "1. 标准链路固定为：剧本/片段解析 -> 人物创建提示词 -> 人物三视图提示词 -> 场景设定 -> 风格校准 -> 分镜表 -> 关键帧 -> 视频生成 -> 资产入库。",
@@ -442,7 +443,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
             id: nanoid(),
             role: "tool",
             title: "工具自动执行完成",
-            text: toolResults.map((item) => toolResultText(item.result)).join("\n"),
+            text: formatToolResultsForChat(toolResults),
             detail: { status: "completed", step, toolCalls: result.toolCalls, results: toolResults },
         });
         await continueOnlineToolLoopAfterResults(sessionId, assistantId, messages, result.toolCalls, toolResults, step);
@@ -455,7 +456,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
             ...toolResults.map((item) => ({ role: "tool" as const, tool_call_id: item.toolCallId, content: JSON.stringify(item.result) })),
         ];
         if (step >= ONLINE_AGENT_MAX_STEPS) {
-            upsertMessage(sessionId, { id: assistantId, role: "assistant", text: toolResults.map((item) => toolResultText(item.result)).join("\n") || "工具已执行。" });
+            upsertMessage(sessionId, { id: assistantId, role: "assistant", text: formatToolResultsForChat(toolResults) || "工具已执行。" });
             addOnlineLog("Agent Tool Loop 达到步数上限", { maxSteps: ONLINE_AGENT_MAX_STEPS });
             return;
         }
@@ -479,7 +480,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
             await continueOnlineToolLoop(sessionId, assistantId, nextMessages, next, step + 1);
             return;
         }
-        upsertMessage(sessionId, { id: assistantId, role: "assistant", text: next.content || streamed || toolResults.map((item) => toolResultText(item.result)).join("\n") || "工具已执行。" });
+        upsertMessage(sessionId, { id: assistantId, role: "assistant", text: next.content || streamed || formatToolResultsForChat(toolResults) || "工具已执行。" });
     };
 
     const executeOps = (ops: CanvasAgentOp[]) => {
@@ -526,9 +527,13 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
     const executeOnlineToolCalls = (toolCalls: ResponseToolCall[]) => {
         const results: OnlineExecutedToolCall[] = [];
         let stopped = false;
-        toolCalls.forEach((toolCall) => {
+        toolCalls.forEach((toolCall, index) => {
+            if (index >= ONLINE_AGENT_MAX_TOOL_CALLS_PER_STEP) {
+                results.push({ toolCallId: toolCall.id, name: toolCall.function.name, result: { ok: false, message: `单轮工具调用过多，已跳过第 ${index + 1} 个及后续工具。` } });
+                return;
+            }
             if (stopped) {
-                results.push({ toolCallId: toolCall.id, name: toolCall.function.name, result: { ok: false, message: "前一个工具调用失败，未继续执行。" } });
+                results.push({ toolCallId: toolCall.id, name: toolCall.function.name, result: { ok: false, message: "前一个工具调用失败，后续工具已停止执行。" } });
                 return;
             }
             const result = executeOnlineToolCall(toolCall);
@@ -560,7 +565,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
             setIsRunning(true);
             const results = executeOnlineToolCalls(toolCalls);
             addOnlineLog("工具执行结果", results);
-            upsertMessage(session.id, { id: messageId, role: "tool", title: "工具执行完成", text: results.map((item) => toolResultText(item.result)).join("\n"), detail: { ...detail, status: "completed", results } });
+            upsertMessage(session.id, { id: messageId, role: "tool", title: "工具执行完成", text: formatToolResultsForChat(results), detail: { ...detail, status: "completed", results } });
             pendingToolContextRef.current.delete(messageId);
             await continueOnlineToolLoopAfterResults(session.id, assistantId, messages, toolCalls, results, step);
         } catch (error) {
@@ -1621,6 +1626,31 @@ function toolCallLabel(name: string) {
 
 function toolResultText(result: OnlineToolResult) {
     return result.message;
+}
+
+function formatToolResultsForChat(results: OnlineExecutedToolCall[]) {
+    const lines: string[] = [];
+    let previous = "";
+    let repeat = 0;
+    const flushRepeat = () => {
+        if (repeat > 0) lines.push(`同类失败已折叠 ${repeat} 条。`);
+        repeat = 0;
+    };
+
+    results.forEach((item) => {
+        const text = toolResultText(item.result);
+        if (!text) return;
+        if (text === previous) {
+            repeat += 1;
+            return;
+        }
+        flushRepeat();
+        lines.push(text);
+        previous = text;
+    });
+    flushRepeat();
+
+    return lines.join("\n");
 }
 
 function requireStringArray(value: unknown, field: string): string[] {
