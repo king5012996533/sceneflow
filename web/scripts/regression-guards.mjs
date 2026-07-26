@@ -67,7 +67,8 @@ assertIncludes("src/app/(user)/canvas/components/canvas-agent-chat-ui.tsx", "Age
 assertIncludes("src/app/(user)/canvas/components/canvas-agent-chat-ui.tsx", "AgentMarkdownTable", "assistant markdown tables should render as scrollable tables.");
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "chatEndRef", "online agent chat should keep a scroll anchor for new messages.");
 assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "scrollIntoView", "online agent chat should auto-scroll to new messages.");
-assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "runCanvasPipeline", "pipeline execution must stay connected to the unified node generator.");
+assertIncludes("src/app/(user)/canvas/hooks/use-canvas-pipeline-runner.ts", "runCanvasPipeline", "pipeline execution must stay connected to the unified node generator.");
+assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "runPipeline", "the canvas page must keep pipeline execution wired through the pipeline runner hook.");
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "assetAutoArchived", "generated reusable assets must automatically return to the asset library.");
 
 const pricingPage = read("src/app/(user)/pricing/page.tsx");

@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     const category = params.get("category") || "";
     const page = Math.max(1, Number(params.get("page")) || 1);
     const pageSize = Math.max(1, Math.min(100, Number(params.get("pageSize")) || 20));
-    const items = await getPrompts();
+    const items = await getPrompts(category);
     const withoutTagFilter = filterPrompts(items, { keyword, category, tags: [] });
     const filtered = filterPrompts(items, { keyword, category, tags });
 
@@ -63,7 +63,11 @@ export async function GET(request: NextRequest) {
     });
 }
 
-async function getPrompts() {
+async function getPrompts(category = "") {
+    if (isActiveOption(category)) {
+        const matchedCategory = categories.find((item) => item.category === category);
+        if (matchedCategory) return loadPromptCategories([matchedCategory]);
+    }
     if (memoryCache && Date.now() - memoryCache.fetchedAt < cacheTtlMs) return memoryCache.items;
     if (loadingPrompts) return loadingPrompts;
     loadingPrompts = loadPrompts().finally(() => {
@@ -73,8 +77,14 @@ async function getPrompts() {
 }
 
 async function loadPrompts() {
+    const items = await loadPromptCategories(categories);
+    memoryCache = { items, fetchedAt: Date.now() };
+    return items;
+}
+
+async function loadPromptCategories(promptCategories: PromptCategory[]) {
     const settled = await Promise.all(
-        categories.map(async (category) => {
+        promptCategories.map(async (category) => {
             try {
                 const items = await category.build();
                 return items.map((item) => ({ ...item, category: category.category, githubUrl: category.githubUrl }));
@@ -83,9 +93,7 @@ async function loadPrompts() {
             }
         }),
     );
-    const items = settled.flat();
-    memoryCache = { items, fetchedAt: Date.now() };
-    return items;
+    return settled.flat();
 }
 
 function filterPrompts(items: Prompt[], options: { keyword: string; category: string; tags: string[] }) {
