@@ -22,7 +22,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { cropDataUrl, splitDataUrl } from "../utils/canvas-image-data";
 import { fitNodeSize } from "../utils/canvas-node-size";
-import { App, Button, Dropdown, Modal } from "antd";
+import { App } from "antd";
 import { NODE_DEFAULT_SIZE } from "../constants";
 import { ActiveConnectionPath, ConnectionPath } from "../components/canvas-connections";
 import { CanvasConfigComposer } from "../components/canvas-config-composer";
@@ -38,10 +38,10 @@ import { CanvasNodePromptPanel, type CanvasNodeGenerationMode } from "../compone
 import { CanvasToolbar } from "../components/canvas-toolbar";
 import { DirectorShotNodeContent } from "../components/director-shot-node-content";
 import { ShotPackNodeContent } from "../components/shot-pack-node-content";
-import { AssetPickerModal } from "../components/asset-picker-modal";
 import { CanvasZoomControls } from "../components/canvas-zoom-controls";
 import { CanvasImageDialogsHost } from "../components/canvas-image-dialogs-host";
 import { CanvasDirectorModalHost } from "../components/canvas-director-modal-host";
+import { CanvasUtilityModalsHost } from "../components/canvas-utility-modals-host";
 import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
 import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
 import { useCanvasStore } from "../stores/use-canvas-store";
@@ -1990,24 +1990,14 @@ function InfiniteCanvasPage() {
                     setPreviewNodeId={setPreviewNodeId}
                 />
 
-                <Modal
-                    title="清空画布？"
-                    open={clearConfirmOpen}
-                    centered
-                    onCancel={() => setClearConfirmOpen(false)}
-                    footer={
-                        <>
-                            <Button onClick={() => setClearConfirmOpen(false)}>取消</Button>
-                            <Button danger type="primary" onClick={clearCanvas}>
-                                清空
-                            </Button>
-                        </>
-                    }
-                >
-                    <p className="text-sm opacity-60">这会删除当前画布上的所有节点和连线。</p>
-                </Modal>
-
-                <AssetPickerModal open={assetPickerOpen} onInsert={handleAssetInsert} onClose={closeAssetPicker} />
+                <CanvasUtilityModalsHost
+                    clearConfirmOpen={clearConfirmOpen}
+                    onCloseClearConfirm={() => setClearConfirmOpen(false)}
+                    onConfirmClear={clearCanvas}
+                    assetPickerOpen={assetPickerOpen}
+                    onAssetInsert={handleAssetInsert}
+                    onCloseAssetPicker={closeAssetPicker}
+                />
                 {codexCompactAgent && !assistantMounted ? <CanvasLocalAgentPanel headless snapshot={agentSnapshot} canUndoOps={Boolean(agentUndoSnapshot)} onApplyOps={applyAgentOps} onUndoOps={undoAgentOps} autoConnect={codexAutoConnect} /> : null}
             </section>
             {assistantMounted ? (
