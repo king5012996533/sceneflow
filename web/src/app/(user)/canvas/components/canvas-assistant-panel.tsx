@@ -380,9 +380,8 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
             } });
             addOnlineLog("模型工具回复", result);
             if (result.toolCalls.length) {
-                // 确认策略：读工具自动执行，非破坏性写工具自动执行，破坏性写工具需要确认
-                const needsConfirm = result.toolCalls.some((call) => CONFIRM_WRITE_TOOLS.has(call.function.name));
-                if (needsConfirm && (confirmTools || loop.step >= 3)) {
+                const needsConfirm = result.toolCalls.some((call) => toolCallNeedsConfirmation(call, confirmTools));
+                if (needsConfirm) {
                     upsertMessage(sessionId, { id: assistantId, role: "assistant", text: result.content || streamed || "准备执行工具，等待确认。" });
                     const toolMessageId = nanoid();
                     pendingToolContextRef.current.set(toolMessageId, { messages, toolCalls: result.toolCalls, assistantId, step: loop.step });
@@ -407,8 +406,8 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                     } });
                     addOnlineLog("重试结果", retryResult);
                     if (retryResult.toolCalls.length) {
-                        const needsConfirm = retryResult.toolCalls.some((call) => CONFIRM_WRITE_TOOLS.has(call.function.name));
-                        if (needsConfirm && (confirmTools || loop.step >= 3)) {
+                        const needsConfirm = retryResult.toolCalls.some((call) => toolCallNeedsConfirmation(call, confirmTools));
+                        if (needsConfirm) {
                             upsertMessage(sessionId, { id: assistantId, role: "assistant", text: retryResult.content || retryStreamed || "准备执行工具，等待确认。" });
                             const toolMessageId = nanoid();
                             pendingToolContextRef.current.set(toolMessageId, { messages: retryMessages, toolCalls: retryResult.toolCalls, assistantId, step: loop.step + 1 });
@@ -466,8 +465,8 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
         } });
         addOnlineLog(`Agent Tool Loop ${step + 1} 回复`, next);
         if (next.toolCalls.length) {
-            const needsConfirm = next.toolCalls.some((call) => CONFIRM_WRITE_TOOLS.has(call.function.name));
-            if (needsConfirm && (confirmTools || step >= 3)) {
+            const needsConfirm = next.toolCalls.some((call) => toolCallNeedsConfirmation(call, confirmTools));
+            if (needsConfirm) {
                 upsertMessage(sessionId, { id: assistantId, role: "assistant", text: next.content || streamed || "准备执行工具，等待确认。" });
                 const toolMessageId = nanoid();
                 pendingToolContextRef.current.set(toolMessageId, { messages: nextMessages, toolCalls: next.toolCalls, assistantId, step: step + 1 });
@@ -1845,14 +1844,31 @@ function shouldRequireToolCall(text: string) {
     return /(创建|新建|放到画布|落到画布|生成节点|执行|运行|重跑|重新生成|立即生成|删除|移动|修改|更新|连线|连接|开始|生成图片|生成视频|图生视频|续写|尾帧|读取画布|当前画布|操作画布|整理成工作流)/.test(text);
 }
 
-/** 需要用户确认的写工具（破坏性操作） */
-const CONFIRM_WRITE_TOOLS = new Set([
+const ALWAYS_CONFIRM_TOOLS = new Set([
     "canvas_delete_nodes",
+    "canvas_generate_text",
+    "canvas_generate_image",
+    "canvas_generate_video",
+    "canvas_generate_audio",
     "canvas_run_generation",
     "canvas_run_pipeline",
     "canvas_continue_video",
     "canvas_apply_ops",
 ]);
+
+const AUTO_RUN_CAPABLE_TOOLS = new Set([
+    "canvas_create_config_node",
+    "canvas_create_image_prompt_flow",
+    "canvas_create_generation_flow",
+]);
+
+function toolCallNeedsConfirmation(call: ResponseToolCall, confirmTools: boolean) {
+    const name = call.function.name;
+    if (ONLINE_READ_TOOLS.has(name)) return false;
+    if (ALWAYS_CONFIRM_TOOLS.has(name)) return true;
+    if (AUTO_RUN_CAPABLE_TOOLS.has(name) && parseToolArguments(call.function.arguments).autoRun === true) return true;
+    return confirmTools;
+}
 
 function compactSnapshot(snapshot: CanvasAgentSnapshot) {
     return {
