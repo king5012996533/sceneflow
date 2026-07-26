@@ -9,23 +9,21 @@ import { requestGeneratedImages } from "@/lib/generation/generation-request";
 import { QuotaExceededError } from "@/lib/generation/generation-guard";
 import { QuotaExceededModal } from "@/components/quota-exceeded-modal";
 
-import { DOCS_URL } from "@/constant/env";
 import { defaultConfig, type AiConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
-import { resolveImageUrl, uploadImage } from "@/services/image-storage";
+import { uploadImage } from "@/services/image-storage";
 import { uploadMediaFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
-import { dataUrlToFile, readImageMeta } from "@/lib/image-utils";
+import { readImageMeta } from "@/lib/image-utils";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { fetchClientEntitlements, isOverLimit, type ClientEntitlements } from "@/lib/client-entitlements";
 import { checkGenerationQuota, reserveGenerationQuota } from "@/lib/generation-quota";
-import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { cropDataUrl, splitDataUrl } from "../utils/canvas-image-data";
 import { fitNodeSize } from "../utils/canvas-node-size";
 import { App, Button, Dropdown, Modal } from "antd";
-import { NODE_DEFAULT_SIZE, getNodeSpec } from "../constants";
+import { NODE_DEFAULT_SIZE } from "../constants";
 import { ActiveConnectionPath, ConnectionPath } from "../components/canvas-connections";
 import { CanvasConfigComposer } from "../components/canvas-config-composer";
 import { CanvasConfigNodePanel } from "../components/canvas-config-node-panel";
@@ -105,12 +103,9 @@ import {
     imageMetadata,
     videoMetadata,
     audioMetadata,
-    buildImageGenerationMetadata,
-    buildAudioGenerationMetadata,
     hydrateCanvasImages,
     hydrateAssistantImages,
     getGenerationCount,
-    applyNodeConfigPatch,
     getConnectionTargetAnchor,
     normalizeConnection,
     getInputSummary,
