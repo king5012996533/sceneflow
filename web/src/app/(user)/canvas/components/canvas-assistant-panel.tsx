@@ -19,7 +19,6 @@ import { DiaTextReveal } from "@/components/ui/dia-text-reveal";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { CanvasPromptLibrary } from "./canvas-prompt-library";
 import { AgentChatComposer, AgentChatMessage, AgentModeSwitch, AgentPanelTabs, AgentWorkingMessage, type CanvasAgentChatMessage, type CanvasAgentMode } from "./canvas-agent-chat-ui";
-import { CanvasCreativeAgentPanel } from "./canvas-creative-agent-panel";
 import { CanvasLocalAgentPanel } from "./canvas-local-agent-panel";
 import { CanvasOrchestratorPanel } from "./canvas-orchestrator-panel";
 import { NODE_DEFAULT_SIZE } from "../constants";
@@ -370,16 +369,20 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
             setIsRunning(true);
             const messages = await buildToolAgentMessages(snapshotRef.current, history, userMessage);
             const toolsForTurn = shouldExposeCanvasTools(userMessage.text) ? ONLINE_AGENT_TOOLS : [];
-            addOnlineLog(`Agent Loop ${loop.step} 开始`, { toolChoice: toolsForTurn.length ? "auto" : "none", toolCount: toolsForTurn.length });
+            // 如果只有读意图，至少暴露读工具
+            const readOnlyTools = ONLINE_AGENT_TOOLS.filter((tool) => ONLINE_READ_TOOLS.has(tool.function.name));
+            const effectiveTools = toolsForTurn.length ? toolsForTurn : readOnlyTools.length ? readOnlyTools : [];
+            addOnlineLog(`Agent Loop ${loop.step} 开始`, { toolChoice: effectiveTools.length ? "auto" : "none", toolCount: effectiveTools.length, readOnly: toolsForTurn.length === 0 && effectiveTools.length > 0 });
             let streamed = "";
-            const result = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages, tools: toolsForTurn, toolChoice: "auto", onDelta: (text) => {
+            const result = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages, tools: effectiveTools, toolChoice: "auto", onDelta: (text) => {
                 streamed = text;
                 if (text.trim()) upsertMessage(sessionId, { id: assistantId, role: "assistant", text });
             } });
             addOnlineLog("模型工具回复", result);
             if (result.toolCalls.length) {
-                const writableCalls = result.toolCalls.filter(isWritableToolCall);
-                if (confirmTools && writableCalls.length) {
+                // 确认策略：读工具自动执行，非破坏性写工具自动执行，破坏性写工具需要确认
+                const needsConfirm = result.toolCalls.some((call) => CONFIRM_WRITE_TOOLS.has(call.function.name));
+                if (needsConfirm && (confirmTools || loop.step >= 3)) {
                     upsertMessage(sessionId, { id: assistantId, role: "assistant", text: result.content || streamed || "准备执行工具，等待确认。" });
                     const toolMessageId = nanoid();
                     pendingToolContextRef.current.set(toolMessageId, { messages, toolCalls: result.toolCalls, assistantId, step: loop.step });
@@ -388,8 +391,37 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                     addOnlineLog("等待用户确认", result.toolCalls);
                     return;
                 }
+                // 执行中提示
+                const executingMsg: CanvasAssistantMessage = { id: nanoid(), role: "tool", title: "正在执行工具...", text: summarizeToolCalls(result.toolCalls), detail: { status: "running", step: loop.step, toolCalls: result.toolCalls } };
+                appendMessage(sessionId, executingMsg);
                 await continueOnlineToolLoop(sessionId, assistantId, messages, result, loop.step);
             } else {
+                // no-tool retry: 用户明确要求执行但模型没有调用工具
+                if (loop.step < ONLINE_AGENT_MAX_STEPS && shouldRequireToolCall(userMessage.text)) {
+                    addOnlineLog("模型未调用工具，重试", { step: loop.step });
+                    const retryMessages = [...messages, { role: "assistant" as const, content: result.content || streamed || "" }, { role: "user" as const, content: "以上回复没有调用任何画布工具。用户明确要求操作画布，请调用对应的工具来执行操作，不要只回复文本。你可以先调用 canvas_get_state 看看当前画布状态。" }];
+                    let retryStreamed = "";
+                    const retryResult = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages: retryMessages, tools: effectiveTools, toolChoice: "auto", onDelta: (text) => {
+                        retryStreamed = text;
+                        if (text.trim()) upsertMessage(sessionId, { id: assistantId, role: "assistant", text });
+                    } });
+                    addOnlineLog("重试结果", retryResult);
+                    if (retryResult.toolCalls.length) {
+                        const needsConfirm = retryResult.toolCalls.some((call) => CONFIRM_WRITE_TOOLS.has(call.function.name));
+                        if (needsConfirm && (confirmTools || loop.step >= 3)) {
+                            upsertMessage(sessionId, { id: assistantId, role: "assistant", text: retryResult.content || retryStreamed || "准备执行工具，等待确认。" });
+                            const toolMessageId = nanoid();
+                            pendingToolContextRef.current.set(toolMessageId, { messages: retryMessages, toolCalls: retryResult.toolCalls, assistantId, step: loop.step + 1 });
+                            const toolMessage: CanvasAssistantMessage = { id: toolMessageId, role: "tool", title: "确认工具调用", text: summarizeToolCalls(retryResult.toolCalls), detail: { status: "pending", step: loop.step + 1, toolCalls: retryResult.toolCalls, pendingContext: { messages: retryMessages, toolCalls: retryResult.toolCalls, assistantId, step: loop.step + 1 } } };
+                            appendMessage(sessionId, toolMessage);
+                            return;
+                        }
+                        const executingMsg: CanvasAssistantMessage = { id: nanoid(), role: "tool", title: "正在执行工具...", text: summarizeToolCalls(retryResult.toolCalls), detail: { status: "running", step: loop.step + 1, toolCalls: retryResult.toolCalls } };
+                        appendMessage(sessionId, executingMsg);
+                        await continueOnlineToolLoop(sessionId, assistantId, retryMessages, retryResult, loop.step + 1);
+                        return;
+                    }
+                }
                 if (!result.content.trim()) throw new Error("模型没有返回内容，请换一种说法再试。");
                 upsertMessage(sessionId, { id: assistantId, role: "assistant", text: result.content || streamed || "没有返回内容。" });
                 addOnlineLog(`Agent Loop ${loop.step} 结束`, { reply: result.content });
@@ -434,8 +466,8 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
         } });
         addOnlineLog(`Agent Tool Loop ${step + 1} 回复`, next);
         if (next.toolCalls.length) {
-            const writableCalls = next.toolCalls.filter(isWritableToolCall);
-            if (confirmTools && writableCalls.length) {
+            const needsConfirm = next.toolCalls.some((call) => CONFIRM_WRITE_TOOLS.has(call.function.name));
+            if (needsConfirm && (confirmTools || step >= 3)) {
                 upsertMessage(sessionId, { id: assistantId, role: "assistant", text: next.content || streamed || "准备执行工具，等待确认。" });
                 const toolMessageId = nanoid();
                 pendingToolContextRef.current.set(toolMessageId, { messages: nextMessages, toolCalls: next.toolCalls, assistantId, step: step + 1 });
@@ -746,12 +778,10 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                         <AgentModeSwitch value={agentMode} theme={theme} onChange={onAgentModeChange} />
-                        {agentMode === "local" ? (
-                            <label className="flex items-center gap-1.5 text-xs" style={{ color: theme.node.muted }}>
-                                <Switch size="small" checked={confirmTools} onChange={(confirmTools) => setAgentState({ confirmTools })} />
-                                工具确认
-                            </label>
-                        ) : null}
+                        <label className="flex items-center gap-1.5 text-xs" style={{ color: theme.node.muted }}>
+                            <Switch size="small" checked={confirmTools} onChange={(confirmTools) => setAgentState({ confirmTools })} />
+                            工具确认
+                        </label>
                         <Tooltip title="收起对话">
                             <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<PanelRightClose className="size-4" />} onClick={collapse} />
                         </Tooltip>
@@ -769,7 +799,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                 ) : agentMode === "orchestrator" ? (
                     <CanvasOrchestratorPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} onToolCall={executeOnlineTool} />
                 ) : (
-                    <CanvasCreativeAgentPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} />
+                    onlineContent
                 )}
             </motion.aside>
         </motion.div>
@@ -1529,10 +1559,6 @@ function runGenerationOp(nodeId: string, mode: "text" | "image" | "video" | "aud
     return { type: "run_generation", nodeId, mode, prompt };
 }
 
-function isWritableToolCall(call: ResponseToolCall) {
-    return !ONLINE_READ_TOOLS.has(call.function.name);
-}
-
 function toolCallsFromDetail(detail: Record<string, unknown>): ResponseToolCall[] {
     return Array.isArray(detail.toolCalls) ? (detail.toolCalls.filter(isResponseToolCall) as ResponseToolCall[]) : [];
 }
@@ -1805,11 +1831,28 @@ function isPollutedAgentMessage(text: unknown) {
 function shouldExposeCanvasTools(text: unknown) {
     if (typeof text !== "string") return false;
     const value = text.trim();
-    if (!value || !CANVAS_TOOL_INTENT_PATTERN.test(value)) return false;
-    const actionHint = /(放到画布|落到画布|创建卡片|创建节点|读取画布|当前画布|操作画布|开始生成|立即生成|生成图片|生成视频|图生视频)/.test(value);
-    const adviceOnlyHint = CHAT_ONLY_INTENT_PATTERN.test(value);
-    return actionHint || !adviceOnlyHint;
+    if (!value) return false;
+    // 明确聊天/建议类问题，且没有画布操作意图 -> 只暴露读工具
+    if (CHAT_ONLY_INTENT_PATTERN.test(value) && !CANVAS_TOOL_INTENT_PATTERN.test(value)) {
+        return false;
+    }
+    // 默认暴露所有工具（读 + 写）
+    return true;
 }
+
+/** 判断用户是否明确要求执行画布操作 —— 用于 no-tool retry */
+function shouldRequireToolCall(text: string) {
+    return /(创建|新建|放到画布|落到画布|生成节点|执行|运行|重跑|重新生成|立即生成|删除|移动|修改|更新|连线|连接|开始|生成图片|生成视频|图生视频|续写|尾帧|读取画布|当前画布|操作画布|整理成工作流)/.test(text);
+}
+
+/** 需要用户确认的写工具（破坏性操作） */
+const CONFIRM_WRITE_TOOLS = new Set([
+    "canvas_delete_nodes",
+    "canvas_run_generation",
+    "canvas_run_pipeline",
+    "canvas_continue_video",
+    "canvas_apply_ops",
+]);
 
 function compactSnapshot(snapshot: CanvasAgentSnapshot) {
     return {
