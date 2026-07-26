@@ -1538,6 +1538,9 @@ function InfiniteCanvasPage() {
     const handleGenerateNode = useCallback(
         async (nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => {
             const sourceNode = nodesRef.current.find((node) => node.id === nodeId);
+            const nodePrompt = sourceNode?.type === CanvasNodeType.Config
+                ? sourceNode.metadata?.composerContent || prompt || sourceNode.metadata?.prompt || ""
+                : prompt || sourceNode?.metadata?.prompt || "";
             const generationConfig = buildGenCfg(sourceNode, mode);
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
                 openConfigDialog(true);
@@ -1557,7 +1560,7 @@ function InfiniteCanvasPage() {
             const runController = new AbortController();
             const sourceTextContent = sourceNode?.type === CanvasNodeType.Text ? sourceNode.metadata?.content?.trim() || "" : "";
             const editingTextNode = mode === "text" && Boolean(sourceTextContent);
-            const generationContext = await buildHydratedContext(nodeId, editingTextNode ? `请根据要求修改以下文本。\n\n原文：\n${sourceTextContent}\n\n修改要求：\n${prompt}` : prompt);
+            const generationContext = await buildHydratedContext(nodeId, editingTextNode ? `请根据要求修改以下文本。\n\n原文：\n${sourceTextContent}\n\n修改要求：\n${nodePrompt}` : nodePrompt);
             const effectivePrompt = generationContext.prompt.trim();
             if (runController.signal.aborted) {
                 finishGenerationRequest(nodeId, runController);
@@ -1565,7 +1568,7 @@ function InfiniteCanvasPage() {
                 return;
             }
             const markSourceStatus = sourceNode?.type !== CanvasNodeType.Image && !editingTextNode;
-            const statusPrompt = sourceNode?.type === CanvasNodeType.Config ? effectivePrompt : prompt;
+            const statusPrompt = sourceNode?.type === CanvasNodeType.Config ? effectivePrompt : nodePrompt;
             if (!effectivePrompt && (mode === "text" || mode === "audio")) {
                 finishGenerationRequest(nodeId, runController);
                 setRunningNodeId(null);
@@ -1616,7 +1619,7 @@ function InfiniteCanvasPage() {
                     generationContext,
                     effectivePrompt,
                     nodeId,
-                    prompt,
+                    prompt: nodePrompt,
                     editingTextNode,
                     runController,
                 });

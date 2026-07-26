@@ -100,6 +100,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions) {
                         generationMode: "text",
                         model: effectiveConfig.textModel || effectiveConfig.model || defaultConfig.textModel,
                         count: 1,
+                        prompt: `参考图片：@[node:${node.id}]\n任务说明：@[node:${textNode.id}]`,
                         composerContent: `参考图片：@[node:${node.id}]\n任务说明：@[node:${textNode.id}]`,
                     },
                 ),
