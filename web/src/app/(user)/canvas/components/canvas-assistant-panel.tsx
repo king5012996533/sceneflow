@@ -341,7 +341,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
         cleanupImages({ sessions: [session] });
     };
 
-    const sendMessage = async (text: string, history: CanvasAssistantMessage[], savedReferences?: CanvasAssistantReference[]) => {
+    const sendMessage = async (text: string, savedReferences?: CanvasAssistantReference[]) => {
         const requestConfig = { ...effectiveConfig, model: effectiveConfig.textModel || effectiveConfig.model };
         if (!isAiConfigReady(requestConfig, requestConfig.model)) {
             openConfigDialog(true);
@@ -361,7 +361,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
         addOnlineLog("发送请求", { text, selectedNodeIds: snapshotRef.current.selectedNodeIds, nodeCount: snapshotRef.current.nodes.length, connectionCount: snapshotRef.current.connections.length });
         setPrompt("");
         setIsRunning(true);
-        void runOnlineAgentStep(session.id, assistantId, history, userMessage, { step: 1 });
+        void runOnlineAgentStep(session.id, assistantId, session.messages, userMessage, { step: 1 });
     };
 
     const runOnlineAgentStep = async (sessionId: string, assistantId: string, history: CanvasAssistantMessage[], userMessage: CanvasAssistantMessage, loop: OnlineLoopContext) => {
@@ -581,7 +581,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
     const submit = async () => {
         const text = prompt.trim();
         if (!text || isRunning) return;
-        await sendMessage(text, messages);
+        await sendMessage(text);
     };
 
     const addImagesToCanvas = (files: FileList | File[] | null) => {
@@ -1790,22 +1790,29 @@ function buildAssistantReferences(nodes: CanvasNodeData[], selectedNodeIds: Set<
 
 async function buildToolAgentMessages(snapshot: CanvasAgentSnapshot, history: CanvasAssistantMessage[], userMessage: CanvasAssistantMessage): Promise<ResponseInputMessage[]> {
     const refs = userMessage.references || [];
+    const canvasMemory = buildCanvasAgentMemory(snapshot, refs, history);
     const contextText = [
         `页面状态：当前在 SceneFlow 画布。节点 ${snapshot.nodes.length} 个，连线 ${snapshot.connections.length} 条，选中 ${snapshot.selectedNodeIds.length} 个节点。`,
+        canvasMemory,
+        "你必须结合最近对话、当前选区、已有节点和工具执行结果理解用户需求；不要把当前消息当作孤立输入。",
         "如果只是聊天、咨询、写剧情或写提示词，请直接回答；只有需要操作画布时才调用工具读取完整画布。",
         `用户需求：${safeMessageText(userMessage.text)}`,
-    ].join("\n");
+    ].filter(Boolean).join("\n\n");
     return [
         { role: "system", content: ONLINE_AGENT_PROMPT },
         ...history
             .filter((message): message is CanvasAssistantMessage & { role: "user" | "assistant" | "system" } => message.role === "user" || message.role === "assistant" || message.role === "system")
             .filter((message) => !isPollutedAgentMessage(message.text))
-            .slice(-8)
+            .slice(-12)
             .map((message): ResponseInputMessage => ({ role: message.role, content: safeMessageText(message.text) })),
         {
             role: "user",
             content: [
-                ...refs.flatMap((item) => (item.text ? [{ type: "text" as const, text: `选中节点 ${safeMessageText(item.title)}：${safeMessageText(item.text)}` }] : [])),
+                ...refs.flatMap((item) => {
+                    const text = safeMessageText(item.text);
+                    const label = `选中节点 ${safeMessageText(item.title)}(${item.type})`;
+                    return text ? [{ type: "text" as const, text: `${label}：${truncateAgentText(text, 900)}` }] : [{ type: "text" as const, text: `${label}：已附加为图片引用。` }];
+                }),
                 { type: "text", text: contextText },
                 ...(await Promise.all(refs.filter((item) => item.dataUrl).map(async (item) => ({ type: "image_url" as const, image_url: { url: await imageToDataUrl(item) } })))),
             ],
@@ -1822,6 +1829,53 @@ function safeMessageText(value: unknown) {
     } catch {
         return "";
     }
+}
+
+function buildCanvasAgentMemory(snapshot: CanvasAgentSnapshot, refs: CanvasAssistantReference[], history: CanvasAssistantMessage[]) {
+    const selectedIds = new Set(snapshot.selectedNodeIds);
+    const selectedNodes = snapshot.nodes.filter((node) => selectedIds.has(node.id));
+    const refIds = new Set(refs.map((item) => item.id));
+    const recentNodes = snapshot.nodes
+        .filter((node) => !selectedIds.has(node.id) && !refIds.has(node.id))
+        .slice(-10);
+    const connectionText = snapshot.connections
+        .slice(-16)
+        .map((connection) => `${connection.fromNodeId} -> ${connection.toNodeId}`)
+        .join("\n");
+    const toolText = history
+        .filter((message) => message.role === "tool" || message.role === "error")
+        .slice(-5)
+        .map((message) => `${message.title || message.role}: ${truncateAgentText(message.text, 240)}`)
+        .join("\n");
+    const recentTalk = history
+        .filter((message) => (message.role === "user" || message.role === "assistant") && !isPollutedAgentMessage(message.text))
+        .slice(-6)
+        .map((message) => `${message.role}: ${truncateAgentText(message.text, 220)}`)
+        .join("\n");
+
+    return [
+        recentTalk ? `最近对话：\n${recentTalk}` : "",
+        selectedNodes.length ? `当前选中节点：\n${selectedNodes.slice(0, 8).map(describeNodeForAgent).join("\n")}` : "",
+        recentNodes.length ? `画布近期节点：\n${recentNodes.map(describeNodeForAgent).join("\n")}` : "",
+        connectionText ? `现有连线：\n${connectionText}` : "",
+        toolText ? `最近工具结果：\n${toolText}` : "",
+    ].filter(Boolean).join("\n\n");
+}
+
+function describeNodeForAgent(node: CanvasNodeData) {
+    const metadata = node.metadata || {};
+    const prompt = truncateAgentText(metadata.prompt || metadata.composerContent || "", 180);
+    const content = truncateAgentText(metadata.content || "", 220);
+    const status = metadata.status ? ` status=${safeMessageText(metadata.status)}` : "";
+    const mode = metadata.generationMode ? ` mode=${safeMessageText(metadata.generationMode)}` : "";
+    const body = [prompt ? `prompt="${prompt}"` : "", content ? `content="${content}"` : ""].filter(Boolean).join(" ");
+    return `- ${node.id} ${node.title || node.type} type=${node.type}${status}${mode}${body ? ` ${body}` : ""}`;
+}
+
+function truncateAgentText(value: unknown, limit: number) {
+    const text = safeMessageText(value).replace(/\s+/g, " ").trim();
+    if (text.length <= limit) return text;
+    return `${text.slice(0, limit)}...`;
 }
 
 function isPollutedAgentMessage(text: unknown) {
