@@ -23,9 +23,22 @@ import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import type { CanvasImageAngleParams } from "../components/canvas-node-angle-dialog";
 import type { CanvasNodeGenerationMode } from "../components/canvas-node-prompt-panel";
 export type { CanvasNodeGenerationMode };
-import type { Asset, AssetCategory, AssetMetadata } from "@/stores/use-asset-store";
+import type { Asset } from "@/stores/use-asset-store";
 import type { AiConfig } from "@/stores/use-config-store";
 import { assetCategoryFromNode, nodeAssetTags, nodeAssetMetadata, imageMetadata, videoMetadata, audioMetadata, buildImageGenerationMetadata, buildAudioGenerationMetadata } from "./canvas-node-metadata";
+import {
+    VIDEO_NODE_MAX_WIDTH,
+    VIDEO_NODE_MAX_HEIGHT,
+    CONNECTION_HANDLE_HIT_RADIUS,
+    CONNECTION_NODE_HIT_PADDING,
+    NODE_STATUS_IDLE,
+    NODE_STATUS_LOADING,
+    NODE_STATUS_SUCCESS,
+    NODE_STATUS_ERROR,
+    DIRECTOR_DESK_URL,
+    AUTO_ARCHIVE_CATEGORIES,
+    IMAGE_PROMPT_REVERSE_PRESET,
+} from "./canvas-constants";
 
 // ========== 类型定义 ==========
 
@@ -65,25 +78,6 @@ export type CanvasGenerationRequest = {
     controller: AbortController;
 };
 
-// ========== 常量 ==========
-
-export const VIDEO_NODE_MAX_WIDTH = 420;
-export const VIDEO_NODE_MAX_HEIGHT = 420;
-export const CONNECTION_HANDLE_HIT_RADIUS = 40;
-export const CONNECTION_NODE_HIT_PADDING = 32;
-export const NODE_STATUS_IDLE = "idle" as const;
-export const NODE_STATUS_LOADING = "loading" as const;
-export const NODE_STATUS_SUCCESS = "success" as const;
-export const NODE_STATUS_ERROR = "error" as const;
-export const DIRECTOR_DESK_URL = process.env.NEXT_PUBLIC_DIRECTOR_DESK_URL || "http://127.0.0.1:5173/";
-export const AUTO_ARCHIVE_CATEGORIES = new Set<AssetCategory>(["character", "character-turnaround", "scene", "style", "storyboard", "keyframe", "video-shot", "template"]);
-export const IMAGE_PROMPT_REVERSE_PRESET = `请根据参考图片反推一段适合用于 AI 生图的提示词。
-
-要求：
-1. 只输出提示词正文，不要解释。
-2. 覆盖主体、构图、风格、光线、色彩、材质、镜头和氛围。
-3. 尽量写成可直接用于生图模型的完整提示词。`;
-
 // ========== 画布函数 ==========
 
 export function resolveDirectorDeskUrl(value: string) {
@@ -96,7 +90,12 @@ export function resolveDirectorDeskUrl(value: string) {
     }
 }
 
-export { assetCategoryFromNode, nodeAssetTags, nodeAssetMetadata, imageMetadata, videoMetadata, audioMetadata, buildImageGenerationMetadata, buildAudioGenerationMetadata };
+export {
+    assetCategoryFromNode, nodeAssetTags, nodeAssetMetadata, imageMetadata, videoMetadata, audioMetadata, buildImageGenerationMetadata, buildAudioGenerationMetadata,
+    VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT, CONNECTION_HANDLE_HIT_RADIUS, CONNECTION_NODE_HIT_PADDING,
+    NODE_STATUS_IDLE, NODE_STATUS_LOADING, NODE_STATUS_SUCCESS, NODE_STATUS_ERROR,
+    DIRECTOR_DESK_URL, AUTO_ARCHIVE_CATEGORIES, IMAGE_PROMPT_REVERSE_PRESET,
+};
 
 export function archiveCanvasNode(
     node: CanvasNodeData,
