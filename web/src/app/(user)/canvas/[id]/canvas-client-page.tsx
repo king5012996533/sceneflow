@@ -41,6 +41,7 @@ import { ShotPackNodeContent } from "../components/shot-pack-node-content";
 import { AssetPickerModal } from "../components/asset-picker-modal";
 import { CanvasZoomControls } from "../components/canvas-zoom-controls";
 import { CanvasImageDialogsHost } from "../components/canvas-image-dialogs-host";
+import { CanvasDirectorModalHost } from "../components/canvas-director-modal-host";
 import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
 import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
 import { useCanvasStore } from "../stores/use-canvas-store";
@@ -1955,27 +1956,13 @@ function InfiniteCanvasPage() {
                     />
                 ) : null}
 
-                <Modal
-                    title={directorNode?.title || "3D 镜头导演台"}
-                    open={Boolean(directorNode)}
-                    centered
-                    width="96vw"
-                    footer={null}
-                    destroyOnClose
-                    onCancel={() => setDirectorNodeId(null)}
-                    styles={{ body: { height: "82vh", padding: 0, overflow: "hidden", background: "#090909" } }}
-                >
-                    {directorDeskSrc ? (
-                        <iframe
-                            ref={directorIframeRef}
-                            title="3D 镜头导演台"
-                            src={directorDeskSrc}
-                            className="block h-full w-full border-0"
-                            allow="clipboard-read; clipboard-write"
-                            onLoad={postDirectorSession}
-                        />
-                    ) : null}
-                </Modal>
+                <CanvasDirectorModalHost
+                    directorNode={directorNode}
+                    directorDeskSrc={directorDeskSrc}
+                    directorIframeRef={directorIframeRef}
+                    onClose={() => setDirectorNodeId(null)}
+                    onLoad={postDirectorSession}
+                />
 
                 <CanvasImageDialogsHost
                     imageInputRef={imageInputRef}
