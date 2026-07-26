@@ -29,13 +29,8 @@ import { CanvasConfigComposer } from "../components/canvas-config-composer";
 import { CanvasConfigNodePanel } from "../components/canvas-config-node-panel";
 import { CANVAS_AGENT_PANEL_MOTION_MS, CanvasAssistantPanel } from "../components/canvas-assistant-panel";
 import { CanvasNodeContextMenu } from "../components/canvas-context-menu";
-import { CanvasNodeAngleDialog, type CanvasImageAngleParams } from "../components/canvas-node-angle-dialog";
-import { CanvasNodeCropDialog, type CanvasImageCropRect } from "../components/canvas-node-crop-dialog";
-import { CanvasNodeMaskEditDialog, type CanvasImageMaskEditPayload } from "../components/canvas-node-mask-edit-dialog";
-import { CanvasNodeSplitDialog, type CanvasImageSplitParams } from "../components/canvas-node-split-dialog";
-import { CanvasNodeUpscaleDialog, type CanvasImageUpscaleParams } from "../components/canvas-node-upscale-dialog";
 
-import { CanvasNodeHoverToolbar, CanvasNodeInfoModal } from "../components/canvas-node-hover-toolbar";
+import { CanvasNodeHoverToolbar } from "../components/canvas-node-hover-toolbar";
 import { InfiniteCanvas } from "../components/infinite-canvas";
 import { Minimap } from "../components/canvas-mini-map";
 import { CanvasNode } from "../components/canvas-node";
@@ -45,6 +40,7 @@ import { DirectorShotNodeContent } from "../components/director-shot-node-conten
 import { ShotPackNodeContent } from "../components/shot-pack-node-content";
 import { AssetPickerModal } from "../components/asset-picker-modal";
 import { CanvasZoomControls } from "../components/canvas-zoom-controls";
+import { CanvasImageDialogsHost } from "../components/canvas-image-dialogs-host";
 import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
 import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
 import { useCanvasStore } from "../stores/use-canvas-store";
@@ -1981,41 +1977,31 @@ function InfiniteCanvasPage() {
                     ) : null}
                 </Modal>
 
-                <input ref={imageInputRef} type="file" accept="image/*,video/*,audio/mpeg,audio/wav,audio/x-wav,.mp3,.wav" className="hidden" onChange={handleImageInputChange} />
-
-                <CanvasNodeInfoModal node={infoNode} open={Boolean(infoNode)} onClose={() => setInfoNodeId(null)} />
-
-                {cropNode?.metadata?.content ? <CanvasNodeCropDialog dataUrl={cropNode.metadata.content} open={Boolean(cropNode)} onClose={() => setCropNodeId(null)} onConfirm={(crop) => void cropImageNode(cropNode!, crop)} /> : null}
-
-                {maskEditNode?.metadata?.content ? <CanvasNodeMaskEditDialog dataUrl={maskEditNode.metadata.content} open={Boolean(maskEditNode)} onClose={() => setMaskEditNodeId(null)} onConfirm={(payload) => void applyMaskEdit(maskEditNode!, payload)} /> : null}
-
-                {splitNode?.metadata?.content ? <CanvasNodeSplitDialog dataUrl={splitNode.metadata.content} open={Boolean(splitNode)} onClose={() => setSplitNodeId(null)} onConfirm={(params) => void splitImageNode(splitNode!, params)} /> : null}
-
-                {upscaleNode?.metadata?.content ? <CanvasNodeUpscaleDialog dataUrl={upscaleNode.metadata.content} open={Boolean(upscaleNode)} onClose={() => setUpscaleNodeId(null)} onConfirm={(params) => void generateUpscaledImage(upscaleNode!, params)} /> : null}
-
-                <Modal title="AI 超分" open={Boolean(superResolveNode?.metadata?.content)} centered footer={null} onCancel={() => setSuperResolveNodeId(null)}>
-                    <div className="py-8 text-center text-base font-medium">暂未实现</div>
-                </Modal>
-
-                {angleNode?.metadata?.content ? <CanvasNodeAngleDialog dataUrl={angleNode.metadata.content} open={Boolean(angleNode)} onClose={() => setAngleNodeId(null)} onConfirm={(params) => void generateAngleImage(angleNode!, params)} /> : null}
-
-                <Modal
-                    title="图片详情"
-                    open={Boolean(previewNode?.metadata?.content)}
-                    centered
-                    onCancel={() => setPreviewNodeId(null)}
-                    footer={null}
-                    width="auto"
-                    styles={{ body: { padding: 0, display: "flex", justifyContent: "center", alignItems: "center", maxHeight: "80vh" } }}
-                >
-                    {previewNode?.metadata?.content ? (
-                        <img
-                            src={previewNode.metadata.content}
-                            alt={previewNode.title || "图片"}
-                            style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain" }}
-                        />
-                    ) : null}
-                </Modal>
+                <CanvasImageDialogsHost
+                    imageInputRef={imageInputRef}
+                    handleImageInputChange={handleImageInputChange}
+                    infoNode={infoNode}
+                    setInfoNodeId={setInfoNodeId}
+                    cropNode={cropNode}
+                    setCropNodeId={setCropNodeId}
+                    cropImageNode={cropImageNode}
+                    maskEditNode={maskEditNode}
+                    setMaskEditNodeId={setMaskEditNodeId}
+                    applyMaskEdit={applyMaskEdit}
+                    splitNode={splitNode}
+                    setSplitNodeId={setSplitNodeId}
+                    splitImageNode={splitImageNode}
+                    upscaleNode={upscaleNode}
+                    setUpscaleNodeId={setUpscaleNodeId}
+                    generateUpscaledImage={generateUpscaledImage}
+                    superResolveNode={superResolveNode}
+                    setSuperResolveNodeId={setSuperResolveNodeId}
+                    angleNode={angleNode}
+                    setAngleNodeId={setAngleNodeId}
+                    generateAngleImage={generateAngleImage}
+                    previewNode={previewNode}
+                    setPreviewNodeId={setPreviewNodeId}
+                />
 
                 <Modal
                     title="清空画布？"
