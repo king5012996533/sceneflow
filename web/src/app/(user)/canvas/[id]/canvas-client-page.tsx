@@ -1107,9 +1107,12 @@ function InfiniteCanvasPage() {
                 return;
             }
 
+            if (connectingParamsRef.current) {
+                setMouseWorld(screenToCanvas(event.clientX, event.clientY));
+            }
             updateConnectionTarget(event.clientX, event.clientY);
         },
-        [handleNodeDragPointerMove, updateConnectionTarget],
+        [handleNodeDragPointerMove, screenToCanvas, updateConnectionTarget],
     );
 
     const handleGlobalMouseUp = useCallback(

@@ -29,6 +29,7 @@ import { summarizeCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot }
 export const CANVAS_AGENT_PANEL_MOTION_MS = 500;
 const PANEL_MOTION_SECONDS = CANVAS_AGENT_PANEL_MOTION_MS / 1000;
 const ONLINE_AGENT_MAX_STEPS = 4;
+const REQUIRED_TOOL_CHOICE = "required" as const;
 const MANGA_PRODUCTION_SKILL = [
     "SceneFlow 漫剧生产 Skill：",
     "1. 标准链路固定为：剧本/片段解析 -> 人物创建提示词 -> 人物三视图提示词 -> 场景设定 -> 风格校准 -> 分镜表 -> 关键帧 -> 视频生成 -> 资产入库。",
@@ -55,7 +56,7 @@ const BASE_ONLINE_AGENT_PROMPT = [
 ].join("\n");
 const ONLINE_AGENT_PROMPT = `${BASE_ONLINE_AGENT_PROMPT}\n\n以下漫剧生产规范只在用户明确要求制作漫剧、分镜、角色三视图、关键帧或视频流水线时参考；普通聊天、看图问答、产品咨询、API 排错时不要套用：\n${MANGA_PRODUCTION_SKILL}`;
 const CANVAS_TOOL_INTENT_PATTERN =
-    /(创建|新建|放到画布|落到画布|生成节点|创建卡片|连线|连接|读取画布|当前画布|看一下画布|选中|删除|移动|调整节点|修改节点|执行|运行|重跑|重新生成|续写|尾帧|帮我操作|改画布|更新节点|开始生成|立即生成|生成图片|生成视频|生成音频|图生视频)/;
+    /(创建|新建|放到画布|落到画布|生成节点|创建卡片|连线|连接|读取画布|当前画布|看一下画布|选中|删除|移动|调整节点|修改节点|执行|运行|重跑|重新生成|续写|尾帧|帮我操作|改画布|更新节点|开始生成|立即生成|生成图片|生成视频|生成音频|图生视频|帮我生成|生成一张|生成一段|出一张|做一张|画一张)/;
 const CHAT_ONLY_INTENT_PATTERN = /(提示词|想法|建议|规划|剧本|剧情|片段|分镜|怎么看|帮我看|分析|优化|怎么做|怎么开始|聊|在吗|你好|谢谢|难用|不会|卡住)/;
 const JSON_RECORD_SCHEMA = { type: "object", additionalProperties: true };
 const POSITION_SCHEMA = { type: "object", properties: { x: { type: "number" }, y: { type: "number" } }, required: ["x", "y"], additionalProperties: false };
@@ -372,7 +373,8 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
             // 如果只有读意图，至少暴露读工具
             const readOnlyTools = ONLINE_AGENT_TOOLS.filter((tool) => ONLINE_READ_TOOLS.has(tool.function.name));
             const effectiveTools = toolsForTurn.length ? toolsForTurn : readOnlyTools.length ? readOnlyTools : [];
-            addOnlineLog(`Agent Loop ${loop.step} 开始`, { toolChoice: effectiveTools.length ? "auto" : "none", toolCount: effectiveTools.length, readOnly: toolsForTurn.length === 0 && effectiveTools.length > 0 });
+            const requireToolCall = effectiveTools.length > 0 && shouldRequireToolCall(userMessage.text);
+            addOnlineLog(`Agent Loop ${loop.step} 开始`, { toolChoice: effectiveTools.length ? "auto" : "none", requireToolCall, toolCount: effectiveTools.length, readOnly: toolsForTurn.length === 0 && effectiveTools.length > 0 });
             let streamed = "";
             const result = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages, tools: effectiveTools, toolChoice: "auto", onDelta: (text) => {
                 streamed = text;
@@ -396,11 +398,11 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                 await continueOnlineToolLoop(sessionId, assistantId, messages, result, loop.step);
             } else {
                 // no-tool retry: 用户明确要求执行但模型没有调用工具
-                if (loop.step < ONLINE_AGENT_MAX_STEPS && shouldRequireToolCall(userMessage.text)) {
+                if (loop.step < ONLINE_AGENT_MAX_STEPS && requireToolCall) {
                     addOnlineLog("模型未调用工具，重试", { step: loop.step });
                     const retryMessages = [...messages, { role: "assistant" as const, content: result.content || streamed || "" }, { role: "user" as const, content: "以上回复没有调用任何画布工具。用户明确要求操作画布，请调用对应的工具来执行操作，不要只回复文本。你可以先调用 canvas_get_state 看看当前画布状态。" }];
                     let retryStreamed = "";
-                    const retryResult = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages: retryMessages, tools: effectiveTools, toolChoice: "auto", onDelta: (text) => {
+                    const retryResult = await requestGeneratedToolResponse({ config: { ...requestConfig, systemPrompt: "" }, messages: retryMessages, tools: effectiveTools, toolChoice: REQUIRED_TOOL_CHOICE, onDelta: (text) => {
                         retryStreamed = text;
                         if (text.trim()) upsertMessage(sessionId, { id: assistantId, role: "assistant", text });
                     } });
@@ -1841,7 +1843,7 @@ function shouldExposeCanvasTools(text: unknown) {
 
 /** 判断用户是否明确要求执行画布操作 —— 用于 no-tool retry */
 function shouldRequireToolCall(text: string) {
-    return /(创建|新建|放到画布|落到画布|生成节点|执行|运行|重跑|重新生成|立即生成|删除|移动|修改|更新|连线|连接|开始|生成图片|生成视频|图生视频|续写|尾帧|读取画布|当前画布|操作画布|整理成工作流)/.test(text);
+    return /(创建|新建|放到画布|落到画布|生成节点|执行|运行|重跑|重新生成|立即生成|删除|移动|修改|更新|连线|连接|开始|生成图片|生成视频|生成音频|图生视频|续写|尾帧|读取画布|当前画布|操作画布|整理成工作流|帮我生成|生成一张|生成一段|出一张|做一张|画一张)/.test(text);
 }
 
 const ALWAYS_CONFIRM_TOOLS = new Set([
