@@ -128,9 +128,9 @@ export function boolConfig(value: string | undefined, fallback: boolean) {
 }
 
 export function seedanceReferenceLabel(kind: "image" | "video" | "audio", index: number) {
-    if (kind === "image") return `图片${index + 1}`;
-    if (kind === "video") return `视频${index + 1}`;
-    return `音频${index + 1}`;
+    if (kind === "image") return `@图片 ${index + 1}`;
+    if (kind === "video") return `@视频 ${index + 1}`;
+    return `@音频 ${index + 1}`;
 }
 
 export function buildSeedancePromptText(prompt: string, images: ReferenceImage[], videos: ReferenceVideo[], audios: ReferenceAudio[]) {

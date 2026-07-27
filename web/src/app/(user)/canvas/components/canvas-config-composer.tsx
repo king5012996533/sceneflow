@@ -120,7 +120,20 @@ export function CanvasConfigComposer({ value, inputs, onChange, onClose }: Canva
                     <div className="shrink-0 text-xs font-semibold">组装提示词</div>
                     <div className="truncate text-[11px] opacity-55">@ 引用已连接素材，发送前按当前连接重新编号</div>
                 </div>
-                <Button size="small" type="text" className="!h-7 !w-7 !min-w-7 !p-0" icon={<X className="size-3.5" />} onClick={onClose} />
+                <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                        size="small"
+                        type="text"
+                        className="!h-7 !px-2 !text-xs"
+                        onClick={() => {
+                            const template = buildMultimodalPromptTemplate(inputs);
+                            onChange(value.trim() ? `${value.trim()}\n\n${template}` : template);
+                        }}
+                    >
+                        模板
+                    </Button>
+                    <Button size="small" type="text" className="!h-7 !w-7 !min-w-7 !p-0" icon={<X className="size-3.5" />} onClick={onClose} />
+                </div>
             </div>
             <div className="relative rounded-xl border" style={{ background: theme.node.fill, borderColor: theme.node.stroke }}>
                 {!value.trim() ? <div className="pointer-events-none absolute left-3 top-2 text-sm leading-7" style={{ color: theme.node.placeholder }}>输入提示词，按 @ 引用连接的图片或文本</div> : null}
@@ -362,10 +375,27 @@ function parseComposerTokens(value: string): Token[] {
 function resourceLabel(input: NodeGenerationInput, inputs: NodeGenerationInput[]) {
     const sameTypeInputs = inputs.filter((item) => item.type === input.type);
     const index = Math.max(0, sameTypeInputs.findIndex((item) => item.nodeId === input.nodeId));
-    if (input.type === "image") return `图片${index + 1}`;
-    if (input.type === "video") return `视频${index + 1}`;
-    if (input.type === "audio") return `音频${index + 1}`;
-    return `文本${index + 1}`;
+    if (input.type === "image") return `@图片 ${index + 1}`;
+    if (input.type === "video") return `@视频 ${index + 1}`;
+    if (input.type === "audio") return `@音频 ${index + 1}`;
+    return `@文本 ${index + 1}`;
+}
+
+function buildMultimodalPromptTemplate(inputs: NodeGenerationInput[]) {
+    const materialLines = inputs.length
+        ? inputs.map((input) => `${resourceLabel(input, inputs)}：${input.title || input.text || "参考素材"}`)
+        : ["@图片 1：主体参考图", "@图片 2：场景风格参考图", "@视频 1：运镜参考", "@音频 1：环境声或配乐参考"];
+    return [
+        "素材准备：",
+        ...materialLines,
+        "",
+        "提示词：",
+        "请结合以上参考素材完成创作。保持主体一致，参考场景风格与运镜方式。",
+        "镜头 1：",
+        "镜头 2：",
+        "镜头 3：",
+        "全程画面高清电影纪实风，色调统一，光影自然；人物面部稳定不变形，动作自然流畅，无卡顿无闪烁。",
+    ].join("\n");
 }
 
 function chipStyle(theme: (typeof canvasThemes)[keyof typeof canvasThemes]): CSSProperties {
