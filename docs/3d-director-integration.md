@@ -20,7 +20,7 @@ Default ports:
 - 3D Director web: `http://127.0.0.1:5173`
 - 3D Director agent service: `http://127.0.0.1:4319`
 
-SceneFlow uses `NEXT_PUBLIC_DIRECTOR_DESK_URL` when set. If it is not set, it falls back to `http://127.0.0.1:5173/`.
+SceneFlow uses `NEXT_PUBLIC_DIRECTOR_DESK_URL` when set. For local Vite development, set it to `http://127.0.0.1:5173/`. If it is not set, SceneFlow falls back to the same-origin static path `/director-desk/`.
 
 ## Production Build
 

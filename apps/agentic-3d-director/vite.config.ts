@@ -6,8 +6,8 @@ import { configDefaults, defineConfig } from "vitest/config";
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 const modelLibraryRoot = resolve(projectRoot, "../模型库");
 
-export default defineConfig({
-  base: "/",
+export default defineConfig(({ command }) => ({
+  base: command === "build" ? process.env.DIRECTOR_BASE_PATH || "/director-desk/" : "/",
   assetsInclude: ["**/*.fbx", "**/*.obj"],
   plugins: [react()],
   server: {
@@ -26,4 +26,4 @@ export default defineConfig({
     maxWorkers: 1,
     setupFiles: "./src/test/setup.ts",
   },
-});
+}));
