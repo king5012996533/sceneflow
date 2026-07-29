@@ -30,6 +30,8 @@ type RequestOptions = { signal?: AbortSignal };
 const SEEDANCE_PROXY_IMAGE_MAX_BYTES = 260 * 1024;
 const SEEDANCE_PROXY_IMAGE_MAX_SIDE = 768;
 const SEEDANCE_PROXY_IMAGE_URL_BUDGET_BYTES = 2_800_000;
+const REPLICATE_VIDEO_IMAGE_MAX_BYTES = 900 * 1024;
+const REPLICATE_VIDEO_IMAGE_MAX_SIDE = 1280;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
 export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate"; model: string; result?: VideoGenerationResult };
@@ -235,7 +237,7 @@ async function buildReplicateVideoInput(config: AiConfig, model: string, prompt:
 
     const firstReference = references[0];
     if (firstReference) {
-        const imageUrl = firstReference.url || firstReference.dataUrl || (await imageToDataUrl(firstReference));
+        const imageUrl = await resolveReplicateVideoImageInput(firstReference);
         if (imageUrl) {
             const key = replicateImageInputKey(model);
             input[key] = imageUrl;
@@ -278,6 +280,16 @@ function replicateImageInputKey(model: string) {
     if (value.includes("hailuo")) return "image";
     if (value.includes("wan")) return "image";
     return "image";
+}
+
+async function resolveReplicateVideoImageInput(image: ReferenceImage) {
+    const directUrl = image.url || image.dataUrl;
+    if (isPublicMediaUrl(directUrl)) return directUrl;
+    const dataUrl = await imageToDataUrl(image);
+    if (!dataUrl) throw new Error("参考图读取失败，请换一张图片或重新上传");
+    if (!dataUrl.startsWith("data:image/")) return dataUrl;
+    if (getDataUrlByteSize(dataUrl) <= REPLICATE_VIDEO_IMAGE_MAX_BYTES) return dataUrl;
+    return compressImageDataUrl(dataUrl, REPLICATE_VIDEO_IMAGE_MAX_BYTES, REPLICATE_VIDEO_IMAGE_MAX_SIDE);
 }
 
 function normalizeReplicateAspectRatio(value: string) {
@@ -551,6 +563,26 @@ async function compressSeedanceImageDataUrl(dataUrl: string) {
     let best = await canvasToDataUrl(canvas, 0.86);
     for (const quality of [0.78, 0.68, 0.58, 0.48]) {
         if (getDataUrlByteSize(best) <= SEEDANCE_PROXY_IMAGE_MAX_BYTES) break;
+        best = await canvasToDataUrl(canvas, quality);
+    }
+    return best;
+}
+
+async function compressImageDataUrl(dataUrl: string, maxBytes: number, maxSide: number) {
+    const image = await loadImage(dataUrl);
+    const { width, height } = fitImageSize(image.naturalWidth || image.width || 1024, image.naturalHeight || image.height || 1024, maxSide);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) return dataUrl;
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(image, 0, 0, width, height);
+
+    let best = await canvasToDataUrl(canvas, 0.86);
+    for (const quality of [0.78, 0.68, 0.58, 0.48, 0.38]) {
+        if (getDataUrlByteSize(best) <= maxBytes) break;
         best = await canvasToDataUrl(canvas, quality);
     }
     return best;
