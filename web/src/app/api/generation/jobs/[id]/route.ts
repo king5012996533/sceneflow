@@ -14,7 +14,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         if (!["succeeded", "failed", "cancelled"].includes(status)) {
             return NextResponse.json({ error: "无效的任务状态" }, { status: 400 });
         }
-        const job = await finishGenerationJob(user.id, id, status as "succeeded" | "failed" | "cancelled", typeof body.error === "string" ? body.error : undefined);
+        const job = await finishGenerationJob(user.id, id, status as "succeeded" | "failed" | "cancelled", typeof body.error === "string" ? body.error : undefined, typeof body.resultUrl === "string" ? body.resultUrl : undefined);
         return NextResponse.json({ job });
     } catch (error) {
         const status = error instanceof GenerationPolicyError ? error.status : 500;

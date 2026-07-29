@@ -34,15 +34,17 @@ export async function beginClientGeneration(kind: ClientGenerationKind, count = 
 }
 
 export async function finishClientGeneration(jobId: string, status: "succeeded" | "failed" | "cancelled", error?: unknown, resultUrl?: string) {
-    const response = await fetch(apiPath(`/api/generation/jobs/${encodeURIComponent(jobId)}`), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status, error: errorMessage(error), resultUrl }),
+    return retryGenerationSettlement(async () => {
+        const response = await fetch(apiPath(`/api/generation/jobs/${encodeURIComponent(jobId)}`), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ status, error: errorMessage(error), resultUrl }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(readError(payload, "generation job settlement failed"));
+        return payload?.job as GenerationJob;
     });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(readError(payload, "生成任务结算失败"));
-    return payload?.job as GenerationJob;
 }
 
 export async function runGuardedGeneration<T>(
@@ -65,6 +67,30 @@ export async function runGuardedGeneration<T>(
         });
         throw error;
     }
+}
+
+async function retryGenerationSettlement<T>(settle: () => Promise<T>) {
+    const delays = [0, 700, 1800, 4000, 8000];
+    let lastError: unknown;
+    for (const delay of delays) {
+        if (delay) await sleep(delay);
+        try {
+            return await settle();
+        } catch (error) {
+            lastError = error;
+            if (!isRetriableSettlementError(error)) break;
+        }
+    }
+    throw lastError;
+}
+
+function isRetriableSettlementError(error: unknown) {
+    if (!(error instanceof Error)) return false;
+    return /Failed to fetch|NetworkError|ERR_NETWORK|Load failed|Network request failed|fetch/i.test(error.message);
+}
+
+function sleep(ms: number) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function createRequestKey(kind: ClientGenerationKind) {
