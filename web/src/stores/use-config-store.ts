@@ -6,7 +6,7 @@ import { nanoid } from "nanoid";
 
 import { scopedStorageKey } from "@/lib/user-data-scope";
 
-export type ApiCallFormat = "openai" | "gemini";
+export type ApiCallFormat = "openai" | "gemini" | "replicate";
 
 export type ModelChannel = {
     id: string;
@@ -62,6 +62,7 @@ export type ModelCapability = "image" | "video" | "text" | "audio";
 const CHANNEL_MODEL_SEPARATOR = "::";
 const OPENAI_BASE_URL = "https://api.openai.com";
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
+const REPLICATE_BASE_URL = "https://api.replicate.com/v1";
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
@@ -431,11 +432,14 @@ function normalizeChannels(config: AiConfig) {
 }
 
 export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
-    return apiFormat === "gemini" ? GEMINI_BASE_URL : OPENAI_BASE_URL;
+    if (apiFormat === "gemini") return GEMINI_BASE_URL;
+    if (apiFormat === "replicate") return REPLICATE_BASE_URL;
+    return OPENAI_BASE_URL;
 }
 
 function normalizeApiFormat(apiFormat: unknown): ApiCallFormat {
-    return apiFormat === "gemini" ? "gemini" : "openai";
+    if (apiFormat === "gemini" || apiFormat === "replicate") return apiFormat;
+    return "openai";
 }
 
 function uniqueRawModels(models: string[]) {

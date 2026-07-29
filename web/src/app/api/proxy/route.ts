@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const MAX_PROXY_REQUEST_BYTES = 4 * 1024 * 1024;
 const PROXY_TIMEOUT_MS = 120_000;
-const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "x-api-key", "x-request-id"]);
+const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "prefer", "x-api-key", "x-request-id"]);
 
 export async function POST(req: NextRequest) {
     const user = await requireCurrentUser(req);

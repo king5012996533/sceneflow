@@ -37,6 +37,7 @@ const modelGroups: ModelGroup[] = [
 const apiFormatOptions: Array<{ label: string; value: ApiCallFormat }> = [
     { label: "OpenAI", value: "openai" },
     { label: "Gemini", value: "gemini" },
+    { label: "Replicate", value: "replicate" },
 ];
 
 const webdavDomainKeys: AppSyncDomainKey[] = ["canvas", "assets", "image-workbench", "video-workbench"];
@@ -490,7 +491,9 @@ function uniqueModels(models: string[]) {
 }
 
 function apiFormatLabel(apiFormat: ApiCallFormat) {
-    return apiFormat === "gemini" ? "Gemini" : "OpenAI";
+    if (apiFormat === "gemini") return "Gemini";
+    if (apiFormat === "replicate") return "Replicate";
+    return "OpenAI";
 }
 
 function SeedanceConfigHint() {

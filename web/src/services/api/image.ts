@@ -6,6 +6,7 @@ import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
+import { proxyFetch } from "./proxy-client";
 
 export type AiTextMessage = {
     role: "system" | "user" | "assistant";
@@ -71,6 +72,13 @@ type ImageApiResponse = {
     error?: { message?: string };
     code?: number;
     msg?: string;
+};
+type ReplicatePrediction = {
+    id?: string;
+    status?: "starting" | "processing" | "succeeded" | "failed" | "canceled";
+    output?: unknown;
+    error?: unknown;
+    urls?: { get?: string };
 };
 type GeminiPart = {
     text?: string;
@@ -298,6 +306,70 @@ function geminiHeaders(config: Pick<AiConfig, "apiKey">) {
         "x-goog-api-key": config.apiKey,
         "Content-Type": "application/json",
     };
+}
+
+function replicateApiUrl(config: Pick<AiConfig, "baseUrl" | "model">) {
+    const baseUrl = config.baseUrl.trim().replace(/\/+$/, "");
+    const model = config.model.trim().replace(/^replicate:/i, "");
+    const [owner, name] = model.split("/", 2);
+    if (!owner || !name) throw new Error("Replicate 模型名必须使用 owner/model 格式，例如 openai/gpt-image-2");
+    return `${baseUrl}/models/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/predictions`;
+}
+
+function replicateHeaders(config: Pick<AiConfig, "apiKey">) {
+    return {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+        Prefer: "wait=60",
+    };
+}
+
+async function requestReplicateImages(config: AiConfig, input: Record<string, unknown>, options?: RequestOptions) {
+    const prediction = await proxyFetch<ReplicatePrediction>({
+        url: replicateApiUrl(config),
+        method: "POST",
+        headers: replicateHeaders(config),
+        body: { input },
+    });
+    const completed = await waitForReplicatePrediction(prediction, config, options);
+    return parseReplicateImagePayload(completed);
+}
+
+async function waitForReplicatePrediction(prediction: ReplicatePrediction, config: Pick<AiConfig, "apiKey">, options?: RequestOptions) {
+    let current = prediction;
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+        if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        if (current.status === "succeeded" || current.status === "failed" || current.status === "canceled") return current;
+        if (!current.urls?.get) return current;
+        await sleep(1500);
+        current = await proxyFetch<ReplicatePrediction>({
+            url: current.urls.get,
+            method: "GET",
+            headers: { Authorization: `Bearer ${config.apiKey}` },
+        });
+    }
+    throw new Error("Replicate 生成超时，请稍后在任务记录中查看结果");
+}
+
+function parseReplicateImagePayload(payload: ReplicatePrediction) {
+    if (payload.status === "failed" || payload.status === "canceled") throw new Error(readReplicateError(payload.error));
+    const values = Array.isArray(payload.output) ? payload.output : payload.output ? [payload.output] : [];
+    const images = values
+        .map((item) => (typeof item === "string" ? item : item && typeof item === "object" && "url" in item && typeof item.url === "string" ? item.url : null))
+        .filter((value): value is string => Boolean(value))
+        .map((dataUrl) => ({ id: nanoid(), dataUrl }));
+    if (!images.length) throw new Error("Replicate 接口没有返回图片");
+    return images;
+}
+
+function readReplicateError(error: unknown) {
+    if (typeof error === "string" && error) return error;
+    if (error && typeof error === "object" && "message" in error && typeof error.message === "string") return error.message;
+    return "Replicate 生成失败";
+}
+
+function sleep(ms: number) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function withSystemMessage<T extends ResponseInputMessage>(config: AiConfig, messages: T[]): ResponseInputMessage[] {
@@ -766,6 +838,22 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
     const requestPrompt = withImageSizeInstruction(prompt, config.size, requestSize);
+    if (requestConfig.apiFormat === "replicate") {
+        try {
+            return await requestReplicateImages(requestConfig, {
+                prompt: withSystemPrompt(requestConfig, requestPrompt),
+                quality: quality || "auto",
+                background: "auto",
+                moderation: "auto",
+                aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
+                output_format: "webp",
+                number_of_images: n,
+                output_compression: 90,
+            }, options);
+        } catch (error) {
+            throw new Error(readAxiosError(error, "request failed"));
+        }
+    }
     try {
         const response = await axios.post<ImageApiResponse>(
             aiApiUrl(requestConfig, "/images/generations"),
@@ -802,6 +890,24 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
             return await requestGeminiImages(requestConfig, requestPrompt, references, n, options);
         } catch (error) {
             throw new Error(readAxiosError(error, "请求失败"));
+        }
+    }
+    if (requestConfig.apiFormat === "replicate") {
+        if (mask) throw new Error("Replicate gpt-image-2 does not support mask editing yet. Use reference-image editing without a mask.");
+        try {
+            return await requestReplicateImages(requestConfig, {
+                prompt: withSystemPrompt(requestConfig, requestPrompt),
+                quality: quality || "auto",
+                background: "auto",
+                moderation: "auto",
+                aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
+                input_images: await Promise.all(references.map((image) => imageToDataUrl(image))),
+                output_format: "webp",
+                number_of_images: n,
+                output_compression: 90,
+            }, options);
+        } catch (error) {
+            throw new Error(readAxiosError(error, "request failed"));
         }
     }
     const formData = new FormData();
