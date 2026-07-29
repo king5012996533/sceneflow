@@ -21,7 +21,7 @@ export const PLAN_ENTITLEMENT_ORDER = [
 ] as const;
 
 export function sortPlanEntitlements<T extends { key: string }>(entitlements: T[]) {
-    const order = new Map(PLAN_ENTITLEMENT_ORDER.map((key, index) => [key, index]));
+    const order = new Map<string, number>(PLAN_ENTITLEMENT_ORDER.map((key, index) => [key, index]));
     return [...entitlements].sort((a, b) => (order.get(a.key) ?? 999) - (order.get(b.key) ?? 999) || a.key.localeCompare(b.key));
 }
 

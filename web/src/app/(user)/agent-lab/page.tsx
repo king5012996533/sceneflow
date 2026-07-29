@@ -187,9 +187,10 @@ export default function AgentLabPage() {
             const data = (await response.json()) as AgentLabResponse & { error?: string };
             if (!response.ok) throw new Error(data.error || "Agent 请求失败");
             setMessages((current) => [...current, { role: "assistant", content: data.answer }]);
-            setArtifact(data.artifact || null);
-            if (data.artifact) {
-                setMemory((current) => mergeArtifactIntoMemory(current, data.artifact));
+            const artifact = data.artifact || null;
+            setArtifact(artifact);
+            if (artifact) {
+                setMemory((current) => mergeArtifactIntoMemory(current, artifact));
             }
         } catch (error) {
             const text = error instanceof Error ? error.message : "Agent 请求失败";

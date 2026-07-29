@@ -19,6 +19,7 @@ import { DiaTextReveal } from "@/components/ui/dia-text-reveal";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { CanvasPromptLibrary } from "./canvas-prompt-library";
 import { AgentChatComposer, AgentChatMessage, AgentModeSwitch, AgentPanelTabs, AgentWorkingMessage, type CanvasAgentChatMessage, type CanvasAgentMode } from "./canvas-agent-chat-ui";
+import { CanvasAutomationAgentPanel } from "./canvas-automation-agent-panel";
 import { CanvasLocalAgentPanel } from "./canvas-local-agent-panel";
 import { CanvasOrchestratorPanel } from "./canvas-orchestrator-panel";
 import { NODE_DEFAULT_SIZE } from "../constants";
@@ -804,6 +805,8 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                     />
                 ) : agentMode === "orchestrator" ? (
                     <CanvasOrchestratorPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} onToolCall={executeOnlineTool} />
+                ) : agentMode === "automation" ? (
+                    <CanvasAutomationAgentPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} />
                 ) : (
                     onlineContent
                 )}

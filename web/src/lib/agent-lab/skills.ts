@@ -157,7 +157,7 @@ export function buildAgentLabMessages(
     ];
 }
 
-export function fallbackAgentLabAnswer(userText: string) {
+export function fallbackAgentLabAnswer(userText: string): import("./types").AgentLabResponse {
     const asksLongScript = /(40集|四十集|90秒|完整剧本|一集|第一集|剧本|先发你|发给你|拆剧本)/.test(userText);
     if (asksLongScript) {
         return {

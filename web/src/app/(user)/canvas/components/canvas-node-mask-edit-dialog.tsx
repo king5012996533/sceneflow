@@ -45,7 +45,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
         const point = readCanvasPoint(event.currentTarget, event.clientX, event.clientY);
         const maskCanvas = maskCanvasRef.current;
         const context = maskCanvas?.getContext("2d");
-        if (!context) return;
+        if (!maskCanvas || !context) return;
         context.lineCap = "round";
         context.lineJoin = "round";
         context.lineWidth = brushSize;
@@ -57,7 +57,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
         } else {
             drawMaskStroke(context, drawingRef.current.last, point, brushSize);
         }
-        renderMaskPreview(maskCanvas, previewCanvasRef.current);
+        if (previewCanvasRef.current) renderMaskPreview(maskCanvas, previewCanvasRef.current);
         drawingRef.current.last = point;
         if (mode === "paint") {
             setError("");
@@ -69,7 +69,7 @@ export function CanvasNodeMaskEditDialog({ dataUrl, open, onClose, onConfirm }: 
         event.stopPropagation();
         event.currentTarget.setPointerCapture(event.pointerId);
         drawingRef.current = { active: true, last: null };
-        if (maskCanvasRef.current) renderMaskPreview(maskCanvasRef.current, previewCanvasRef.current);
+        if (maskCanvasRef.current && previewCanvasRef.current) renderMaskPreview(maskCanvasRef.current, previewCanvasRef.current);
         draw(event);
     };
 

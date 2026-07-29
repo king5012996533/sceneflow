@@ -133,7 +133,7 @@ export const AnimatedThemeToggler = ({ children, className, duration = 400, vari
             x = viewportWidth / 2;
             y = viewportHeight / 2;
         } else {
-            const { top, left, width, height } = button.getBoundingClientRect();
+            const { top, left, width, height } = button!.getBoundingClientRect();
             x = left + width / 2;
             y = top + height / 2;
         }
