@@ -22,9 +22,14 @@ type GenerationConfigNode = {
 
 export function buildNodeGenerationConfig(config: AiConfig, node: GenerationConfigNode | undefined, mode: GenerationMode): AiConfig {
     const defaultModel = mode === "image" ? config.imageModel : mode === "video" ? config.videoModel : mode === "audio" ? config.audioModel : config.textModel;
+    const selectedModel = node?.metadata?.model || defaultModel || (mode === "audio" ? defaultConfig.audioModel : config.model || defaultConfig.model);
     return {
         ...config,
-        model: node?.metadata?.model || defaultModel || (mode === "audio" ? defaultConfig.audioModel : config.model || defaultConfig.model),
+        model: selectedModel,
+        imageModel: mode === "image" ? selectedModel : config.imageModel,
+        videoModel: mode === "video" ? selectedModel : config.videoModel,
+        audioModel: mode === "audio" ? selectedModel : config.audioModel,
+        textModel: mode === "text" ? selectedModel : config.textModel,
         quality: node?.metadata?.quality || config.quality || defaultConfig.quality,
         size: node?.metadata?.size || config.size || defaultConfig.size,
         videoSeconds: node?.metadata?.seconds || config.videoSeconds || defaultConfig.videoSeconds,
