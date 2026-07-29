@@ -32,7 +32,7 @@ const SEEDANCE_PROXY_IMAGE_MAX_SIDE = 768;
 const SEEDANCE_PROXY_IMAGE_URL_BUDGET_BYTES = 2_800_000;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
-export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate"; model: string };
+export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate"; model: string; result?: VideoGenerationResult };
 export type VideoGenerationTaskState = { status: "pending" } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
 function aiApiUrl(config: AiConfig, path: string) {
@@ -48,6 +48,7 @@ function aiHeaders(config: AiConfig, contentType?: string) {
 
 export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationResult> {
     const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options);
+    if (task.result) return task.result;
     const delayMs = task.provider === "seedance" ? 5000 : task.provider === "replicate" ? 1500 : 2500;
     for (let attempt = 0; attempt < 120; attempt += 1) {
         if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -189,7 +190,9 @@ async function createReplicateVideoTask(config: AiConfig, model: string, prompt:
             body: { input },
         });
         const completed = await waitForReplicateVideoPrediction(prediction, config, options);
-        if (completed.status === "succeeded") return { id: completed.id || prediction.id || "", provider: "replicate", model };
+        if (completed.status === "succeeded") {
+            return { id: completed.id || prediction.id || "", provider: "replicate", model, result: await videoResultFromUrl(parseReplicateVideoUrl(completed), options) };
+        }
         if (!prediction.id) throw new Error("Replicate 接口没有返回任务 ID");
         return { id: prediction.id, provider: "replicate", model };
     } catch (error) {
@@ -230,14 +233,22 @@ async function waitForReplicateVideoPrediction(prediction: ReplicatePrediction, 
 
 async function buildReplicateVideoInput(config: AiConfig, model: string, prompt: string, references: ReferenceImage[]) {
     const input: Record<string, unknown> = { prompt };
+    const modelName = modelOptionName(model).toLowerCase();
     const aspectRatio = normalizeReplicateAspectRatio(config.size);
     if (aspectRatio) input.aspect_ratio = aspectRatio;
 
     const seconds = Number(normalizeVideoSeconds(config.videoSeconds));
     if (Number.isFinite(seconds)) input.duration = seconds;
 
-    const resolution = normalizeVideoResolution(config.vquality);
+    const resolution = normalizeReplicateResolution(config.vquality, modelName);
     if (resolution) input.resolution = resolution;
+
+    if (modelName.includes("prunaai/p-video")) {
+        input.draft = true;
+        input.fps = 24;
+        input.prompt_upsampling = true;
+        input.save_audio = boolConfig(config.videoGenerateAudio, true);
+    }
 
     const firstReference = references[0];
     if (firstReference) {
@@ -249,6 +260,12 @@ async function buildReplicateVideoInput(config: AiConfig, model: string, prompt:
     }
 
     return input;
+}
+
+function normalizeReplicateResolution(value: string, model: string) {
+    const resolution = normalizeVideoResolution(value);
+    if (model.includes("prunaai/p-video")) return resolution === "1080p" ? "1080p" : "720p";
+    return resolution;
 }
 
 function replicateApiUrl(config: Pick<AiConfig, "baseUrl">, model: string) {
