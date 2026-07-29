@@ -253,6 +253,10 @@ function readStatusError(status: number | undefined, fallback: string) {
     return status ? `${fallback}：${status}` : fallback;
 }
 
+function readImageApiError(payload: ImageApiResponse | null, fallback: string) {
+    return payload?.msg || payload?.error?.message || (payload?.code ? `${fallback}: ${payload.code}` : fallback);
+}
+
 function withSystemPrompt(config: AiConfig, prompt: string) {
     const systemPrompt = config.systemPrompt.trim();
     return systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
@@ -819,8 +823,18 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     if (mask) formData.set("mask", dataUrlToFile(mask));
 
     try {
-        const response = await axios.post<ImageApiResponse>(aiApiUrl(requestConfig, "/images/edits"), formData, { headers: aiHeaders(requestConfig), signal: options?.signal });
-        const images = parseImagePayload(response.data);
+        formData.set("_proxy_url", aiApiUrl(requestConfig, "/images/edits"));
+        formData.set("_proxy_method", "POST");
+        formData.set("_proxy_headers", JSON.stringify(aiHeaders(requestConfig)));
+        const response = await fetch("/canvas/api/proxy/form-data", {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+            signal: options?.signal,
+        });
+        const data = (await response.json().catch(() => null)) as ImageApiResponse | null;
+        if (!response.ok) throw new Error(readImageApiError(data, readStatusError(response.status, "request failed")));
+        const images = parseImagePayload(data || {});
         return images;
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
