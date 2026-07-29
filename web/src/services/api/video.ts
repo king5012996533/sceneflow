@@ -17,6 +17,13 @@ type SeedanceTask = {
     error?: { code?: string; message?: string } | null;
     content?: { video_url?: string; last_frame_url?: string } | null;
 };
+type ReplicatePrediction = {
+    id?: string;
+    status?: "starting" | "processing" | "succeeded" | "failed" | "canceled";
+    output?: unknown;
+    error?: unknown;
+    urls?: { get?: string };
+};
 type ApiEnvelope<T> = T | { code?: number; data?: T | null; msg?: string };
 type RequestOptions = { signal?: AbortSignal };
 
@@ -25,7 +32,7 @@ const SEEDANCE_PROXY_IMAGE_MAX_SIDE = 768;
 const SEEDANCE_PROXY_IMAGE_URL_BUDGET_BYTES = 2_800_000;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
-export type VideoGenerationTask = { id: string; provider: "openai" | "seedance"; model: string };
+export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate"; model: string };
 export type VideoGenerationTaskState = { status: "pending" } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
 function aiApiUrl(config: AiConfig, path: string) {
@@ -41,7 +48,7 @@ function aiHeaders(config: AiConfig, contentType?: string) {
 
 export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationResult> {
     const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options);
-    const delayMs = task.provider === "seedance" ? 5000 : 2500;
+    const delayMs = task.provider === "seedance" ? 5000 : task.provider === "replicate" ? 1500 : 2500;
     for (let attempt = 0; attempt < 120; attempt += 1) {
         if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const state = await pollVideoGenerationTask(config, task, options);
@@ -60,6 +67,12 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     if (isSeedanceVideoConfig(requestConfig)) {
         return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
+    if (requestConfig.apiFormat === "replicate") {
+        if (videoReferences.length || audioReferences.length) {
+            throw new Error("Replicate 视频模型暂不支持直接引用视频或音频，请先只使用提示词和参考图。");
+        }
+        return createReplicateVideoTask(requestConfig, selectedModel, prompt, references, options);
+    }
     if (videoReferences.length || audioReferences.length) {
         throw new Error("当前视频接口不支持参考视频或参考音频，请切换到 Seedance 2.0 / 火山 Agent Plan 模型，或移除参考素材");
     }
@@ -69,7 +82,9 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
 export async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     const requestConfig = resolveModelRequestConfig(config, task.model);
     assertVideoConfig(requestConfig, requestConfig.model);
-    return task.provider === "seedance" ? pollSeedanceTask(requestConfig, task, options) : pollOpenAIVideoTask(requestConfig, task, options);
+    if (task.provider === "seedance") return pollSeedanceTask(requestConfig, task, options);
+    if (task.provider === "replicate") return pollReplicateVideoTask(requestConfig, task, options);
+    return pollOpenAIVideoTask(requestConfig, task, options);
 }
 
 export async function storeGeneratedVideo(result: VideoGenerationResult): Promise<UploadedFile> {
@@ -162,6 +177,163 @@ async function pollSeedanceTask(config: AiConfig, task: VideoGenerationTask, opt
     } catch (error) {
         throw new Error(readAxiosError(error, "Seedance 任务查询失败"));
     }
+}
+
+async function createReplicateVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<VideoGenerationTask> {
+    const input = await buildReplicateVideoInput(config, model, prompt, references);
+    try {
+        const prediction = await proxyFetch<ReplicatePrediction>({
+            url: replicateApiUrl(config, model),
+            method: "POST",
+            headers: replicateHeaders(config),
+            body: { input },
+        });
+        const completed = await waitForReplicateVideoPrediction(prediction, config, options);
+        if (completed.status === "succeeded") return { id: completed.id || prediction.id || "", provider: "replicate", model };
+        if (!prediction.id) throw new Error("Replicate 接口没有返回任务 ID");
+        return { id: prediction.id, provider: "replicate", model };
+    } catch (error) {
+        throw new Error(readAxiosError(error, "Replicate 视频任务创建失败"));
+    }
+}
+
+async function pollReplicateVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
+    try {
+        const state = await proxyFetch<ReplicatePrediction>({
+            url: replicatePredictionUrl(config, task),
+            method: "GET",
+            headers: { Authorization: `Bearer ${config.apiKey}` },
+        });
+        if (state.status === "succeeded") return { status: "completed", result: await videoResultFromUrl(parseReplicateVideoUrl(state), options) };
+        if (state.status === "failed" || state.status === "canceled") return { status: "failed", error: readReplicateError(state.error) };
+        return { status: "pending" };
+    } catch (error) {
+        throw new Error(readAxiosError(error, "Replicate 视频任务查询失败"));
+    }
+}
+
+async function waitForReplicateVideoPrediction(prediction: ReplicatePrediction, config: Pick<AiConfig, "apiKey">, options?: RequestOptions) {
+    let current = prediction;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+        if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        if (current.status === "succeeded" || current.status === "failed" || current.status === "canceled") return current;
+        if (!current.urls?.get) return current;
+        await delay(1500, options?.signal);
+        current = await proxyFetch<ReplicatePrediction>({
+            url: current.urls.get,
+            method: "GET",
+            headers: { Authorization: `Bearer ${config.apiKey}` },
+        });
+    }
+    return current;
+}
+
+async function buildReplicateVideoInput(config: AiConfig, model: string, prompt: string, references: ReferenceImage[]) {
+    const input: Record<string, unknown> = { prompt };
+    const aspectRatio = normalizeReplicateAspectRatio(config.size);
+    if (aspectRatio) input.aspect_ratio = aspectRatio;
+
+    const seconds = Number(normalizeVideoSeconds(config.videoSeconds));
+    if (Number.isFinite(seconds)) input.duration = seconds;
+
+    const resolution = normalizeVideoResolution(config.vquality);
+    if (resolution) input.resolution = resolution;
+
+    const firstReference = references[0];
+    if (firstReference) {
+        const imageUrl = firstReference.url || firstReference.dataUrl || (await imageToDataUrl(firstReference));
+        if (imageUrl) {
+            const key = replicateImageInputKey(model);
+            input[key] = imageUrl;
+        }
+    }
+
+    return input;
+}
+
+function replicateApiUrl(config: Pick<AiConfig, "baseUrl">, model: string) {
+    const baseUrl = config.baseUrl.trim().replace(/\/+$/, "");
+    const cleanModel = modelOptionName(model).trim().replace(/^replicate:/i, "");
+    const [owner, name] = cleanModel.split("/", 2);
+    if (!owner || !name) throw new Error("Replicate 模型名必须使用 owner/model 格式，例如 google/veo-3 或 kling-ai/kling-v1.6-standard");
+    return `${baseUrl}/models/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/predictions`;
+}
+
+function replicatePredictionUrl(config: Pick<AiConfig, "baseUrl">, task: VideoGenerationTask) {
+    const baseUrl = config.baseUrl.trim().replace(/\/+$/, "");
+    return `${baseUrl}/predictions/${encodeURIComponent(task.id)}`;
+}
+
+function replicateHeaders(config: Pick<AiConfig, "apiKey">) {
+    return {
+        Authorization: `Bearer ${config.apiKey}`,
+        "Content-Type": "application/json",
+        Prefer: "wait=60",
+    };
+}
+
+function replicateImageInputKey(model: string) {
+    const value = modelOptionName(model).toLowerCase();
+    if (value.includes("kling")) return "start_image";
+    if (value.includes("minimax")) return "first_frame_image";
+    if (value.includes("hailuo")) return "image";
+    if (value.includes("wan")) return "image";
+    return "image";
+}
+
+function normalizeReplicateAspectRatio(value: string) {
+    if (!value || value === "auto") return undefined;
+    if (/^\d+:\d+$/.test(value)) return value;
+    const match = value.match(/^(\d+)x(\d+)$/);
+    if (!match) return undefined;
+    const width = Number(match[1]);
+    const height = Number(match[2]);
+    if (!width || !height) return undefined;
+    const divisor = gcd(width, height);
+    return `${Math.round(width / divisor)}:${Math.round(height / divisor)}`;
+}
+
+function gcd(a: number, b: number): number {
+    let x = Math.abs(Math.round(a));
+    let y = Math.abs(Math.round(b));
+    while (y) {
+        const next = x % y;
+        x = y;
+        y = next;
+    }
+    return x || 1;
+}
+
+function parseReplicateVideoUrl(payload: ReplicatePrediction) {
+    if (payload.status === "failed" || payload.status === "canceled") throw new Error(readReplicateError(payload.error));
+    const url = findFirstUrl(payload.output);
+    if (!url) throw new Error("Replicate 接口没有返回视频 URL");
+    return url;
+}
+
+function findFirstUrl(value: unknown): string | null {
+    if (typeof value === "string") return /^https?:\/\//i.test(value) ? value : null;
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const found = findFirstUrl(item);
+            if (found) return found;
+        }
+        return null;
+    }
+    if (value && typeof value === "object") {
+        const record = value as Record<string, unknown>;
+        for (const key of ["url", "video", "output", "file"]) {
+            const found = findFirstUrl(record[key]);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+function readReplicateError(error: unknown) {
+    if (typeof error === "string" && error) return error;
+    if (error && typeof error === "object" && "message" in error && typeof error.message === "string") return error.message;
+    return "Replicate 视频生成失败";
 }
 
 function assertSeedanceVideoReferences(videoReferences: ReferenceVideo[]) {
