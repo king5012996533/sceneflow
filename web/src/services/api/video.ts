@@ -189,9 +189,8 @@ async function createReplicateVideoTask(config: AiConfig, model: string, prompt:
             headers: replicateHeaders(config),
             body: { input },
         });
-        const completed = await waitForReplicateVideoPrediction(prediction, config, options);
-        if (completed.status === "succeeded") {
-            return { id: completed.id || prediction.id || "", provider: "replicate", model, result: await videoResultFromUrl(parseReplicateVideoUrl(completed), options) };
+        if (prediction.status === "succeeded") {
+            return { id: prediction.id || "", provider: "replicate", model, result: await videoResultFromUrl(parseReplicateVideoUrl(prediction), options) };
         }
         if (!prediction.id) throw new Error("Replicate 接口没有返回任务 ID");
         return { id: prediction.id, provider: "replicate", model };
@@ -213,22 +212,6 @@ async function pollReplicateVideoTask(config: AiConfig, task: VideoGenerationTas
     } catch (error) {
         throw new Error(readAxiosError(error, "Replicate 视频任务查询失败"));
     }
-}
-
-async function waitForReplicateVideoPrediction(prediction: ReplicatePrediction, config: Pick<AiConfig, "apiKey">, options?: RequestOptions) {
-    let current = prediction;
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-        if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-        if (current.status === "succeeded" || current.status === "failed" || current.status === "canceled") return current;
-        if (!current.urls?.get) return current;
-        await delay(1500, options?.signal);
-        current = await proxyFetch<ReplicatePrediction>({
-            url: current.urls.get,
-            method: "GET",
-            headers: { Authorization: `Bearer ${config.apiKey}` },
-        });
-    }
-    return current;
 }
 
 async function buildReplicateVideoInput(config: AiConfig, model: string, prompt: string, references: ReferenceImage[]) {
@@ -285,7 +268,6 @@ function replicateHeaders(config: Pick<AiConfig, "apiKey">) {
     return {
         Authorization: `Bearer ${config.apiKey}`,
         "Content-Type": "application/json",
-        Prefer: "wait=60",
     };
 }
 
