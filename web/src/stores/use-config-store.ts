@@ -390,12 +390,13 @@ export function resolveModelChannel(config: AiConfig, value: string) {
 
 export function resolveModelRequestConfig(config: AiConfig, value: string) {
     const channel = resolveModelChannel(config, value);
+    const apiFormat = inferApiFormatFromBaseUrl(channel.baseUrl) || channel.apiFormat;
     return {
         ...config,
         model: modelOptionName(value || config.model),
         baseUrl: channel.baseUrl,
         apiKey: channel.apiKey,
-        apiFormat: channel.apiFormat,
+        apiFormat,
     };
 }
 
@@ -440,6 +441,13 @@ export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
 function normalizeApiFormat(apiFormat: unknown): ApiCallFormat {
     if (apiFormat === "gemini" || apiFormat === "replicate") return apiFormat;
     return "openai";
+}
+
+export function inferApiFormatFromBaseUrl(baseUrl: string): ApiCallFormat | null {
+    const value = baseUrl.trim().toLowerCase();
+    if (value.includes("api.replicate.com") || value.includes("replicate.com/v1")) return "replicate";
+    if (value.includes("generativelanguage.googleapis.com")) return "gemini";
+    return null;
 }
 
 function uniqueRawModels(models: string[]) {
