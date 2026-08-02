@@ -46,7 +46,7 @@ import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
 import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
 import { useCanvasStore } from "../stores/use-canvas-store";
 import { applyCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
-import { canvasGenerationErrorToast } from "../utils/canvas-generation-error";
+import { canvasGenerationErrorToast, formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
 import { buildCanvasResourceReferences, buildNodeMentionReferences } from "../utils/canvas-resource-references";
 import { createMangaWorkflow } from "../utils/manga-workflow";
 
@@ -1625,7 +1625,7 @@ function InfiniteCanvasPage() {
                 });
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : "生成失败";
+                const errorDetails = formatCanvasGenerationErrorDetails(error);
                 message.error(canvasGenerationErrorToast(errorDetails));
                 setNodes((prev) =>
                     prev.map((node) => (node.id === nodeId || pendingChildIds.includes(node.id) ? (node.id === nodeId && !markSourceStatus ? node : { ...node, metadata: { ...node.metadata, status: NODE_STATUS_ERROR, errorDetails } }) : node)),

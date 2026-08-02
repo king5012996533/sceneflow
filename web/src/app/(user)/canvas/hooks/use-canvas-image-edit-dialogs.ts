@@ -20,7 +20,7 @@ import {
     buildImageGenerationMetadata,
     isGenerationCanceled,
 } from "../utils/canvas-utils";
-import { canvasGenerationErrorToast } from "../utils/canvas-generation-error";
+import { canvasGenerationErrorToast, formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
 
 type UseCanvasImageEditDialogsOptions = {
     nodes: CanvasNodeData[];
@@ -230,7 +230,7 @@ export function useCanvasImageEditDialogs(options: UseCanvasImageEditDialogsOpti
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt, ...generationMetadata } } : item)));
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : "局部修改失败";
+                const errorDetails = formatCanvasGenerationErrorDetails(error, "局部修改失败");
                 message.error(canvasGenerationErrorToast(errorDetails));
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {

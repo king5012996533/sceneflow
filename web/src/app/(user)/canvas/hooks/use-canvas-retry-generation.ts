@@ -23,7 +23,7 @@ import {
     buildAudioGenerationMetadata,
 } from "../utils/canvas-utils";
 import { fitNodeSize } from "../utils/canvas-node-size";
-import { canvasGenerationErrorToast } from "../utils/canvas-generation-error";
+import { canvasGenerationErrorToast, formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
 import type { ReferenceImage } from "@/types/image";
 
 type UseCanvasRetryGenerationOptions = {
@@ -173,7 +173,7 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
                 );
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : "生成失败";
+                const errorDetails = formatCanvasGenerationErrorDetails(error);
                 message.error(canvasGenerationErrorToast(errorDetails));
                 setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {

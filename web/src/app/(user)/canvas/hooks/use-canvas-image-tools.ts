@@ -7,6 +7,7 @@ import { requestGeneratedImages } from "@/lib/generation/generation-request";
 import { QuotaExceededError } from "@/lib/generation/generation-guard";
 import { defaultConfig, type AiConfig } from "@/stores/use-config-store";
 import { uploadImage } from "@/services/image-storage";
+import { formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
 import { upscaleDataUrl } from "../utils/canvas-image-data";
 import { fitNodeSize } from "../utils/canvas-node-size";
 import { NODE_DEFAULT_SIZE } from "../constants";
@@ -201,7 +202,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions) {
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, width: size.width, height: size.height, metadata: { ...item.metadata, ...imageMetadata(uploaded), prompt, ...generationMetadata } } : item)));
             } catch (error) {
                 if (isGenerationCanceled(error)) return;
-                const errorDetails = error instanceof Error ? error.message : "生成失败";
+                const errorDetails = formatCanvasGenerationErrorDetails(error);
                 setNodes((prev) => prev.map((item) => (item.id === childId ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails } } : item)));
             } finally {
                 finishGenerationRequest(childId, controller);

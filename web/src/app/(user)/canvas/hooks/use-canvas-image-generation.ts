@@ -6,6 +6,7 @@ import { requestGeneratedImages } from "@/lib/generation/generation-request";
 import { QuotaExceededError } from "@/lib/generation/generation-guard";
 import { uploadImage } from "@/services/image-storage";
 import type { AiConfig } from "@/stores/use-config-store";
+import { canvasGenerationErrorToast, formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
 import { NODE_DEFAULT_SIZE, getNodeSpec } from "../constants";
 import { CanvasNodeType } from "../types";
 import type { CanvasNodeData, CanvasConnection, CanvasNodeMetadata } from "../types";
@@ -193,7 +194,7 @@ export function useCanvasImageGeneration(options: UseCanvasImageGenerationOption
                         return true;
                     } catch (error) {
                         if (isGenerationCanceled(error)) return false;
-                        const errorDetails = error instanceof Error ? error.message : "生成失败";
+                        const errorDetails = formatCanvasGenerationErrorDetails(error);
                         hasFailure = true;
                         setNodes((prev) => prev.map((node) => (node.id === targetId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_ERROR, errorDetails } } : node)));
                     } finally {
