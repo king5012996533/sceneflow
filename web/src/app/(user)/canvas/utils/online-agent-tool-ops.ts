@@ -14,7 +14,7 @@ export function describeCanvasSnapshot(snapshot: CanvasAgentSnapshot) {
         acc[node.type] = (acc[node.type] || 0) + 1;
         return acc;
     }, {});
-    return `当前画布有 ${snapshot.nodes.length} 个节点、${snapshot.connections.length} 条连线。文本 ${counts[CanvasNodeType.Text] || 0} 个，图片 ${counts[CanvasNodeType.Image] || 0} 个，生成配置 ${counts[CanvasNodeType.Config] || 0} 个，视频 ${counts[CanvasNodeType.Video] || 0} 个，音频 ${counts[CanvasNodeType.Audio] || 0} 个。`;
+    return `????? ${snapshot.nodes.length} ????${snapshot.connections.length} ?????? ${counts[CanvasNodeType.Text] || 0} ???? ${counts[CanvasNodeType.Image] || 0} ?????? ${counts[CanvasNodeType.Config] || 0} ???? ${counts[CanvasNodeType.Video] || 0} ???? ${counts[CanvasNodeType.Audio] || 0} ??`;
 }
 
 export function parseToolArguments(value: string) {
@@ -28,9 +28,14 @@ export function parseToolArguments(value: string) {
 }
 
 export function onlineToolToOps(name: string, input: Record<string, unknown>, snapshot: CanvasAgentSnapshot, config: AiConfig): CanvasAgentOp[] {
+    const nodeIds = new Set(snapshot.nodes.map((node) => node.id));
     if (name === "canvas_create_workflow_cards") return workflowCardOps(input, snapshot, config);
     if (name === "canvas_analyze_reference_image") return referenceAnalysisOps(input, snapshot);
-    if (name === "canvas_apply_ops") return requireOps(input.ops);
+    if (name === "canvas_apply_ops") {
+        const ops = requireOps(input.ops);
+        validateOpsAgainstSnapshot(ops, snapshot);
+        return ops;
+    }
     if (name === "canvas_create_node") {
         const nodeType = requireNodeType(input.nodeType);
         const x = numberOr(input.x, nextCanvasX(snapshot));
@@ -58,24 +63,30 @@ export function onlineToolToOps(name: string, input: Record<string, unknown>, sn
     if (name === "canvas_generate_image") return generationFlowOps({ ...input, mode: "image", autoRun: true }, snapshot, config);
     if (name === "canvas_generate_video") return generationFlowOps({ ...input, mode: "video", autoRun: true }, snapshot, config);
     if (name === "canvas_generate_audio") return generationFlowOps({ ...input, mode: "audio", autoRun: true }, snapshot, config);
-    if (name === "canvas_update_node") return [{ type: "update_node", id: requireString(input.id, "id"), patch: recordOptional(input.patch) as Partial<CanvasNodeData> | undefined, metadata: recordOptional(input.metadata) as CanvasNodeData["metadata"] }];
-    if (name === "canvas_update_node_text") return [{ type: "update_node", id: requireString(input.id, "id"), patch: stringOptional(input.title) ? { title: stringOptional(input.title) } : undefined, metadata: { content: requireString(input.text, "text"), status: "success" } }];
+    if (name === "canvas_update_node") {
+        const id = requireExistingNodeId(input.id, "id", nodeIds);
+        return [{ type: "update_node", id, patch: recordOptional(input.patch) as Partial<CanvasNodeData> | undefined, metadata: recordOptional(input.metadata) as CanvasNodeData["metadata"] }];
+    }
+    if (name === "canvas_update_node_text") {
+        const id = requireExistingNodeId(input.id, "id", nodeIds);
+        return [{ type: "update_node", id, patch: stringOptional(input.title) ? { title: stringOptional(input.title) } : undefined, metadata: { content: requireString(input.text, "text"), status: "success" } }];
+    }
     if (name === "canvas_move_nodes") {
         return requireRecordArray(input.items, "items").map((item) => {
-            const id = requireString(item.id, "id");
+            const id = requireExistingNodeId(item.id, "id", nodeIds);
             const current = snapshot.nodes.find((node) => node.id === id);
             return { type: "update_node", id, patch: { position: { x: numberOr(item.x, (current?.position.x || 0) + numberOr(item.dx, 0)), y: numberOr(item.y, (current?.position.y || 0) + numberOr(item.dy, 0)) } } };
         });
     }
-    if (name === "canvas_resize_node") return [{ type: "update_node", id: requireString(input.id, "id"), patch: { width: requireNumber(input.width, "width"), height: requireNumber(input.height, "height") }, metadata: typeof input.freeResize === "boolean" ? { freeResize: input.freeResize } : undefined }];
-    if (name === "canvas_delete_nodes") return [{ type: "delete_node", ids: requireStringArray(input.ids, "ids") }];
-    if (name === "canvas_connect_nodes") return requireRecordArray(input.connections, "connections").map((connection) => ({ type: "connect_nodes", fromNodeId: requireString(connection.fromNodeId, "fromNodeId"), toNodeId: requireString(connection.toNodeId, "toNodeId") }));
-    if (name === "canvas_select_nodes") return [{ type: "select_nodes", ids: requireStringArray(input.ids, "ids") }];
+    if (name === "canvas_resize_node") return [{ type: "update_node", id: requireExistingNodeId(input.id, "id", nodeIds), patch: { width: requireNumber(input.width, "width"), height: requireNumber(input.height, "height") }, metadata: typeof input.freeResize === "boolean" ? { freeResize: input.freeResize } : undefined }];
+    if (name === "canvas_delete_nodes") return [{ type: "delete_node", ids: requireExistingNodeIds(input.ids, "ids", nodeIds) }];
+    if (name === "canvas_connect_nodes") return requireRecordArray(input.connections, "connections").map((connection) => ({ type: "connect_nodes", fromNodeId: requireExistingNodeId(connection.fromNodeId, "fromNodeId", nodeIds), toNodeId: requireExistingNodeId(connection.toNodeId, "toNodeId", nodeIds) }));
+    if (name === "canvas_select_nodes") return [{ type: "select_nodes", ids: requireExistingNodeIds(input.ids, "ids", nodeIds) }];
     if (name === "canvas_set_viewport") return [{ type: "set_viewport", viewport: requireViewport(input.viewport) }];
-    if (name === "canvas_run_generation") return [runGenerationOp(requireString(input.nodeId, "nodeId"), generationMode(input.mode), stringOptional(input.prompt))];
-    if (name === "canvas_run_pipeline") return [{ type: "run_pipeline", nodeIds: requireStringArray(input.nodeIds, "nodeIds"), resume: input.resume !== false }];
-    if (name === "canvas_continue_video") return [{ type: "continue_video", nodeId: requireString(input.nodeId, "nodeId") }];
-    throw new Error(`不支持的工具：${name}`);
+    if (name === "canvas_run_generation") return [runGenerationOp(requireExistingNodeId(input.nodeId, "nodeId", nodeIds), generationMode(input.mode), stringOptional(input.prompt))];
+    if (name === "canvas_run_pipeline") return [{ type: "run_pipeline", nodeIds: requireExistingNodeIds(input.nodeIds, "nodeIds", nodeIds), resume: input.resume !== false }];
+    if (name === "canvas_continue_video") return [{ type: "continue_video", nodeId: requireExistingNodeId(input.nodeId, "nodeId", nodeIds) }];
+    throw new Error(`???????${name}`);
 }
 
 function generationFlowOps(input: Record<string, unknown>, snapshot: CanvasAgentSnapshot, config: AiConfig): CanvasAgentOp[] {
@@ -85,10 +96,11 @@ function generationFlowOps(input: Record<string, unknown>, snapshot: CanvasAgent
     const y = numberOr(input.y, 0);
     const textId = `text-${nanoid()}`;
     const configId = `config-${nanoid()}`;
-    const referenceNodeIds = Array.isArray(input.referenceNodeIds) ? input.referenceNodeIds.filter((id): id is string => typeof id === "string") : [];
+    const nodeIds = new Set(snapshot.nodes.map((node) => node.id));
+    const referenceNodeIds = Array.isArray(input.referenceNodeIds) ? requireExistingNodeIds(input.referenceNodeIds, "referenceNodeIds", nodeIds) : [];
     const tokens = [`@[node:${textId}]`, ...referenceNodeIds.map((id) => `@[node:${id}]`)];
     return [
-        textNodeOp({ id: textId, text: prompt, title: stringOptional(input.title) || "提示词" }, x, y),
+        textNodeOp({ id: textId, text: prompt, title: stringOptional(input.title) || "???" }, x, y),
         configNodeOp(configId, { ...input, prompt: tokens.join("\n") }, x + NODE_DEFAULT_SIZE[CanvasNodeType.Text].width + 80, y, config),
         { type: "connect_nodes", fromNodeId: textId, toNodeId: configId },
         ...referenceNodeIds.map((fromNodeId) => ({ type: "connect_nodes" as const, fromNodeId, toNodeId: configId })),
@@ -264,10 +276,11 @@ function workflowCardOps(input: Record<string, unknown>, snapshot: CanvasAgentSn
     const stages = workflowPresets[intent];
     const x = numberOr(input.x, nextCanvasX(snapshot));
     const y = numberOr(input.y, 0);
-    const sourceNodeId = stringOptional(input.sourceNodeId);
-    const referenceNodeIds = Array.isArray(input.referenceNodeIds) ? input.referenceNodeIds.filter((id): id is string => typeof id === "string") : [];
-    const nodeIds = stages.map((item) => `${item.key}-${nanoid(6)}`);
-    const nodeIdByStageKey = new Map(stages.map((item, index) => [item.key, nodeIds[index]]));
+    const existingNodeIds = new Set(snapshot.nodes.map((node) => node.id));
+    const sourceNodeId = stringOptional(input.sourceNodeId) ? requireExistingNodeId(input.sourceNodeId, "sourceNodeId", existingNodeIds) : "";
+    const referenceNodeIds = Array.isArray(input.referenceNodeIds) ? requireExistingNodeIds(input.referenceNodeIds, "referenceNodeIds", existingNodeIds) : [];
+    const stageNodeIds = stages.map((item) => `${item.key}-${nanoid(6)}`);
+    const nodeIdByStageKey = new Map(stages.map((item, index) => [item.key, stageNodeIds[index]]));
     const ops: CanvasAgentOp[] = stages.map((item, index) => {
         const stageReferenceNodeIds = workflowStageReferenceKeys(intent, item.key)
             .map((key) => nodeIdByStageKey.get(key))
@@ -299,7 +312,7 @@ function workflowCardOps(input: Record<string, unknown>, snapshot: CanvasAgentSn
         }) as CanvasNodeData["metadata"];
         return {
             type: "add_node",
-            id: nodeIds[index],
+            id: stageNodeIds[index],
             nodeType: item.type,
             title: item.title,
             position: { x: x + index * 420, y: y + (index % 2) * 320 },
@@ -314,19 +327,19 @@ function workflowCardOps(input: Record<string, unknown>, snapshot: CanvasAgentSn
         if (connectionOps.some((op) => op.type === "connect_nodes" && op.fromNodeId === fromNodeId && op.toNodeId === toNodeId)) return;
         connectionOps.push({ type: "connect_nodes", fromNodeId, toNodeId });
     };
-    if (sourceNodeId && snapshot.nodes.some((node) => node.id === sourceNodeId)) pushConnection(sourceNodeId, nodeIds[0]);
-    referenceNodeIds.filter((id) => snapshot.nodes.some((node) => node.id === id)).forEach((id) => pushConnection(id, nodeIds[0]));
-    nodeIds.slice(0, -1).forEach((fromNodeId, index) => pushConnection(fromNodeId, nodeIds[index + 1]));
+    if (sourceNodeId) pushConnection(sourceNodeId, stageNodeIds[0]);
+    referenceNodeIds.forEach((id) => pushConnection(id, stageNodeIds[0]));
+    stageNodeIds.slice(0, -1).forEach((fromNodeId, index) => pushConnection(fromNodeId, stageNodeIds[index + 1]));
     stages.forEach((item, index) => {
         workflowStageReferenceKeys(intent, item.key)
             .map((key) => nodeIdByStageKey.get(key))
-            .forEach((fromNodeId) => pushConnection(fromNodeId, nodeIds[index]));
+            .forEach((fromNodeId) => pushConnection(fromNodeId, stageNodeIds[index]));
         if (workflowStageUsesExternalReferences(intent, item.key, index)) {
-            if (sourceNodeId && snapshot.nodes.some((node) => node.id === sourceNodeId)) pushConnection(sourceNodeId, nodeIds[index]);
-            referenceNodeIds.filter((id) => snapshot.nodes.some((node) => node.id === id)).forEach((id) => pushConnection(id, nodeIds[index]));
+            if (sourceNodeId) pushConnection(sourceNodeId, stageNodeIds[index]);
+            referenceNodeIds.forEach((id) => pushConnection(id, stageNodeIds[index]));
         }
     });
-    return [...ops, ...connectionOps, { type: "select_nodes", ids: [nodeIds[0]] }];
+    return [...ops, ...connectionOps, { type: "select_nodes", ids: [stageNodeIds[0]] }];
 }
 
 function withNodeReferenceTokens(prompt: string, nodeIds: string[]) {
@@ -514,6 +527,38 @@ function runGenerationOp(nodeId: string, mode: "text" | "image" | "video" | "aud
     return { type: "run_generation", nodeId, mode, prompt };
 }
 
+function validateOpsAgainstSnapshot(ops: CanvasAgentOp[], snapshot: CanvasAgentSnapshot) {
+    const nodeIds = new Set(snapshot.nodes.map((node) => node.id));
+    ops.forEach((op) => {
+        if (op.type === "update_node") requireExistingNodeId(op.id, "id", nodeIds);
+        if (op.type === "delete_node") {
+            const ids = [...(op.ids || []), ...(op.id ? [op.id] : [])];
+            if (ids.length) requireExistingNodeIds(ids, "ids", nodeIds);
+        }
+        if (op.type === "connect_nodes") {
+            requireExistingNodeId(op.fromNodeId, "fromNodeId", nodeIds);
+            requireExistingNodeId(op.toNodeId, "toNodeId", nodeIds);
+        }
+        if (op.type === "select_nodes") requireExistingNodeIds(op.ids, "ids", nodeIds);
+        if (op.type === "run_generation") requireExistingNodeId(op.nodeId, "nodeId", nodeIds);
+        if (op.type === "run_pipeline") requireExistingNodeIds(op.nodeIds, "nodeIds", nodeIds);
+        if (op.type === "continue_video") requireExistingNodeId(op.nodeId, "nodeId", nodeIds);
+    });
+}
+
+function requireExistingNodeId(value: unknown, field: string, nodeIds: Set<string>) {
+    const id = requireString(value, field);
+    if (!nodeIds.has(id)) throw new Error(`${field} 指向的节点不存在：${id}。请先读取画布状态，使用真实节点 id。`);
+    return id;
+}
+
+function requireExistingNodeIds(value: unknown, field: string, nodeIds: Set<string>) {
+    const ids = requireStringArray(value, field);
+    const missing = ids.filter((id) => !nodeIds.has(id));
+    if (missing.length) throw new Error(`${field} 包含不存在的节点：${missing.join(", ")}。请先读取画布状态，使用真实节点 id。`);
+    return ids;
+}
+
 function requireStringArray(value: unknown, field: string): string[] {
     if (!Array.isArray(value)) throw new Error(`${field} 必须是字符串数组`);
     if (!value.every((item) => typeof item === "string" && Boolean(item))) throw new Error(`${field} 必须只包含非空字符串`);
@@ -606,10 +651,10 @@ function generationMode(value: unknown): "text" | "image" | "video" | "audio" {
 }
 
 function generationTitle(mode: "text" | "image" | "video" | "audio") {
-    if (mode === "text") return "文本生成";
-    if (mode === "video") return "视频生成";
-    if (mode === "audio") return "音频生成";
-    return "图片生成";
+    if (mode === "text") return "????";
+    if (mode === "video") return "????";
+    if (mode === "audio") return "????";
+    return "????";
 }
 
 function defaultGenerationModel(config: AiConfig, mode: "text" | "image" | "video" | "audio") {
@@ -637,7 +682,7 @@ export function snapshotSignature(snapshot: CanvasAgentSnapshot) {
 }
 
 export function explainNoop(ops: CanvasAgentOp[], snapshot: CanvasAgentSnapshot) {
-    if (!ops.length) return "模型没有返回可执行的画布操作。";
+    if (!ops.length) return "???????????????";
     const nodeIds = new Set(snapshot.nodes.map((node) => node.id));
     const connectionIds = new Set(snapshot.connections.map((conn) => conn.id));
     const deleteConnectionOps = ops.filter((op): op is Extract<CanvasAgentOp, { type: "delete_connections" }> => op.type === "delete_connections");
@@ -646,18 +691,18 @@ export function explainNoop(ops: CanvasAgentOp[], snapshot: CanvasAgentSnapshot)
     const updateOps = ops.filter((op): op is Extract<CanvasAgentOp, { type: "update_node" }> => op.type === "update_node");
     const selectOps = ops.filter((op): op is Extract<CanvasAgentOp, { type: "select_nodes" }> => op.type === "select_nodes");
     const generationOps = ops.filter((op): op is Extract<CanvasAgentOp, { type: "run_generation" }> => op.type === "run_generation");
-    if (deleteConnectionOps.length && !snapshot.connections.length) return "画布当前没有连线可删除。";
-    if (deleteConnectionOps.length && deleteConnectionOps.every((op) => !op.all && [...(op.ids || []), ...(op.id ? [op.id] : [])].every((id) => !connectionIds.has(id)))) return "没有找到要删除的连线。";
-    if (connectOps.length && connectOps.every((op) => snapshot.connections.some((conn) => conn.fromNodeId === op.fromNodeId && conn.toNodeId === op.toNodeId))) return "这些节点已经存在对应连线，无需重复连接。";
-    if (connectOps.length && connectOps.every((op) => !nodeIds.has(op.fromNodeId) || !nodeIds.has(op.toNodeId))) return "没有找到要连接的节点。";
-    if (deleteNodeOps.length && deleteNodeOps.every((op) => op.nodeType === CanvasNodeType.Config) && !snapshot.nodes.some((node) => node.type === CanvasNodeType.Config)) return "画布当前没有生成配置节点可删除。";
-    if (deleteNodeOps.length && deleteNodeOps.every((op) => [...(op.ids || []), ...(op.id ? [op.id] : [])].every((id) => !nodeIds.has(id)))) return "没有找到要删除的节点。";
-    if (updateOps.length && updateOps.every((op) => !nodeIds.has(op.id))) return "没有找到要更新的节点。";
-    if (selectOps.length && selectOps.every((op) => !(op.ids || []).some((id) => nodeIds.has(id)))) return "没有找到要选择的节点。";
-    if (generationOps.length && generationOps.every((op) => !nodeIds.has(op.nodeId))) return "没有找到要触发生成的节点。";
-    if (ops.every((op) => op.type === "set_viewport")) return "视图已经是目标状态。";
-    if (selectOps.length && selectOps.every((op) => JSON.stringify(op.ids || []) === JSON.stringify(snapshot.selectedNodeIds))) return "选区已经是目标状态。";
-    return "工具已执行，但画布状态没有变化；请在日志 tab 查看工具参数和执行前后状态。";
+    if (deleteConnectionOps.length && !snapshot.connections.length) return "????????????";
+    if (deleteConnectionOps.length && deleteConnectionOps.every((op) => !op.all && [...(op.ids || []), ...(op.id ? [op.id] : [])].every((id) => !connectionIds.has(id)))) return "???????????";
+    if (connectOps.length && connectOps.every((op) => snapshot.connections.some((conn) => conn.fromNodeId === op.fromNodeId && conn.toNodeId === op.toNodeId))) return "????????????????????";
+    if (connectOps.length && connectOps.every((op) => !nodeIds.has(op.fromNodeId) || !nodeIds.has(op.toNodeId))) return "???????????";
+    if (deleteNodeOps.length && deleteNodeOps.every((op) => op.nodeType === CanvasNodeType.Config) && !snapshot.nodes.some((node) => node.type === CanvasNodeType.Config)) return "????????????????";
+    if (deleteNodeOps.length && deleteNodeOps.every((op) => [...(op.ids || []), ...(op.id ? [op.id] : [])].every((id) => !nodeIds.has(id)))) return "???????????";
+    if (updateOps.length && updateOps.every((op) => !nodeIds.has(op.id))) return "???????????";
+    if (selectOps.length && selectOps.every((op) => !(op.ids || []).some((id) => nodeIds.has(id)))) return "???????????";
+    if (generationOps.length && generationOps.every((op) => !nodeIds.has(op.nodeId))) return "?????????????";
+    if (ops.every((op) => op.type === "set_viewport")) return "??????????";
+    if (selectOps.length && selectOps.every((op) => JSON.stringify(op.ids || []) === JSON.stringify(snapshot.selectedNodeIds))) return "??????????";
+    return "???????????????????? tab ??????????????";
 }
 
 export function compactSnapshot(snapshot: CanvasAgentSnapshot) {
