@@ -67,10 +67,31 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
         });
     };
 
+    const explainToolFailure = async (messages: ResponseInputMessage[], toolCalls: ResponseToolCall[], toolResults: OnlineExecutedToolCall[]) => {
+        const requestConfig = { ...effectiveConfig, model: effectiveConfig.textModel || effectiveConfig.model };
+        try {
+            const response = await requestGeneratedToolResponse({
+                config: { ...requestConfig, systemPrompt: "" },
+                messages: [
+                    ...messages,
+                    ...toolCalls.map(toolCallToResponseInput),
+                    ...toolResults.map((item) => ({ role: "tool" as const, tool_call_id: item.toolCallId, content: JSON.stringify(item.result) })),
+                    { role: "user", content: "上一个工具调用失败了。请不要再调用工具，也不要重复失败信息。请用一句话说明失败原因，再给出一个最小可执行的修正建议。" },
+                ],
+                tools: [],
+                toolChoice: "auto",
+            });
+            return response.content.trim();
+        } catch {
+            return "";
+        }
+    };
+
     const continueAfterResults = async (sessionId: string, assistantId: string, messages: ResponseInputMessage[], toolCalls: ResponseToolCall[], toolResults: OnlineExecutedToolCall[], step: number) => {
         const failed = toolResults.find((item) => !item.result.ok);
         if (failed) {
-            upsertMessage(sessionId, { id: assistantId, role: "assistant", text: formatToolResultsForChat(toolResults) || failed.result.message || "工具执行失败，已停止继续执行。" });
+            const recovery = await explainToolFailure(messages, toolCalls, toolResults);
+            upsertMessage(sessionId, { id: assistantId, role: "assistant", text: recovery || formatToolResultsForChat(toolResults) || failed.result.message || "工具执行失败，已停止继续执行。" });
             addOnlineLog("Agent Tool Loop 因工具失败停止", { failed });
             return;
         }
@@ -134,16 +155,18 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
             const messages = await buildMessages(snapshotRef.current, history, userMessage);
             const toolsForTurn = shouldExposeCanvasTools(userMessage.text) ? ONLINE_AGENT_TOOLS : [];
             const readOnlyTools = ONLINE_AGENT_TOOLS.filter((tool) => ONLINE_READ_TOOLS.has(tool.function.name));
-            const effectiveTools = toolsForTurn.length ? toolsForTurn : readOnlyTools.length ? readOnlyTools : [];
+            const shouldReadFirst = toolsForTurn.length > 0 && shouldRequireToolCall(userMessage.text) && shouldReadCanvasBeforeWrite(userMessage.text);
+            const effectiveTools = shouldReadFirst ? readOnlyTools : toolsForTurn.length ? toolsForTurn : readOnlyTools.length ? readOnlyTools : [];
             const requireToolCall = effectiveTools.length > 0 && shouldRequireToolCall(userMessage.text);
-            addOnlineLog(`Agent Loop ${loop.step} 开始`, { toolChoice: effectiveTools.length ? "auto" : "none", requireToolCall, toolCount: effectiveTools.length, readOnly: toolsForTurn.length === 0 && effectiveTools.length > 0 });
+            const toolChoice = shouldReadFirst ? REQUIRED_TOOL_CHOICE : "auto";
+            addOnlineLog(`Agent Loop ${loop.step} 开始`, { toolChoice, requireToolCall, toolCount: effectiveTools.length, readOnly: toolsForTurn.length === 0 && effectiveTools.length > 0, readFirst: shouldReadFirst });
 
             let streamed = "";
             const result = await requestGeneratedToolResponse({
                 config: { ...requestConfig, systemPrompt: "" },
                 messages,
                 tools: effectiveTools,
-                toolChoice: "auto",
+                toolChoice,
                 onDelta: (text) => {
                     streamed = text;
                     if (text.trim()) upsertMessage(sessionId, { id: assistantId, role: "assistant", text });
@@ -166,7 +189,7 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
 
             if (loop.step < ONLINE_AGENT_MAX_STEPS && requireToolCall) {
                 addOnlineLog("模型未调用工具，重试", { step: loop.step });
-                const retryMessages = [...messages, { role: "assistant" as const, content: result.content || streamed || "" }, { role: "user" as const, content: "以上回复没有调用任何画布工具。用户明确要求操作画布，请调用对应的工具来执行操作，不要只回复文本。你可以先调用 canvas_get_state 看看当前画布状态。" }];
+                const retryMessages = [...messages, { role: "assistant" as const, content: result.content || streamed || "" }, { role: "user" as const, content: "以上回复没有调用任何画布工具。用户明确要求操作画布，请调用对应的工具来执行操作，不要只回复文本。涉及已有节点、选中节点、参考图或连接关系时，先调用 canvas_get_state 或 canvas_get_selection。" }];
                 let retryStreamed = "";
                 const retryResult = await requestGeneratedToolResponse({
                     config: { ...requestConfig, systemPrompt: "" },
@@ -355,6 +378,10 @@ function shouldExposeCanvasTools(text: unknown) {
 
 function shouldRequireToolCall(text: string) {
     return /(创建|新建|放到画布|落到画布|生成节点|执行|运行|重跑|重新生成|立即生成|删除|移动|修改|更新|连线|连接|开始|生成图片|生成视频|生成音频|图生视频|续写|尾帧|读取画布|当前画布|操作画布|整理成工作流|帮我生成|生成一张|生成一段|出一张|做一张|画一张)/.test(text);
+}
+
+function shouldReadCanvasBeforeWrite(text: string) {
+    return /(这个|这张|当前|选中|基于|参考|连接|连线|删除|修改|更新|移动|重跑|重新生成|续写|尾帧|图生视频|工作流|流程|已有|上一个|下一个)/.test(text);
 }
 
 const ALWAYS_CONFIRM_TOOLS = new Set([

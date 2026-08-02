@@ -20,7 +20,8 @@ export async function buildToolAgentMessages(snapshot: CanvasAgentSnapshot, hist
         `页面状态：当前在 SceneFlow 画布。节点 ${snapshot.nodes.length} 个，连线 ${snapshot.connections.length} 条，选中 ${snapshot.selectedNodeIds.length} 个节点。`,
         canvasMemory,
         "你必须结合最近对话、当前选区、已有节点和工具执行结果理解用户需求；不要把当前消息当作孤立输入。",
-        "如果只是聊天、咨询、写剧情或写提示词，请直接回答；只有需要操作画布时才调用工具读取完整画布。",
+        "如果只是聊天、咨询、写剧情或写提示词，请直接回答；只有需要操作画布时才调用工具。",
+        "如果要操作已有节点、选中节点、参考图、连线关系、重跑、续写、图生视频或删除修改，先读取画布状态或选区，拿到真实节点 id 后再执行。",
         `用户需求：${safeMessageText(userMessage.text)}`,
     ].filter(Boolean).join("\n\n");
 
@@ -36,7 +37,7 @@ export async function buildToolAgentMessages(snapshot: CanvasAgentSnapshot, hist
             content: [
                 ...refs.flatMap((item) => {
                     const text = safeMessageText(item.text);
-                    const label = `选中节点 ${safeMessageText(item.title)}(${item.type})`;
+                    const label = `选中节点 ${safeMessageText(item.title)}(${item.type}) id=${item.id}`;
                     return text ? [{ type: "text" as const, text: `${label}：${truncateAgentText(text, 900)}` }] : [{ type: "text" as const, text: `${label}：已附加为图片引用。` }];
                 }),
                 { type: "text", text: contextText },
@@ -49,6 +50,12 @@ export async function buildToolAgentMessages(snapshot: CanvasAgentSnapshot, hist
 function nodeToReference(node: CanvasNodeData): CanvasAssistantReference | null {
     if (node.type === CanvasNodeType.Image && node.metadata?.content) {
         return { id: node.id, type: node.type, title: node.title, dataUrl: node.metadata.content, storageKey: node.metadata.storageKey };
+    }
+    if (node.type === CanvasNodeType.Video && node.metadata?.content) {
+        return { id: node.id, type: node.type, title: node.title, text: `视频节点：${node.title || node.id}` };
+    }
+    if (node.type === CanvasNodeType.Audio && node.metadata?.content) {
+        return { id: node.id, type: node.type, title: node.title, text: `音频节点：${node.title || node.id}` };
     }
     if (node.type === CanvasNodeType.Text && node.metadata?.content) {
         return { id: node.id, type: node.type, title: node.title, text: node.metadata.content };
@@ -94,7 +101,7 @@ function describeNodeForAgent(node: CanvasNodeData) {
     const status = metadata.status ? ` status=${safeMessageText(metadata.status)}` : "";
     const mode = metadata.generationMode ? ` mode=${safeMessageText(metadata.generationMode)}` : "";
     const body = [prompt ? `prompt="${prompt}"` : "", content ? `content="${content}"` : ""].filter(Boolean).join(" ");
-    return `- ${node.id} ${node.title || node.type} type=${node.type}${status}${mode}${body ? ` ${body}` : ""}`;
+    return `- id=${node.id} title="${node.title || node.type}" type=${node.type}${status}${mode}${body ? ` ${body}` : ""}`;
 }
 
 function safeMessageText(value: unknown) {
