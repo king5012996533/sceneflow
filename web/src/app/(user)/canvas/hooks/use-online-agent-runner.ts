@@ -295,38 +295,39 @@ function isResponseToolCall(value: unknown): value is ResponseToolCall {
 }
 
 function summarizeToolCalls(calls: ResponseToolCall[]) {
-    return calls.map((call) => toolCallLabel(call.function.name)).join("，") || "工具调用";
+    return calls.map((call) => toolCallLabel(call.function.name)).join("; ") || "tool call";
 }
 
 function toolCallLabel(name: string) {
-    if (name === "canvas_apply_ops") return "画布操作";
-    if (name === "canvas_get_state") return "读取画布";
-    if (name === "canvas_get_selection") return "读取选区";
-    if (name === "canvas_export_snapshot") return "导出快照";
-    if (name === "canvas_plan_workflow") return "规划流程";
-    if (name === "canvas_create_workflow_cards") return "创建流程卡";
-    if (name === "canvas_analyze_reference_image") return "分析参考图";
-    if (name === "canvas_create_node") return "创建节点";
-    if (name === "canvas_create_text_node") return "创建文本";
-    if (name === "canvas_create_text_nodes") return "批量创建文本";
-    if (name === "canvas_create_config_node") return "创建生成配置";
-    if (name === "canvas_create_image_prompt_flow") return "创建生图流程";
-    if (name === "canvas_create_generation_flow") return "创建生成流程";
-    if (name === "canvas_generate_text") return "生成文本";
-    if (name === "canvas_generate_image") return "生成图片";
-    if (name === "canvas_generate_video") return "生成视频";
-    if (name === "canvas_generate_audio") return "生成音频";
-    if (name === "canvas_update_node") return "更新节点";
-    if (name === "canvas_update_node_text") return "更新文本";
-    if (name === "canvas_move_nodes") return "移动节点";
-    if (name === "canvas_resize_node") return "调整节点尺寸";
-    if (name === "canvas_delete_nodes") return "删除节点";
-    if (name === "canvas_connect_nodes") return "连接节点";
-    if (name === "canvas_select_nodes") return "选择节点";
-    if (name === "canvas_set_viewport") return "调整视口";
-    if (name === "canvas_run_generation") return "触发生成";
-    if (name === "canvas_run_pipeline") return "执行创作流水线";
-    if (name === "canvas_continue_video") return "创建连续镜头";
+    if (name === "canvas_apply_ops") return "apply canvas ops";
+    if (name === "canvas_get_state") return "read canvas";
+    if (name === "canvas_get_selection") return "read selection";
+    if (name === "canvas_export_snapshot") return "export snapshot";
+    if (name === "canvas_plan_workflow") return "plan workflow";
+    if (name === "canvas_create_workflow_cards") return "create workflow cards";
+    if (name === "canvas_analyze_reference_image") return "analyze reference image";
+    if (name === "canvas_create_reverse_prompt_flow") return "create reverse prompt flow";
+    if (name === "canvas_create_node") return "create node";
+    if (name === "canvas_create_text_node") return "create text node";
+    if (name === "canvas_create_text_nodes") return "create text nodes";
+    if (name === "canvas_create_config_node") return "create config node";
+    if (name === "canvas_create_image_prompt_flow") return "create image prompt flow";
+    if (name === "canvas_create_generation_flow") return "create generation flow";
+    if (name === "canvas_generate_text") return "generate text";
+    if (name === "canvas_generate_image") return "generate image";
+    if (name === "canvas_generate_video") return "generate video";
+    if (name === "canvas_generate_audio") return "generate audio";
+    if (name === "canvas_update_node") return "update node";
+    if (name === "canvas_update_node_text") return "update text";
+    if (name === "canvas_move_nodes") return "move nodes";
+    if (name === "canvas_resize_node") return "resize node";
+    if (name === "canvas_delete_nodes") return "delete nodes";
+    if (name === "canvas_connect_nodes") return "connect nodes";
+    if (name === "canvas_select_nodes") return "select nodes";
+    if (name === "canvas_set_viewport") return "set viewport";
+    if (name === "canvas_run_generation") return "run generation";
+    if (name === "canvas_run_pipeline") return "run pipeline";
+    if (name === "canvas_continue_video") return "continue video";
     return name;
 }
 
@@ -335,7 +336,7 @@ function formatToolResultsForChat(results: OnlineExecutedToolCall[]) {
     let previous = "";
     let repeat = 0;
     const flushRepeat = () => {
-        if (repeat > 0) lines.push(`同类失败已折叠 ${repeat} 条。`);
+        if (repeat > 0) lines.push(`Repeated failures folded: ${repeat}`);
         repeat = 0;
     };
 
@@ -377,11 +378,11 @@ function shouldExposeCanvasTools(text: unknown) {
 }
 
 function shouldRequireToolCall(text: string) {
-    return /(创建|新建|放到画布|落到画布|生成节点|执行|运行|重跑|重新生成|立即生成|删除|移动|修改|更新|连线|连接|开始|生成图片|生成视频|生成音频|图生视频|续写|尾帧|读取画布|当前画布|操作画布|整理成工作流|帮我生成|生成一张|生成一段|出一张|做一张|画一张)/.test(text);
+    return /(创建|新建|放到画布|落到画布|生成节点|执行|运行|重跑|重新生成|立即生成|删除|移动|修改|更新|连线|连接|开始|生成图片|生成视频|生成音频|图生视频|续写|尾帧|读取画布|当前画布|操作画布|整理成工作流|帮我生成|生成一张|生成一段|出一张|做一张|画一张|反推|倒推|提取提示词|生成提示词)/.test(text);
 }
 
 function shouldReadCanvasBeforeWrite(text: string) {
-    return /(这个|这张|当前|选中|基于|参考|连接|连线|删除|修改|更新|移动|重跑|重新生成|续写|尾帧|图生视频|工作流|流程|已有|上一个|下一个)/.test(text);
+    return /(这个|这张|当前|选中|基于|参考|参考图|图片|连接|连线|删除|修改|更新|移动|重跑|重新生成|续写|尾帧|图生视频|工作流|流程|已有|上一个|下一个|反推|倒推|提取提示词)/.test(text);
 }
 
 const ALWAYS_CONFIRM_TOOLS = new Set([
@@ -400,6 +401,7 @@ const AUTO_RUN_CAPABLE_TOOLS = new Set([
     "canvas_create_config_node",
     "canvas_create_image_prompt_flow",
     "canvas_create_generation_flow",
+    "canvas_create_reverse_prompt_flow",
 ]);
 
 function toolCallNeedsConfirmation(call: ResponseToolCall, confirmTools: boolean) {

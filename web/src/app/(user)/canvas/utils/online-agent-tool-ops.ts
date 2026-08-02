@@ -4,6 +4,7 @@ import { normalizeModelOptionValue, selectableModelsByCapability, type AiConfig 
 import { NODE_DEFAULT_SIZE } from "../constants";
 import { CanvasNodeType, type CanvasNodeData } from "../types";
 import { type CanvasAgentOp, type CanvasAgentSnapshot } from "./canvas-agent-ops";
+import { IMAGE_PROMPT_REVERSE_PRESET } from "./canvas-constants";
 
 export function objectDetail(value: unknown) {
     return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -31,6 +32,7 @@ export function onlineToolToOps(name: string, input: Record<string, unknown>, sn
     const nodeIds = new Set(snapshot.nodes.map((node) => node.id));
     if (name === "canvas_create_workflow_cards") return workflowCardOps(input, snapshot, config);
     if (name === "canvas_analyze_reference_image") return referenceAnalysisOps(input, snapshot);
+    if (name === "canvas_create_reverse_prompt_flow") return reversePromptFlowOps(input, snapshot, config);
     if (name === "canvas_apply_ops") {
         const ops = requireOps(input.ops);
         validateOpsAgainstSnapshot(ops, snapshot);
@@ -87,6 +89,61 @@ export function onlineToolToOps(name: string, input: Record<string, unknown>, sn
     if (name === "canvas_run_pipeline") return [{ type: "run_pipeline", nodeIds: requireExistingNodeIds(input.nodeIds, "nodeIds", nodeIds), resume: input.resume !== false }];
     if (name === "canvas_continue_video") return [{ type: "continue_video", nodeId: requireExistingNodeId(input.nodeId, "nodeId", nodeIds) }];
     throw new Error(`不支持的工具：${name}`);
+}
+
+function reversePromptFlowOps(input: Record<string, unknown>, snapshot: CanvasAgentSnapshot, config: AiConfig): CanvasAgentOp[] {
+    const nodeIds = new Set(snapshot.nodes.map((node) => node.id));
+    const nodeId = requireExistingNodeId(input.nodeId, "nodeId", nodeIds);
+    const source = snapshot.nodes.find((node) => node.id === nodeId);
+    if (!source) throw new Error("找不到要反推的图片节点");
+    if (source.type !== CanvasNodeType.Image) throw new Error("反推提示词只能基于图片节点执行");
+    if (!source.metadata?.content) throw new Error("图片节点为空，无法反推提示词");
+
+    const gap = 96;
+    const textSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Text];
+    const configSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Config];
+    const x = numberOr(input.x, source.position.x + source.width + gap);
+    const y = numberOr(input.y, source.position.y);
+    const textId = `reverse-prompt-${nanoid(6)}`;
+    const configId = `reverse-config-${nanoid(6)}`;
+    const brief = stringOptional(input.brief);
+    const instruction = brief ? `${IMAGE_PROMPT_REVERSE_PRESET}\n\n补充要求：${brief}` : IMAGE_PROMPT_REVERSE_PRESET;
+    const prompt = `参考图片：@[node:${nodeId}]\n任务说明：@[node:${textId}]`;
+
+    return [
+        {
+            type: "add_node",
+            id: textId,
+            nodeType: CanvasNodeType.Text,
+            title: "反推提示词",
+            position: { x, y },
+            width: textSpec.width,
+            height: textSpec.height,
+            metadata: { content: instruction, prompt: instruction, status: "success", fontSize: 14 },
+        },
+        {
+            type: "add_node",
+            id: configId,
+            nodeType: CanvasNodeType.Config,
+            title: "反推提示词配置",
+            position: { x: x + textSpec.width + gap, y },
+            width: configSpec.width,
+            height: configSpec.height,
+            metadata: {
+                generationMode: "text",
+                model: config.textModel || config.model,
+                count: 1,
+                prompt,
+                composerContent: prompt,
+                status: "idle",
+                references: [nodeId, textId],
+            },
+        },
+        { type: "connect_nodes", fromNodeId: nodeId, toNodeId: configId },
+        { type: "connect_nodes", fromNodeId: textId, toNodeId: configId },
+        { type: "select_nodes", ids: [configId] },
+        ...(input.autoRun ? [runGenerationOp(configId, "text", prompt)] : []),
+    ];
 }
 
 function generationFlowOps(input: Record<string, unknown>, snapshot: CanvasAgentSnapshot, config: AiConfig): CanvasAgentOp[] {
