@@ -322,9 +322,23 @@ function InfiniteCanvasPage() {
         [cleanupAssetImages],
     );
 
-    useEffect(() => {
+    const refreshEntitlements = useCallback(() => {
         void fetchClientEntitlements().then(setEntitlements);
     }, []);
+
+    useEffect(() => {
+        refreshEntitlements();
+        const handleFocus = () => refreshEntitlements();
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") refreshEntitlements();
+        };
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => {
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, [refreshEntitlements]);
 
     const {
         generationRequestsRef,

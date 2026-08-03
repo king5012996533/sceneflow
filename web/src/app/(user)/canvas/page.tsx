@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { App, Button } from "antd";
 import { Download, FileUp, Plus } from "lucide-react";
@@ -101,13 +101,27 @@ function CanvasPageInner() {
         }
     };
 
-    useEffect(() => {
+    const refreshEntitlements = useCallback(() => {
         if (!user) {
             setEntitlements(null);
             return;
         }
         void fetchClientEntitlements().then(setEntitlements);
     }, [user]);
+
+    useEffect(() => {
+        refreshEntitlements();
+        const handleFocus = () => refreshEntitlements();
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") refreshEntitlements();
+        };
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => {
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, [refreshEntitlements]);
 
     useEffect(() => {
         if (!hydrated || autoOpenRef.current || (mode !== "new" && mode !== "recent")) return;

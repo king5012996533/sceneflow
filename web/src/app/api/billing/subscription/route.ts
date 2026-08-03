@@ -4,6 +4,8 @@ import { activateSubscription, ensureDefaultPlans, sortPlanEntitlements } from "
 import { requireCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
     try {
         if (!prisma) return NextResponse.json({ error: "数据库不可用" }, { status: 503 });
@@ -40,17 +42,20 @@ export async function GET(req: NextRequest) {
             take: 10,
         });
 
-        return NextResponse.json({
-            user: { id: user.id, role: user.role },
-            subscription: subscription
-                ? {
-                      ...subscription,
-                      plan: subscription.plan ? { ...subscription.plan, entitlements: sortPlanEntitlements(subscription.plan.entitlements) } : subscription.plan,
-                  }
-                : subscription,
-            usage,
-            orders,
-        });
+        return NextResponse.json(
+            {
+                user: { id: user.id, role: user.role },
+                subscription: subscription
+                    ? {
+                          ...subscription,
+                          plan: subscription.plan ? { ...subscription.plan, entitlements: sortPlanEntitlements(subscription.plan.entitlements) } : subscription.plan,
+                      }
+                    : subscription,
+                usage,
+                orders,
+            },
+            { headers: { "Cache-Control": "no-store" } },
+        );
     } catch (error) {
         console.error("[billing/subscription:get]", error);
         return NextResponse.json({ error: "获取订阅失败" }, { status: 500 });
@@ -83,12 +88,15 @@ export async function PATCH(req: NextRequest) {
             include: { plan: { include: { entitlements: true } } },
         });
 
-        return NextResponse.json({
-            subscription: {
-                ...updated,
-                plan: updated.plan ? { ...updated.plan, entitlements: sortPlanEntitlements(updated.plan.entitlements) } : updated.plan,
+        return NextResponse.json(
+            {
+                subscription: {
+                    ...updated,
+                    plan: updated.plan ? { ...updated.plan, entitlements: sortPlanEntitlements(updated.plan.entitlements) } : updated.plan,
+                },
             },
-        });
+            { headers: { "Cache-Control": "no-store" } },
+        );
     } catch (error) {
         console.error("[billing/subscription:patch]", error);
         return NextResponse.json({ error: "更新订阅失败" }, { status: 500 });

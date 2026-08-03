@@ -35,7 +35,7 @@ function parseLimit(value?: string) {
 
 export async function fetchClientEntitlements(): Promise<ClientEntitlements> {
     try {
-        const res = await fetch(apiPath("/api/billing/subscription"), { credentials: "include" });
+        const res = await fetch(apiPath("/api/billing/subscription"), { credentials: "include", cache: "no-store" });
         if (!res.ok) return defaultFreeEntitlements;
         const data = await res.json();
         if (data?.user?.role === "admin") return unlimitedEntitlements;
