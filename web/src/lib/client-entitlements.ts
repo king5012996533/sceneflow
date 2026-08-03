@@ -1,6 +1,7 @@
 import { apiPath } from "@/lib/app-paths";
 
 export type ClientEntitlements = {
+    planId: string;
     projects: number | null;
     storageGb: number | null;
     concurrentJobs: number | null;
@@ -10,6 +11,7 @@ export type ClientEntitlements = {
 };
 
 const defaultFreeEntitlements: ClientEntitlements = {
+    planId: "free",
     projects: 3,
     storageGb: 1,
     concurrentJobs: 1,
@@ -19,6 +21,7 @@ const defaultFreeEntitlements: ClientEntitlements = {
 };
 
 const unlimitedEntitlements: ClientEntitlements = {
+    planId: "enterprise",
     projects: null,
     storageGb: null,
     concurrentJobs: null,
@@ -42,6 +45,7 @@ export async function fetchClientEntitlements(): Promise<ClientEntitlements> {
         const entries = data.subscription?.plan?.entitlements || [];
         const byKey = new Map<string, string>(entries.map((item: { key: string; value: string }) => [item.key, item.value]));
         return {
+            planId: data.subscription?.planId || data.subscription?.plan?.id || "free",
             projects: parseLimit(byKey.get("projects")),
             storageGb: parseLimit(byKey.get("storage_gb")),
             concurrentJobs: parseLimit(byKey.get("concurrent_jobs")),

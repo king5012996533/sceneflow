@@ -2,6 +2,7 @@ import { activateSubscription, ensureDefaultPlans } from "@/lib/billing";
 import { prisma } from "@/lib/ic-prisma";
 
 export type ServerEntitlements = {
+    planId: string;
     projects: number | null;
     storageGb: number | null;
     concurrentJobs: number | null;
@@ -45,6 +46,7 @@ export async function getServerEntitlements(userId: string): Promise<ServerEntit
     const byKey = new Map(subscription.plan?.entitlements.map((item) => [item.key, item.value]) || []);
 
     return {
+        planId: subscription.planId,
         projects: parseEntitlementLimit(byKey.get("projects")),
         storageGb: parseEntitlementLimit(byKey.get("storage_gb")),
         concurrentJobs: parseEntitlementLimit(byKey.get("concurrent_jobs")),
@@ -74,7 +76,7 @@ export async function reserveGenerationUsage(userId: string, count: number) {
     }
 
     const entitlements = await getServerEntitlements(userId);
-    const generationLimit = entitlements.projects !== null && entitlements.projects <= 3 ? FREE_DAILY_GENERATION_LIMIT : null;
+    const generationLimit = entitlements.planId === "free" ? FREE_DAILY_GENERATION_LIMIT : null;
 
     if (generationLimit === null) {
         return { allowed: true, used: 0, reserved: safeCount, remaining: -1, limit: null };

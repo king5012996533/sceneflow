@@ -37,7 +37,7 @@ export function getGenerationCount(): number {
 export function getGenerationLimit(entitlements: ClientEntitlements | null, userRole?: string): number | null {
     if (userRole === "admin") return null;
     if (!entitlements) return FREE_DAILY_LIMIT;
-    if (entitlements.projects !== null && entitlements.projects <= 3) return FREE_DAILY_LIMIT;
+    if (entitlements.planId === "free") return FREE_DAILY_LIMIT;
     return null;
 }
 

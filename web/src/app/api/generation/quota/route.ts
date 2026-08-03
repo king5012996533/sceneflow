@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         if (user.role === "admin") return NextResponse.json({ allowed: true, remaining: -1, limit: null });
 
         const entitlements = await getServerEntitlements(user.id);
-        const generationLimit = entitlements.projects !== null && entitlements.projects <= 3 ? FREE_DAILY_LIMIT : null;
+        const generationLimit = entitlements.planId === "free" ? FREE_DAILY_LIMIT : null;
 
         if (generationLimit === null) return NextResponse.json({ allowed: true, remaining: -1, limit: null });
 

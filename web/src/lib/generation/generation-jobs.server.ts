@@ -29,7 +29,7 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
         getServerEntitlements(userId),
     ]);
     const isAdmin = user?.role === "admin";
-    const generationLimit = !isAdmin && entitlements.projects !== null && entitlements.projects <= 3 ? FREE_DAILY_GENERATION_LIMIT : null;
+    const generationLimit = !isAdmin && entitlements.planId === "free" ? FREE_DAILY_GENERATION_LIMIT : null;
     const staleBefore = new Date(Date.now() - STALE_JOB_MS);
 
     return prisma.$transaction(async (tx) => {
