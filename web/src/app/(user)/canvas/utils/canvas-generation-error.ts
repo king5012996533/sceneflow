@@ -46,7 +46,7 @@ export function summarizeCanvasGenerationError(message?: string | null): CanvasG
     if (lower.includes("content too large") || lower.includes("payload too large") || lower.includes("413") || text.includes("请求内容过大")) {
         return {
             title: "请求内容过大",
-            hint: "参考素材过多或图片体积过大。请减少参考图，压缩素材，或先合成一张参考图再生成。",
+            hint: "单张参考图或多张参考素材的总请求体过大。画布尺寸相同不代表文件体积相同，base64 编码还会放大体积；请压缩图片、减少参考素材，或改用公网素材 URL。",
             requestId,
         };
     }

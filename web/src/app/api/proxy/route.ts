@@ -7,7 +7,7 @@ import { requireCurrentUser } from "@/lib/current-user";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_PROXY_REQUEST_BYTES = 4 * 1024 * 1024;
+const MAX_PROXY_REQUEST_BYTES = 16 * 1024 * 1024;
 const PROXY_TIMEOUT_MS = 120_000;
 const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "prefer", "x-api-key", "x-request-id"]);
 
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
 
     const contentLength = Number(req.headers.get("content-length") || 0);
     if (contentLength > MAX_PROXY_REQUEST_BYTES) {
-        return NextResponse.json({ error: "请求内容过大，请减少参考素材数量或改用公网素材 URL。" }, { status: 413 });
+        return NextResponse.json({ error: "请求内容过大：单张或多张参考素材的总请求体超过代理限制。请压缩图片、减少参考素材，或改用公网素材 URL。" }, { status: 413 });
     }
 
     try {
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
         const safeHeaders = sanitizeHeaders(headers);
         const upstreamBody = buildBody(body, safeHeaders);
         if (upstreamBody.byteLength > MAX_PROXY_REQUEST_BYTES) {
-            return NextResponse.json({ error: "请求内容过大，请减少参考素材数量或改用公网素材 URL。" }, { status: 413 });
+            return NextResponse.json({ error: "请求内容过大：单张或多张参考素材的总请求体超过代理限制。请压缩图片、减少参考素材，或改用公网素材 URL。" }, { status: 413 });
         }
 
         const controller = new AbortController();

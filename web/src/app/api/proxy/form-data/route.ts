@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
     const contentLength = Number(req.headers.get("content-length") || 0);
-    if (contentLength > MAX_PROXY_REQUEST_BYTES) return NextResponse.json({ error: "请求内容过大，请减少参考素材数量或压缩图片后重试。" }, { status: 413 });
+    if (contentLength > MAX_PROXY_REQUEST_BYTES) return NextResponse.json({ error: "请求内容过大：单张或多张参考素材的总上传体积超过代理限制。请压缩图片、减少参考素材，或改用公网素材 URL。" }, { status: 413 });
 
     try {
         const incoming = await req.formData();

@@ -1,6 +1,6 @@
 // proxy-client.ts — 客户端代理请求，解决 CORS 和第三方 API 调用问题
 const PROXY_PATH = "/canvas/api/proxy";
-const PROXY_WARNING_BYTES = 4 * 1024 * 1024;
+const PROXY_WARNING_BYTES = 16 * 1024 * 1024;
 
 export interface ProxyRequestOptions {
     url: string;
@@ -13,7 +13,9 @@ export interface ProxyRequestOptions {
 export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Promise<T> {
     const payload = JSON.stringify(options);
     if (payload.length > PROXY_WARNING_BYTES) {
-        throw new Error("请求内容过大：参考图过多或图片体积过大。请减少参考素材，或先把多张分镜/角色图拼成一张容器图后再生成视频。");
+        throw new Error(
+            `请求内容过大：本次代理请求约 ${formatProxyBytes(payload.length)}，超过 ${formatProxyBytes(PROXY_WARNING_BYTES)}。单张参考图也可能因原图体积或 base64 编码膨胀触发限制，请压缩图片、减少参考素材，或改用公网素材 URL。`,
+        );
     }
     const res = await fetch(PROXY_PATH, {
         method: "POST",
@@ -36,10 +38,15 @@ export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Pro
 }
 
 function proxyStatusMessage(status: number) {
-    if (status === 413) return "请求内容过大：参考图过多或图片体积过大。请减少参考素材，或先把多张分镜/角色图拼成一张容器图后再生成视频。";
+    if (status === 413) return `请求内容过大：代理请求超过 ${formatProxyBytes(PROXY_WARNING_BYTES)}。单张参考图也可能因原图体积或 base64 编码膨胀触发限制，请压缩图片、减少参考素材，或改用公网素材 URL。`;
     if (status === 401 || status === 403) return "鉴权失败，请检查 API Key、模型权限或套餐权限。";
     if (status === 429) return "请求被限流或额度不足，请稍后重试。";
     return `请求失败: ${status}`;
+}
+
+function formatProxyBytes(bytes: number) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return "0 MB";
+    return `${(bytes / 1024 / 1024).toFixed(bytes >= 10 * 1024 * 1024 ? 1 : 2)} MB`;
 }
 
 function proxyErrorMessage(data: unknown): string {
