@@ -357,9 +357,9 @@ function InfiniteCanvasPage() {
         async (count = 1) => {
             const safeCount = Math.max(1, Math.min(50, Math.floor(Number(count) || 1)));
             const concurrentLimit = entitlements ? entitlements.concurrentJobs : null;
-            const activeRequests = generationRequestsRef.current.size;
-            if (concurrentLimit !== null && activeRequests + safeCount > concurrentLimit) {
-                throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请减少生成数量或升级套餐。`);
+            const activeRunningTasks = new Set(Array.from(generationRequestsRef.current.values()).map((request) => request.runningNodeId)).size;
+            if (concurrentLimit !== null && activeRunningTasks + 1 > concurrentLimit) {
+                throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请等待已有任务完成或升级套餐。`);
             }
             const quota = checkGenerationQuota(entitlements, safeCount, user?.role);
             if (!quota.allowed) {

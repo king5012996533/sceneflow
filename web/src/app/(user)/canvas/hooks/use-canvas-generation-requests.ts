@@ -28,8 +28,13 @@ export function useCanvasGenerationRequests(options: UseCanvasGenerationRequests
             const previous = generationRequestsRef.current.get(targetNodeId);
             if (previous?.controller !== controller) previous?.controller.abort();
             const concurrentLimit = entitlements ? entitlements.concurrentJobs : null;
-            const activeRequests = Array.from(generationRequestsRef.current.values()).filter((request) => request.targetNodeId !== targetNodeId).length;
-            if (isOverLimit(activeRequests, concurrentLimit)) {
+            const activeRunningTasks = new Set(
+                Array.from(generationRequestsRef.current.values())
+                    .filter((request) => request.targetNodeId !== targetNodeId)
+                    .map((request) => request.runningNodeId),
+            );
+            activeRunningTasks.add(runningId);
+            if (isOverLimit(activeRunningTasks.size - 1, concurrentLimit)) {
                 throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请等待已有任务完成或升级套餐。`);
             }
             generationRequestsRef.current.set(targetNodeId, { targetNodeId, originNodeId, runningNodeId: runningId, controller });

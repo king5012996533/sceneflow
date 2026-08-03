@@ -55,11 +55,10 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
         }
 
         if (!isAdmin && entitlements.concurrentJobs !== null) {
-            const running = await tx.generationJob.aggregate({
+            const runningJobs = await tx.generationJob.count({
                 where: { userId, status: "running" },
-                _sum: { count: true },
             });
-            if ((running._sum.count || 0) + count > entitlements.concurrentJobs) {
+            if (runningJobs + 1 > entitlements.concurrentJobs) {
                 throw new GenerationPolicyError(`当前套餐最多同时运行 ${entitlements.concurrentJobs} 个生成任务`, 429);
             }
         }
