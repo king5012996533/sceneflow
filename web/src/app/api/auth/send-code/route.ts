@@ -56,6 +56,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "短信服务未配置" }, { status: 503 });
     } catch (err: unknown) {
         console.error("send-code error:", err);
-        return NextResponse.json({ error: "发送失败" }, { status: 500 });
+        const errorMessage = err instanceof Error ? err.message : String(err || "");
+        if (/database|prisma|connection (terminated|reset|refused|closed|timeout)|can't reach|timed?\s*out/i.test(errorMessage)) {
+            return NextResponse.json({ error: "数据库暂时不可用，请稍后再试" }, { status: 503 });
+        }
+        return NextResponse.json({ error: "验证码服务暂时不可用，请稍后再试" }, { status: 503 });
     }
 }
