@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, LoaderCircle, Music2, Plus, SlidersHorizontal, Sparkles, Trash2, Upload, VideoIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Input, Modal, Tag, Typography } from "antd";
 import { nanoid } from "nanoid";
 import { saveAs } from "file-saver";
@@ -75,8 +75,35 @@ type UpdateAiConfig = <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => 
 const getLogStore = () => createScopedLocalForageStore("video_generation_logs");
 
 export default function VideoPage() {
+    const user = useUserStore((state) => state.user);
     const [entitlements, setEntitlements] = useState<ClientEntitlements | null>(null);
-    useEffect(() => { void fetchClientEntitlements().then(setEntitlements); }, []);
+    const [entitlementsLoading, setEntitlementsLoading] = useState(true);
+
+    const refreshEntitlements = useCallback(() => {
+        if (!user) {
+            setEntitlements(null);
+            setEntitlementsLoading(false);
+            return;
+        }
+        setEntitlementsLoading(true);
+        void fetchClientEntitlements()
+            .then(setEntitlements)
+            .finally(() => setEntitlementsLoading(false));
+    }, [user]);
+
+    useEffect(() => {
+        refreshEntitlements();
+        const handleFocus = () => refreshEntitlements();
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") refreshEntitlements();
+        };
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => {
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, [refreshEntitlements]);
     const { message } = App.useApp();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const activeLogIdsRef = useRef<Set<string>>(new Set());
@@ -85,7 +112,6 @@ export default function VideoPage() {
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
-    const user = useUserStore((state) => state.user);
     const addAsset = useAssetStore((state) => state.addAsset);
     const [prompt, setPrompt] = useState("");
     const [references, setReferences] = useState<ReferenceImage[]>([]);
@@ -178,6 +204,10 @@ export default function VideoPage() {
     const generate = async () => {
         const snapshot = buildRequestSnapshot();
         if (!snapshot) return;
+        if (entitlementsLoading) {
+            message.info("正在加载套餐权益，请稍候…");
+            return;
+        }
         // 配额检查
         const { allowed, remaining, limit } = checkGenerationQuota(entitlements, 1, user?.role);
         if (!allowed) {

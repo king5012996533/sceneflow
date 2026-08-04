@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Empty, Input, Select, Tabs, Tag } from "antd";
+import { App, Button, Empty, Input, Select, Tabs, Tag, Tooltip } from "antd";
 import { Ban, Boxes, CreditCard, Database, FileText, History, Settings, Shield, Users } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
@@ -274,7 +274,7 @@ export default function AdminPage() {
                                                             value={user.role}
                                                             options={[
                                                                 { label: "user", value: "user" },
-                                                                { label: "pro", value: "pro" },
+                                                                { label: "pro（无权益，请用套餐开通）", value: "pro", disabled: true },
                                                                 { label: "admin", value: "admin" },
                                                             ]}
                                                             onChange={(role) => void updateUser(user.id, "role", { role })}
@@ -294,18 +294,20 @@ export default function AdminPage() {
                                                                 onChange={(value) => setSelectedCycles((prev) => ({ ...prev, [user.id]: value }))}
                                                                 className="w-24"
                                                             />
-                                                            <Button
-                                                                size="small"
-                                                                type="primary"
-                                                                onClick={() =>
-                                                                    void updateUser(user.id, "subscription", {
-                                                                        planId: selectedPlans[user.id] || "free",
-                                                                        billingCycle: selectedCycles[user.id] || "monthly",
-                                                                    })
-                                                                }
-                                                            >
-                                                                开通
-                                                            </Button>
+                                                            <Tooltip title="开通后用户刷新页面（或回到页面）即按新套餐生效；若用户仍受限，请确认下方订阅列显示的是目标套餐">
+                                                                <Button
+                                                                    size="small"
+                                                                    type="primary"
+                                                                    onClick={() =>
+                                                                        void updateUser(user.id, "subscription", {
+                                                                            planId: selectedPlans[user.id] || "free",
+                                                                            billingCycle: selectedCycles[user.id] || "monthly",
+                                                                        })
+                                                                    }
+                                                                >
+                                                                    开通
+                                                                </Button>
+                                                            </Tooltip>
                                                         </div>
                                                     </td>
                                                     <td className="py-3">{user.bannedAt ? <Tag color="red">已封禁</Tag> : <Tag color="green">正常</Tag>}</td>

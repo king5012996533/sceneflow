@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, LoaderCircle, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Tooltip, Typography } from "antd";
 import { saveAs } from "file-saver";
 
@@ -81,8 +81,33 @@ export default function ImagePage() {
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const user = useUserStore((state) => state.user);
     const [entitlements, setEntitlements] = useState<ClientEntitlements | null>(null);
+    const [entitlementsLoading, setEntitlementsLoading] = useState(true);
 
-    useEffect(() => { void fetchClientEntitlements().then(setEntitlements); }, []);
+    const refreshEntitlements = useCallback(() => {
+        if (!user) {
+            setEntitlements(null);
+            setEntitlementsLoading(false);
+            return;
+        }
+        setEntitlementsLoading(true);
+        void fetchClientEntitlements()
+            .then(setEntitlements)
+            .finally(() => setEntitlementsLoading(false));
+    }, [user]);
+
+    useEffect(() => {
+        refreshEntitlements();
+        const handleFocus = () => refreshEntitlements();
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible") refreshEntitlements();
+        };
+        window.addEventListener("focus", handleFocus);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => {
+            window.removeEventListener("focus", handleFocus);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, [refreshEntitlements]);
     const addAsset = useAssetStore((state) => state.addAsset);
     const [prompt, setPrompt] = useState("");
     const [references, setReferences] = useState<ReferenceImage[]>([]);
@@ -150,6 +175,10 @@ export default function ImagePage() {
         const text = prompt.trim();
         if (!text) {
             message.error("请输入生图提示词");
+            return;
+        }
+        if (entitlementsLoading) {
+            message.info("正在加载套餐权益，请稍候…");
             return;
         }
         // 配额检查

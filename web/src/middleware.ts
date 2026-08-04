@@ -46,9 +46,10 @@ const STATIC_PREFIXES = [
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
-    // The app is deployed under basePath "/canvas"; that external path maps to
-    // the public landing page. Keep "/canvas/canvas" and product pages protected.
-    if (pathname === "/" || pathname === "/canvas") {
+    // The app is deployed under basePath "/canvas"; the external "/canvas" URL maps to
+    // the internal "/" landing page. The internal "/canvas" path (external "/canvas/canvas")
+    // is the canvas project list and must stay protected like other product pages.
+    if (pathname === "/") {
         return NextResponse.next();
     }
 
