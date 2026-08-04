@@ -182,7 +182,7 @@ function CanvasPageInner() {
     if (!user) {
         return (
             <main className="flex h-full flex-col items-center justify-center bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#eef4ff_100%)] text-[#172033]">
-                <LoginModal open={true} onClose={() => router.push("/")} />
+                <LoginModal open={true} onClose={() => router.push("/canvas")} />
                 <p className="text-sm text-[#746b7a]">请先登录后再使用画布</p>
             </main>
         );
