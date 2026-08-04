@@ -70,8 +70,13 @@ export async function POST(req: NextRequest) {
         return setAuthCookie(response, token);
     } catch (err: any) {
         console.error("Login error:", err?.message, err?.code);
-        if (err?.code === "P1008" || String(err?.message || "").includes("timed out")) {
-            return withNoStore(NextResponse.json({ error: "数据库连接超时" }, { status: 503 }));
+        const dbErrorCode = typeof err?.code === "string" && /^P10\d{2}$/.test(err.code);
+        const dbErrorMessage =
+            /connection (terminated|reset|refused|closed|timeout)|can't reach database|database server timeout|timed?\s*out/i.test(
+                String(err?.message || ""),
+            );
+        if (dbErrorCode || dbErrorMessage) {
+            return withNoStore(NextResponse.json({ error: "数据库连接超时，请稍后再试" }, { status: 503 }));
         }
         return withNoStore(NextResponse.json({ error: "登录失败" }, { status: 500 }));
     }

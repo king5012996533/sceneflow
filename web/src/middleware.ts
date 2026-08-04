@@ -18,7 +18,6 @@ const PUBLIC_PATHS = [
     "/api/experience-agent",
     "/api/agent-lab",
     "/agent-lab",
-    "/showcase",
 ];
 
 const STATIC_PREFIXES = [
@@ -42,7 +41,6 @@ const STATIC_PREFIXES = [
     "/canvas/character-asset.png",
     "/canvas/commerce-visual.png",
     "/canvas/brand-visual.png",
-    "/canvas/showcase",
 ];
 
 export function middleware(request: NextRequest) {

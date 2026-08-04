@@ -67,9 +67,14 @@ export async function POST(req: NextRequest) {
         });
         return setAuthCookie(response, token);
     } catch (err: any) {
-        console.error("Register error:", err);
-        if (err?.code === "P1008" || String(err?.message || "").includes("timed out")) {
-            return applyPrivateNoStore(NextResponse.json({ error: "数据库连接超时" }, { status: 503 }));
+        console.error("Register error:", err?.message, err?.code);
+        const dbErrorCode = typeof err?.code === "string" && /^P10\d{2}$/.test(err.code);
+        const dbErrorMessage =
+            /connection (terminated|reset|refused|closed|timeout)|can't reach database|database server timeout|timed?\s*out/i.test(
+                String(err?.message || ""),
+            );
+        if (dbErrorCode || dbErrorMessage) {
+            return applyPrivateNoStore(NextResponse.json({ error: "数据库连接超时，请稍后再试" }, { status: 503 }));
         }
         return applyPrivateNoStore(NextResponse.json({ error: "注册失败" }, { status: 500 }));
     }
