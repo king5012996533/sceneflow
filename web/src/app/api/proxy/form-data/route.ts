@@ -33,7 +33,11 @@ export async function POST(req: NextRequest) {
         const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
 
         try {
-            const response = await fetch(target.toString(), { method, headers: safeHeaders, body, signal: controller.signal });
+            const fetchHeaders: Record<string, string> = { ...safeHeaders };
+            // 让 fetch 自动生成 multipart/form-data boundary
+            delete fetchHeaders["content-type"];
+            delete fetchHeaders["Content-Type"];
+            const response = await fetch(target.toString(), { method, headers: fetchHeaders, body, signal: controller.signal });
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
             return NextResponse.json(data, { status: response.status });
         } finally {
