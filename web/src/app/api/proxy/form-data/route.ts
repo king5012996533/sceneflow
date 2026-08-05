@@ -37,7 +37,9 @@ export async function POST(req: NextRequest) {
             // 让 fetch 自动生成 multipart/form-data boundary
             delete fetchHeaders["content-type"];
             delete fetchHeaders["Content-Type"];
+            console.log("[proxy/form-data] target:", target.toString(), "method:", method, "headers:", Object.keys(fetchHeaders).join(","));
             const response = await fetch(target.toString(), { method, headers: fetchHeaders, body, signal: controller.signal });
+            console.log("[proxy/form-data] response status:", response.status);
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
             return NextResponse.json(data, { status: response.status });
         } finally {
