@@ -71,6 +71,9 @@ export async function POST(req: NextRequest) {
             const response = await fetch(target.toString(), { method, headers: fetchHeaders, body, signal: controller.signal });
             console.log("[proxy/form-data] response status:", response.status);
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
+            if (response.status >= 400) {
+                console.error("[proxy/form-data] error response:", JSON.stringify(data).slice(0, 500));
+            }
             return NextResponse.json(data, { status: response.status });
         } finally {
             clearTimeout(timeout);
