@@ -7,7 +7,7 @@ import { requireCurrentUser } from "@/lib/current-user";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_PROXY_REQUEST_BYTES = 16 * 1024 * 1024;
+const MAX_PROXY_REQUEST_BYTES = 32 * 1024 * 1024;
 const PROXY_TIMEOUT_MS = 120_000;
 const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "prefer", "x-api-key", "x-request-id"]);
 

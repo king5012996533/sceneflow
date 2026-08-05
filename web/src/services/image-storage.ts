@@ -82,10 +82,28 @@ export async function setImageBlob(storageKey: string, blob: Blob) {
     return url;
 }
 
+async function compressImageBlob(blob: Blob, maxSide = 1280, quality = 0.85): Promise<Blob> {
+    const bitmap = await createImageBitmap(blob);
+    let { width, height } = bitmap;
+    if (width > maxSide || height > maxSide) {
+        const ratio = Math.min(maxSide / width, maxSide / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+    }
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    const result = await canvas.convertToBlob({ type: "image/jpeg", quality });
+    return result;
+}
+
 export async function imageToDataUrl(image: { url?: string; dataUrl?: string; storageKey?: string }) {
     const url = image.dataUrl || (await resolveImageUrl(image.storageKey, image.url || ""));
     if (!url || url.startsWith("data:")) return url;
-    return blobToDataUrl(await (await fetch(url)).blob());
+    const blob = await (await fetch(url)).blob();
+    const compressed = blob.size > 900_000 ? await compressImageBlob(blob) : blob;
+    return blobToDataUrl(compressed);
 }
 
 export async function deleteStoredImages(keys: Iterable<string>) {
