@@ -23,21 +23,21 @@ export async function POST(req: NextRequest) {
         const target = await assertAllowedProxyUrl(String(incoming.get("_proxy_url") || ""));
         const method = sanitizeMethod(incoming.get("_proxy_method") || "POST");
         const safeHeaders = sanitizeHeaders(parseHeaders(incoming.get("_proxy_headers")));
-        const body = new FormData();
 
-        incoming.forEach((value, key) => {
+        // 直接构建新的 FormData，确保二进制数据正确传递
+        const body = new FormData();
+        for (const [key, value] of incoming.entries()) {
             if (!key.startsWith("_proxy_")) body.append(key, value);
-        });
+        }
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
 
         try {
             const fetchHeaders: Record<string, string> = { ...safeHeaders };
-            // 让 fetch 自动生成 multipart/form-data boundary
             delete fetchHeaders["content-type"];
             delete fetchHeaders["Content-Type"];
-            console.log("[proxy/form-data] target:", target.toString(), "method:", method, "headers:", Object.keys(fetchHeaders).join(","));
+            console.log("[proxy/form-data] target:", target.toString(), "method:", method, "bodySize:", body.toString().length);
             const response = await fetch(target.toString(), { method, headers: fetchHeaders, body, signal: controller.signal });
             console.log("[proxy/form-data] response status:", response.status);
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
