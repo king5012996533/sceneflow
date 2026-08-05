@@ -24,20 +24,50 @@ export async function POST(req: NextRequest) {
         const method = sanitizeMethod(incoming.get("_proxy_method") || "POST");
         const safeHeaders = sanitizeHeaders(parseHeaders(incoming.get("_proxy_headers")));
 
-        // 直接构建新的 FormData，确保二进制数据正确传递
-        const body = new FormData();
+        // 收集所有字段和文件
+        const fields: [string, string][] = [];
+        const files: [string, File][] = [];
         for (const [key, value] of incoming.entries()) {
-            if (!key.startsWith("_proxy_")) body.append(key, value);
+            if (key.startsWith("_proxy_")) continue;
+            if (value instanceof File) {
+                files.push([key, value]);
+            } else {
+                fields.push([key, String(value)]);
+            }
         }
+
+        // 构建 multipart body
+        const boundary = `----FormBoundary${Math.random().toString(36).slice(2)}`;
+        const parts: string[] = [];
+        for (const [key, value] of fields) {
+            parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}`);
+        }
+        for (const [key, file] of files) {
+            const buffer = Buffer.from(await file.arrayBuffer());
+            parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="${key}"; filename="${file.name}"\r\nContent-Type: ${file.type || "application/octet-stream"}\r\n\r\n`);
+            parts.push(buffer);
+        }
+        parts.push(`--${boundary}--\r\n`);
+
+        const bodyParts: (string | Buffer)[] = [];
+        for (let i = 0; i < parts.length; i++) {
+            if (typeof parts[i] === "string") {
+                bodyParts.push(Buffer.from(parts[i]));
+            } else {
+                bodyParts.push(parts[i]);
+            }
+        }
+        const body = Buffer.concat(bodyParts.map(p => typeof p === "string" ? Buffer.from(p) : p));
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
 
         try {
-            const fetchHeaders: Record<string, string> = { ...safeHeaders };
-            delete fetchHeaders["content-type"];
-            delete fetchHeaders["Content-Type"];
-            console.log("[proxy/form-data] target:", target.toString(), "method:", method, "bodySize:", body.toString().length);
+            const fetchHeaders: Record<string, string> = {
+                ...safeHeaders,
+                "Content-Type": `multipart/form-data; boundary=${boundary}`,
+            };
+            console.log("[proxy/form-data] target:", target.toString(), "method:", method, "bodyBytes:", body.length);
             const response = await fetch(target.toString(), { method, headers: fetchHeaders, body, signal: controller.signal });
             console.log("[proxy/form-data] response status:", response.status);
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
