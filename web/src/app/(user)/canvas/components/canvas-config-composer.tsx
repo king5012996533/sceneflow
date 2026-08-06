@@ -104,15 +104,19 @@ export function CanvasConfigComposer({ value, inputs, onChange, onClose }: Canva
         onChange(serializeEditor(editor));
     };
 
-    const stopCanvasInteraction = (event: PointerEvent | MouseEvent) => event.stopPropagation();
+    const stopCanvasZoom = (event: PointerEvent | MouseEvent) => {
+        // 只阻止画布缩放，不阻止输入框聚焦
+        if ((event.target as HTMLElement)?.closest("[contenteditable]")) return;
+        event.stopPropagation();
+    };
 
     return (
         <div
             data-canvas-no-zoom
             className="rounded-2xl border p-3 shadow-2xl backdrop-blur"
             style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
-            onMouseDown={stopCanvasInteraction}
-            onPointerDown={stopCanvasInteraction}
+            onMouseDown={stopCanvasZoom}
+            onPointerDown={stopCanvasZoom}
             onWheel={(event) => event.stopPropagation()}
         >
             <div className="mb-2 flex items-center justify-between gap-2">
