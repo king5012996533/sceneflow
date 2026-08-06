@@ -104,8 +104,10 @@ export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Pro
     const showOverlay = Boolean(activeLabels.length && !hasSelection);
     const mergedStyle = {
         ...(style || {}),
-        color: showOverlay ? "transparent" : style?.color,
-        caretColor: style?.color || theme.node.text,
+        color: showOverlay ? "transparent" : style?.color || theme.node.text,
+        caretColor: theme.node.activeStroke,
+        cursor: "text",
+        userSelect: "text",
         overscrollBehavior: "contain",
         ...(showOverlay ? { background: "transparent", backgroundColor: "transparent" } : {}),
     } as CSSProperties;
