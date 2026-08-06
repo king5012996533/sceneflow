@@ -55,13 +55,13 @@ assertIncludes("prisma/schema.prisma", "model GenerationJob", "generation lifecy
 assertNoAppDirectGenerationApiImports();
 
 assertIncludes("src/app/(user)/canvas/utils/canvas-agent-ops.ts", 'type: "run_pipeline"', "the canvas agent must keep an executable pipeline operation.");
-assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "canvas_run_pipeline", "the online creation agent must expose pipeline execution.");
-assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "canvas_continue_video", "the creation agent must expose tail-frame continuation.");
-assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "MANGA_PRODUCTION_SKILL", "the creation agent must keep the manga production skill constraints.");
-assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "workflowStageReferenceKeys", "workflow cards must keep stage dependency references.");
-assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "withNodeReferenceTokens", "workflow prompts must include @node references for upstream assets.");
-assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "safeMessageText", "the online agent must stringify message content safely.");
-assertIncludes("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", "isPollutedAgentMessage", "the online agent must filter polluted object-placeholder history.");
+assertIncludes("src/app/(user)/canvas/utils/online-agent-tools.ts", "canvas_run_pipeline", "the online creation agent must expose pipeline execution.");
+assertIncludes("src/app/(user)/canvas/utils/online-agent-tools.ts", "canvas_continue_video", "the creation agent must expose tail-frame continuation.");
+assertIncludes("src/app/(user)/canvas/utils/online-agent-tools.ts", "MANGA_PRODUCTION_SKILL", "the creation agent must keep the manga production skill constraints.");
+assertIncludes("src/app/(user)/canvas/utils/online-agent-tool-ops.ts", "workflowStageReferenceKeys", "workflow cards must keep stage dependency references.");
+assertIncludes("src/app/(user)/canvas/utils/online-agent-tool-ops.ts", "withNodeReferenceTokens", "workflow prompts must include @node references for upstream assets.");
+assertIncludes("src/app/(user)/canvas/utils/online-agent-memory.ts", "safeMessageText", "the online agent must stringify message content safely.");
+assertIncludes("src/app/(user)/canvas/utils/online-agent-memory.ts", "isPollutedAgentMessage", "the online agent must filter polluted object-placeholder history.");
 assertNotMatches("src/app/(user)/canvas/components/canvas-assistant-panel.tsx", /toolChoice:\s*"required"/, "the online agent must not force tool calls for normal chat.");
 assertIncludes("src/app/(user)/canvas/components/canvas-agent-chat-ui.tsx", "AgentMarkdownText", "assistant messages should render structured markdown instead of raw table text.");
 assertIncludes("src/app/(user)/canvas/components/canvas-agent-chat-ui.tsx", "AgentMarkdownTable", "assistant markdown tables should render as scrollable tables.");

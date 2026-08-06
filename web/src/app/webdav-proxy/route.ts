@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { assertAllowedProxyUrl } from "@/lib/url-safety";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,13 +11,13 @@ export async function POST(request: NextRequest) {
     const method = (request.headers.get("x-webdav-method") || "GET").toUpperCase();
     if (!target) return new Response("Missing x-webdav-target", { status: 400 });
 
+    // SSRF 防护：拒绝内网/本机/保留地址
     let url: URL;
     try {
-        url = new URL(target);
-    } catch {
-        return new Response("Invalid x-webdav-target", { status: 400 });
+        url = await assertAllowedProxyUrl(target);
+    } catch (error) {
+        return new Response(error instanceof Error ? error.message : "Invalid x-webdav-target", { status: 400 });
     }
-    if (url.protocol !== "http:" && url.protocol !== "https:") return new Response("Unsupported WebDAV target", { status: 400 });
 
     const headers = new Headers();
     copyHeader(request, headers, "x-webdav-authorization", "Authorization");

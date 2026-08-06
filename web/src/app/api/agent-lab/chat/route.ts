@@ -1,9 +1,12 @@
 import { buildAgentLabMessages, fallbackAgentLabAnswer } from "@/lib/agent-lab/skills";
 import { splitAgentLabArtifact } from "@/lib/agent-lab/parser";
+import { assertAllowedProxyUrl } from "@/lib/url-safety";
 import type { AgentLabRequest, AgentLabResponse } from "@/lib/agent-lab/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const TRUSTED_PROVIDER_HOSTS = new Set(["api.deepseek.com", "api.openai.com", "api.anthropic.com"]);
 
 export async function POST(request: Request) {
     try {
@@ -15,7 +18,7 @@ export async function POST(request: Request) {
             ?.content.trim();
         if (!lastUser) return Response.json({ error: "请输入你的创作需求。" }, { status: 400 });
 
-        const provider = resolveProvider(body);
+        const provider = await resolveProvider(body);
         if (!provider.apiKey) {
             const fallback = fallbackAgentLabAnswer(lastUser);
             return Response.json({ ...fallback, model: "fallback-local" } satisfies AgentLabResponse);
@@ -45,15 +48,34 @@ export async function POST(request: Request) {
         const parsed = splitAgentLabArtifact(raw);
         return Response.json({ ...parsed, model: provider.model } satisfies AgentLabResponse);
     } catch (error) {
+        if (error instanceof Error && (error.message.includes("不允许") || error.message.includes("非法") || error.message.includes("解析失败"))) {
+            return Response.json({ error: error.message }, { status: 400 });
+        }
         return Response.json({ error: error instanceof Error ? error.message : "Agent Lab 请求失败。" }, { status: 500 });
     }
 }
 
-function resolveProvider(body: AgentLabRequest) {
-    const baseUrl = (body.provider?.baseUrl || process.env.AGENT_LAB_BASE_URL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/+$/, "");
+async function resolveProvider(body: AgentLabRequest) {
+    const rawBaseUrl = (body.provider?.baseUrl || process.env.AGENT_LAB_BASE_URL || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/+$/, "");
+
+    // SSRF 防护：拒绝内网/本机/保留地址
+    const target = await assertAllowedProxyUrl(rawBaseUrl);
+    const baseUrl = target.origin;
+
+    const isTrustedHost = TRUSTED_PROVIDER_HOSTS.has(target.hostname.toLowerCase());
+    const userProvidedKey = (body.provider?.apiKey || "").trim();
+
+    // 服务器 API Key 只在「可信提供商 + 用户未自带 key」时才使用，
+    // 防止把服务器 key 发送到任意攻击者控制的地址。
+    let apiKey = userProvidedKey;
+    if (!apiKey) {
+        if (isTrustedHost) apiKey = (process.env.AGENT_LAB_API_KEY || process.env.DEEPSEEK_API_KEY || "").trim();
+        else if (!body.provider?.baseUrl) apiKey = (process.env.AGENT_LAB_API_KEY || process.env.DEEPSEEK_API_KEY || "").trim();
+    }
+
     return {
         baseUrl,
-        apiKey: (body.provider?.apiKey || process.env.AGENT_LAB_API_KEY || process.env.DEEPSEEK_API_KEY || "").trim(),
+        apiKey,
         model: (body.provider?.model || process.env.AGENT_LAB_MODEL || process.env.DEEPSEEK_MODEL || "deepseek-chat").trim(),
     };
 }
