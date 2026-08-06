@@ -48,7 +48,15 @@ export async function POST(req: NextRequest) {
                 ...safeHeaders,
                 ...form.getHeaders(),
             };
-            const response = await fetch(target.toString(), { method, headers: fetchHeaders, body: form.pipe(), signal: controller.signal });
+            // 将 form-data 转为 Buffer 以兼容 fetch API
+            const bodyBuffer = await new Promise<Buffer>((resolve, reject) => {
+                const chunks: Buffer[] = [];
+                form.on("data", (chunk: Buffer) => chunks.push(chunk));
+                form.on("end", () => resolve(Buffer.concat(chunks)));
+                form.on("error", reject);
+                form.pipe();
+            });
+            const response = await fetch(target.toString(), { method, headers: fetchHeaders, body: bodyBuffer, signal: controller.signal });
             console.log("[proxy/form-data] response status:", response.status);
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
             if (response.status >= 400) {
