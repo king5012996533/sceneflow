@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
+import FormData from "form-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,43 +25,20 @@ export async function POST(req: NextRequest) {
         const method = sanitizeMethod(incoming.get("_proxy_method") || "POST");
         const safeHeaders = sanitizeHeaders(parseHeaders(incoming.get("_proxy_headers")));
 
-        // 收集所有字段和文件
-        const fields: [string, string][] = [];
-        const files: [string, File][] = [];
+        // 使用 form-data 包构建 multipart body
+        const form = new FormData();
         for (const [key, value] of incoming.entries()) {
             if (key.startsWith("_proxy_")) continue;
             if (typeof value === "string") {
-                fields.push([key, value]);
+                form.append(key, value);
             } else if (value instanceof File || (typeof Blob !== "undefined" && value instanceof Blob)) {
-                files.push([key, value as File]);
+                const buffer = Buffer.from(await (value as File).arrayBuffer());
+                form.append(key, buffer, { filename: (value as File).name, contentType: (value as File).type || "application/octet-stream" });
             } else {
-                fields.push([key, String(value)]);
+                form.append(key, String(value));
             }
         }
-        console.log("[proxy/form-data] fields:", fields.map(([k]) => k).join(","), "files:", files.length);
-
-        // 构建 multipart body
-        const boundary = `----FormBoundary${Math.random().toString(36).slice(2)}`;
-        const parts: string[] = [];
-        for (const [key, value] of fields) {
-            parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="${key}"\r\n\r\n${value}`);
-        }
-        for (const [key, file] of files) {
-            const buffer = Buffer.from(await file.arrayBuffer());
-            parts.push(`--${boundary}\r\nContent-Disposition: form-data; name="${key}"; filename="${file.name}"\r\nContent-Type: ${file.type || "application/octet-stream"}\r\n\r\n`);
-            parts.push(buffer);
-        }
-        parts.push(`--${boundary}--\r\n`);
-
-        const bodyParts: (string | Buffer)[] = [];
-        for (let i = 0; i < parts.length; i++) {
-            if (typeof parts[i] === "string") {
-                bodyParts.push(Buffer.from(parts[i]));
-            } else {
-                bodyParts.push(parts[i]);
-            }
-        }
-        const body = Buffer.concat(bodyParts.map(p => typeof p === "string" ? Buffer.from(p) : p));
+        console.log("[proxy/form-data] target:", target.toString(), "method:", method, "fields:", [...form.keys()].join(","));
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
@@ -68,10 +46,9 @@ export async function POST(req: NextRequest) {
         try {
             const fetchHeaders: Record<string, string> = {
                 ...safeHeaders,
-                "Content-Type": `multipart/form-data; boundary=${boundary}`,
+                ...form.getHeaders(),
             };
-            console.log("[proxy/form-data] target:", target.toString(), "method:", method, "bodyBytes:", body.length);
-            const response = await fetch(target.toString(), { method, headers: fetchHeaders, body, signal: controller.signal });
+            const response = await fetch(target.toString(), { method, headers: fetchHeaders, body: form.pipe(), signal: controller.signal });
             console.log("[proxy/form-data] response status:", response.status);
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
             if (response.status >= 400) {
