@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
+import { prisma } from "@/lib/ic-prisma";
 import FormData from "form-data";
 
 export const runtime = "nodejs";
@@ -24,6 +25,18 @@ export async function POST(req: NextRequest) {
         const target = await assertAllowedProxyUrl(String(incoming.get("_proxy_url") || ""));
         const method = sanitizeMethod(incoming.get("_proxy_method") || "POST");
         const safeHeaders = sanitizeHeaders(parseHeaders(incoming.get("_proxy_headers")));
+
+        // 从数据库读取用户的 API Key，不从请求头获取
+        let apiKey = "";
+        if (prisma) {
+            const config = await prisma.userConfig.findUnique({ where: { userId: user.id } });
+            if (config?.config && typeof config.config === "object") {
+                const cfg = config.config as Record<string, unknown>;
+                apiKey = String(cfg.apiKey || "");
+            }
+        }
+        if (apiKey) safeHeaders["authorization"] = `Bearer ${apiKey}`;
+        else delete safeHeaders["authorization"];
 
         // 使用 form-data 包构建 multipart body
         const form = new FormData();
