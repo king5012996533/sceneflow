@@ -130,8 +130,14 @@ export function CanvasPromptChipInput({ value, references, onChange, onSubmit, c
                 suppressContentEditableWarning
                 role="textbox"
                 aria-multiline="true"
+                tabIndex={0}
                 className={`${className || ""} overflow-y-auto whitespace-pre-wrap break-words outline-none`}
-                style={{ ...style, cursor: "text" }}
+                style={{ ...style, cursor: "text", caretColor: theme.node.text }}
+                onMouseDown={(event) => {
+                    event.stopPropagation();
+                    (event.currentTarget as HTMLElement).focus();
+                }}
+                onPointerDown={(event) => event.stopPropagation()}
                 onInput={() => {
                     if (!composingRef.current) syncFromEditor();
                 }}
