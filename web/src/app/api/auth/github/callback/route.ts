@@ -11,6 +11,13 @@ function getExternalBase(req: NextRequest): string {
 }
 
 export async function GET(req: NextRequest) {
+  // CSRF 防护：校验 state 必须与发起时写入 cookie 的随机值一致
+  const state = req.nextUrl.searchParams.get("state");
+  const cookieState = req.cookies.get("oauth_state")?.value;
+  if (!state || !cookieState || state !== cookieState) {
+    return NextResponse.redirect(new URL("/canvas?error=github_state_mismatch", getExternalBase(req)));
+  }
+
   const code = req.nextUrl.searchParams.get("code");
   if (!code) {
     return NextResponse.redirect(new URL("/canvas?error=github_no_code", getExternalBase(req)));
@@ -83,6 +90,8 @@ export async function GET(req: NextRequest) {
     const token = signToken({ userId: user.id, email: user.email });
     const base = getExternalBase(req);
     const response = NextResponse.redirect(new URL("/canvas", base));
+    // 一次性 state 用后即焚，防重放
+    response.cookies.delete("oauth_state");
     return setAuthCookie(response, token);
   } catch (err: unknown) {
     console.error("GitHub OAuth error:", err);

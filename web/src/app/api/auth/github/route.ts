@@ -1,5 +1,6 @@
 // GET /api/auth/github — 重定向到 GitHub OAuth 授权页
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 
 export async function GET(req: NextRequest) {
   const clientId = process.env.GITHUB_CLIENT_ID;
@@ -14,12 +15,22 @@ export async function GET(req: NextRequest) {
   const baseUrl = `${proto}://${host}${basePath}`;
   const redirectUri = `${baseUrl}/api/auth/github/callback`;
 
-  const params = new URLSearchParams({
+  // 生成一次性随机 state，存 HttpOnly cookie，防 OAuth CSRF / 账号绑定攻击
+  const state = randomUUID();
+  const response = NextResponse.redirect(`https://github.com/login/oauth/authorize?${new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
     scope: "user:email",
-    state: "sceneflow",
+    state,
+  })}`);
+
+  response.cookies.set("oauth_state", state, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 600, // 10 分钟
   });
 
-  return NextResponse.redirect(`https://github.com/login/oauth/authorize?${params}`);
+  return response;
 }
