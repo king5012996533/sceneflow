@@ -27,8 +27,10 @@ export async function POST(req: NextRequest) {
 
         // 使用 form-data 包构建 multipart body
         const form = new FormData();
+        const fieldNames: string[] = [];
         for (const [key, value] of incoming.entries()) {
             if (key.startsWith("_proxy_")) continue;
+            fieldNames.push(key);
             if (typeof value === "string") {
                 form.append(key, value);
             } else if (value instanceof File || (typeof Blob !== "undefined" && value instanceof Blob)) {
@@ -38,25 +40,23 @@ export async function POST(req: NextRequest) {
                 form.append(key, String(value));
             }
         }
-        console.log("[proxy/form-data] target:", target.toString(), "method:", method, "fields:", [...form.keys()].join(","));
+        console.log("[proxy/form-data] target:", target.toString(), "method:", method, "fields:", fieldNames.join(","));
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
 
         try {
-            const fetchHeaders: Record<string, string> = {
-                ...safeHeaders,
-                "content-type": `multipart/form-data; boundary=${form.getBoundary()}`,
-            };
-            // 将 form-data 转为 Buffer 以兼容 fetch API
-            const bodyBuffer = await new Promise<Buffer>((resolve, reject) => {
-                const chunks: Buffer[] = [];
-                form.on("data", (chunk: Buffer) => chunks.push(chunk));
-                form.on("end", () => resolve(Buffer.concat(chunks)));
-                form.on("error", reject);
-                form.pipe();
+            const bodyBuffer = form.getBuffer();
+            const response = await fetch(target.toString(), {
+                method,
+                headers: {
+                    ...safeHeaders,
+                    "content-type": `multipart/form-data; boundary=${form.getBoundary()}`,
+                    "content-length": String(bodyBuffer.length),
+                },
+                body: bodyBuffer,
+                signal: controller.signal,
             });
-            const response = await fetch(target.toString(), { method, headers: fetchHeaders, body: bodyBuffer, signal: controller.signal });
             console.log("[proxy/form-data] response status:", response.status);
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
             if (response.status >= 400) {
