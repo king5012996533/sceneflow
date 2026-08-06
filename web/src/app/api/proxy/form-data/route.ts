@@ -29,12 +29,15 @@ export async function POST(req: NextRequest) {
         const files: [string, File][] = [];
         for (const [key, value] of incoming.entries()) {
             if (key.startsWith("_proxy_")) continue;
-            if (value instanceof File) {
-                files.push([key, value]);
+            if (typeof value === "string") {
+                fields.push([key, value]);
+            } else if (value instanceof File || (typeof Blob !== "undefined" && value instanceof Blob)) {
+                files.push([key, value as File]);
             } else {
                 fields.push([key, String(value)]);
             }
         }
+        console.log("[proxy/form-data] fields:", fields.map(([k]) => k).join(","), "files:", files.length);
 
         // 构建 multipart body
         const boundary = `----FormBoundary${Math.random().toString(36).slice(2)}`;
