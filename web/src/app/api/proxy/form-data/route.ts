@@ -44,10 +44,9 @@ export async function POST(req: NextRequest) {
         const timeout = setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
 
         try {
-            const formHeaders = form.getHeaders();
             const fetchHeaders: Record<string, string> = {
                 ...safeHeaders,
-                "content-type": formHeaders["content-type"] || `multipart/form-data; boundary=${form.getBoundary()}`,
+                "content-type": `multipart/form-data; boundary=${form.getBoundary()}`,
             };
             // 将 form-data 转为 Buffer 以兼容 fetch API
             const bodyBuffer = await new Promise<Buffer>((resolve, reject) => {
