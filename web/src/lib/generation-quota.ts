@@ -37,8 +37,8 @@ export function getGenerationCount(): number {
 export function getGenerationLimit(entitlements: ClientEntitlements | null, userRole?: string): number | null {
     if (userRole === "admin") return null;
     if (!entitlements) return FREE_DAILY_LIMIT;
-    if (entitlements.planId === "free") return FREE_DAILY_LIMIT;
-    return null;
+    // 每日限额来自套餐权益 daily_generations（服务端为准，这里只做展示提示）
+    return entitlements.dailyGenerations ?? (entitlements.planId === "free" ? FREE_DAILY_LIMIT : null);
 }
 
 export function checkGenerationQuota(entitlements: ClientEntitlements | null, count = 1, userRole?: string): { allowed: boolean; remaining: number; limit: number | null } {

@@ -6,6 +6,7 @@ export type ServerEntitlements = {
     projects: number | null;
     storageGb: number | null;
     concurrentJobs: number | null;
+    dailyGenerations: number | null;
     hdExport: boolean;
     privateCharacters: number | null;
     teamMembers: number | null;
@@ -29,6 +30,17 @@ export async function getActiveSubscription(userId: string) {
         orderBy: { createdAt: "desc" },
     });
 
+    // 到期自动失效：付费订阅在 currentPeriodEnd 之后不再生效，回落到免费版。
+    // 否则一次性开通的付费套餐会永久有效，未续费用户持续白嫖权益。
+    const now = new Date();
+    if (subscription?.currentPeriodEnd && subscription.currentPeriodEnd < now) {
+        await prisma.subscription.update({
+            where: { id: subscription.id },
+            data: { status: "expired", autoRenew: false },
+        });
+        subscription = null;
+    }
+
     if (!subscription) {
         subscription = await activateSubscription({
             userId,
@@ -50,6 +62,7 @@ export async function getServerEntitlements(userId: string): Promise<ServerEntit
         projects: parseEntitlementLimit(byKey.get("projects")),
         storageGb: parseEntitlementLimit(byKey.get("storage_gb")),
         concurrentJobs: parseEntitlementLimit(byKey.get("concurrent_jobs")),
+        dailyGenerations: parseEntitlementLimit(byKey.get("daily_generations")) ?? (subscription.planId === "free" ? FREE_DAILY_GENERATION_LIMIT : null),
         hdExport: byKey.get("hd_export") === "true",
         privateCharacters: parseEntitlementLimit(byKey.get("private_characters")),
         teamMembers: parseEntitlementLimit(byKey.get("team_members")),
@@ -76,7 +89,7 @@ export async function reserveGenerationUsage(userId: string, count: number) {
     }
 
     const entitlements = await getServerEntitlements(userId);
-    const generationLimit = entitlements.planId === "free" ? FREE_DAILY_GENERATION_LIMIT : null;
+    const generationLimit = entitlements.dailyGenerations;
 
     if (generationLimit === null) {
         return { allowed: true, used: 0, reserved: safeCount, remaining: -1, limit: null };

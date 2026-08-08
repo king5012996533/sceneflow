@@ -4,8 +4,6 @@ import { getCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 import { dailyPeriod, getServerEntitlements } from "@/lib/server-entitlements";
 
-const FREE_DAILY_LIMIT = 3;
-
 export async function GET(req: NextRequest) {
     try {
         if (!prisma) return NextResponse.json({ allowed: true, remaining: -1, limit: null });
@@ -16,7 +14,7 @@ export async function GET(req: NextRequest) {
         if (user.role === "admin") return NextResponse.json({ allowed: true, remaining: -1, limit: null });
 
         const entitlements = await getServerEntitlements(user.id);
-        const generationLimit = entitlements.planId === "free" ? FREE_DAILY_LIMIT : null;
+        const generationLimit = entitlements.dailyGenerations;
 
         if (generationLimit === null) return NextResponse.json({ allowed: true, remaining: -1, limit: null });
 

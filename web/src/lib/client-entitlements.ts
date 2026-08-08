@@ -5,6 +5,7 @@ export type ClientEntitlements = {
     projects: number | null;
     storageGb: number | null;
     concurrentJobs: number | null;
+    dailyGenerations: number | null;
     hdExport: boolean;
     privateCharacters: number | null;
     teamMembers: number | null;
@@ -15,6 +16,7 @@ const defaultFreeEntitlements: ClientEntitlements = {
     projects: 3,
     storageGb: 1,
     concurrentJobs: 1,
+    dailyGenerations: 3,
     hdExport: false,
     privateCharacters: 0,
     teamMembers: 1,
@@ -25,6 +27,7 @@ const unlimitedEntitlements: ClientEntitlements = {
     projects: null,
     storageGb: null,
     concurrentJobs: null,
+    dailyGenerations: null,
     hdExport: true,
     privateCharacters: null,
     teamMembers: null,
@@ -49,6 +52,7 @@ export async function fetchClientEntitlements(): Promise<ClientEntitlements> {
             projects: parseLimit(byKey.get("projects")),
             storageGb: parseLimit(byKey.get("storage_gb")),
             concurrentJobs: parseLimit(byKey.get("concurrent_jobs")),
+            dailyGenerations: parseLimit(byKey.get("daily_generations")),
             hdExport: byKey.get("hd_export") === "true",
             privateCharacters: parseLimit(byKey.get("private_characters")),
             teamMembers: parseLimit(byKey.get("team_members")),

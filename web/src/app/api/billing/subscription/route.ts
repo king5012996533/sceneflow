@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { activateSubscription, ensureDefaultPlans, sortPlanEntitlements } from "@/lib/billing";
+import { ensureDefaultPlans, sortPlanEntitlements } from "@/lib/billing";
 import { requireCurrentUser } from "@/lib/current-user";
+import { getActiveSubscription } from "@/lib/server-entitlements";
 import { prisma } from "@/lib/ic-prisma";
 
 export const dynamic = "force-dynamic";
@@ -15,20 +16,8 @@ export async function GET(req: NextRequest) {
 
         await ensureDefaultPlans();
 
-        let subscription = await prisma.subscription.findFirst({
-            where: { userId: user.id, status: "active" },
-            include: { plan: { include: { entitlements: { orderBy: { key: "asc" } } } } },
-            orderBy: { createdAt: "desc" },
-        });
-
-        if (!subscription) {
-            subscription = await activateSubscription({
-                userId: user.id,
-                planId: "free",
-                cycle: "monthly",
-                provider: "manual",
-            });
-        }
+        // 统一走 getActiveSubscription：付费订阅到期后自动失效并回落到免费版
+        const subscription = await getActiveSubscription(user.id);
 
         const usage = await prisma.usageRecord.findMany({
             where: { userId: user.id },

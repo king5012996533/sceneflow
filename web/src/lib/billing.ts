@@ -7,7 +7,7 @@ export type PaymentProvider = "wechat" | "alipay" | "stripe" | "manual";
 
 type DefaultEntitlement = readonly [key: string, label: string, value: string, unit: string];
 
-export const PLAN_ENTITLEMENT_ORDER = ["projects", "storage_gb", "concurrent_jobs", "hd_export", "private_characters", "canvas_agent", "creative_agent", "cut_editor", "asset_library", "team_members"] as const;
+export const PLAN_ENTITLEMENT_ORDER = ["projects", "storage_gb", "concurrent_jobs", "daily_generations", "hd_export", "private_characters", "canvas_agent", "creative_agent", "cut_editor", "asset_library", "team_members"] as const;
 
 export function sortPlanEntitlements<T extends { key: string }>(entitlements: T[]) {
     const order = new Map<string, number>(PLAN_ENTITLEMENT_ORDER.map((key, index) => [key, index]));
@@ -28,6 +28,7 @@ export const DEFAULT_PLANS = [
             ["projects", "画布项目", "3", "个"],
             ["storage_gb", "素材存储", "1", "GB"],
             ["concurrent_jobs", "并发生成", "1", "个"],
+            ["daily_generations", "每日生成", "3", "次"],
             ["hd_export", "高清导出", "false", ""],
             ["private_characters", "私有角色资产", "0", "个"],
             ["team_members", "团队成员", "1", "人"],
@@ -50,6 +51,7 @@ export const DEFAULT_PLANS = [
             ["projects", "画布项目", "50", "个"],
             ["storage_gb", "素材存储", "50", "GB"],
             ["concurrent_jobs", "并发生成", "3", "个"],
+            ["daily_generations", "每日生成", "50", "次"],
             ["hd_export", "高清导出", "true", ""],
             ["private_characters", "私有角色资产", "20", "个"],
             ["team_members", "团队成员", "1", "人"],
@@ -72,6 +74,7 @@ export const DEFAULT_PLANS = [
             ["projects", "画布项目", "300", "个"],
             ["storage_gb", "素材存储", "500", "GB"],
             ["concurrent_jobs", "并发生成", "10", "个"],
+            ["daily_generations", "每日生成", "300", "次"],
             ["hd_export", "高清导出", "true", ""],
             ["private_characters", "私有角色资产", "200", "个"],
             ["team_members", "团队成员", "8", "人"],
@@ -94,6 +97,7 @@ export const DEFAULT_PLANS = [
             ["projects", "画布项目", "unlimited", "个"],
             ["storage_gb", "素材存储", "unlimited", "GB"],
             ["concurrent_jobs", "并发生成", "custom", "个"],
+            ["daily_generations", "每日生成", "unlimited", "次"],
             ["hd_export", "高清导出", "true", ""],
             ["private_characters", "私有角色资产", "unlimited", "个"],
             ["team_members", "团队成员", "custom", "人"],

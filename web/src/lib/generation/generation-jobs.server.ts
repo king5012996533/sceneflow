@@ -2,7 +2,6 @@ import { dailyPeriod, getServerEntitlements, nextDayStart } from "@/lib/server-e
 import { prisma } from "@/lib/ic-prisma";
 import { Prisma } from "@/generated/ic-prisma/client";
 
-const FREE_DAILY_GENERATION_LIMIT = 3;
 const STALE_JOB_MS = 30 * 60 * 1000;
 
 export type GenerationKind = "image" | "video" | "audio" | "text" | "tool";
@@ -24,12 +23,11 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
         return { job: existing, reused: true };
     }
 
-    const [user, entitlements] = await Promise.all([
-        prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
-        getServerEntitlements(userId),
-    ]);
+    const [user, entitlements] = await Promise.all([prisma.user.findUnique({ where: { id: userId }, select: { role: true } }), getServerEntitlements(userId)]);
     const isAdmin = user?.role === "admin";
-    const generationLimit = !isAdmin && entitlements.planId === "free" ? FREE_DAILY_GENERATION_LIMIT : null;
+    // 每日生成限额来自套餐权益 daily_generations（admin 后台可改），
+    // 免费版兜底 3 次/天；不存在权益值时免费版仍按 3 次限制，避免回退成无限。
+    const generationLimit = !isAdmin ? entitlements.dailyGenerations : null;
     const staleBefore = new Date(Date.now() - STALE_JOB_MS);
 
     return prisma.$transaction(async (tx) => {
@@ -124,7 +122,10 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
 }
 
 export class GenerationPolicyError extends Error {
-    constructor(message: string, readonly status: number) {
+    constructor(
+        message: string,
+        readonly status: number,
+    ) {
         super(message);
     }
 }
