@@ -11,6 +11,7 @@ export function ConnectionPath({
     from,
     to,
     active,
+    flowing = false,
     onSelect,
     onContextMenu,
 }: {
@@ -18,6 +19,7 @@ export function ConnectionPath({
     from: CanvasNodeData;
     to: CanvasNodeData;
     active: boolean;
+    flowing?: boolean;
     onSelect: () => void;
     onContextMenu?: (event: ReactMouseEvent<SVGPathElement>) => void;
 }) {
@@ -50,37 +52,33 @@ export function ConnectionPath({
                     onContextMenu?.(event);
                 }}
             />
-            {/* 底层光晕：给线一点体积感 */}
+            {/* 底层光晕：给线一点体积感（数据流动时增强） */}
+            <path d={pathD} stroke={active || flowing ? theme.node.activeStroke : theme.node.muted} strokeWidth={active || flowing ? 9 : 7} strokeOpacity={flowing ? 0.3 : active ? 0.16 : 0.12} fill="none" style={{ pointerEvents: "none" }} />
+            {/* 主线：挂载时 0.35s 画入 */}
             <path
                 d={pathD}
-                stroke={active ? theme.node.activeStroke : theme.node.muted}
-                strokeWidth={active ? 9 : 7}
-                strokeOpacity={active ? 0.16 : 0.12}
-                fill="none"
-                style={{ pointerEvents: "none" }}
-            />
-            {/* 主线 */}
-            <path
-                d={pathD}
-                stroke={active ? theme.node.activeStroke : theme.node.muted}
+                pathLength={1}
+                stroke={active || flowing ? theme.node.activeStroke : theme.node.muted}
                 strokeWidth={active ? 3 : 2}
-                strokeOpacity={active ? 1 : 0.85}
+                strokeOpacity={flowing ? 1 : active ? 1 : 0.85}
+                strokeDasharray={1}
+                strokeDashoffset={1}
                 fill="none"
-                style={{ filter: active ? `drop-shadow(0 0 8px ${theme.node.activeStroke}66)` : undefined, pointerEvents: "none" }}
+                style={{ animation: "canvas-connection-draw 0.35s ease-out both", filter: active || flowing ? `drop-shadow(0 0 8px ${theme.node.activeStroke}66)` : undefined, pointerEvents: "none" }}
             />
-            {/* 流水线动态光流：光点沿连线从源节点流向目标节点 */}
+            {/* 流水线动态光流：光点沿连线从源节点流向目标节点（空闲静止，选中/生成时流动） */}
             <path
                 d={pathD}
-                stroke={selectionBlue}
-                strokeWidth={active ? 2.5 : 2}
-                strokeOpacity={active ? 1 : 0.4}
+                stroke={flowing ? selectionBlue : theme.node.activeStroke}
+                strokeWidth={flowing ? 3 : active ? 2.5 : 2}
+                strokeOpacity={flowing ? 1 : active ? 1 : 0.22}
                 strokeLinecap="round"
                 strokeDasharray="12 16"
                 fill="none"
                 style={{
                     pointerEvents: "none",
-                    animation: active ? "canvas-connection-flow 0.9s linear infinite" : "canvas-connection-flow 2.8s linear infinite",
-                    filter: active ? `drop-shadow(0 0 4px ${selectionBlue}aa)` : undefined,
+                    animation: flowing ? "canvas-connection-flow 0.55s linear infinite" : active ? "canvas-connection-flow 0.9s linear infinite" : "none",
+                    filter: flowing ? `drop-shadow(0 0 6px ${selectionBlue}cc)` : active ? `drop-shadow(0 0 4px ${selectionBlue}aa)` : undefined,
                 }}
             />
         </g>

@@ -1462,8 +1462,31 @@
     }
 }
 
+/* 画布连线：新连线画入（pathLength 归一化为 1，dashoffset 1→0） */
+@keyframes canvas-connection-draw {
+    from {
+        stroke-dashoffset: 1;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* 卡片状态条：生成中的脉冲呼吸 */
+@keyframes canvas-status-pulse {
+    0%,
+    100% {
+        opacity: 0.45;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
-    [style*="canvas-connection-flow"] {
+    [style*="canvas-connection-flow"],
+    [style*="canvas-connection-draw"],
+    [style*="canvas-status-pulse"] {
         animation: none !important;
     }
 }

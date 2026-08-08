@@ -1647,6 +1647,7 @@ function InfiniteCanvasPage() {
                                         from={from}
                                         to={to}
                                         active={selectedConnectionId === connection.id || relatedHighlight.connectionIds.has(connection.id)}
+                                        flowing={from.metadata?.status === NODE_STATUS_LOADING}
                                         onSelect={() => {
                                             setSelectedConnectionId(connection.id);
                                             setSelectedNodeIds(new Set());

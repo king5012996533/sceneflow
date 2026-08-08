@@ -120,6 +120,8 @@ export const CanvasNode = React.memo(function CanvasNode({
     const isBatchChild = data.type === CanvasNodeType.Image && Boolean(data.metadata?.batchRootId);
     const isActive = isConnectionTarget || isSelected || isFocusRelated;
     const imageBorderColor = isActive ? selectionBlue : isRelated && !isBatchChild ? theme.node.muted : "transparent";
+    const nodeStatus = data.metadata?.status;
+    const statusColor = nodeStatus === "loading" ? selectionBlue : nodeStatus === "error" ? "#f87171" : nodeStatus === "success" ? theme.node.muted : "transparent";
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const titleInputRef = useRef<HTMLInputElement>(null);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -332,7 +334,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                 </div>
             ) : null}
             <div
-                className="relative h-full w-full overflow-visible rounded-3xl border-2 transition-[box-shadow,border-color] duration-150"
+                className="relative h-full w-full overflow-visible rounded-2xl border transition-[box-shadow,border-color] duration-150"
                 style={{
                     background: hasImageContent || hasVideoContent || hasDirectorShotContent ? "transparent" : theme.node.fill,
                     borderColor: hasImageContent ? (hovered && !isActive && !isBatchChild ? theme.node.muted : imageBorderColor) : isActive ? selectionBlue : isRelated ? theme.node.muted : hovered ? theme.node.muted : theme.node.stroke,
@@ -405,6 +407,19 @@ export const CanvasNode = React.memo(function CanvasNode({
 
                 {!hasImageContent && !hasVideoContent && !hasAudioContent && !hasDirectorShotContent ? (
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(to top, ${theme.canvas.background}66, transparent)` }} />
+                ) : null}
+
+                {nodeStatus && nodeStatus !== "idle" ? (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[3px] overflow-hidden rounded-b-2xl">
+                        <div
+                            className="h-full w-full"
+                            style={{
+                                background: statusColor,
+                                opacity: nodeStatus === "loading" ? undefined : nodeStatus === "error" ? 0.95 : 0.4,
+                                animation: nodeStatus === "loading" ? "canvas-status-pulse 1.2s ease-in-out infinite" : undefined,
+                            }}
+                        />
+                    </div>
                 ) : null}
 
                 <ResizeHandle corner="top-left" onMouseDown={handleResizeMouseDown} />
