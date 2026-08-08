@@ -172,14 +172,14 @@ export default function AdminPage() {
         void loadAll();
     }, [checkingAccess, user?.role]);
 
-    async function updateUser(userId: string, action: string, payload: Record<string, unknown> = {}) {
+    async function updateUser(userId: string, action: string, payload: Record<string, unknown> = {}, successText?: string) {
         try {
             await requestJson(apiPath("/api/admin/users"), {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ userId, action, ...payload }),
             });
-            message.success("用户已更新");
+            message.success(successText || "用户已更新");
             await loadAll();
         } catch (error) {
             message.error(error instanceof Error ? error.message : "更新用户失败");
@@ -294,18 +294,17 @@ export default function AdminPage() {
                                                                 onChange={(value) => setSelectedCycles((prev) => ({ ...prev, [user.id]: value }))}
                                                                 className="w-24"
                                                             />
-                                                            <Tooltip title="开通后用户刷新页面（或回到页面）即按新套餐生效；若用户仍受限，请确认下方订阅列显示的是目标套餐">
+                                                            <Tooltip title="为用户开通所选套餐并创建订阅；用户刷新页面（或回到页面）后按新套餐生效">
                                                                 <Button
                                                                     size="small"
                                                                     type="primary"
-                                                                    onClick={() =>
-                                                                        void updateUser(user.id, "subscription", {
-                                                                            planId: selectedPlans[user.id] || "free",
-                                                                            billingCycle: selectedCycles[user.id] || "monthly",
-                                                                        })
-                                                                    }
+                                                                    onClick={() => {
+                                                                        const planId = selectedPlans[user.id] || "free";
+                                                                        const planName = planOptions.find((plan) => plan.value === planId)?.label || "免费版";
+                                                                        void updateUser(user.id, "subscription", { planId, billingCycle: selectedCycles[user.id] || "monthly" }, `已开通「${planName}」订阅，刷新后生效`);
+                                                                    }}
                                                                 >
-                                                                    开通
+                                                                    开通·{planOptions.find((plan) => plan.value === (selectedPlans[user.id] || "free"))?.label || "免费版"}
                                                                 </Button>
                                                             </Tooltip>
                                                         </div>

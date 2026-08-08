@@ -44,7 +44,7 @@ function CanvasPageInner() {
     const mode = searchParams.get("mode");
     const agentMode = mode === "new" || mode === "recent" || mode === "choose";
     const agentQuery = agentMode ? `?${searchParams.toString()}` : "";
-    const projectLimit = entitlements?.projects ?? 3;
+    const projectLimit = user?.role === "admin" ? null : (entitlements?.projects ?? null);
     const projectLimitReached = isOverLimit(projects.length, projectLimit);
 
     const enterProject = (id: string) => {

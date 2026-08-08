@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { activateSubscription, type BillingCycle, type PaymentProvider } from "@/lib/billing";
 import { requireAdminUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 
@@ -45,9 +46,20 @@ export async function PATCH(req: NextRequest) {
 
         const order = await prisma.order.update({
             where: { id: orderId },
-            data: { status },
+            data: status === "paid" ? { status, paidAt: new Date() } : { status },
             include: { user: { select: { id: true, email: true, name: true } }, plan: true },
         });
+
+        // 手动开通：订单置为「已开通」时同步激活订阅，与支付回调逻辑一致
+        // （此前只改订单状态不建订阅，导致后台开通权限不生效）
+        if (status === "paid") {
+            await activateSubscription({
+                userId: order.userId,
+                planId: order.planId,
+                cycle: order.billingCycle as BillingCycle,
+                provider: (order.provider || "manual") as PaymentProvider,
+            });
+        }
 
         await prisma.adminAuditLog.create({
             data: {
