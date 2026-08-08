@@ -2,42 +2,15 @@
 // GET /api/sync?type=projects — 从服务器加载画布数据
 import { NextRequest, NextResponse } from "next/server";
 
-import { activateSubscription, ensureDefaultPlans } from "@/lib/billing";
 import { requireCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
+import { getServerEntitlements } from "@/lib/server-entitlements";
 
 function privateJson(body: unknown, init?: ResponseInit) {
   const response = NextResponse.json(body, init);
   response.headers.set("Cache-Control", "no-store, private, max-age=0");
   response.headers.set("Vary", "Cookie");
   return response;
-}
-
-function parseLimit(value?: string | null) {
-  if (!value || value === "custom" || value === "unlimited") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-async function getProjectLimit(userId: string) {
-  await ensureDefaultPlans();
-  let subscription = await prisma?.subscription.findFirst({
-    where: { userId, status: "active" },
-    include: { plan: { include: { entitlements: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (!subscription) {
-    subscription = await activateSubscription({
-      userId,
-      planId: "free",
-      cycle: "monthly",
-      provider: "manual",
-    });
-  }
-
-  const entitlement = subscription.plan?.entitlements.find((item) => item.key === "projects");
-  return parseLimit(entitlement?.value);
 }
 
 export async function POST(req: NextRequest) {
@@ -58,7 +31,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === "projects" && Array.isArray(data)) {
-      const projectLimit = await getProjectLimit(user.id);
+      // 与前端 client-entitlements 及其他后端接口保持一致：admin 角色不受套餐项目数限制
+      const projectLimit = user.role === "admin" ? null : (await getServerEntitlements(user.id)).projects;
       if (projectLimit !== null && data.length > projectLimit) {
         return privateJson({ error: `当前套餐最多保存 ${projectLimit} 个画布项目` }, { status: 403 });
       }
