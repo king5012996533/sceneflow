@@ -16,7 +16,7 @@ import { nanoid } from "nanoid";
 import { readImageMeta } from "@/lib/image-utils";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { fetchClientEntitlements, isOverLimit, type ClientEntitlements } from "@/lib/client-entitlements";
-import { checkGenerationQuota, reserveGenerationQuota } from "@/lib/generation-quota";
+import { checkGenerationQuota } from "@/lib/generation-quota";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -102,7 +102,7 @@ import {
     audioMetadata,
     hydrateCanvasImages,
     hydrateAssistantImages,
-    getGenerationCount,
+    resolveGenerationCount,
     getConnectionTargetAnchor,
     normalizeConnection,
     getInputSummary,
@@ -321,7 +321,6 @@ function InfiniteCanvasPage() {
             if (quota.remaining > 0 && quota.remaining <= safeCount) {
                 message.info(`免费套餐今日还剩 ${quota.remaining} 次生成机会`);
             }
-            await reserveGenerationQuota(safeCount);
         },
         [entitlements, message, user?.role],
     );
@@ -503,7 +502,7 @@ function InfiniteCanvasPage() {
 
     const createConnectedNode = useCallback(
         (type: CanvasNodeType.Image | CanvasNodeType.Text | CanvasNodeType.Config | CanvasNodeType.Video | CanvasNodeType.Audio, pending: PendingConnectionCreate) => {
-            const metadata = type === CanvasNodeType.Config ? { model: effectiveConfig.imageModel || effectiveConfig.model, size: effectiveConfig.size, count: getGenerationCount(effectiveConfig.canvasImageCount || effectiveConfig.count) } : undefined;
+            const metadata = type === CanvasNodeType.Config ? { model: effectiveConfig.imageModel || effectiveConfig.model, size: effectiveConfig.size, count: resolveGenerationCount(effectiveConfig.canvasImageCount || effectiveConfig.count) } : undefined;
             const newNode = createCanvasNode(type, pending.position, metadata);
             const connection = normalizeConnection(pending.connection.nodeId, newNode.id, [...nodesRef.current, newNode], pending.connection.handleType);
             if (!connection) {
@@ -903,7 +902,7 @@ function InfiniteCanvasPage() {
                     ? {
                           model: effectiveConfig.imageModel || effectiveConfig.model,
                           size: effectiveConfig.size,
-                          count: getGenerationCount(effectiveConfig.canvasImageCount || effectiveConfig.count),
+                          count: resolveGenerationCount(effectiveConfig.canvasImageCount || effectiveConfig.count),
                       }
                     : undefined;
             const newNode = createCanvasNode(type, targetPosition, configMetadata);
@@ -1433,7 +1432,7 @@ function InfiniteCanvasPage() {
                 return;
             }
 
-            const plannedGenerationCount = mode === "image" ? getGenerationCount(generationConfig.count) : mode === "text" && sourceNode?.type === CanvasNodeType.Config ? getGenerationCount(generationConfig.count) : 1;
+            const plannedGenerationCount = mode === "image" ? resolveGenerationCount(generationConfig.count) : mode === "text" && sourceNode?.type === CanvasNodeType.Config ? resolveGenerationCount(generationConfig.count) : 1;
             try {
                 await reserveCanvasGenerationQuota(plannedGenerationCount);
             } catch (error) {

@@ -30,10 +30,6 @@ function saveUsage(record: UsageRecord) {
     } catch {}
 }
 
-export function getGenerationCount(): number {
-    return getCurrentUsage().count;
-}
-
 export function getGenerationLimit(entitlements: ClientEntitlements | null, userRole?: string): number | null {
     if (userRole === "admin") return null;
     if (!entitlements) return FREE_DAILY_LIMIT;
@@ -54,10 +50,4 @@ export function recordGeneration(count = 1): number {
     usage.count += count;
     saveUsage(usage);
     return usage.count;
-}
-
-export async function reserveGenerationQuota(count = 1) {
-    // Compatibility shim. The unified generation layer now performs the
-    // authoritative reservation atomically in /api/generation/jobs.
-    return { allowed: true, used: getGenerationCount(), reserved: count, remaining: -1, limit: null };
 }

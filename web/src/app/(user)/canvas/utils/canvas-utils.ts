@@ -1,15 +1,7 @@
 // canvas-utils.ts — 纯工具函数和类型定义，从 canvas-client-page.tsx 提取
 
 import { getDataUrlByteSize } from "@/lib/image-utils";
-import {
-    CanvasNodeType,
-    type CanvasAssistantSession,
-    type CanvasConnection,
-    type CanvasNodeData,
-    type CanvasNodeMetadata,
-    type ConnectionHandle,
-    type Position,
-} from "../types";
+import { CanvasNodeType, type CanvasAssistantSession, type CanvasConnection, type CanvasNodeData, type CanvasNodeMetadata, type ConnectionHandle, type Position } from "../types";
 import { getNodeSpec } from "../constants";
 import { canvasGenerationErrorToast } from "./canvas-generation-error";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
@@ -31,7 +23,7 @@ import {
     AUTO_ARCHIVE_CATEGORIES,
     IMAGE_PROMPT_REVERSE_PRESET,
 } from "./canvas-constants";
-import { getGenerationCount, applyNodeConfigPatch, buildGenerationConfig, buildShotPackPrompt, buildContinuationPrompt, buildAngleLabel, buildAnglePrompt, imageExtension, audioExtension } from "./canvas-prompt-utils";
+import { resolveGenerationCount, applyNodeConfigPatch, buildGenerationConfig, buildShotPackPrompt, buildContinuationPrompt, buildAngleLabel, buildAnglePrompt, imageExtension, audioExtension } from "./canvas-prompt-utils";
 
 // ========== 类型定义 ==========
 
@@ -84,19 +76,43 @@ export function resolveDirectorDeskUrl(value: string) {
 }
 
 export {
-    assetCategoryFromNode, nodeAssetTags, nodeAssetMetadata, imageMetadata, videoMetadata, audioMetadata, buildImageGenerationMetadata, buildAudioGenerationMetadata,
-    VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT, CONNECTION_HANDLE_HIT_RADIUS, CONNECTION_NODE_HIT_PADDING,
-    NODE_STATUS_IDLE, NODE_STATUS_LOADING, NODE_STATUS_SUCCESS, NODE_STATUS_ERROR,
-    DIRECTOR_DESK_URL, AUTO_ARCHIVE_CATEGORIES, IMAGE_PROMPT_REVERSE_PRESET,
-    referenceUrl, generationReferenceUrls, resolveMetadataReferences, hydrateCanvasImages, hydrateAssistantImages, extractVideoFrame,
-    getGenerationCount, applyNodeConfigPatch, buildGenerationConfig, buildShotPackPrompt, buildContinuationPrompt, buildAngleLabel, buildAnglePrompt, imageExtension, audioExtension,
+    assetCategoryFromNode,
+    nodeAssetTags,
+    nodeAssetMetadata,
+    imageMetadata,
+    videoMetadata,
+    audioMetadata,
+    buildImageGenerationMetadata,
+    buildAudioGenerationMetadata,
+    VIDEO_NODE_MAX_WIDTH,
+    VIDEO_NODE_MAX_HEIGHT,
+    CONNECTION_HANDLE_HIT_RADIUS,
+    CONNECTION_NODE_HIT_PADDING,
+    NODE_STATUS_IDLE,
+    NODE_STATUS_LOADING,
+    NODE_STATUS_SUCCESS,
+    NODE_STATUS_ERROR,
+    DIRECTOR_DESK_URL,
+    AUTO_ARCHIVE_CATEGORIES,
+    IMAGE_PROMPT_REVERSE_PRESET,
+    referenceUrl,
+    generationReferenceUrls,
+    resolveMetadataReferences,
+    hydrateCanvasImages,
+    hydrateAssistantImages,
+    extractVideoFrame,
+    resolveGenerationCount,
+    applyNodeConfigPatch,
+    buildGenerationConfig,
+    buildShotPackPrompt,
+    buildContinuationPrompt,
+    buildAngleLabel,
+    buildAnglePrompt,
+    imageExtension,
+    audioExtension,
 };
 
-export function archiveCanvasNode(
-    node: CanvasNodeData,
-    projectId: string,
-    addAsset: (asset: Omit<Asset, "id" | "createdAt" | "updatedAt">) => string | null,
-) {
+export function archiveCanvasNode(node: CanvasNodeData, projectId: string, addAsset: (asset: Omit<Asset, "id" | "createdAt" | "updatedAt">) => string | null) {
     const tags = nodeAssetTags(node);
     const metadata = nodeAssetMetadata(node, projectId);
     if (node.type === CanvasNodeType.Text) {

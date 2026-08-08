@@ -6,6 +6,7 @@ import { App, Button, Segmented, Tag } from "antd";
 import { ArrowRight, Check, Crown, Sparkles, Users, Zap } from "lucide-react";
 
 import { apiPath, publicPath } from "@/lib/app-paths";
+import { formatCny } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type Plan = {
@@ -71,7 +72,7 @@ const planIcons = {
 
 function formatPrice(amount: number) {
     if (amount <= 0) return copy.free;
-    return `\uffe5${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
+    return formatCny(amount);
 }
 
 function formatEntitlement(value: string, unit: string) {

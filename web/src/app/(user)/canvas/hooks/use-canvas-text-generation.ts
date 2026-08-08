@@ -9,11 +9,7 @@ import { CanvasNodeType } from "../types";
 import type { CanvasNodeData, CanvasConnection, CanvasNodeMetadata } from "../types";
 import type { NodeGenerationContext } from "../components/canvas-node-generation";
 import { buildNodeResponseMessages } from "../components/canvas-node-generation";
-import {
-    NODE_STATUS_LOADING,
-    NODE_STATUS_SUCCESS,
-    getGenerationCount,
-} from "../utils/canvas-utils";
+import { NODE_STATUS_LOADING, NODE_STATUS_SUCCESS, resolveGenerationCount } from "../utils/canvas-utils";
 
 type UseCanvasTextGenerationOptions = {
     startGenerationRequest: (targetNodeId: string, originNodeId: string, runningId?: string, controller?: AbortController) => Promise<AbortController>;
@@ -34,18 +30,13 @@ type GenerateTextParams = {
 };
 
 export function useCanvasTextGeneration(options: UseCanvasTextGenerationOptions) {
-    const {
-        startGenerationRequest,
-        finishGenerationRequest,
-        setNodes,
-        setConnections,
-    } = options;
+    const { startGenerationRequest, finishGenerationRequest, setNodes, setConnections } = options;
 
     const generateText = useCallback(
         async ({ sourceNode, generationConfig, generationContext, effectivePrompt, nodeId, prompt, editingTextNode, runController }: GenerateTextParams) => {
             let streamed = "";
             const isConfigNode = sourceNode?.type === CanvasNodeType.Config;
-            const textCount = isConfigNode ? getGenerationCount(generationConfig.count) : 1;
+            const textCount = isConfigNode ? resolveGenerationCount(generationConfig.count) : 1;
             const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : CanvasNodeType.Text];
             const textConfig = NODE_DEFAULT_SIZE[CanvasNodeType.Text];
             const parentPosition = sourceNode?.position || { x: 0, y: 0 };
@@ -73,12 +64,19 @@ export function useCanvasTextGeneration(options: UseCanvasTextGenerationOptions)
             const answers = await Promise.all(
                 textTargetIds.map((targetNodeId) => {
                     let localStreamed = "";
-                    return requestGeneratedText({ config: generationConfig, messages: buildNodeResponseMessages({ ...generationContext, prompt: effectivePrompt }), onDelta: (text) => {
-                        localStreamed = text;
-                        streamed = text;
-                        if (isConfigNode) return;
-                        setNodes((prev) => prev.map((node) => (node.id === targetNodeId ? { ...node, type: CanvasNodeType.Text, metadata: { ...node.metadata, content: text, status: NODE_STATUS_LOADING } } : node)));
-                    }, options: { signal: controller.signal } }).then((answer) => ({ nodeId: targetNodeId, content: answer || localStreamed })).finally(() => finishGenerationRequest(targetNodeId, controller));
+                    return requestGeneratedText({
+                        config: generationConfig,
+                        messages: buildNodeResponseMessages({ ...generationContext, prompt: effectivePrompt }),
+                        onDelta: (text) => {
+                            localStreamed = text;
+                            streamed = text;
+                            if (isConfigNode) return;
+                            setNodes((prev) => prev.map((node) => (node.id === targetNodeId ? { ...node, type: CanvasNodeType.Text, metadata: { ...node.metadata, content: text, status: NODE_STATUS_LOADING } } : node)));
+                        },
+                        options: { signal: controller.signal },
+                    })
+                        .then((answer) => ({ nodeId: targetNodeId, content: answer || localStreamed }))
+                        .finally(() => finishGenerationRequest(targetNodeId, controller));
                 }),
             );
             if (controller.signal.aborted) return;

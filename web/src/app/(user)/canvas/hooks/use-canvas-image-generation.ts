@@ -11,16 +11,7 @@ import { NODE_DEFAULT_SIZE, getNodeSpec } from "../constants";
 import { CanvasNodeType } from "../types";
 import type { CanvasNodeData, CanvasConnection, CanvasNodeMetadata } from "../types";
 import type { NodeGenerationContext } from "../components/canvas-node-generation";
-import {
-    NODE_STATUS_IDLE,
-    NODE_STATUS_SUCCESS,
-    NODE_STATUS_LOADING,
-    NODE_STATUS_ERROR,
-    buildImageGenerationMetadata,
-    createCanvasNode,
-    imageMetadata,
-    getGenerationCount,
-} from "../utils/canvas-utils";
+import { NODE_STATUS_IDLE, NODE_STATUS_SUCCESS, NODE_STATUS_LOADING, NODE_STATUS_ERROR, buildImageGenerationMetadata, createCanvasNode, imageMetadata, resolveGenerationCount } from "../utils/canvas-utils";
 import { fitNodeSize } from "../utils/canvas-node-size";
 
 type UseCanvasImageGenerationOptions = {
@@ -69,7 +60,7 @@ export function useCanvasImageGeneration(options: UseCanvasImageGenerationOption
 
     const generateImage = useCallback(
         async ({ nodeId, sourceNode, generationConfig, generationContext, effectivePrompt, runController }: GenerateImageParams) => {
-            const count = getGenerationCount(generationConfig.count);
+            const count = resolveGenerationCount(generationConfig.count);
             try {
                 await reserveCanvasGenerationQuota(count);
             } catch (error) {
@@ -128,10 +119,7 @@ export function useCanvasImageGeneration(options: UseCanvasImageGenerationOption
                 height: imageConfig.height,
                 metadata: { prompt: effectivePrompt, status: NODE_STATUS_LOADING, batchRootId: count > 1 ? rootId : undefined, ...generationMetadata },
             }));
-            const batchConnections = [
-                ...(isEmptyImageNode ? [] : [{ id: nanoid(), fromNodeId: nodeId, toNodeId: rootId }]),
-                ...childIds.map((childId) => ({ id: nanoid(), fromNodeId: rootId, toNodeId: childId })),
-            ];
+            const batchConnections = [...(isEmptyImageNode ? [] : [{ id: nanoid(), fromNodeId: nodeId, toNodeId: rootId }]), ...childIds.map((childId) => ({ id: nanoid(), fromNodeId: rootId, toNodeId: childId }))];
 
             setNodes((prev) => [
                 ...prev.map((node) =>
@@ -142,7 +130,14 @@ export function useCanvasImageGeneration(options: UseCanvasImageGenerationOption
                               ? { ...node, position: rootNode.position, width: rootNode.width, height: rootNode.height, title: rootNode.title, metadata: { ...node.metadata, ...rootNode.metadata, errorDetails: undefined } }
                               : isImageNode
                                 ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS, errorDetails: undefined } }
-                                : { ...node, type: CanvasNodeType.Text, title: effectivePrompt.slice(0, 32) || "Prompt", width: parentConfig.width, height: parentConfig.height, metadata: { ...node.metadata, content: effectivePrompt, prompt: effectivePrompt, status: NODE_STATUS_SUCCESS, fontSize: 14, errorDetails: undefined } }
+                                : {
+                                      ...node,
+                                      type: CanvasNodeType.Text,
+                                      title: effectivePrompt.slice(0, 32) || "Prompt",
+                                      width: parentConfig.width,
+                                      height: parentConfig.height,
+                                      metadata: { ...node.metadata, content: effectivePrompt, prompt: effectivePrompt, status: NODE_STATUS_SUCCESS, fontSize: 14, errorDetails: undefined },
+                                  }
                         : node,
                 ),
                 ...(isEmptyImageNode ? [] : [rootNode]),
@@ -220,19 +215,7 @@ export function useCanvasImageGeneration(options: UseCanvasImageGenerationOption
                 ),
             );
         },
-        [
-            finishGenerationRequest,
-            isGenerationCanceled,
-            message,
-            quotaModalRef,
-            reserveCanvasGenerationQuota,
-            setConnections,
-            setDialogNodeId,
-            setNodes,
-            setSelectedConnectionId,
-            setSelectedNodeIds,
-            startGenerationRequest,
-        ],
+        [finishGenerationRequest, isGenerationCanceled, message, quotaModalRef, reserveCanvasGenerationQuota, setConnections, setDialogNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds, startGenerationRequest],
     );
 
     const generateImageFromTextNode = useCallback(
@@ -255,7 +238,7 @@ export function useCanvasImageGeneration(options: UseCanvasImageGenerationOption
                     prompt: "",
                     model: effectiveConfig.imageModel || effectiveConfig.model,
                     size: effectiveConfig.size,
-                    count: getGenerationCount(effectiveConfig.canvasImageCount || effectiveConfig.count),
+                    count: resolveGenerationCount(effectiveConfig.canvasImageCount || effectiveConfig.count),
                 },
             );
             const connection = { id: nanoid(), fromNodeId: sourceNode.id, toNodeId: configNode.id };
@@ -269,7 +252,21 @@ export function useCanvasImageGeneration(options: UseCanvasImageGenerationOption
             setSelectedConnectionId(null);
             setDialogNodeId(configNode.id);
         },
-        [connectionsRef, effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, message, nodesRef, setConnections, setDialogNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds],
+        [
+            connectionsRef,
+            effectiveConfig.canvasImageCount,
+            effectiveConfig.count,
+            effectiveConfig.imageModel,
+            effectiveConfig.model,
+            effectiveConfig.size,
+            message,
+            nodesRef,
+            setConnections,
+            setDialogNodeId,
+            setNodes,
+            setSelectedConnectionId,
+            setSelectedNodeIds,
+        ],
     );
 
     return { generateImage, generateImageFromTextNode };

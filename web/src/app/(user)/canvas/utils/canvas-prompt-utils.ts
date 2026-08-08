@@ -10,7 +10,7 @@ import type { AiConfig } from "@/stores/use-config-store";
 
 // ========== 数字/配置辅助函数 ==========
 
-export function getGenerationCount(count: string) {
+export function resolveGenerationCount(count: string) {
     return Math.max(1, Math.min(15, Math.floor(Math.abs(Number(count)) || 1)));
 }
 

@@ -17,7 +17,7 @@ import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { requestGeneratedImages } from "@/lib/generation/generation-request";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
-import { checkGenerationQuota, reserveGenerationQuota } from "@/lib/generation-quota";
+import { checkGenerationQuota } from "@/lib/generation-quota";
 import { fetchClientEntitlements, type ClientEntitlements } from "@/lib/client-entitlements";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -206,13 +206,6 @@ export default function ImagePage() {
 
         setElapsedMs(0);
         setRunning(true);
-        try {
-            await reserveGenerationQuota(generationCount);
-        } catch (error) {
-            message.warning(error instanceof Error ? error.message : "生成额度检查失败");
-            setRunning(false);
-            return;
-        }
         setPreviewLog(null);
         setResults(Array.from({ length: generationCount }, () => ({ id: nanoid(), status: "pending" })));
         const batchStartedAt = performance.now();

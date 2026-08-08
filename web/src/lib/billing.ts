@@ -123,10 +123,6 @@ export function getPlanAmount(plan: { monthlyPrice: number; yearlyPrice: number 
     return cycle === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
 }
 
-export function formatCny(amount: number) {
-    return `￥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
-}
-
 export function createOrderNo() {
     const time = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
     return `SF${time}${nanoid(8).toUpperCase()}`;

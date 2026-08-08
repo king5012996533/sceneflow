@@ -6,6 +6,7 @@ import { App, Button, Empty, Progress, Tag } from "antd";
 import { ArrowRight, CreditCard, Gauge, PackageCheck } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
+import { formatCny } from "@/lib/format";
 
 type BillingState = {
     subscription?: {
@@ -31,10 +32,6 @@ type BillingState = {
         plan: { name: string };
     }>;
 };
-
-function formatPrice(amount: number) {
-    return `¥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
-}
 
 export default function BillingPage() {
     const { message } = App.useApp();
@@ -181,7 +178,7 @@ export default function BillingPage() {
                                         <tr key={order.id} className="border-b border-[#f1ebe0]">
                                             <td className="py-3 font-mono text-xs">{order.orderNo}</td>
                                             <td className="py-3">{order.plan.name}</td>
-                                            <td className="py-3">{formatPrice(order.amount)}</td>
+                                            <td className="py-3">{formatCny(order.amount)}</td>
                                             <td className="py-3">{order.provider}</td>
                                             <td className="py-3">
                                                 <Tag>{order.status}</Tag>

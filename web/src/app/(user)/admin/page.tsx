@@ -7,6 +7,7 @@ import { App, Button, Empty, Input, InputNumber, Select, Switch, Tabs, Tag, Tool
 import { Ban, Boxes, CreditCard, Database, FileText, History, Settings, Shield, Users } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
+import { formatCny } from "@/lib/format";
 import { useUserStore } from "@/stores/use-user-store";
 
 type Overview = {
@@ -83,10 +84,6 @@ type GenerationJob = {
     resultUrl: string | null;
     createdAt: string;
 };
-
-function formatPrice(amount: number) {
-    return `¥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
-}
 
 function formatDateTime(value?: string | null) {
     if (!value) return "-";
@@ -302,7 +299,7 @@ export default function AdminPage() {
                     <Metric icon={Boxes} label="活跃订阅" value={overview?.activeSubscriptions ?? "-"} />
                     <Metric icon={CreditCard} label="已开通记录" value={overview?.paidOrders ?? "-"} />
                     <Metric icon={CreditCard} label="开通申请" value={overview?.pendingOrders ?? "-"} />
-                    <Metric icon={Database} label="参考金额" value={overview ? formatPrice(overview.revenue) : "-"} />
+                    <Metric icon={Database} label="参考金额" value={overview ? formatCny(overview.revenue) : "-"} />
                 </div>
 
                 <Tabs
@@ -415,7 +412,7 @@ export default function AdminPage() {
                                                     <td className="py-3 font-mono text-xs">{order.orderNo}</td>
                                                     <td className="py-3">{order.user.email}</td>
                                                     <td className="py-3">{order.plan.name}</td>
-                                                    <td className="py-3">{formatPrice(order.amount)}</td>
+                                                    <td className="py-3">{formatCny(order.amount)}</td>
                                                     <td className="py-3">{order.provider === "manual" ? "开通申请" : order.provider}</td>
                                                     <td className="py-3 text-sm text-stone-600">
                                                         <div>{formatDateTime(order.createdAt)}</div>
