@@ -53,32 +53,32 @@ export function ConnectionPath({
                 }}
             />
             {/* 底层光晕：给线一点体积感（数据流动时增强） */}
-            <path d={pathD} stroke={active || flowing ? theme.node.activeStroke : theme.node.muted} strokeWidth={active || flowing ? 9 : 7} strokeOpacity={flowing ? 0.3 : active ? 0.16 : 0.12} fill="none" style={{ pointerEvents: "none" }} />
+            <path d={pathD} stroke={active || flowing ? theme.node.activeStroke : theme.node.muted} strokeWidth={active || flowing ? 5 : 4} strokeOpacity={flowing ? 0.28 : active ? 0.15 : 0.1} fill="none" style={{ pointerEvents: "none" }} />
             {/* 主线：挂载时 0.35s 画入 */}
             <path
                 d={pathD}
                 pathLength={1}
                 stroke={active || flowing ? theme.node.activeStroke : theme.node.muted}
-                strokeWidth={active ? 3 : 2}
-                strokeOpacity={flowing ? 1 : active ? 1 : 0.85}
+                strokeWidth={active ? 2 : 1.5}
+                strokeOpacity={flowing ? 1 : active ? 1 : 0.8}
                 strokeDasharray={1}
                 strokeDashoffset={1}
                 fill="none"
-                style={{ animation: "canvas-connection-draw 0.35s ease-out both", filter: active || flowing ? `drop-shadow(0 0 8px ${theme.node.activeStroke}66)` : undefined, pointerEvents: "none" }}
+                style={{ animation: "canvas-connection-draw 0.35s ease-out both", filter: active || flowing ? `drop-shadow(0 0 6px ${theme.node.activeStroke}55)` : undefined, pointerEvents: "none" }}
             />
             {/* 流水线动态光流：光点沿连线从源节点流向目标节点（空闲静止，选中/生成时流动） */}
             <path
                 d={pathD}
                 stroke={flowing ? selectionBlue : theme.node.activeStroke}
-                strokeWidth={flowing ? 3 : active ? 2.5 : 2}
-                strokeOpacity={flowing ? 1 : active ? 1 : 0.22}
+                strokeWidth={flowing ? 2 : active ? 1.8 : 1.5}
+                strokeOpacity={flowing ? 1 : active ? 0.95 : 0.2}
                 strokeLinecap="round"
                 strokeDasharray="12 16"
                 fill="none"
                 style={{
                     pointerEvents: "none",
                     animation: flowing ? "canvas-connection-flow 0.55s linear infinite" : active ? "canvas-connection-flow 0.9s linear infinite" : "none",
-                    filter: flowing ? `drop-shadow(0 0 6px ${selectionBlue}cc)` : active ? `drop-shadow(0 0 4px ${selectionBlue}aa)` : undefined,
+                    filter: flowing ? `drop-shadow(0 0 4px ${selectionBlue}bb)` : active ? `drop-shadow(0 0 3px ${selectionBlue}99)` : undefined,
                 }}
             />
         </g>
@@ -102,9 +102,9 @@ export function ActiveConnectionPath({ node, handle, mouseWorld, target }: { nod
 
     return (
         <g>
-            <path d={pathD} stroke={theme.node.activeStroke} strokeWidth="2" fill="none" strokeDasharray="5,5" />
+            <path d={pathD} stroke={theme.node.activeStroke} strokeWidth="1.5" fill="none" strokeDasharray="5,5" />
             {/* 拖拽连线时的动态光流 */}
-            <path d={pathD} stroke={selectionBlue} strokeWidth="2" fill="none" strokeLinecap="round" strokeDasharray="12 16" style={{ animation: "canvas-connection-flow 0.6s linear infinite" }} />
+            <path d={pathD} stroke={selectionBlue} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeDasharray="12 16" style={{ animation: "canvas-connection-flow 0.6s linear infinite" }} />
         </g>
     );
 }
