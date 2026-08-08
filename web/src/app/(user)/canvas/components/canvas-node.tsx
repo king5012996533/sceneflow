@@ -329,11 +329,27 @@ export const CanvasNode = React.memo(function CanvasNode({
                 </div>
             ) : null}
             <div
-                className="relative h-full w-full overflow-visible rounded-3xl border-2"
+                className="relative h-full w-full overflow-visible rounded-3xl border-2 transition-[box-shadow,border-color] duration-150"
                 style={{
                     background: hasImageContent || hasVideoContent || hasDirectorShotContent ? "transparent" : theme.node.fill,
-                    borderColor: hasImageContent ? imageBorderColor : isActive ? selectionBlue : isRelated ? theme.node.muted : theme.node.stroke,
-                    boxShadow: isActive ? `0 0 0 1px ${selectionBlue}55` : isRelated && !isBatchChild ? `0 0 0 1px ${theme.node.muted}55, 0 18px 48px rgba(0,0,0,.14)` : undefined,
+                    borderColor: hasImageContent
+                        ? hovered && !isActive && !isBatchChild
+                            ? theme.node.muted
+                            : imageBorderColor
+                        : isActive
+                          ? selectionBlue
+                          : isRelated
+                            ? theme.node.muted
+                            : hovered
+                              ? theme.node.muted
+                              : theme.node.stroke,
+                    boxShadow: isActive
+                        ? `0 0 0 1.5px ${selectionBlue}66, 0 10px 34px rgba(47,128,255,.16)`
+                        : isRelated && !isBatchChild
+                          ? `0 0 0 1px ${theme.node.muted}55, 0 18px 48px rgba(0,0,0,.14)`
+                          : hovered
+                            ? `0 14px 40px rgba(0,0,0,.16)`
+                            : undefined,
                 }}
                 onMouseDown={(event) => onMouseDown(event, data.id)}
                 onDoubleClick={(event) => {
@@ -403,7 +419,7 @@ export const CanvasNode = React.memo(function CanvasNode({
             <ConnectionHandleDot side="left" visible={hovered || isSelected || isConnecting} onMouseDown={(event) => onConnectStart(event, data.id, "target")} />
             <ConnectionHandleDot side="right" visible={data.type !== CanvasNodeType.Config && (hovered || isSelected || isConnecting)} onMouseDown={(event) => onConnectStart(event, data.id, "source")} />
 
-            {showPanel && renderPanel ? <div className="absolute left-1/2 top-full z-[70] w-[500px] -translate-x-1/2 pt-4">{renderPanel(data)}</div> : null}
+            {showPanel && renderPanel ? <div className="absolute left-1/2 top-full z-[70] w-[600px] -translate-x-1/2 pt-4">{renderPanel(data)}</div> : null}
         </div>
     );
 });
