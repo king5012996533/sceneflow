@@ -75,12 +75,13 @@ export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Pro
 
     const syncMention = (nextValue: string, cursor: number) => {
         const prefix = nextValue.slice(0, cursor);
-        const match = /(^|\s)@([^\s@]*)$/.exec(prefix);
+        // 与官方产品一致：@ 可以在任意位置随时调用，不只是行首或空格后
+        const match = /@([^\s@]*)$/.exec(prefix);
         if (!match || !references.some((item) => item.active)) {
             closeMention();
             return;
         }
-        setMention({ start: cursor - match[2].length - 1, query: match[2] });
+        setMention({ start: cursor - match[1].length - 1, query: match[1] });
         setActiveIndex(0);
     };
 
@@ -400,15 +401,16 @@ function escapeRegExp(value: string) {
 }
 
 // 纯 textarea 无法表达原子 token，退格/删除时一次删掉整个引用标签。
+// 标签可能出现在句子中间（@随时插入），所以不要求前面是空格。
 // 标签必须按长度降序排列，让长标签先匹配。
 function deleteAdjacentLabel(value: string, caret: number, direction: "backward" | "forward", labels: string[]): { value: string; caret: number } | null {
     if (direction === "backward") {
         const before = value.slice(0, caret);
         for (const label of labels) {
             if (!label) continue;
-            const match = new RegExp(`(^|\\s)(${escapeRegExp(label)})\\s*$`).exec(before);
+            const match = new RegExp(`(${escapeRegExp(label)})\\s*$`).exec(before);
             if (match) {
-                const start = match.index + match[1].length; // 标签起点，保留前面的分隔空格
+                const start = match.index;
                 return { value: value.slice(0, start) + value.slice(caret), caret: start };
             }
         }
