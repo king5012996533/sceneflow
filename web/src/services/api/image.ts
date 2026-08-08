@@ -998,10 +998,9 @@ export async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKe
                 .filter((id): id is string => Boolean(id))
                 .sort((a, b) => a.localeCompare(b));
         }
-        const response = await axios.get<{ data?: Array<{ id?: string }>; error?: { message?: string } }>(buildApiUrl(config.baseUrl, "/models"), {
-            headers: {
-                Authorization: `Bearer ${config.apiKey}`,
-            },
+        const response = await proxyFetch<{ data?: Array<{ id?: string }>; error?: { message?: string } }>({
+            url: buildApiUrl(config.baseUrl, "/models"),
+            method: "GET",
         });
         return (response.data.data || [])
             .map((model) => model.id)
