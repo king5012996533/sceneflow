@@ -26,17 +26,21 @@ export async function POST(req: NextRequest) {
         const method = sanitizeMethod(incoming.get("_proxy_method") || "POST");
         const safeHeaders = sanitizeHeaders(parseHeaders(incoming.get("_proxy_headers")));
 
-        // 从数据库读取用户的 API Key，不从请求头获取
+        // 优先从数据库读取用户的 API Key；数据库不可用或没存时回退到请求头自带的 Key
         let apiKey = "";
-        if (prisma) {
-            const config = await prisma.userConfig.findUnique({ where: { userId: user.id } });
-            if (config?.config && typeof config.config === "object") {
-                const cfg = config.config as Record<string, unknown>;
-                apiKey = String(cfg.apiKey || "");
+        try {
+            if (prisma) {
+                const config = await prisma.userConfig.findUnique({ where: { userId: user.id } });
+                if (config?.config && typeof config.config === "object") {
+                    const cfg = config.config as Record<string, unknown>;
+                    apiKey = String(cfg.apiKey || "");
+                }
             }
+        } catch (dbErr) {
+            console.warn("[proxy/form-data] DB key 读取失败，回退请求头 Key:", (dbErr as Error)?.message);
         }
         if (apiKey) safeHeaders["authorization"] = `Bearer ${apiKey}`;
-        else delete safeHeaders["authorization"];
+        // DB 无 key 时：保留请求头自带的 key，不再删掉导致 502
 
         // 使用 form-data 包构建 multipart body
         const form = new FormData();
@@ -81,9 +85,10 @@ export async function POST(req: NextRequest) {
         }
     } catch (err: unknown) {
         const message = err instanceof Error ? err.message : "代理请求失败";
-        console.error("[proxy/form-data]", message);
-        const status = message.includes("不允许") || message.includes("非法") ? 400 : message.includes("超时") ? 504 : 502;
-        return NextResponse.json({ error: message }, { status });
+        const cause = err instanceof Error && err.cause instanceof Error && err.cause.message && err.cause.message !== message ? `: ${err.cause.message}` : "";
+        console.error("[proxy/form-data]", message + cause);
+        const status = message.includes("不允许") || message.includes("非法") ? 400 : message.includes("超时") || message.includes("aborted") ? 504 : 502;
+        return NextResponse.json({ error: message + cause }, { status });
     }
 }
 

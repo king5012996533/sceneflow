@@ -137,6 +137,14 @@ exports.Prisma.UserScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.UserConfigScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  config: 'config',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.PlanScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -200,6 +208,7 @@ exports.Prisma.GenerationJobScalarFieldEnum = {
   status: 'status',
   error: 'error',
   metadata: 'metadata',
+  resultUrl: 'resultUrl',
   quotaRefunded: 'quotaRefunded',
   startedAt: 'startedAt',
   finishedAt: 'finishedAt',
@@ -298,6 +307,10 @@ exports.Prisma.SortOrder = {
   desc: 'desc'
 };
 
+exports.Prisma.JsonNullValueInput = {
+  JsonNull: Prisma.JsonNull
+};
+
 exports.Prisma.NullableJsonNullValueInput = {
   DbNull: Prisma.DbNull,
   JsonNull: Prisma.JsonNull
@@ -322,6 +335,7 @@ exports.Prisma.JsonNullValueFilter = {
 
 exports.Prisma.ModelName = {
   User: 'User',
+  UserConfig: 'UserConfig',
   Plan: 'Plan',
   Entitlement: 'Entitlement',
   Subscription: 'Subscription',

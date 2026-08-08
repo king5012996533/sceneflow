@@ -1001,6 +1001,7 @@ export async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKe
         const response = await proxyFetch<{ data?: Array<{ id?: string }>; error?: { message?: string } }>({
             url: buildApiUrl(config.baseUrl, "/models"),
             method: "GET",
+            headers: { Authorization: `Bearer ${config.apiKey}` },
         });
         return (response.data.data || [])
             .map((model) => model.id)
