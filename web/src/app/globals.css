@@ -1454,3 +1454,16 @@
         display: none;
     }
 }
+
+/* 画布连线：流水线动态光流（stroke-dashoffset 沿路径前进） */
+@keyframes canvas-connection-flow {
+    to {
+        stroke-dashoffset: -28;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    [style*="canvas-connection-flow"] {
+        animation: none !important;
+    }
+}

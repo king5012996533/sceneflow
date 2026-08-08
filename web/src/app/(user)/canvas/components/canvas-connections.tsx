@@ -4,6 +4,8 @@ import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { CanvasConnection, CanvasNodeData, ConnectionHandle, Position } from "../types";
 
+const selectionBlue = "#2f80ff";
+
 export function ConnectionPath({
     connection,
     from,
@@ -30,6 +32,7 @@ export function ConnectionPath({
 
     return (
         <g>
+            {/* 命中区域：透明加粗路径，方便点选连线 */}
             <path
                 data-connection-id={connection.id}
                 d={pathD}
@@ -47,13 +50,38 @@ export function ConnectionPath({
                     onContextMenu?.(event);
                 }}
             />
+            {/* 底层光晕：给线一点体积感 */}
+            <path
+                d={pathD}
+                stroke={active ? theme.node.activeStroke : theme.node.muted}
+                strokeWidth={active ? 9 : 7}
+                strokeOpacity={active ? 0.16 : 0.12}
+                fill="none"
+                style={{ pointerEvents: "none" }}
+            />
+            {/* 主线 */}
             <path
                 d={pathD}
                 stroke={active ? theme.node.activeStroke : theme.node.muted}
                 strokeWidth={active ? 3 : 2}
-                strokeOpacity={active ? 1 : 0.82}
+                strokeOpacity={active ? 1 : 0.85}
                 fill="none"
                 style={{ filter: active ? `drop-shadow(0 0 8px ${theme.node.activeStroke}66)` : undefined, pointerEvents: "none" }}
+            />
+            {/* 流水线动态光流：光点沿连线从源节点流向目标节点 */}
+            <path
+                d={pathD}
+                stroke={selectionBlue}
+                strokeWidth={active ? 2.5 : 2}
+                strokeOpacity={active ? 1 : 0.4}
+                strokeLinecap="round"
+                strokeDasharray="12 16"
+                fill="none"
+                style={{
+                    pointerEvents: "none",
+                    animation: active ? "canvas-connection-flow 0.9s linear infinite" : "canvas-connection-flow 2.8s linear infinite",
+                    filter: active ? `drop-shadow(0 0 4px ${selectionBlue}aa)` : undefined,
+                }}
             />
         </g>
     );
@@ -74,5 +102,11 @@ export function ActiveConnectionPath({ node, handle, mouseWorld, target }: { nod
     const distance = Math.abs(snappedEndX - snappedStartX);
     const pathD = `M ${snappedStartX} ${snappedStartY} C ${snappedStartX + distance * 0.5} ${snappedStartY}, ${snappedEndX - distance * 0.5} ${snappedEndY}, ${snappedEndX} ${snappedEndY}`;
 
-    return <path d={pathD} stroke={theme.node.activeStroke} strokeWidth="2" fill="none" strokeDasharray="5,5" />;
+    return (
+        <g>
+            <path d={pathD} stroke={theme.node.activeStroke} strokeWidth="2" fill="none" strokeDasharray="5,5" />
+            {/* 拖拽连线时的动态光流 */}
+            <path d={pathD} stroke={selectionBlue} strokeWidth="2" fill="none" strokeLinecap="round" strokeDasharray="12 16" style={{ animation: "canvas-connection-flow 0.6s linear infinite" }} />
+        </g>
+    );
 }
