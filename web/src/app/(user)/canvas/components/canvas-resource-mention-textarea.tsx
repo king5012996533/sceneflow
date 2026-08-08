@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { FileText, Image as ImageIcon, Music2, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
+import { isImeComposing, isPlainEnterKey } from "@/lib/keyboard-event";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { CanvasResourceReference } from "../utils/canvas-resource-references";
 
@@ -23,7 +24,10 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "onChange" | "val
     highlightLabels?: boolean;
 };
 
-export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Props>(function CanvasResourceMentionTextarea({ value, references, onChange, onSubmit, onKeyDown, className, containerClassName, style, highlightLabels = true, ...props }, forwardedRef) {
+export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Props>(function CanvasResourceMentionTextarea(
+    { value, references, onChange, onSubmit, onKeyDown, className, containerClassName, style, highlightLabels = true, ...props },
+    forwardedRef,
+) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
@@ -71,12 +75,12 @@ export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Pro
 
     const syncMention = (nextValue: string, cursor: number) => {
         const prefix = nextValue.slice(0, cursor);
-        const match = /@([^\s@[\]]*)$/.exec(prefix);
+        const match = /(^|\s)@([^\s@]*)$/.exec(prefix);
         if (!match || !references.some((item) => item.active)) {
             closeMention();
             return;
         }
-        setMention({ start: cursor - match[1].length - 1, query: match[1] });
+        setMention({ start: cursor - match[2].length - 1, query: match[2] });
         setActiveIndex(0);
     };
 
@@ -109,9 +113,13 @@ export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Pro
         cursor: "text",
         userSelect: "text",
         overscrollBehavior: "contain",
-        ...(showOverlay ? { background: "transparent", backgroundColor: "transparent" } : {}),
+        // The highlight layer covers the textarea when showOverlay is active, so keep the textarea above it to preserve the native caret.
+        ...(showOverlay ? { position: "relative", zIndex: 1, background: "transparent", backgroundColor: "transparent" } : {}),
     } as CSSProperties;
-    const menu = mention && candidates.length && textareaRef.current ? <MentionMenu textarea={textareaRef.current} references={candidates} activeIndex={Math.min(activeIndex, candidates.length - 1)} theme={theme} onSelect={insertReference} /> : null;
+    const menu =
+        mention && candidates.length && textareaRef.current ? (
+            <MentionMenu textarea={textareaRef.current} caretIndex={mention.start} references={candidates} activeIndex={Math.min(activeIndex, candidates.length - 1)} theme={theme} onSelect={insertReference} />
+        ) : null;
 
     return (
         <div
@@ -163,6 +171,23 @@ export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Pro
                     props.onPointerUp?.(event);
                 }}
                 onKeyDown={(event) => {
+                    // 中文/日文等输入法组合输入期间，方向键和回车属于输入法，不能触发提及菜单或提交。
+                    if (isImeComposing(event)) {
+                        onKeyDown?.(event);
+                        return;
+                    }
+                    if ((event.key === "Backspace" || event.key === "Delete") && !mention) {
+                        const el = textareaRef.current;
+                        if (el && el.selectionStart === el.selectionEnd) {
+                            const result = deleteAdjacentLabel(value, el.selectionStart, event.key === "Backspace" ? "backward" : "forward", activeLabels);
+                            if (result) {
+                                event.preventDefault();
+                                updateValue(result.value, result.caret);
+                                requestAnimationFrame(updateSelectionState);
+                                return;
+                            }
+                        }
+                    }
                     if (mention && candidates.length) {
                         if (event.key === "ArrowDown") {
                             event.preventDefault();
@@ -185,7 +210,7 @@ export const CanvasResourceMentionTextarea = forwardRef<HTMLTextAreaElement, Pro
                             return;
                         }
                     }
-                    if (event.key === "Enter" && onSubmit && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+                    if (isPlainEnterKey(event) && onSubmit) {
                         event.preventDefault();
                         onSubmit();
                         return;
@@ -226,16 +251,38 @@ function MentionHighlightText({ value, labels, placeholder }: { value: string; l
     );
 }
 
-function MentionMenu({ textarea, references, activeIndex, theme, onSelect }: { textarea: HTMLTextAreaElement; references: CanvasResourceReference[]; activeIndex: number; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onSelect: (reference: CanvasResourceReference) => void }) {
+function MentionMenu({
+    textarea,
+    caretIndex,
+    references,
+    activeIndex,
+    theme,
+    onSelect,
+}: {
+    textarea: HTMLTextAreaElement;
+    caretIndex: number;
+    references: CanvasResourceReference[];
+    activeIndex: number;
+    theme: (typeof canvasThemes)[keyof typeof canvasThemes];
+    onSelect: (reference: CanvasResourceReference) => void;
+}) {
     const selectedRef = useRef(false);
     const rect = textarea.getBoundingClientRect();
     const boundary = textarea.closest(".ant-modal-content")?.getBoundingClientRect() || { left: 8, top: 8, right: window.innerWidth - 8, bottom: window.innerHeight - 8 };
     const menuWidth = 256;
     const maxMenuHeight = 224;
     const gap = 6;
-    const left = clamp(rect.left, boundary.left + 8, boundary.right - menuWidth - 8);
-    const showAbove = rect.bottom + gap + maxMenuHeight > boundary.bottom && rect.top - gap - maxMenuHeight >= boundary.top;
-    const top = clamp(showAbove ? rect.top - gap - maxMenuHeight : rect.bottom + gap, boundary.top + 8, boundary.bottom - maxMenuHeight - 8);
+    // 菜单锚定到 @ 光标所在像素位置，而不是整个 textarea 的角落。
+    // 画布可能有缩放：rect 是缩放后的坐标，镜像测量是布局坐标，所以乘上 scale。
+    const scale = textarea.offsetWidth ? rect.width / textarea.offsetWidth : 1;
+    const computed = window.getComputedStyle(textarea);
+    const lineHeight = (parseFloat(computed.lineHeight) || parseFloat(computed.fontSize) * 1.4 || 20) * scale;
+    const caret = getCaretPoint(textarea, caretIndex);
+    const caretLeft = rect.left + (caret.left - textarea.scrollLeft) * scale;
+    const caretTop = rect.top + (caret.top - textarea.scrollTop) * scale;
+    const left = clamp(caretLeft, boundary.left + 8, boundary.right - menuWidth - 8);
+    const showAbove = caretTop + lineHeight + gap + maxMenuHeight > boundary.bottom && caretTop - gap - maxMenuHeight >= boundary.top;
+    const top = clamp(showAbove ? caretTop - gap - maxMenuHeight : caretTop + lineHeight + gap, boundary.top + 8, boundary.bottom - maxMenuHeight - 8);
 
     const stopCanvasInteraction = (event: PointerEvent | MouseEvent) => {
         event.stopPropagation();
@@ -300,6 +347,82 @@ function clamp(value: number, min: number, max: number) {
     return Math.min(Math.max(value, min), max);
 }
 
+// 在镜像 div 中模拟 textarea 布局，测量 index 处光标在未缩放布局坐标下的位置。
+const MIRROR_STYLE_PROPS = [
+    "boxSizing",
+    "width",
+    "paddingTop",
+    "paddingRight",
+    "paddingBottom",
+    "paddingLeft",
+    "borderTopWidth",
+    "borderRightWidth",
+    "borderBottomWidth",
+    "borderLeftWidth",
+    "fontStyle",
+    "fontVariant",
+    "fontWeight",
+    "fontStretch",
+    "fontSize",
+    "lineHeight",
+    "fontFamily",
+    "textAlign",
+    "textIndent",
+    "letterSpacing",
+    "wordSpacing",
+    "tabSize",
+    "textTransform",
+] as const;
+
+function getCaretPoint(textarea: HTMLTextAreaElement, index: number) {
+    const computed = window.getComputedStyle(textarea);
+    const mirror = document.createElement("div");
+    const style = mirror.style;
+    style.position = "absolute";
+    style.top = "0";
+    style.left = "-9999px";
+    style.visibility = "hidden";
+    style.whiteSpace = "pre-wrap";
+    style.overflowWrap = "break-word";
+    for (const prop of MIRROR_STYLE_PROPS) style[prop] = computed[prop];
+    mirror.textContent = textarea.value.slice(0, index);
+    const marker = document.createElement("span");
+    marker.textContent = textarea.value.slice(index) || ".";
+    mirror.appendChild(marker);
+    document.body.appendChild(mirror);
+    const point = { left: marker.offsetLeft, top: marker.offsetTop };
+    document.body.removeChild(mirror);
+    return point;
+}
+
 function escapeRegExp(value: string) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// 纯 textarea 无法表达原子 token，退格/删除时一次删掉整个引用标签。
+// 标签必须按长度降序排列，让长标签先匹配。
+function deleteAdjacentLabel(value: string, caret: number, direction: "backward" | "forward", labels: string[]): { value: string; caret: number } | null {
+    if (direction === "backward") {
+        const before = value.slice(0, caret);
+        for (const label of labels) {
+            if (!label) continue;
+            const match = new RegExp(`(^|\\s)(${escapeRegExp(label)})\\s*$`).exec(before);
+            if (match) {
+                const start = match.index + match[1].length; // 标签起点，保留前面的分隔空格
+                return { value: value.slice(0, start) + value.slice(caret), caret: start };
+            }
+        }
+    } else {
+        // 向前删除要求光标前是行首或空白，避免切进其他文字
+        if (caret > 0 && !/\s/.test(value[caret - 1])) return null;
+        const after = value.slice(caret);
+        for (const label of labels) {
+            if (!label) continue;
+            const match = new RegExp(`^(\\s*)(${escapeRegExp(label)})(?=\\s|$)`).exec(after);
+            if (match) {
+                return { value: value.slice(0, caret) + value.slice(caret + match[0].length), caret };
+            }
+        }
+    }
+    return null;
 }

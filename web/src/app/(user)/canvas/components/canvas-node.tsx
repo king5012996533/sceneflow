@@ -42,6 +42,7 @@ type CanvasNodeProps = {
     onConnectStart: (event: React.MouseEvent, nodeId: string, handleType: "source" | "target") => void;
     onResize: (nodeId: string, width: number, height: number, position?: Position) => void;
     onContentChange: (nodeId: string, content: string) => void;
+    onTitleChange: (nodeId: string, title: string) => void;
     onToggleBatch?: (nodeId: string) => void;
     onSetBatchPrimary?: (node: CanvasNodeData) => void;
     onRetry?: (node: CanvasNodeData) => void;
@@ -62,6 +63,7 @@ type NodeContentRendererProps = {
     batchRecovering: boolean;
     renderNodeContent?: (node: CanvasNodeData) => ReactNode;
     onContentChange: (nodeId: string, content: string) => void;
+    onTitleChange: (nodeId: string, title: string) => void;
     onStopEditing: () => void;
     mentionReferences: CanvasResourceReference[];
     onRetry?: (node: CanvasNodeData) => void;
@@ -97,6 +99,7 @@ export const CanvasNode = React.memo(function CanvasNode({
     onConnectStart,
     onResize,
     onContentChange,
+    onTitleChange,
     onToggleBatch,
     onSetBatchPrimary,
     onRetry,
@@ -116,6 +119,9 @@ export const CanvasNode = React.memo(function CanvasNode({
     const isActive = isConnectionTarget || isSelected || isFocusRelated;
     const imageBorderColor = isActive ? selectionBlue : isRelated && !isBatchChild ? theme.node.muted : "transparent";
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const titleInputRef = useRef<HTMLInputElement>(null);
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [titleDraft, setTitleDraft] = useState(data.title || "");
     const resizeRef = useRef({
         isResizing: false,
         corner: "bottom-right" as ResizeCorner,
@@ -128,6 +134,34 @@ export const CanvasNode = React.memo(function CanvasNode({
         keepRatio: false,
         ratio: 1,
     });
+
+    useEffect(() => {
+        setTitleDraft(data.title || "");
+    }, [data.title]);
+
+    useEffect(() => {
+        if (!isEditingTitle) return;
+        titleInputRef.current?.focus();
+        titleInputRef.current?.select();
+    }, [isEditingTitle]);
+
+    const finishTitleEditing = useCallback(() => {
+        const title = titleDraft.trim() || data.title || "未命名";
+        setTitleDraft(title);
+        setIsEditingTitle(false);
+        if (title !== data.title) onTitleChange(data.id, title);
+    }, [data.id, data.title, onTitleChange, titleDraft]);
+
+    useEffect(() => {
+        if (!isEditingTitle) return;
+        const handleOutsidePointerDown = (event: PointerEvent) => {
+            const target = event.target;
+            if (target instanceof Node && titleInputRef.current?.contains(target)) return;
+            finishTitleEditing();
+        };
+        window.addEventListener("pointerdown", handleOutsidePointerDown, true);
+        return () => window.removeEventListener("pointerdown", handleOutsidePointerDown, true);
+    }, [finishTitleEditing, isEditingTitle]);
 
     useEffect(() => {
         const textarea = textareaRef.current;
@@ -259,6 +293,41 @@ export const CanvasNode = React.memo(function CanvasNode({
             }}
             onContextMenu={(event) => onContextMenu(event, data.id)}
         >
+            {isSelected || hovered || isEditingTitle ? (
+                <div className="absolute left-3 top-[-28px] z-[65] max-w-[calc(100%-24px)]" onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
+                    {isEditingTitle ? (
+                        <input
+                            ref={titleInputRef}
+                            value={titleDraft}
+                            maxLength={64}
+                            className="h-6 max-w-full border-0 border-b border-dashed bg-transparent px-0 text-left text-xs font-medium outline-none"
+                            style={{ borderColor: theme.node.muted, color: theme.node.text }}
+                            onChange={(event) => setTitleDraft(event.target.value)}
+                            onBlur={finishTitleEditing}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") finishTitleEditing();
+                                if (event.key === "Escape") {
+                                    setTitleDraft(data.title || "");
+                                    setIsEditingTitle(false);
+                                }
+                            }}
+                        />
+                    ) : (
+                        <button
+                            type="button"
+                            className="block max-w-full truncate border-b border-dashed border-transparent px-0 py-0.5 text-left text-xs font-medium opacity-75 transition hover:border-current hover:opacity-100"
+                            style={{ color: theme.node.text }}
+                            title="双击重命名"
+                            onDoubleClick={(event) => {
+                                event.stopPropagation();
+                                setIsEditingTitle(true);
+                            }}
+                        >
+                            {data.title || "未命名"}
+                        </button>
+                    )}
+                </div>
+            ) : null}
             <div
                 className="relative h-full w-full overflow-visible rounded-3xl border-2"
                 style={{
@@ -321,7 +390,9 @@ export const CanvasNode = React.memo(function CanvasNode({
                 {resourceLabel ? <ResourceLabelBadge reference={resourceLabel} /> : null}
                 {data.metadata?.pipelineLabel ? <PipelineBadge node={data} /> : null}
 
-                {!hasImageContent && !hasVideoContent && !hasAudioContent && !hasDirectorShotContent ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(to top, ${theme.canvas.background}66, transparent)` }} /> : null}
+                {!hasImageContent && !hasVideoContent && !hasAudioContent && !hasDirectorShotContent ? (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(to top, ${theme.canvas.background}66, transparent)` }} />
+                ) : null}
 
                 <ResizeHandle corner="top-left" onMouseDown={handleResizeMouseDown} />
                 <ResizeHandle corner="top-right" onMouseDown={handleResizeMouseDown} />
@@ -449,11 +520,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
                     onWheel={(event) => event.stopPropagation()}
                 />
             ) : (
-                <div
-                    className="thin-scrollbar block h-full w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent pl-4 pr-14 pt-0 pb-4 font-mono"
-                    style={textStyle}
-                    onWheel={(event) => event.stopPropagation()}
-                >
+                <div className="thin-scrollbar block h-full w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent pl-4 pr-14 pt-0 pb-4 font-mono" style={textStyle} onWheel={(event) => event.stopPropagation()}>
                     {node.metadata?.content || <span style={{ color: theme.node.placeholder }}>双击编辑文字</span>}
                 </div>
             )}
@@ -462,11 +529,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
 }
 
 function ResourceLabelBadge({ reference }: { reference: CanvasResourceReference }) {
-    return (
-        <span className={`pointer-events-none absolute right-2 top-2 z-30 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${reference.active ? "bg-[#2f80ff] text-white shadow-sm" : "bg-black/35 text-white/75"}`}>
-            {reference.label}
-        </span>
-    );
+    return <span className={`pointer-events-none absolute right-2 top-2 z-30 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${reference.active ? "bg-[#2f80ff] text-white shadow-sm" : "bg-black/35 text-white/75"}`}>{reference.label}</span>;
 }
 
 function ImageNodeContent(props: NodeContentRendererProps) {

@@ -95,14 +95,36 @@ export function useCanvasNodeActions(options: UseCanvasNodeActionsOptions) {
             setContextMenu((current) => (current?.type === "node" && allIds.has(current.nodeId) ? null : current));
             cleanupCanvasFiles({ projectId, nodes: nodesRef.current.filter((node) => !allIds.has(node.id)), chatSessions });
         },
-        [chatSessions, cleanupCanvasFiles, nodesRef, projectId, setAngleNodeId, setConnections, setContextMenu, setCropNodeId, setDialogNodeId, setEditingNodeId, setHoveredNodeId, setInfoNodeId, setMaskEditNodeId, setPreviewNodeId, setRunningNodeId, setSelectedConnectionId, setSelectedNodeIds, setToolbarNodeId],
+        [
+            chatSessions,
+            cleanupCanvasFiles,
+            nodesRef,
+            projectId,
+            setAngleNodeId,
+            setConnections,
+            setContextMenu,
+            setCropNodeId,
+            setDialogNodeId,
+            setEditingNodeId,
+            setHoveredNodeId,
+            setInfoNodeId,
+            setMaskEditNodeId,
+            setPreviewNodeId,
+            setRunningNodeId,
+            setSelectedConnectionId,
+            setSelectedNodeIds,
+            setToolbarNodeId,
+        ],
     );
 
-    const deleteConnection = useCallback((connectionId: string) => {
-        setConnections((prev) => prev.filter((conn) => conn.id !== connectionId));
-        setSelectedConnectionId((current) => (current === connectionId ? null : current));
-        setContextMenu((current) => (current?.type === "connection" && current.connectionId === connectionId ? null : current));
-    }, [setConnections, setSelectedConnectionId, setContextMenu]);
+    const deleteConnection = useCallback(
+        (connectionId: string) => {
+            setConnections((prev) => prev.filter((conn) => conn.id !== connectionId));
+            setSelectedConnectionId((current) => (current === connectionId ? null : current));
+            setContextMenu((current) => (current?.type === "connection" && current.connectionId === connectionId ? null : current));
+        },
+        [setConnections, setSelectedConnectionId, setContextMenu],
+    );
 
     const clearCanvas = useCallback(() => {
         setNodes([]);
@@ -117,54 +139,79 @@ export function useCanvasNodeActions(options: UseCanvasNodeActionsOptions) {
         cleanupCanvasFiles({ projectId, nodes: [], chatSessions: [] });
     }, [chatSessions, cleanupCanvasFiles, projectId, setAngleNodeId, setClearConfirmOpen, setConnections, setCropNodeId, setInfoNodeId, setMaskEditNodeId, setNodes, setPreviewNodeId, setRunningNodeId]);
 
-    const duplicateNode = useCallback((nodeId: string) => {
-        const source = nodesRef.current.find((node) => node.id === nodeId);
-        if (!source) return;
+    const duplicateNode = useCallback(
+        (nodeId: string) => {
+            const source = nodesRef.current.find((node) => node.id === nodeId);
+            if (!source) return;
 
-        const id = `${source.type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-        const next: CanvasNodeData = {
-            ...source,
-            id,
-            title: `${source.title} Copy`,
-            position: { x: source.position.x + 36, y: source.position.y + 36 },
-        };
+            const id = `${source.type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const next: CanvasNodeData = {
+                ...source,
+                id,
+                title: `${source.title} Copy`,
+                position: { x: source.position.x + 36, y: source.position.y + 36 },
+            };
 
-        setNodes((prev) => [...prev, next]);
-        setSelectedNodeIds(new Set([id]));
-        setSelectedConnectionId(null);
-        setDialogNodeId(id);
-    }, [nodesRef, setDialogNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds]);
+            setNodes((prev) => [...prev, next]);
+            setSelectedNodeIds(new Set([id]));
+            setSelectedConnectionId(null);
+            setDialogNodeId(id);
+        },
+        [nodesRef, setDialogNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds],
+    );
 
-    const updateNodeContent = useCallback((nodeId: string, content: string) => {
-        setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, content } } : node)));
-    }, [setNodes]);
+    const updateNodeContent = useCallback(
+        (nodeId: string, content: string) => {
+            setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, content } } : node)));
+        },
+        [setNodes],
+    );
 
-    const updateNodePrompt = useCallback((nodeId: string, prompt: string) => {
-        setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, prompt } } : node)));
-    }, [setNodes]);
+    const updateNodeTitle = useCallback(
+        (nodeId: string, title: string) => {
+            setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, title } : node)));
+        },
+        [setNodes],
+    );
 
-    const patchNodeConfig = useCallback((nodeId: string, patch: Partial<CanvasNodeData["metadata"]>) => {
-        const applyPatch = (items: CanvasNodeData[]) => items.map((node) => (node.id === nodeId ? applyNodeConfigPatch(node, patch) : node));
-        nodesRef.current = applyPatch(nodesRef.current);
-        setNodes((prev) => applyPatch(prev));
-    }, [nodesRef, setNodes]);
+    const updateNodePrompt = useCallback(
+        (nodeId: string, prompt: string) => {
+            setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, prompt } } : node)));
+        },
+        [setNodes],
+    );
 
-    const resizeNode = useCallback((nodeId: string, width: number, height: number, position?: { x: number; y: number }) => {
-        setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, width, height, position: position || node.position } : node)));
-    }, [setNodes]);
+    const patchNodeConfig = useCallback(
+        (nodeId: string, patch: Partial<CanvasNodeData["metadata"]>) => {
+            const applyPatch = (items: CanvasNodeData[]) => items.map((node) => (node.id === nodeId ? applyNodeConfigPatch(node, patch) : node));
+            nodesRef.current = applyPatch(nodesRef.current);
+            setNodes((prev) => applyPatch(prev));
+        },
+        [nodesRef, setNodes],
+    );
 
-    const toggleFreeResize = useCallback((nodeId: string) => {
-        setNodes((prev) =>
-            prev.map((node) => {
-                if (node.id !== nodeId) return node;
-                const freeResize = !node.metadata?.freeResize;
-                if (freeResize || node.type !== CanvasNodeType.Image) return { ...node, metadata: { ...node.metadata, freeResize } };
-                const ratio = (node.metadata?.naturalWidth || node.width) / (node.metadata?.naturalHeight || node.height || 1);
-                const height = node.width / ratio;
-                return { ...node, height, position: { x: node.position.x, y: node.position.y + node.height / 2 - height / 2 }, metadata: { ...node.metadata, freeResize } };
-            }),
-        );
-    }, [setNodes]);
+    const resizeNode = useCallback(
+        (nodeId: string, width: number, height: number, position?: { x: number; y: number }) => {
+            setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, width, height, position: position || node.position } : node)));
+        },
+        [setNodes],
+    );
+
+    const toggleFreeResize = useCallback(
+        (nodeId: string) => {
+            setNodes((prev) =>
+                prev.map((node) => {
+                    if (node.id !== nodeId) return node;
+                    const freeResize = !node.metadata?.freeResize;
+                    if (freeResize || node.type !== CanvasNodeType.Image) return { ...node, metadata: { ...node.metadata, freeResize } };
+                    const ratio = (node.metadata?.naturalWidth || node.width) / (node.metadata?.naturalHeight || node.height || 1);
+                    const height = node.width / ratio;
+                    return { ...node, height, position: { x: node.position.x, y: node.position.y + node.height / 2 - height / 2 }, metadata: { ...node.metadata, freeResize } };
+                }),
+            );
+        },
+        [setNodes],
+    );
 
     return {
         deleteNodes,
@@ -172,6 +219,7 @@ export function useCanvasNodeActions(options: UseCanvasNodeActionsOptions) {
         clearCanvas,
         duplicateNode,
         updateNodeContent,
+        updateNodeTitle,
         updateNodePrompt,
         patchNodeConfig,
         resizeNode,

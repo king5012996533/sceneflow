@@ -129,8 +129,6 @@ import {
 } from "../types";
 import type { ReferenceImage } from "@/types/image";
 
-
-
 export default function CanvasPage() {
     const [mounted, setMounted] = useState(false);
 
@@ -142,10 +140,6 @@ export default function CanvasPage() {
 
     return <InfiniteCanvasPage />;
 }
-
-
-
-
 
 function InfiniteCanvasPage() {
     const { message, modal } = App.useApp();
@@ -213,7 +207,6 @@ function InfiniteCanvasPage() {
     const [collapsingBatchIds, setCollapsingBatchIds] = useState<Set<string>>(new Set());
     const [openingBatchIds, setOpeningBatchIds] = useState<Set<string>>(new Set());
 
-
     const selection = useCanvasSelection({
         setContextMenu,
     });
@@ -237,40 +230,19 @@ function InfiniteCanvasPage() {
         projectLoaded,
         updateProject,
     });
-    const {
-        containerRef,
-        viewport,
-        setViewport,
-        size,
-        setSize,
-        viewportRef,
-        screenToCanvas,
-        getCanvasCenter,
-        resetViewport: vpResetViewport,
-        setZoomScale: vpSetZoomScale,
-    } = vp;
+    const { containerRef, viewport, setViewport, size, setSize, viewportRef, screenToCanvas, getCanvasCenter, resetViewport: vpResetViewport, setZoomScale: vpSetZoomScale } = vp;
 
     const nodesRef = useRef(nodes);
     const connectionsRef = useRef(connections);
 
-    const {
-        selectionBox,
-        selectionBoxRef,
-        startSelectionBox,
-        clearSelectionBox,
-        handleGlobalPointerMove,
-    } = useCanvasPointerInteractions({
+    const { selectionBox, selectionBoxRef, startSelectionBox, clearSelectionBox, handleGlobalPointerMove } = useCanvasPointerInteractions({
         screenToCanvas,
         nodesRef,
         selectedNodeIdsRef,
         setSelectedNodeIds,
     });
 
-    const {
-        clipboardRef,
-        copySelectedNodes,
-        pasteCopiedNodes,
-    } = useCanvasClipboard({
+    const { clipboardRef, copySelectedNodes, pasteCopiedNodes } = useCanvasClipboard({
         nodesRef,
         connectionsRef,
         selectedNodeIdsRef,
@@ -286,21 +258,7 @@ function InfiniteCanvasPage() {
     const generateNodeRef = useRef<((nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => Promise<void>) | null>(null);
     const agentCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const {
-        historyRef,
-        lastHistoryRef,
-        historyCommitTimerRef,
-        applyingHistoryRef,
-        historyPausedRef,
-        historyState,
-        setHistoryState,
-        createHistoryEntry,
-        applyHistory,
-        undoCanvas,
-        redoCanvas,
-        resetHistory,
-        updateLastHistoryEntry,
-    } = useCanvasHistory(
+    const { historyRef, lastHistoryRef, historyCommitTimerRef, applyingHistoryRef, historyPausedRef, historyState, setHistoryState, createHistoryEntry, applyHistory, undoCanvas, redoCanvas, resetHistory, updateLastHistoryEntry } = useCanvasHistory(
         { nodes, connections, chatSessions, activeChatId, backgroundMode, showImageInfo },
         {
             setNodes,
@@ -340,13 +298,7 @@ function InfiniteCanvasPage() {
         };
     }, [refreshEntitlements]);
 
-    const {
-        generationRequestsRef,
-        startGenerationRequest,
-        finishGenerationRequest,
-        stopGenerationByRunningId,
-        confirmStopGeneration,
-    } = useCanvasGenerationRequests({
+    const { generationRequestsRef, startGenerationRequest, finishGenerationRequest, stopGenerationByRunningId, confirmStopGeneration } = useCanvasGenerationRequests({
         entitlements,
         setRunningNodeId,
         setNodes,
@@ -420,7 +372,15 @@ function InfiniteCanvasPage() {
         if (!projectLoaded || applyingHistoryRef.current || historyPausedRef.current) return;
         const next = createHistoryEntry();
         const previous = lastHistoryRef.current;
-        if (previous?.nodes === next.nodes && previous.connections === next.connections && previous.chatSessions === next.chatSessions && previous.activeChatId === next.activeChatId && previous.backgroundMode === next.backgroundMode && previous.showImageInfo === next.showImageInfo) return;
+        if (
+            previous?.nodes === next.nodes &&
+            previous.connections === next.connections &&
+            previous.chatSessions === next.chatSessions &&
+            previous.activeChatId === next.activeChatId &&
+            previous.backgroundMode === next.backgroundMode &&
+            previous.showImageInfo === next.showImageInfo
+        )
+            return;
 
         if (historyCommitTimerRef.current) clearTimeout(historyCommitTimerRef.current);
         historyCommitTimerRef.current = setTimeout(() => {
@@ -487,19 +447,7 @@ function InfiniteCanvasPage() {
         );
     }, [addAsset, nodes, projectId, projectLoaded]);
 
-
-
-
-    const {
-        directorIframeRef,
-        directorNodeId,
-        setDirectorNodeId,
-        directorDeskSrc,
-        directorNode,
-        openDirectorShot,
-        createDirectorShotNode,
-        postDirectorSession,
-    } = useDirectorShotBridge({
+    const { directorIframeRef, directorNodeId, setDirectorNodeId, directorDeskSrc, directorNode, openDirectorShot, createDirectorShotNode, postDirectorSession } = useDirectorShotBridge({
         nodes,
         projectId,
         getCanvasCenter,
@@ -626,14 +574,7 @@ function InfiniteCanvasPage() {
         connectNodes,
     });
 
-    const {
-        isNodeDragging,
-        nodeDraggingRef,
-        dragRef,
-        handleNodePointerDown,
-        handleNodeDragPointerMove,
-        finishNodeDrag,
-    } = useCanvasNodeDrag({
+    const { isNodeDragging, nodeDraggingRef, dragRef, handleNodePointerDown, handleNodeDragPointerMove, finishNodeDrag } = useCanvasNodeDrag({
         nodesRef,
         selectedNodeIdsRef,
         viewportRef,
@@ -645,17 +586,7 @@ function InfiniteCanvasPage() {
         setDialogNodeId,
     });
 
-    const {
-        deleteNodes,
-        deleteConnection,
-        clearCanvas,
-        duplicateNode,
-        updateNodeContent,
-        updateNodePrompt,
-        patchNodeConfig,
-        resizeNode,
-        toggleFreeResize,
-    } = useCanvasNodeActions({
+    const { deleteNodes, deleteConnection, clearCanvas, duplicateNode, updateNodeContent, updateNodeTitle, updateNodePrompt, patchNodeConfig, resizeNode, toggleFreeResize } = useCanvasNodeActions({
         nodesRef,
         cleanupCanvasFiles,
         projectId,
@@ -678,13 +609,7 @@ function InfiniteCanvasPage() {
         setContextMenu,
     });
 
-    const {
-        assetPickerOpen,
-        openAssetPicker,
-        closeAssetPicker,
-        saveNodeAsset,
-        handleAssetInsert,
-    } = useCanvasAssetImportArchive({
+    const { assetPickerOpen, openAssetPicker, closeAssetPicker, saveNodeAsset, handleAssetInsert } = useCanvasAssetImportArchive({
         projectId,
         getCanvasCenter,
         setNodes,
@@ -712,10 +637,7 @@ function InfiniteCanvasPage() {
         connectionsRef,
     });
 
-    const {
-        generateImage,
-        generateImageFromTextNode,
-    } = useCanvasImageGeneration({
+    const { generateImage, generateImageFromTextNode } = useCanvasImageGeneration({
         nodesRef,
         connectionsRef,
         effectiveConfig,
@@ -732,11 +654,7 @@ function InfiniteCanvasPage() {
         quotaModalRef,
     });
 
-    const {
-        generateVideo,
-        createContinuationFromVideo,
-        continueVideoRef,
-    } = useCanvasVideoGeneration({
+    const { generateVideo, createContinuationFromVideo, continueVideoRef } = useCanvasVideoGeneration({
         nodesRef,
         connectionsRef,
         effectiveConfig,
@@ -752,20 +670,7 @@ function InfiniteCanvasPage() {
         message,
     });
 
-    const {
-        cropNode,
-        maskEditNode,
-        splitNode,
-        upscaleNode,
-        angleNode,
-        superResolveNode,
-        previewNode,
-        infoNode,
-        clearDialogState,
-        cropImageNode,
-        splitImageNode,
-        applyMaskEdit,
-    } = useCanvasImageEditDialogs({
+    const { cropNode, maskEditNode, splitNode, upscaleNode, angleNode, superResolveNode, previewNode, infoNode, clearDialogState, cropImageNode, splitImageNode, applyMaskEdit } = useCanvasImageEditDialogs({
         nodes,
         effectiveConfig,
         cropNodeId,
@@ -842,12 +747,7 @@ function InfiniteCanvasPage() {
         message,
     });
 
-    const {
-        downloadNodeImage,
-        createImageReversePromptNodes,
-        generateUpscaledImage,
-        generateAngleImage,
-    } = useCanvasImageTools({
+    const { downloadNodeImage, createImageReversePromptNodes, generateUpscaledImage, generateAngleImage } = useCanvasImageTools({
         effectiveConfig,
         setNodes,
         setConnections,
@@ -937,7 +837,10 @@ function InfiniteCanvasPage() {
             const generationOps = safeOps.filter((op): op is Extract<CanvasAgentOp, { type: "run_generation" }> => op.type === "run_generation" && Boolean(op.nodeId));
             const pipelineOps = safeOps.filter((op): op is Extract<CanvasAgentOp, { type: "run_pipeline" }> => op.type === "run_pipeline" && op.nodeIds.length > 0);
             const continuationOps = safeOps.filter((op): op is Extract<CanvasAgentOp, { type: "continue_video" }> => op.type === "continue_video" && Boolean(op.nodeId));
-            const next = applyCanvasAgentOps(before, safeOps.filter((op) => op.type !== "run_generation" && op.type !== "run_pipeline" && op.type !== "continue_video"));
+            const next = applyCanvasAgentOps(
+                before,
+                safeOps.filter((op) => op.type !== "run_generation" && op.type !== "run_pipeline" && op.type !== "continue_video"),
+            );
             nodesRef.current = next.nodes;
             connectionsRef.current = next.connections;
             selectedNodeIdsRef.current = new Set(next.selectedNodeIds);
@@ -953,7 +856,7 @@ function InfiniteCanvasPage() {
                 queueMicrotask(() =>
                     generationOps.forEach((op) => {
                         const target = nodesRef.current.find((node) => node.id === op.nodeId);
-                        const prompt = op.prompt?.trim() ? op.prompt : target?.metadata?.composerContent ?? target?.metadata?.prompt ?? "";
+                        const prompt = op.prompt?.trim() ? op.prompt : (target?.metadata?.composerContent ?? target?.metadata?.prompt ?? "");
                         void generateNodeRef.current?.(op.nodeId, op.mode || target?.metadata?.generationMode || "image", prompt);
                     }),
                 );
@@ -1013,7 +916,6 @@ function InfiniteCanvasPage() {
         [effectiveConfig.canvasImageCount, effectiveConfig.count, effectiveConfig.imageModel, effectiveConfig.model, effectiveConfig.size, getCanvasCenter],
     );
 
-
     const createMangaWorkflowNodes = useCallback(() => {
         // 先检查角色资产额度
         const charLimit = entitlements?.privateCharacters ?? 0;
@@ -1063,7 +965,6 @@ function InfiniteCanvasPage() {
         },
         [vp.setZoomScale],
     );
-
 
     const createAndOpenProject = useCallback(() => {
         const projects = useCanvasStore.getState().projects;
@@ -1199,7 +1100,6 @@ function InfiniteCanvasPage() {
         setSelectedConnectionId(null);
         setDialogNodeId(id);
     }, []);
-
 
     const createAudioFileNode = useCallback(async (file: File, position: Position) => {
         const audio = await uploadMediaFile(file, "audio");
@@ -1373,16 +1273,9 @@ function InfiniteCanvasPage() {
         setNodes((prev) => prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, fontSize } } : node)));
     }, []);
 
-    const {
-        handleUploadRequest,
-        handleImageInputChange,
-        handleDrop,
-        imageInputRef,
-    } = useCanvasFileImport({
+    const { handleUploadRequest, handleImageInputChange, handleDrop, imageInputRef } = useCanvasFileImport({
         onFilesSelected: (files, target) => {
-            const file = Array.from(files).find(
-                (item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item),
-            );
+            const file = Array.from(files).find((item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item));
             if (!file) return;
             if (target?.nodeId) {
                 if (isAudioFile(file)) {
@@ -1419,12 +1312,7 @@ function InfiniteCanvasPage() {
                 if (file.type.startsWith("video/")) {
                     void (async () => {
                         const video = await uploadMediaFile(file, "video");
-                        const nextSize = fitNodeSize(
-                            video.width || 1280,
-                            video.height || 720,
-                            VIDEO_NODE_MAX_WIDTH,
-                            VIDEO_NODE_MAX_HEIGHT,
-                        );
+                        const nextSize = fitNodeSize(video.width || 1280, video.height || 720, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
                         setNodes((prev) =>
                             prev.map((node) =>
                                 node.id === target.nodeId
@@ -1493,30 +1381,16 @@ function InfiniteCanvasPage() {
                 })();
                 return;
             }
-            const position = target?.position || screenToCanvas(
-                (containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2,
-                (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2,
-            );
-            void (isAudioFile(file)
-                ? createAudioFileNode(file, position)
-                : file.type.startsWith("video/")
-                  ? createVideoFileNode(file, position)
-                  : createImageFileNode(file, position));
+            const position = target?.position || screenToCanvas((containerRef.current?.getBoundingClientRect().left || 0) + size.width / 2, (containerRef.current?.getBoundingClientRect().top || 0) + size.height / 2);
+            void (isAudioFile(file) ? createAudioFileNode(file, position) : file.type.startsWith("video/") ? createVideoFileNode(file, position) : createImageFileNode(file, position));
         },
         onFilesDropped: (files, worldPos) => {
-            const file = Array.from(files).find(
-                (item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item),
-            );
+            const file = Array.from(files).find((item) => item.type.startsWith("image/") || item.type.startsWith("video/") || isAudioFile(item));
             if (!file) return;
-            void (isAudioFile(file)
-                ? createAudioFileNode(file, worldPos)
-                : file.type.startsWith("video/")
-                  ? createVideoFileNode(file, worldPos)
-                  : createImageFileNode(file, worldPos));
+            void (isAudioFile(file) ? createAudioFileNode(file, worldPos) : file.type.startsWith("video/") ? createVideoFileNode(file, worldPos) : createImageFileNode(file, worldPos));
         },
         screenToCanvas,
     });
-
 
     const pasteAssistantImage = useCallback(
         (file: File) => {
@@ -1552,9 +1426,7 @@ function InfiniteCanvasPage() {
     const handleGenerateNode = useCallback(
         async (nodeId: string, mode: CanvasNodeGenerationMode, prompt: string) => {
             const sourceNode = nodesRef.current.find((node) => node.id === nodeId);
-            const nodePrompt = sourceNode?.type === CanvasNodeType.Config
-                ? sourceNode.metadata?.composerContent || prompt || sourceNode.metadata?.prompt || ""
-                : prompt || sourceNode?.metadata?.prompt || "";
+            const nodePrompt = sourceNode?.type === CanvasNodeType.Config ? sourceNode.metadata?.composerContent || prompt || sourceNode.metadata?.prompt || "" : prompt || sourceNode?.metadata?.prompt || "";
             const generationConfig = buildGenCfg(sourceNode, mode);
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
                 openConfigDialog(true);
@@ -1654,7 +1526,6 @@ function InfiniteCanvasPage() {
     useEffect(() => {
         generateNodeRef.current = handleGenerateNode;
     }, [handleGenerateNode]);
-
 
     const insertAssistantImage = useCallback(
         async (image: CanvasAssistantImage) => {
@@ -1871,6 +1742,7 @@ function InfiniteCanvasPage() {
                             onConnectStart={handleConnectStart}
                             onResize={resizeNode}
                             onContentChange={updateNodeContent}
+                            onTitleChange={updateNodeTitle}
                             onToggleBatch={toggleBatchExpanded}
                             onSetBatchPrimary={setBatchPrimary}
                             onRetry={(node) => void retryNode(node)}
@@ -1897,7 +1769,16 @@ function InfiniteCanvasPage() {
                             }}
                         />
                     ) : null}
-                    {pendingConnectionCreate ? <ConnectionCreateMenu pending={pendingConnectionCreate} onCreate={(type) => { createConnectedNode(type, pendingConnectionCreate); cancelPendingConnectionCreate(); }} onClose={cancelPendingConnectionCreate} /> : null}
+                    {pendingConnectionCreate ? (
+                        <ConnectionCreateMenu
+                            pending={pendingConnectionCreate}
+                            onCreate={(type) => {
+                                createConnectedNode(type, pendingConnectionCreate);
+                                cancelPendingConnectionCreate();
+                            }}
+                            onClose={cancelPendingConnectionCreate}
+                        />
+                    ) : null}
                 </InfiniteCanvas>
 
                 <CanvasNodeHoverToolbar
@@ -1976,13 +1857,7 @@ function InfiniteCanvasPage() {
                     />
                 ) : null}
 
-                <CanvasDirectorModalHost
-                    directorNode={directorNode}
-                    directorDeskSrc={directorDeskSrc}
-                    directorIframeRef={directorIframeRef}
-                    onClose={() => setDirectorNodeId(null)}
-                    onLoad={postDirectorSession}
-                />
+                <CanvasDirectorModalHost directorNode={directorNode} directorDeskSrc={directorDeskSrc} directorIframeRef={directorIframeRef} onClose={() => setDirectorNodeId(null)} onLoad={postDirectorSession} />
 
                 <CanvasImageDialogsHost
                     imageInputRef={imageInputRef}
