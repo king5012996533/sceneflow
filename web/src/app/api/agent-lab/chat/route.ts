@@ -1,6 +1,7 @@
 import { buildAgentLabMessages, fallbackAgentLabAnswer } from "@/lib/agent-lab/skills";
 import { splitAgentLabArtifact } from "@/lib/agent-lab/parser";
-import { assertAllowedProxyUrl } from "@/lib/url-safety";
+import { requireCurrentUser } from "@/lib/current-user";
+import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
 import type { AgentLabRequest, AgentLabResponse } from "@/lib/agent-lab/types";
 
 export const runtime = "nodejs";
@@ -10,6 +11,10 @@ const TRUSTED_PROVIDER_HOSTS = new Set(["api.deepseek.com", "api.openai.com", "a
 
 export async function POST(request: Request) {
     try {
+        // 防止未登录用户无限调用消耗服务器 API Key
+        const user = await requireCurrentUser(request);
+        if (!user) return Response.json({ error: "请先登录" }, { status: 401 });
+
         const body = (await request.json()) as AgentLabRequest;
         const messages = (body.messages || []).filter((message) => (message.role === "user" || message.role === "assistant") && message.content?.trim()).slice(-12);
         const lastUser = [...messages]
@@ -24,7 +29,7 @@ export async function POST(request: Request) {
             return Response.json({ ...fallback, model: "fallback-local" } satisfies AgentLabResponse);
         }
 
-        const response = await fetch(`${provider.baseUrl}/chat/completions`, {
+        const response = await fetchSafely(`${provider.baseUrl}/chat/completions`, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${provider.apiKey}`,

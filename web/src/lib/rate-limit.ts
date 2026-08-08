@@ -25,7 +25,15 @@ export async function checkRateLimit(key: string, config: RateLimitConfig): Prom
 }
 
 export function getClientIp(req: Request): string {
-  const forwarded = req.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  return req.headers.get("x-real-ip") || "unknown";
+    // nginx 用 $remote_addr 覆写 X-Real-IP，客户端无法伪造；优先用它。
+    // X-Forwarded-For 取最后一段（nginx 的 $proxy_add_x_forwarded_for 会把真实 IP 追加在末尾），
+    // 不要取第一段——那是客户端可任意伪造的。
+    const realIp = req.headers.get("x-real-ip");
+    if (realIp) return realIp.trim();
+    const forwarded = req.headers.get("x-forwarded-for");
+    if (forwarded) {
+        const parts = forwarded.split(",").map((item) => item.trim()).filter(Boolean);
+        if (parts.length) return parts[parts.length - 1];
+    }
+    return "unknown";
 }

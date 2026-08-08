@@ -20,6 +20,19 @@ return {
         typescript: {
             ignoreBuildErrors: true,
         },
+        async headers() {
+            return [
+                {
+                    source: "/(.*)",
+                    headers: [
+                        { key: "X-Content-Type-Options", value: "nosniff" },
+                        { key: "X-Frame-Options", value: "SAMEORIGIN" },
+                        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+                        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+                    ],
+                },
+            ];
+        },
         env: {
             NEXT_PUBLIC_APP_VERSION: localVersion,
             NEXT_PUBLIC_APP_RELEASES: JSON.stringify(releases),

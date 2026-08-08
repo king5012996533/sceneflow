@@ -1,10 +1,12 @@
 // verification-code.ts — 验证码存储与校验（邮箱 + 手机通用）
+import { randomInt } from "node:crypto";
 import { prisma } from "@/lib/ic-prisma";
 
 const CODE_TTL_MS = 300_000; // 5 分钟
 
 export function generateCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  // 加密安全随机数，避免 Math.random 可预测
+  return String(randomInt(100000, 1000000));
 }
 
 export async function storeCode(target: string, method: "email" | "phone", code: string): Promise<void> {

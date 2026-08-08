@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { assertAllowedProxyUrl } from "@/lib/url-safety";
+import { requireCurrentUser } from "@/lib/current-user";
+import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,6 +8,10 @@ export const dynamic = "force-dynamic";
 const WEBDAV_PROXY_TIMEOUT_MS = 120000;
 
 export async function POST(request: NextRequest) {
+    // 真实鉴权（中间件只查 token 存在性，路由必须验签）
+    const user = await requireCurrentUser(request);
+    if (!user) return new Response("请先登录", { status: 401 });
+
     const target = request.headers.get("x-webdav-target") || "";
     const method = (request.headers.get("x-webdav-method") || "GET").toUpperCase();
     if (!target) return new Response("Missing x-webdav-target", { status: 400 });
@@ -30,9 +35,7 @@ export async function POST(request: NextRequest) {
     const timer = setTimeout(() => controller.abort(), WEBDAV_PROXY_TIMEOUT_MS);
     try {
         const body = method === "GET" || method === "HEAD" ? undefined : await request.arrayBuffer();
-        console.log(`[webdav-proxy] ${method} ${url.href} ${body?.byteLength || 0}B`);
-        const response = await fetch(url, { method, headers, body: body?.byteLength ? body : undefined, signal: controller.signal });
-        console.log(`[webdav-proxy] ${method} ${url.href} -> ${response.status}`);
+        const response = await fetchSafely(url.toString(), { method, headers, body: body?.byteLength ? body : undefined, signal: controller.signal });
         return new Response(method === "HEAD" ? null : response.body, {
             status: response.status,
             headers: responseHeaders(response.headers),

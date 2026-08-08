@@ -15,9 +15,6 @@ const PUBLIC_PATHS = [
     "/api/billing/plans",
     "/api/payments/callback",
     "/api/prompts",
-    "/api/experience-agent",
-    "/api/agent-lab",
-    "/agent-lab",
 ];
 
 const STATIC_PREFIXES = [

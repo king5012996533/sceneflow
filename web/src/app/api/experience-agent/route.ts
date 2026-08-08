@@ -1,3 +1,6 @@
+import { requireCurrentUser } from "@/lib/current-user";
+import { fetchSafely } from "@/lib/url-safety";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -39,6 +42,10 @@ API 接入重点：
 
 export async function POST(request: Request) {
     try {
+        // 防止未登录用户无限调用消耗服务器 API Key
+        const user = await requireCurrentUser(request);
+        if (!user) return Response.json({ error: "请先登录" }, { status: 401 });
+
         const body = (await request.json()) as { messages?: ExperienceMessage[] };
         const messages = (body.messages || []).filter((item) => (item.role === "user" || item.role === "assistant") && item.content?.trim()).slice(-8);
         const lastUser = [...messages].reverse().find((item) => item.role === "user")?.content.trim();
@@ -51,7 +58,7 @@ export async function POST(request: Request) {
 
         const baseUrl = (process.env.DEEPSEEK_BASE_URL || process.env.EXPERIENCE_AGENT_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
         const model = process.env.DEEPSEEK_MODEL || process.env.EXPERIENCE_AGENT_MODEL || "deepseek-chat";
-        const response = await fetch(`${baseUrl}/chat/completions`, {
+        const response = await fetchSafely(`${baseUrl}/chat/completions`, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${apiKey}`,
