@@ -19,6 +19,7 @@ type CanvasNodeProps = {
     data: CanvasNodeData;
     scale: number;
     isSelected: boolean;
+    isDragging?: boolean;
     isRelated: boolean;
     isFocusRelated: boolean;
     isConnectionTarget: boolean;
@@ -76,6 +77,7 @@ export const CanvasNode = React.memo(function CanvasNode({
     data,
     scale,
     isSelected,
+    isDragging = false,
     isRelated,
     isFocusRelated,
     isConnectionTarget,
@@ -275,13 +277,14 @@ export const CanvasNode = React.memo(function CanvasNode({
     return (
         <div
             data-node-id={data.id}
-            className={`node-element absolute flex select-none flex-col transition-shadow duration-200 ${isSelected ? "z-50" : "z-10"}`}
+            className={`node-element absolute flex select-none flex-col transition-shadow duration-200 ${isDragging ? "z-[60]" : isSelected ? "z-50" : "z-10"}`}
             style={{
                 transform: `translate(${data.position.x}px, ${data.position.y}px)`,
                 width: data.width,
                 height: data.height,
                 transition: "box-shadow 200ms ease",
                 contain: "layout style",
+                willChange: isDragging ? "transform" : undefined,
             }}
             onMouseEnter={() => {
                 setHovered(true);
@@ -332,24 +335,18 @@ export const CanvasNode = React.memo(function CanvasNode({
                 className="relative h-full w-full overflow-visible rounded-3xl border-2 transition-[box-shadow,border-color] duration-150"
                 style={{
                     background: hasImageContent || hasVideoContent || hasDirectorShotContent ? "transparent" : theme.node.fill,
-                    borderColor: hasImageContent
-                        ? hovered && !isActive && !isBatchChild
-                            ? theme.node.muted
-                            : imageBorderColor
+                    borderColor: hasImageContent ? (hovered && !isActive && !isBatchChild ? theme.node.muted : imageBorderColor) : isActive ? selectionBlue : isRelated ? theme.node.muted : hovered ? theme.node.muted : theme.node.stroke,
+                    transform: isDragging ? "scale(1.02)" : undefined,
+                    transition: "transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease",
+                    boxShadow: isDragging
+                        ? `0 26px 64px rgba(0,0,0,.32), 0 0 0 1px ${isActive ? selectionBlue : theme.node.muted}44`
                         : isActive
-                          ? selectionBlue
-                          : isRelated
-                            ? theme.node.muted
+                          ? `0 0 0 1.5px ${selectionBlue}66, 0 10px 34px rgba(47,128,255,.16)`
+                          : isRelated && !isBatchChild
+                            ? `0 0 0 1px ${theme.node.muted}55, 0 18px 48px rgba(0,0,0,.14)`
                             : hovered
-                              ? theme.node.muted
-                              : theme.node.stroke,
-                    boxShadow: isActive
-                        ? `0 0 0 1.5px ${selectionBlue}66, 0 10px 34px rgba(47,128,255,.16)`
-                        : isRelated && !isBatchChild
-                          ? `0 0 0 1px ${theme.node.muted}55, 0 18px 48px rgba(0,0,0,.14)`
-                          : hovered
-                            ? `0 14px 40px rgba(0,0,0,.16)`
-                            : undefined,
+                              ? `0 14px 40px rgba(0,0,0,.16)`
+                              : undefined,
                 }}
                 onMouseDown={(event) => onMouseDown(event, data.id)}
                 onDoubleClick={(event) => {

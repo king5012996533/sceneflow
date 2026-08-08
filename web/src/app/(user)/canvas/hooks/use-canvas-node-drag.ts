@@ -29,6 +29,7 @@ export function useCanvasNodeDrag(options: UseCanvasNodeDragOptions) {
     const { nodesRef, selectedNodeIdsRef, viewportRef, historyPausedRef, setNodes, setSelectedNodeIds, setSelectedConnectionId, setContextMenu, setDialogNodeId } = options;
 
     const [isNodeDragging, setIsNodeDragging] = useState(false);
+    const [draggingNodeIds, setDraggingNodeIds] = useState<Set<string>>(new Set());
     const nodeDraggingRef = useRef(false);
     const rafRef = useRef<number | null>(null);
     const dragRef = useRef<DragState>({
@@ -39,42 +40,46 @@ export function useCanvasNodeDrag(options: UseCanvasNodeDragOptions) {
         initialSelectedNodes: [],
     });
 
-    const handleNodePointerDown = useCallback((event: ReactMouseEvent, nodeId: string) => {
-        event.stopPropagation();
-        setContextMenu(null);
-        setSelectedConnectionId(null);
+    const handleNodePointerDown = useCallback(
+        (event: ReactMouseEvent, nodeId: string) => {
+            event.stopPropagation();
+            setContextMenu(null);
+            setSelectedConnectionId(null);
 
-        const currentSelected = selectedNodeIdsRef.current;
-        const currentNodes = nodesRef.current;
-        const nextSelected = new Set(currentSelected);
+            const currentSelected = selectedNodeIdsRef.current;
+            const currentNodes = nodesRef.current;
+            const nextSelected = new Set(currentSelected);
 
-        if (event.shiftKey || event.metaKey || event.ctrlKey) {
-            if (nextSelected.has(nodeId)) {
-                nextSelected.delete(nodeId);
-            } else {
+            if (event.shiftKey || event.metaKey || event.ctrlKey) {
+                if (nextSelected.has(nodeId)) {
+                    nextSelected.delete(nodeId);
+                } else {
+                    nextSelected.add(nodeId);
+                }
+            } else if (!nextSelected.has(nodeId)) {
+                nextSelected.clear();
                 nextSelected.add(nodeId);
             }
-        } else if (!nextSelected.has(nodeId)) {
-            nextSelected.clear();
-            nextSelected.add(nodeId);
-        }
 
-        setSelectedNodeIds(nextSelected);
-        const dragIds = new Set(nextSelected);
-        currentNodes.forEach((node) => {
-            if (nextSelected.has(node.id)) node.metadata?.batchChildIds?.forEach((childId) => dragIds.add(childId));
-        });
-        dragRef.current = {
-            isDraggingNode: true,
-            hasMoved: false,
-            startX: event.clientX,
-            startY: event.clientY,
-            initialSelectedNodes: currentNodes.filter((node) => dragIds.has(node.id)).map((node) => ({ id: node.id, x: node.position.x, y: node.position.y })),
-        };
-        historyPausedRef.current = true;
-        nodeDraggingRef.current = true;
-        setIsNodeDragging(true);
-    }, [selectedNodeIdsRef, nodesRef, historyPausedRef, setContextMenu, setSelectedConnectionId, setSelectedNodeIds, setIsNodeDragging]);
+            setSelectedNodeIds(nextSelected);
+            const dragIds = new Set(nextSelected);
+            currentNodes.forEach((node) => {
+                if (nextSelected.has(node.id)) node.metadata?.batchChildIds?.forEach((childId) => dragIds.add(childId));
+            });
+            dragRef.current = {
+                isDraggingNode: true,
+                hasMoved: false,
+                startX: event.clientX,
+                startY: event.clientY,
+                initialSelectedNodes: currentNodes.filter((node) => dragIds.has(node.id)).map((node) => ({ id: node.id, x: node.position.x, y: node.position.y })),
+            };
+            historyPausedRef.current = true;
+            nodeDraggingRef.current = true;
+            setDraggingNodeIds(new Set(dragIds));
+            setIsNodeDragging(true);
+        },
+        [selectedNodeIdsRef, nodesRef, historyPausedRef, setContextMenu, setSelectedConnectionId, setSelectedNodeIds, setIsNodeDragging],
+    );
 
     const handleNodeDragPointerMove = useCallback(
         (event: MouseEvent) => {
@@ -87,6 +92,7 @@ export function useCanvasNodeDrag(options: UseCanvasNodeDragOptions) {
             const initialPositions = dragRef.current.initialSelectedNodes;
             if (Math.abs(event.clientX - dragRef.current.startX) > 3 || Math.abs(event.clientY - dragRef.current.startY) > 3) {
                 dragRef.current.hasMoved = true;
+                if (document.body.style.cursor !== "grabbing") document.body.style.cursor = "grabbing";
             }
 
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -120,6 +126,8 @@ export function useCanvasNodeDrag(options: UseCanvasNodeDragOptions) {
 
             historyPausedRef.current = false;
             nodeDraggingRef.current = false;
+            setDraggingNodeIds(new Set());
+            if (document.body.style.cursor === "grabbing") document.body.style.cursor = "";
             setIsNodeDragging(false);
             if (dragRef.current.hasMoved && clientX != null && clientY != null) {
                 setNodes((prev) =>
@@ -148,6 +156,7 @@ export function useCanvasNodeDrag(options: UseCanvasNodeDragOptions) {
 
     return {
         isNodeDragging,
+        draggingNodeIds,
         nodeDraggingRef,
         dragRef,
         rafRef,

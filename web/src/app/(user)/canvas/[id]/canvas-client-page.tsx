@@ -573,7 +573,7 @@ function InfiniteCanvasPage() {
         connectNodes,
     });
 
-    const { isNodeDragging, nodeDraggingRef, dragRef, handleNodePointerDown, handleNodeDragPointerMove, finishNodeDrag } = useCanvasNodeDrag({
+    const { isNodeDragging, draggingNodeIds, nodeDraggingRef, dragRef, handleNodePointerDown, handleNodeDragPointerMove, finishNodeDrag } = useCanvasNodeDrag({
         nodesRef,
         selectedNodeIdsRef,
         viewportRef,
@@ -1669,6 +1669,7 @@ function InfiniteCanvasPage() {
                             data={node}
                             scale={viewport.k}
                             isSelected={selectedNodeIds.has(node.id)}
+                            isDragging={draggingNodeIds.has(node.id)}
                             isRelated={relatedHighlight.nodeIds.has(node.id)}
                             isFocusRelated={activeNodeId === node.id}
                             isConnectionTarget={connectionTargetNodeId === node.id}
