@@ -33,7 +33,7 @@ type BillingState = {
 };
 
 function formatPrice(amount: number) {
-    return `¥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
+    return `¥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
 }
 
 export default function BillingPage() {

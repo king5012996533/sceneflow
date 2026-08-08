@@ -7,18 +7,7 @@ export type PaymentProvider = "wechat" | "alipay" | "stripe" | "manual";
 
 type DefaultEntitlement = readonly [key: string, label: string, value: string, unit: string];
 
-export const PLAN_ENTITLEMENT_ORDER = [
-    "projects",
-    "storage_gb",
-    "concurrent_jobs",
-    "hd_export",
-    "private_characters",
-    "canvas_agent",
-    "creative_agent",
-    "cut_editor",
-    "asset_library",
-    "team_members",
-] as const;
+export const PLAN_ENTITLEMENT_ORDER = ["projects", "storage_gb", "concurrent_jobs", "hd_export", "private_characters", "canvas_agent", "creative_agent", "cut_editor", "asset_library", "team_members"] as const;
 
 export function sortPlanEntitlements<T extends { key: string }>(entitlements: T[]) {
     const order = new Map<string, number>(PLAN_ENTITLEMENT_ORDER.map((key, index) => [key, index]));
@@ -131,7 +120,7 @@ export function getPlanAmount(plan: { monthlyPrice: number; yearlyPrice: number 
 }
 
 export function formatCny(amount: number) {
-    return `￥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
+    return `￥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
 }
 
 export function createOrderNo() {
@@ -178,17 +167,7 @@ export async function ensureDefaultPlans() {
     }
 }
 
-export async function activateSubscription({
-    userId,
-    planId,
-    cycle,
-    provider,
-}: {
-    userId: string;
-    planId: string;
-    cycle: BillingCycle;
-    provider: PaymentProvider;
-}) {
+export async function activateSubscription({ userId, planId, cycle, provider }: { userId: string; planId: string; cycle: BillingCycle; provider: PaymentProvider }) {
     if (!prisma) throw new Error("Database unavailable");
 
     const now = new Date();

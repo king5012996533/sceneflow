@@ -34,8 +34,7 @@ const copy = {
     betaAccess: "Beta Access",
     betaTag: "\u5185\u6d4b\u671f\u4eba\u5de5\u5f00\u901a",
     title: "\u9009\u62e9\u9002\u5408\u4f60\u7684\u751f\u4ea7\u89c4\u6a21",
-    intro:
-        "\u5f53\u524d\u9636\u6bb5\u6682\u4e0d\u63a5\u5165\u5728\u7ebf\u6536\u94f6\u53f0\uff0c\u5957\u9910\u4ecd\u6309\u6240\u9009\u6743\u76ca\u4ed8\u8d39\u624b\u52a8\u5f00\u901a\u6743\u76ca\u3002\u9009\u62e9\u5957\u9910\u540e\u4f1a\u751f\u6210\u5bf9\u5e94\u5e94\u4ed8\u91d1\u989d\u548c\u4ed8\u6b3e\u5907\u6ce8\uff0c\u626b\u7801\u4ed8\u6b3e\u540e\u8054\u7cfb\u7ba1\u7406\u5458\u5f00\u901a\u3002",
+    intro: "\u5f53\u524d\u9636\u6bb5\u6682\u4e0d\u63a5\u5165\u5728\u7ebf\u6536\u94f6\u53f0\uff0c\u5957\u9910\u4ecd\u6309\u6240\u9009\u6743\u76ca\u4ed8\u8d39\u624b\u52a8\u5f00\u901a\u6743\u76ca\u3002\u9009\u62e9\u5957\u9910\u540e\u4f1a\u751f\u6210\u5bf9\u5e94\u5e94\u4ed8\u91d1\u989d\u548c\u4ed8\u6b3e\u5907\u6ce8\uff0c\u626b\u7801\u4ed8\u6b3e\u540e\u8054\u7cfb\u7ba1\u7406\u5458\u5f00\u901a\u3002",
     monthly: "\u6708\u4ed8",
     yearly: "\u5e74\u4ed8",
     popular: "\u63a8\u8350\u5957\u9910",
@@ -58,10 +57,8 @@ const copy = {
     payMonth: "\u6708\u4ed8",
     paymentNote: "\u4ed8\u6b3e\u5907\u6ce8",
     qrAlt: "\u5fae\u4fe1\u6536\u6b3e\u7801",
-    qrTip:
-        "\u4e2a\u4eba\u6536\u6b3e\u7801\u4e0d\u4f1a\u81ea\u52a8\u9501\u5b9a\u91d1\u989d\uff0c\u8bf7\u6309\u4e0a\u65b9\u91d1\u989d\u4ed8\u6b3e\u3002\u4ed8\u6b3e\u5b8c\u6210\u540e\uff0c\u628a\u4ed8\u6b3e\u622a\u56fe\u6216\u5907\u6ce8\u53d1\u7ed9\u7ba1\u7406\u5458\uff0c\u7ba1\u7406\u5458\u4f1a\u6309\u8d26\u53f7\u624b\u52a8\u5f00\u901a\u5957\u9910\u6743\u76ca\u3002",
-    footer:
-        "\u63d0\u4ea4\u5f00\u901a\u7533\u8bf7\u4e0d\u7b49\u4e8e\u514d\u8d39\u5f00\u901a\u3002\u7ba1\u7406\u5458\u4f1a\u6839\u636e\u4ed8\u6b3e\u8bb0\u5f55\u3001\u4ed8\u6b3e\u5907\u6ce8\u548c\u8d26\u53f7\u4fe1\u606f\u5b8c\u6210\u5957\u9910\u6743\u76ca\u5f00\u901a\u3002",
+    qrTip: "\u4e2a\u4eba\u6536\u6b3e\u7801\u4e0d\u4f1a\u81ea\u52a8\u9501\u5b9a\u91d1\u989d\uff0c\u8bf7\u6309\u4e0a\u65b9\u91d1\u989d\u4ed8\u6b3e\u3002\u4ed8\u6b3e\u5b8c\u6210\u540e\uff0c\u628a\u4ed8\u6b3e\u622a\u56fe\u6216\u5907\u6ce8\u53d1\u7ed9\u7ba1\u7406\u5458\uff0c\u7ba1\u7406\u5458\u4f1a\u6309\u8d26\u53f7\u624b\u52a8\u5f00\u901a\u5957\u9910\u6743\u76ca\u3002",
+    footer: "\u63d0\u4ea4\u5f00\u901a\u7533\u8bf7\u4e0d\u7b49\u4e8e\u514d\u8d39\u5f00\u901a\u3002\u7ba1\u7406\u5458\u4f1a\u6839\u636e\u4ed8\u6b3e\u8bb0\u5f55\u3001\u4ed8\u6b3e\u5907\u6ce8\u548c\u8d26\u53f7\u4fe1\u606f\u5b8c\u6210\u5957\u9910\u6743\u76ca\u5f00\u901a\u3002",
     backCanvas: "\u56de\u5230\u753b\u5e03",
 };
 
@@ -74,7 +71,7 @@ const planIcons = {
 
 function formatPrice(amount: number) {
     if (amount <= 0) return copy.free;
-    return `\uffe5${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
+    return `\uffe5${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
 }
 
 function formatEntitlement(value: string, unit: string) {
@@ -195,9 +192,7 @@ export default function PricingPage() {
                                     plan.isPopular ? "border-[#4f5cff] ring-1 ring-[#4f5cff]" : "border-[#eadfce]",
                                 )}
                             >
-                                {plan.isPopular ? (
-                                    <span className="absolute right-6 top-6 rounded-full bg-[#4f5cff] px-3 py-1 text-xs font-medium text-white">{copy.popular}</span>
-                                ) : null}
+                                {plan.isPopular ? <span className="absolute right-6 top-6 rounded-full bg-[#4f5cff] px-3 py-1 text-xs font-medium text-white">{copy.popular}</span> : null}
 
                                 <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f0eaff] text-[#4f5cff]">
                                     <Icon className="h-7 w-7" />

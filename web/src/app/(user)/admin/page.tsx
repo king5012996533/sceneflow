@@ -85,7 +85,7 @@ type GenerationJob = {
 };
 
 function formatPrice(amount: number) {
-    return `¥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
+    return `¥${(amount / 100).toLocaleString("zh-CN", { maximumFractionDigits: 2 })}`;
 }
 
 function formatDateTime(value?: string | null) {
@@ -573,24 +573,12 @@ export default function AdminPage() {
                                                         <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
                                                             <div className="flex items-center gap-2 text-stone-600">
                                                                 月度
-                                                                <InputNumber
-                                                                    min={0}
-                                                                    precision={0}
-                                                                    value={Math.round(draft.monthlyPrice / 100)}
-                                                                    onChange={(value) => updatePlanDraft(plan.id, { monthlyPrice: Math.round((value ?? 0) * 100) })}
-                                                                    className="w-28"
-                                                                />
+                                                                <InputNumber min={0} precision={2} value={draft.monthlyPrice / 100} onChange={(value) => updatePlanDraft(plan.id, { monthlyPrice: Math.round((value ?? 0) * 100) })} className="w-28" />
                                                                 <span className="text-stone-400">元</span>
                                                             </div>
                                                             <div className="flex items-center gap-2 text-stone-600">
                                                                 年度
-                                                                <InputNumber
-                                                                    min={0}
-                                                                    precision={0}
-                                                                    value={Math.round(draft.yearlyPrice / 100)}
-                                                                    onChange={(value) => updatePlanDraft(plan.id, { yearlyPrice: Math.round((value ?? 0) * 100) })}
-                                                                    className="w-28"
-                                                                />
+                                                                <InputNumber min={0} precision={2} value={draft.yearlyPrice / 100} onChange={(value) => updatePlanDraft(plan.id, { yearlyPrice: Math.round((value ?? 0) * 100) })} className="w-28" />
                                                                 <span className="text-stone-400">元</span>
                                                             </div>
                                                         </div>
