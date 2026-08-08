@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Empty, Input, Select, Tabs, Tag, Tooltip } from "antd";
+import { App, Button, Empty, Input, InputNumber, Select, Switch, Tabs, Tag, Tooltip } from "antd";
 import { Ban, Boxes, CreditCard, Database, FileText, History, Settings, Shield, Users } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
@@ -47,10 +47,21 @@ type AdminConfig = {
         monthlyPrice: number;
         yearlyPrice: number;
         isActive: boolean;
-        entitlements: Array<{ label: string; value: string; unit: string }>;
+        isPopular?: boolean;
+        entitlements: Array<{ key: string; label: string; value: string; unit: string }>;
     }>;
     modelConfigs: Array<{ id: string; provider: string; model: string; displayName: string; type: string; enabled: boolean; isDefault: boolean }>;
     operationConfigs: Array<{ id: string; key: string; value: unknown; description: string }>;
+};
+
+type PlanEntitlementDraft = { key: string; label: string; value: string; unit: string };
+type PlanDraft = {
+    name: string;
+    monthlyPrice: number;
+    yearlyPrice: number;
+    isActive: boolean;
+    isPopular: boolean;
+    entitlements: PlanEntitlementDraft[];
 };
 
 type AuditLog = {
@@ -114,6 +125,7 @@ export default function AdminPage() {
     const [checkingAccess, setCheckingAccess] = useState(true);
     const [selectedPlans, setSelectedPlans] = useState<Record<string, string>>({});
     const [selectedCycles, setSelectedCycles] = useState<Record<string, "monthly" | "yearly">>({});
+    const [planDrafts, setPlanDrafts] = useState<Record<string, PlanDraft>>({});
 
     async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
         const res = await fetch(url, init);
@@ -163,6 +175,31 @@ export default function AdminPage() {
     }, [fetchSession]);
 
     useEffect(() => {
+        if (!config) return;
+        setPlanDrafts((prev) => {
+            const next = { ...prev };
+            for (const plan of config.plans) {
+                if (!next[plan.id]) {
+                    next[plan.id] = {
+                        name: plan.name,
+                        monthlyPrice: plan.monthlyPrice,
+                        yearlyPrice: plan.yearlyPrice,
+                        isActive: plan.isActive,
+                        isPopular: plan.isPopular ?? false,
+                        entitlements: plan.entitlements.map((item) => ({
+                            key: item.key,
+                            label: item.label,
+                            value: item.value,
+                            unit: item.unit,
+                        })),
+                    };
+                }
+            }
+            return next;
+        });
+    }, [config]);
+
+    useEffect(() => {
         if (checkingAccess) return;
         if (user?.role !== "admin") {
             message.error("没有管理员权限");
@@ -197,6 +234,39 @@ export default function AdminPage() {
             await loadAll();
         } catch (error) {
             message.error(error instanceof Error ? error.message : "更新记录失败");
+        }
+    }
+
+    function updatePlanDraft(planId: string, patch: Partial<PlanDraft>) {
+        setPlanDrafts((prev) => {
+            const draft = prev[planId];
+            if (!draft) return prev;
+            return { ...prev, [planId]: { ...draft, ...patch } };
+        });
+    }
+
+    function updatePlanEntitlement(planId: string, index: number, patch: Partial<PlanEntitlementDraft>) {
+        setPlanDrafts((prev) => {
+            const draft = prev[planId];
+            if (!draft) return prev;
+            const entitlements = draft.entitlements.map((item, i) => (i === index ? { ...item, ...patch } : item));
+            return { ...prev, [planId]: { ...draft, entitlements } };
+        });
+    }
+
+    async function savePlan(planId: string) {
+        const draft = planDrafts[planId];
+        if (!draft) return;
+        try {
+            await requestJson(apiPath("/api/admin/configs"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type: "plan", planId, ...draft }),
+            });
+            message.success("套餐已保存，定价页立即生效");
+            await loadAll();
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "保存套餐失败");
         }
     }
 
@@ -406,7 +476,9 @@ export default function AdminPage() {
                                                 <tr key={log.id} className="border-b border-stone-100">
                                                     <td className="py-3 text-sm text-stone-600">{formatDateTime(log.createdAt)}</td>
                                                     <td className="py-3 text-sm">{log.actor?.email || "-"}</td>
-                                                    <td className="py-3"><Tag>{log.action}</Tag></td>
+                                                    <td className="py-3">
+                                                        <Tag>{log.action}</Tag>
+                                                    </td>
                                                     <td className="py-3 text-sm">{log.target}</td>
                                                     <td className="py-3 font-mono text-xs text-stone-500">{log.targetId.slice(0, 12)}...</td>
                                                     <td className="py-3 text-xs text-stone-400 max-w-[200px] truncate">{JSON.stringify(log.metadata)}</td>
@@ -442,12 +514,12 @@ export default function AdminPage() {
                                                 <tr key={job.id} className="border-b border-stone-100">
                                                     <td className="py-3 text-sm text-stone-600">{formatDateTime(job.createdAt)}</td>
                                                     <td className="py-3 text-sm">{job.user?.email || "-"}</td>
-                                                    <td className="py-3"><Tag>{job.kind}</Tag></td>
+                                                    <td className="py-3">
+                                                        <Tag>{job.kind}</Tag>
+                                                    </td>
                                                     <td className="py-3 text-sm">{String(job.metadata?.model || job.metadata?.imageModel || job.metadata?.videoModel || "-")}</td>
                                                     <td className="py-3">
-                                                        <Tag color={job.status === "succeeded" ? "green" : job.status === "failed" ? "red" : "blue"}>
-                                                            {job.status}
-                                                        </Tag>
+                                                        <Tag color={job.status === "succeeded" ? "green" : job.status === "failed" ? "red" : "blue"}>{job.status}</Tag>
                                                     </td>
                                                     <td className="py-3">
                                                         {job.resultUrl ? (
@@ -471,27 +543,71 @@ export default function AdminPage() {
                             children: (
                                 <div className="grid gap-4 lg:grid-cols-2">
                                     <section className="rounded-lg border border-stone-200 bg-white p-5">
-                                        <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                                            <Settings className="size-5" />
-                                            套餐权益
+                                        <div className="mb-4 flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2 text-lg font-semibold">
+                                                <Settings className="size-5" />
+                                                套餐权益
+                                            </div>
+                                            <span className="text-xs text-stone-400">修改保存后立即生效（定价页 / 开通均读取数据库）</span>
                                         </div>
-                                        <div className="space-y-3">
-                                            {config?.plans.map((plan) => (
-                                                <div key={plan.id} className="rounded-md border border-stone-200 p-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="font-medium">{plan.name}</div>
-                                                        <Tag>{plan.isActive ? "上架" : "下架"}</Tag>
+                                        <div className="space-y-4">
+                                            {(config?.plans || []).map((plan) => {
+                                                const draft = planDrafts[plan.id];
+                                                if (!draft) return null;
+                                                return (
+                                                    <div key={plan.id} className="rounded-md border border-stone-200 p-4">
+                                                        <div className="flex flex-wrap items-center gap-3">
+                                                            <Input value={draft.name} maxLength={40} onChange={(event) => updatePlanDraft(plan.id, { name: event.target.value })} className="w-36" />
+                                                            <div className="flex items-center gap-2 text-sm text-stone-600">
+                                                                <Switch size="small" checked={draft.isActive} onChange={(checked) => updatePlanDraft(plan.id, { isActive: checked })} />
+                                                                上架
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-sm text-stone-600">
+                                                                <Switch size="small" checked={draft.isPopular} onChange={(checked) => updatePlanDraft(plan.id, { isPopular: checked })} />
+                                                                热门
+                                                            </div>
+                                                            <Button type="primary" size="small" className="ml-auto" onClick={() => void savePlan(plan.id)}>
+                                                                保存
+                                                            </Button>
+                                                        </div>
+                                                        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                                                            <div className="flex items-center gap-2 text-stone-600">
+                                                                月度
+                                                                <InputNumber
+                                                                    min={0}
+                                                                    precision={0}
+                                                                    value={Math.round(draft.monthlyPrice / 100)}
+                                                                    onChange={(value) => updatePlanDraft(plan.id, { monthlyPrice: Math.round((value ?? 0) * 100) })}
+                                                                    className="w-28"
+                                                                />
+                                                                <span className="text-stone-400">元</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-stone-600">
+                                                                年度
+                                                                <InputNumber
+                                                                    min={0}
+                                                                    precision={0}
+                                                                    value={Math.round(draft.yearlyPrice / 100)}
+                                                                    onChange={(value) => updatePlanDraft(plan.id, { yearlyPrice: Math.round((value ?? 0) * 100) })}
+                                                                    className="w-28"
+                                                                />
+                                                                <span className="text-stone-400">元</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="mt-3 space-y-1.5">
+                                                            {draft.entitlements.map((item, index) => (
+                                                                <div key={item.key} className="flex items-center gap-2 text-sm">
+                                                                    <span className="w-36 shrink-0 truncate text-stone-500" title={item.label}>
+                                                                        {item.label}
+                                                                    </span>
+                                                                    <Input size="small" value={item.value} maxLength={100} onChange={(event) => updatePlanEntitlement(plan.id, index, { value: event.target.value })} className="w-24" />
+                                                                    <Input size="small" value={item.unit} maxLength={10} onChange={(event) => updatePlanEntitlement(plan.id, index, { unit: event.target.value })} className="w-12" />
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                    <div className="mt-2 text-sm text-stone-500">
-                                                        月度 {formatPrice(plan.monthlyPrice)} / 年度 {formatPrice(plan.yearlyPrice)}
-                                                    </div>
-                                                    <div className="mt-3 flex flex-wrap gap-2">
-                                                        {plan.entitlements.map((item) => (
-                                                            <Tag key={`${plan.id}-${item.label}`}>{`${item.label}: ${item.value}${item.unit}`}</Tag>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </section>
                                     <section className="rounded-lg border border-stone-200 bg-white p-5">

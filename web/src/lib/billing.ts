@@ -149,38 +149,31 @@ export function getPeriodEnd(cycle: BillingCycle) {
 export async function ensureDefaultPlans() {
     if (!prisma) return;
 
+    // 只播种不覆盖：套餐和权益已存在时保持数据库里的当前值不变，
+    // 让 admin 后台可以直接修改价格/权益而不会被硬编码默认值冲掉。
     for (const plan of DEFAULT_PLANS) {
-        await prisma.plan.upsert({
-            where: { id: plan.id },
-            update: {
-                name: plan.name,
-                description: plan.description,
-                monthlyPrice: plan.monthlyPrice,
-                yearlyPrice: plan.yearlyPrice,
-                currency: plan.currency,
-                sortOrder: plan.sortOrder,
-                isPopular: plan.isPopular,
-                isActive: true,
-            },
-            create: {
-                id: plan.id,
-                name: plan.name,
-                description: plan.description,
-                monthlyPrice: plan.monthlyPrice,
-                yearlyPrice: plan.yearlyPrice,
-                currency: plan.currency,
-                sortOrder: plan.sortOrder,
-                isPopular: plan.isPopular,
-                isActive: true,
-            },
-        });
+        const existing = await prisma.plan.findUnique({ where: { id: plan.id } });
+        if (!existing) {
+            await prisma.plan.create({
+                data: {
+                    id: plan.id,
+                    name: plan.name,
+                    description: plan.description,
+                    monthlyPrice: plan.monthlyPrice,
+                    yearlyPrice: plan.yearlyPrice,
+                    currency: plan.currency,
+                    sortOrder: plan.sortOrder,
+                    isPopular: plan.isPopular,
+                    isActive: true,
+                },
+            });
+        }
 
         for (const [key, label, value, unit] of plan.entitlements) {
-            await prisma.entitlement.upsert({
-                where: { planId_key: { planId: plan.id, key } },
-                update: { label, value, unit },
-                create: { planId: plan.id, key, label, value, unit },
-            });
+            const existingEntitlement = await prisma.entitlement.findUnique({ where: { planId_key: { planId: plan.id, key } } });
+            if (!existingEntitlement) {
+                await prisma.entitlement.create({ data: { planId: plan.id, key, label, value, unit } });
+            }
         }
     }
 }

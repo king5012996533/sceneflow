@@ -79,6 +79,56 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ config });
         }
 
+        if (type === "plan") {
+            const planId = String(body.planId || "");
+            const plan = await prisma.plan.findUnique({ where: { id: planId } });
+            if (!plan) return NextResponse.json({ error: "套餐不存在" }, { status: 404 });
+
+            const data: Record<string, unknown> = {};
+            if (body.name !== undefined) data.name = String(body.name || "").slice(0, 40);
+            if (body.description !== undefined) data.description = String(body.description || "");
+            if (body.monthlyPrice !== undefined) {
+                const price = Number(body.monthlyPrice);
+                if (!Number.isFinite(price) || price < 0) return NextResponse.json({ error: "月度价格无效" }, { status: 400 });
+                data.monthlyPrice = Math.round(price);
+            }
+            if (body.yearlyPrice !== undefined) {
+                const price = Number(body.yearlyPrice);
+                if (!Number.isFinite(price) || price < 0) return NextResponse.json({ error: "年度价格无效" }, { status: 400 });
+                data.yearlyPrice = Math.round(price);
+            }
+            if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
+            if (body.isPopular !== undefined) data.isPopular = Boolean(body.isPopular);
+            if (body.sortOrder !== undefined) data.sortOrder = Number(body.sortOrder) || 0;
+
+            const updated = await prisma.plan.update({ where: { id: planId }, data });
+
+            // 权益批量更新（可选）：[{ key, label, value, unit }]
+            if (Array.isArray(body.entitlements)) {
+                for (const item of body.entitlements) {
+                    const key = String(item?.key || "");
+                    if (!key) continue;
+                    await prisma.entitlement.upsert({
+                        where: { planId_key: { planId, key } },
+                        update: {
+                            label: item.label !== undefined ? String(item.label).slice(0, 40) : undefined,
+                            value: item.value !== undefined ? String(item.value).slice(0, 100) : undefined,
+                            unit: item.unit !== undefined ? String(item.unit).slice(0, 10) : undefined,
+                        },
+                        create: {
+                            planId,
+                            key,
+                            label: String(item.label ?? key).slice(0, 40),
+                            value: String(item.value ?? "").slice(0, 100),
+                            unit: String(item.unit ?? "").slice(0, 10),
+                        },
+                    });
+                }
+            }
+
+            return NextResponse.json({ plan: updated });
+        }
+
         return NextResponse.json({ error: "配置类型无效" }, { status: 400 });
     } catch (error) {
         console.error("[admin/configs:post]", error);
