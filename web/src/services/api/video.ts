@@ -51,7 +51,7 @@ function aiHeaders(config: AiConfig, contentType?: string) {
 export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationResult> {
     const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options);
     if (task.result) return task.result;
-    const delayMs = task.provider === "seedance" ? 5000 : task.provider === "replicate" ? 1500 : 2500;
+    const delayMs = task.provider === "seedance" ? 5000 : task.provider === "replicate" ? 1500 : task.provider === "minimax" ? 10000 : 2500;
     for (let attempt = 0; attempt < 120; attempt += 1) {
         if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const state = await pollVideoGenerationTask(config, task, options);
