@@ -34,7 +34,7 @@ const REPLICATE_VIDEO_IMAGE_MAX_BYTES = 900 * 1024;
 const REPLICATE_VIDEO_IMAGE_MAX_SIDE = 1280;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
-export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate"; model: string; result?: VideoGenerationResult };
+export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate" | "minimax"; model: string; result?: VideoGenerationResult };
 export type VideoGenerationTaskState = { status: "pending" } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
 function aiApiUrl(config: AiConfig, path: string) {
@@ -76,6 +76,9 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
         }
         return createReplicateVideoTask(requestConfig, selectedModel, prompt, references, options);
     }
+    if (requestConfig.apiFormat === "minimax") {
+        return createMiniMaxVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
+    }
     if (videoReferences.length || audioReferences.length) {
         throw new Error("当前视频接口不支持参考视频或参考音频，请切换到 Seedance 2.0 / 火山 Agent Plan 模型，或移除参考素材");
     }
@@ -87,6 +90,7 @@ export async function pollVideoGenerationTask(config: AiConfig, task: VideoGener
     assertVideoConfig(requestConfig, requestConfig.model);
     if (task.provider === "seedance") return pollSeedanceTask(requestConfig, task, options);
     if (task.provider === "replicate") return pollReplicateVideoTask(requestConfig, task, options);
+    if (task.provider === "minimax") return pollMiniMaxVideoTask(requestConfig, task, options);
     return pollOpenAIVideoTask(requestConfig, task, options);
 }
 
@@ -165,11 +169,13 @@ async function createSeedanceTask(config: AiConfig, model: string, prompt: strin
 
 async function pollSeedanceTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     try {
-        const state = unwrapSeedanceTask(await proxyFetch<ApiEnvelope<SeedanceTask>>({
-            url: seedanceApiUrl(config, task.id),
-            method: "GET",
-            headers: aiHeaders(config),
-        }));
+        const state = unwrapSeedanceTask(
+            await proxyFetch<ApiEnvelope<SeedanceTask>>({
+                url: seedanceApiUrl(config, task.id),
+                method: "GET",
+                headers: aiHeaders(config),
+            }),
+        );
         if (state.status === "succeeded") {
             const url = state.content?.video_url;
             if (!url) return { status: "failed", error: "Seedance 任务成功但没有返回视频 URL" };
@@ -179,6 +185,128 @@ async function pollSeedanceTask(config: AiConfig, task: VideoGenerationTask, opt
         return { status: "pending" };
     } catch (error) {
         throw new Error(readAxiosError(error, "Seedance 任务查询失败"));
+    }
+}
+
+// ---------- MiniMax（Hailuo / H3，原生 REST 接口）----------
+
+function minimaxApiUrl(config: AiConfig, path: string) {
+    let base = config.baseUrl.trim().replace(/\/+$/, "");
+    if (base.toLowerCase().endsWith("/v1")) base = base.slice(0, -3);
+    return `${base}${path}`;
+}
+
+function minimaxModelName(model: string) {
+    const value = modelOptionName(model).trim();
+    if (value.toLowerCase().includes("h3")) return "MiniMax-H3";
+    throw new Error("MiniMax 渠道目前仅支持 MiniMax-H3（V2 接口），请把模型名设置为 MiniMax-H3 或 H3");
+}
+
+function minimaxRatio(value: string): string | undefined {
+    if (!value || value === "auto") return undefined;
+    const match = value.match(/^(\d+):(\d+)$/);
+    if (!match) return undefined;
+    const ratio = `${Number(match[1])}:${Number(match[2])}`;
+    return ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"].includes(ratio) ? ratio : "16:9";
+}
+
+function minimaxDuration(value: string) {
+    return Math.min(15, Math.max(4, Math.round(Number(value) || 6)));
+}
+
+function readMiniMaxBaseResp(payload: unknown): string | null {
+    if (!payload || typeof payload !== "object") return null;
+    const base = (payload as { base_resp?: { status_code?: number; status_msg?: string } }).base_resp;
+    if (base && typeof base.status_code === "number" && base.status_code !== 0) {
+        return base.status_msg || `MiniMax 错误 ${base.status_code}`;
+    }
+    return null;
+}
+
+async function resolveMiniMaxImageUrl(image: ReferenceImage) {
+    const directUrl = image.url || image.dataUrl;
+    if (isPublicMediaUrl(directUrl)) return directUrl;
+    const dataUrl = await imageToDataUrl(image);
+    if (!dataUrl) throw new Error("参考图读取失败，请换一张图片或重新上传");
+    return dataUrl;
+}
+
+async function resolveMiniMaxVideoUrl(video: ReferenceVideo) {
+    if (isPublicMediaUrl(video.url) || video.url.startsWith("asset://")) return video.url;
+    let blob: Blob | null = null;
+    if (video.storageKey) blob = await getMediaBlob(video.storageKey!);
+    if (!blob && video.url?.startsWith("blob:")) blob = await (await fetch(video.url!)).blob();
+    if (!blob) throw new Error("参考视频必须是公网 URL、素材 ID，或本地已保存的视频");
+    return blobToDataUrl(blob!);
+}
+
+async function resolveMiniMaxAudioUrl(audio: ReferenceAudio) {
+    if (isPublicMediaUrl(audio.url) || audio.url.startsWith("asset://")) return audio.url;
+    let blob: Blob | null = null;
+    if (audio.storageKey) blob = await getMediaBlob(audio.storageKey!);
+    if (!blob && audio.url?.startsWith("blob:")) blob = await (await fetch(audio.url!)).blob();
+    if (!blob) throw new Error("参考音频必须是公网 URL、素材 ID，或本地已保存的音频");
+    return blobToDataUrl(blob!);
+}
+
+async function createMiniMaxVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+    const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
+    const images = references.slice(0, 9);
+    // 单张参考图当作首帧(I2V), 多张则全部作为分镜参考图; H3 不允许首帧与参考输入混用
+    const isFirstFrame = images.length === 1 && !videoReferences.length && !audioReferences.length;
+    for (const image of images) {
+        content.push({ type: "image_url", image_url: { url: await resolveMiniMaxImageUrl(image) }, role: isFirstFrame ? "first_frame" : "reference_image" });
+    }
+    for (const video of videoReferences.slice(0, 3)) {
+        content.push({ type: "video_url", video_url: { url: await resolveMiniMaxVideoUrl(video) }, role: "reference_video" });
+    }
+    for (const audio of audioReferences.slice(0, 3)) {
+        content.push({ type: "audio_url", audio_url: { url: await resolveMiniMaxAudioUrl(audio) }, role: "reference_audio" });
+    }
+    const payload = {
+        model: minimaxModelName(model),
+        content,
+        resolution: "2K",
+        duration: minimaxDuration(config.videoSeconds),
+        ratio: minimaxRatio(config.size) ?? (images.length ? "adaptive" : "16:9"),
+    };
+    try {
+        const data = await proxyFetch<{ task_id?: string; base_resp?: { status_code?: number; status_msg?: string } }>({
+            url: minimaxApiUrl(config, "/v2/video_generation"),
+            method: "POST",
+            headers: aiHeaders(config, "application/json"),
+            body: payload,
+        });
+        const baseError = readMiniMaxBaseResp(data);
+        if (baseError) throw new Error(baseError);
+        if (!data.task_id) throw new Error("MiniMax 接口没有返回任务 ID");
+        return { id: data.task_id, provider: "minimax", model };
+    } catch (error) {
+        throw new Error(readAxiosError(error, "MiniMax 任务创建失败"));
+    }
+}
+
+async function pollMiniMaxVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
+    try {
+        const data = await proxyFetch<{ task?: { status?: string; error?: { code?: string; message?: string } | null; content?: { url?: string } | null } }>({
+            url: minimaxApiUrl(config, `/v2/query/video_generation/${encodeURIComponent(task.id)}`),
+            method: "GET",
+            headers: aiHeaders(config),
+        });
+        const miniMaxTask = data.task;
+        if (!miniMaxTask) return { status: "pending" };
+        if (miniMaxTask.status === "succeeded") {
+            const url = miniMaxTask.content?.url;
+            if (!url) return { status: "failed", error: "MiniMax 任务成功但没有返回视频 URL" };
+            return { status: "completed", result: await videoResultFromUrl(url, options) };
+        }
+        if (miniMaxTask.status === "failed" || miniMaxTask.status === "cancelled" || miniMaxTask.status === "expired") {
+            const reason = miniMaxTask.error?.message || miniMaxTask.error?.code || `MiniMax 视频生成${miniMaxTask.status === "expired" ? "超时" : "失败"}`;
+            return { status: "failed", error: reason };
+        }
+        return { status: "pending" };
+    } catch (error) {
+        throw new Error(readAxiosError(error, "MiniMax 任务查询失败"));
     }
 }
 
@@ -255,7 +383,9 @@ function normalizeReplicateResolution(value: string, model: string) {
 
 function replicateApiUrl(config: Pick<AiConfig, "baseUrl">, model: string) {
     const baseUrl = config.baseUrl.trim().replace(/\/+$/, "");
-    const cleanModel = modelOptionName(model).trim().replace(/^replicate:/i, "");
+    const cleanModel = modelOptionName(model)
+        .trim()
+        .replace(/^replicate:/i, "");
     const [owner, name] = cleanModel.split("/", 2);
     if (!owner || !name) throw new Error("Replicate 模型名必须使用 owner/model 格式，例如 google/veo-3 或 kling-ai/kling-v1.6-standard");
     return `${baseUrl}/models/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/predictions`;

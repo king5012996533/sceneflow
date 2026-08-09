@@ -6,7 +6,7 @@ import { nanoid } from "nanoid";
 
 import { scopedStorageKey } from "@/lib/user-data-scope";
 
-export type ApiCallFormat = "openai" | "gemini" | "replicate";
+export type ApiCallFormat = "openai" | "gemini" | "replicate" | "minimax";
 
 export type ModelChannel = {
     id: string;
@@ -183,7 +183,20 @@ function isVideoModelName(model: string) {
 
 function isImageModelName(model: string) {
     const value = modelOptionName(model).toLowerCase();
-    return !isVideoModelName(model) && !isAudioModelName(model) && (value.includes("seedream") || value.includes("gpt-image") || value.includes("image") || value.includes("dall-e") || value.includes("dalle") || value.includes("imagen") || value.includes("flux") || value.includes("sdxl") || value.includes("stable-diffusion") || value.includes("midjourney"));
+    return (
+        !isVideoModelName(model) &&
+        !isAudioModelName(model) &&
+        (value.includes("seedream") ||
+            value.includes("gpt-image") ||
+            value.includes("image") ||
+            value.includes("dall-e") ||
+            value.includes("dalle") ||
+            value.includes("imagen") ||
+            value.includes("flux") ||
+            value.includes("sdxl") ||
+            value.includes("stable-diffusion") ||
+            value.includes("midjourney"))
+    );
 }
 
 function isAudioModelName(model: string) {
@@ -418,14 +431,7 @@ function normalizeChannels(config: AiConfig) {
                 baseUrl: config.baseUrl || defaultConfig.baseUrl,
                 apiKey: config.apiKey || "",
                 apiFormat: config.apiFormat || defaultConfig.apiFormat,
-                models: uniqueRawModels([
-                    ...(config.models || []),
-                    config.model,
-                    config.imageModel,
-                    config.videoModel,
-                    config.textModel,
-                    config.audioModel,
-                ]),
+                models: uniqueRawModels([...(config.models || []), config.model, config.imageModel, config.videoModel, config.textModel, config.audioModel]),
             }),
         );
     }
@@ -439,7 +445,7 @@ export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
 }
 
 function normalizeApiFormat(apiFormat: unknown): ApiCallFormat {
-    if (apiFormat === "gemini" || apiFormat === "replicate") return apiFormat;
+    if (apiFormat === "gemini" || apiFormat === "replicate" || apiFormat === "minimax") return apiFormat;
     return "openai";
 }
 
@@ -447,6 +453,7 @@ export function inferApiFormatFromBaseUrl(baseUrl: string): ApiCallFormat | null
     const value = baseUrl.trim().toLowerCase();
     if (value.includes("api.replicate.com") || value.includes("replicate.com/v1")) return "replicate";
     if (value.includes("generativelanguage.googleapis.com")) return "gemini";
+    if (value.includes("api.minimaxi.com")) return "minimax";
     return null;
 }
 
