@@ -60,11 +60,34 @@ export async function POST(req: NextRequest) {
 
         const target = await assertAllowedProxyUrl(String(url || ""));
         const safeHeaders = sanitizeHeaders(headers);
-        // 数据库 key 只在「匹配到目标渠道」或「请求头没有带 key」时才覆盖；
-        // 多渠道/配置不同步时保留浏览器请求头里渠道自己的 key，避免用错 key 导致 401
-        if (apiKey && (matchedChannelKey || !safeHeaders.authorization)) {
-            safeHeaders["authorization"] = `Bearer ${apiKey}`;
+
+        // —— API Key 优先级 ——
+        // ① 浏览器请求头自带的 key（用户在设置里最新配置，每次修改都会同步到数据库，是最新来源）
+        // ② 数据库里「匹配到目标地址渠道」的 key
+        // ③ 数据库默认 key
+        // 之前 401 的根因：客户端发的是 "Authorization"（大写 A），这里判断却读 safeHeaders.authorization
+        // （小写），永远取不到 → 只要数据库默认 key 非空就无条件覆盖掉浏览器带上的正确 key，
+        // MiniMax 收到错误 key 报 "login fail ..." 401。
+        const headerAuth = readHeaderAuthorization(safeHeaders);
+        const headerKey = headerAuth.replace(/^Bearer\s+/i, "").trim();
+        let finalToken = "";
+        let keySource: "header" | "db-channel" | "db-default" | "none" = "none";
+        if (headerKey) {
+            finalToken = headerKey;
+            keySource = "header";
+        } else if (matchedChannelKey) {
+            finalToken = apiKey.trim();
+            keySource = "db-channel";
+        } else if (apiKey.trim()) {
+            finalToken = apiKey.trim();
+            keySource = "db-default";
         }
+        // 清掉原有的 Authorization（可能是 "Authorization" 或 "authorization"，避免同名字头重复），统一写小写
+        for (const key of Object.keys(safeHeaders)) {
+            if (key.toLowerCase() === "authorization") delete safeHeaders[key];
+        }
+        if (finalToken) safeHeaders["authorization"] = `Bearer ${finalToken}`;
+        console.log(`[proxy] key-source=${keySource} target=${target.hostname}${target.pathname}`);
         const upstreamBody = buildBody(body, safeHeaders);
         if (upstreamBody.byteLength > MAX_PROXY_REQUEST_BYTES) {
             return NextResponse.json({ error: "请求内容过大：单张或多张参考素材的总请求体超过代理限制。请压缩图片、减少参考素材，或改用公网素材 URL。" }, { status: 413 });
@@ -115,6 +138,13 @@ function sanitizeMethod(method: unknown) {
     const normalized = String(method || "POST").toUpperCase();
     if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(normalized)) throw new Error("非法请求方法");
     return normalized;
+}
+
+function readHeaderAuthorization(headers: Record<string, string>): string {
+    for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === "authorization") return String(headers[key] ?? "");
+    }
+    return "";
 }
 
 function sanitizeHeaders(headers: unknown) {
