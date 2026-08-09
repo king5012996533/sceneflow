@@ -22,14 +22,34 @@ export async function POST(req: NextRequest) {
     try {
         const { url, method = "POST", headers = {}, body, responseType } = await req.json();
 
-        // 优先从数据库读取用户的 API Key；数据库不可用或没存时回退到请求头自带的 Key
+        // 优先从数据库读取用户的 API Key：按目标地址匹配对应渠道的 key（多渠道场景），
+        // 找不到匹配渠道时回退到默认 key；数据库不可用或没存时回退到请求头自带的 Key（BYOK）
         let apiKey = "";
         try {
             if (prisma) {
                 const config = await prisma.userConfig.findUnique({ where: { userId: user.id } });
                 if (config?.config && typeof config.config === "object") {
-                    const cfg = config.config as Record<string, unknown>;
+                    const stored = config.config as { config?: Record<string, unknown> };
+                    const cfg = (stored.config || stored) as Record<string, unknown>;
                     apiKey = String(cfg.apiKey || "");
+                    try {
+                        const targetHost = new URL(String(url || "")).hostname;
+                        const channels = Array.isArray(cfg.channels) ? (cfg.channels as Array<Record<string, unknown>>) : [];
+                        const matched = channels.find((channel) => {
+                            try {
+                                const base = String(channel.baseUrl || "").trim();
+                                if (!base) return false;
+                                return new URL(base).hostname === targetHost;
+                            } catch {
+                                return false;
+                            }
+                        });
+                        if (matched && typeof matched.apiKey === "string" && matched.apiKey.trim()) {
+                            apiKey = matched.apiKey;
+                        }
+                    } catch {
+                        // 目标地址解析失败时回退默认 key
+                    }
                 }
             }
         } catch (dbErr) {
