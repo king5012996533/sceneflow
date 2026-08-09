@@ -157,7 +157,7 @@ export default function PricingPage() {
 
     return (
         <main className="h-full overflow-y-auto bg-[#f7f2ea] text-[#172033]">
-            <section className="mx-auto flex w-full max-w-7xl flex-col gap-10 px-6 py-12 md:px-10">
+            <section className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-10 md:px-10">
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                     <div className="max-w-3xl">
                         <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -189,44 +189,47 @@ export default function PricingPage() {
                             <article
                                 key={plan.id}
                                 className={cn(
-                                    "relative flex min-h-[560px] flex-col rounded-3xl border bg-white/82 p-6 shadow-[0_22px_68px_rgba(38,28,18,0.08)] backdrop-blur",
+                                    "relative flex min-h-[470px] flex-col rounded-3xl border bg-white/85 p-6 shadow-[0_22px_68px_rgba(38,28,18,0.08)] backdrop-blur transition-transform duration-300 hover:-translate-y-1",
                                     plan.isPopular ? "border-[#4f5cff] ring-1 ring-[#4f5cff]" : "border-[#eadfce]",
                                 )}
                             >
-                                {plan.isPopular ? <span className="absolute right-6 top-6 rounded-full bg-[#4f5cff] px-3 py-1 text-xs font-medium text-white">{copy.popular}</span> : null}
+                                {plan.isPopular ? <span className="absolute right-5 top-5 rounded-full bg-[#4f5cff] px-2.5 py-0.5 text-[11px] font-medium text-white">{copy.popular}</span> : null}
 
-                                <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#f0eaff] text-[#4f5cff]">
-                                    <Icon className="h-7 w-7" />
+                                <div className="mb-4 flex items-center gap-3">
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f0eaff] text-[#4f5cff]">
+                                        <Icon className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h2 className="truncate text-lg font-semibold leading-6">{plan.name}</h2>
+                                        <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-[#8a8a96]">{plan.description}</p>
+                                    </div>
                                 </div>
 
-                                <h2 className="text-2xl font-semibold">{plan.name}</h2>
-                                <p className="mt-4 min-h-14 text-sm leading-7 text-[#5f6170]">{plan.description}</p>
-
-                                <div className="mt-7">
-                                    <span className="text-5xl font-semibold tracking-tight">{formatPrice(price)}</span>
-                                    {!isFree ? (
-                                        <span className="ml-2 text-sm text-stone-500">
-                                            / {cycle === "yearly" ? copy.perYear : copy.perMonth}, {copy.betaPrice}
-                                        </span>
-                                    ) : null}
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-[40px] font-semibold leading-none tracking-tight">{formatPrice(price)}</span>
+                                    {!isFree ? <span className="text-sm text-stone-500">/ {cycle === "yearly" ? copy.perYear : copy.perMonth}</span> : null}
                                 </div>
+                                {!isFree ? <span className="mt-2 inline-block text-xs text-stone-400">{copy.betaPrice}</span> : <span className="mt-2 inline-block text-xs text-stone-400">{copy.freeInfo}</span>}
 
-                                <ul className="mt-7 flex-1 space-y-3 text-sm text-[#344054]">
+                                <div className="my-5 h-px bg-[#eae4d8]" />
+
+                                <ul className="flex-1 space-y-2.5 text-sm text-[#344054]">
                                     {plan.entitlements.map((item) => (
-                                        <li key={item.id || item.key} className="flex gap-3">
-                                            <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                                            <span>
-                                                {item.label}: {formatEntitlement(item.value, item.unit)}
+                                        <li key={item.id || item.key} className="flex items-center justify-between gap-3">
+                                            <span className="flex min-w-0 items-center gap-2">
+                                                <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                                                <span className="truncate">{item.label}</span>
                                             </span>
+                                            <span className="shrink-0 text-xs font-medium text-stone-500">{formatEntitlement(item.value, item.unit)}</span>
                                         </li>
                                     ))}
                                 </ul>
 
-                                {!isFree ? <p className="mb-3 text-xs leading-5 text-stone-500">{copy.paidHint}</p> : null}
+                                {!isFree ? <p className="mb-3 text-xs leading-5 text-stone-400">{copy.paidHint}</p> : null}
                                 <Button
                                     type={plan.isPopular ? "primary" : "default"}
                                     size="large"
-                                    className={cn("h-12 w-full rounded-xl", plan.isPopular ? "!bg-[#111] !text-white" : "")}
+                                    className={cn("h-11 w-full rounded-xl", plan.isPopular ? "!bg-[#111] !text-white" : "")}
                                     loading={loadingPlan === plan.id}
                                     onClick={() => void applyPlan(plan)}
                                 >
