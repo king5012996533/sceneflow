@@ -88,6 +88,10 @@ export async function POST(req: NextRequest) {
             }
 
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
+            if (response.status >= 400) {
+                const snippet = typeof data === "object" && data !== null ? JSON.stringify(data).slice(0, 400) : String(data).slice(0, 400);
+                console.error(`[proxy] 上游 ${response.status} ${method} ${target}: ${snippet}`);
+            }
             return NextResponse.json(data, { status: response.status });
         } finally {
             clearTimeout(timeout);

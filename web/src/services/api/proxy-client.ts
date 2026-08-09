@@ -13,9 +13,7 @@ export interface ProxyRequestOptions {
 export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Promise<T> {
     const payload = JSON.stringify(options);
     if (payload.length > PROXY_WARNING_BYTES) {
-        throw new Error(
-            `请求内容过大：本次代理请求约 ${formatProxyBytes(payload.length)}，超过 ${formatProxyBytes(PROXY_WARNING_BYTES)}。单张参考图也可能因原图体积或 base64 编码膨胀触发限制，请压缩图片、减少参考素材，或改用公网素材 URL。`,
-        );
+        throw new Error(`请求内容过大：本次代理请求约 ${formatProxyBytes(payload.length)}，超过 ${formatProxyBytes(PROXY_WARNING_BYTES)}。单张参考图也可能因原图体积或 base64 编码膨胀触发限制，请压缩图片、减少参考素材，或改用公网素材 URL。`);
     }
     const res = await fetch(PROXY_PATH, {
         method: "POST",
@@ -51,17 +49,25 @@ function formatProxyBytes(bytes: number) {
 
 function proxyErrorMessage(data: unknown): string {
     if (!data || typeof data !== "object") return "";
-    const payload = data as { error?: unknown; msg?: unknown; message?: unknown; code?: unknown };
-    if (typeof payload.msg === "string" && payload.msg) return payload.msg;
-    if (typeof payload.message === "string" && payload.message) return payload.message;
-    if (typeof payload.error === "string" && payload.error) return payload.error;
-    if (payload.error && typeof payload.error === "object") {
-        const error = payload.error as { message?: unknown; code?: unknown };
-        if (typeof error.message === "string" && error.message) return error.message;
-        if (typeof error.code === "string" && error.code) return error.code;
+    const payload = data as Record<string, unknown>;
+    // MiniMax 等上游把错误包在 base_resp 里（base_resp.status_code / status_msg）
+    const base = payload.base_resp;
+    if (base && typeof base === "object") {
+        const baseResp = base as { status_code?: unknown; status_msg?: unknown };
+        if (typeof baseResp.status_msg === "string" && baseResp.status_msg) return baseResp.status_msg;
+        if (typeof baseResp.status_code === "number") return `上游错误 ${baseResp.status_code}`;
     }
-    if (typeof payload.code === "string" && payload.code) return payload.code;
-    if (typeof payload.code === "number") return `请求失败: ${payload.code}`;
+    const { msg, message, error, code } = payload as { msg?: unknown; message?: unknown; error?: unknown; code?: unknown };
+    if (typeof msg === "string" && msg) return msg;
+    if (typeof message === "string" && message) return message;
+    if (typeof error === "string" && error) return error;
+    if (error && typeof error === "object") {
+        const err = error as { message?: unknown; code?: unknown };
+        if (typeof err.message === "string" && err.message) return err.message;
+        if (typeof err.code === "string" && err.code) return err.code;
+    }
+    if (typeof code === "string" && code) return code;
+    if (typeof code === "number") return `请求失败: ${code}`;
     return "";
 }
 
