@@ -25,6 +25,7 @@ export async function POST(req: NextRequest) {
         // 优先从数据库读取用户的 API Key：按目标地址匹配对应渠道的 key（多渠道场景），
         // 找不到匹配渠道时回退到默认 key；数据库不可用或没存时回退到请求头自带的 Key（BYOK）
         let apiKey = "";
+        let matchedChannelKey = false;
         try {
             if (prisma) {
                 const config = await prisma.userConfig.findUnique({ where: { userId: user.id } });
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
                         });
                         if (matched && typeof matched.apiKey === "string" && matched.apiKey.trim()) {
                             apiKey = matched.apiKey;
+                            matchedChannelKey = true;
                         }
                     } catch {
                         // 目标地址解析失败时回退默认 key
@@ -58,8 +60,11 @@ export async function POST(req: NextRequest) {
 
         const target = await assertAllowedProxyUrl(String(url || ""));
         const safeHeaders = sanitizeHeaders(headers);
-        if (apiKey) safeHeaders["authorization"] = `Bearer ${apiKey}`;
-        // DB 无 key 时：保留请求头自带的 key（BYOK 直连模式），不再删掉导致 502
+        // 数据库 key 只在「匹配到目标渠道」或「请求头没有带 key」时才覆盖；
+        // 多渠道/配置不同步时保留浏览器请求头里渠道自己的 key，避免用错 key 导致 401
+        if (apiKey && (matchedChannelKey || !safeHeaders.authorization)) {
+            safeHeaders["authorization"] = `Bearer ${apiKey}`;
+        }
         const upstreamBody = buildBody(body, safeHeaders);
         if (upstreamBody.byteLength > MAX_PROXY_REQUEST_BYTES) {
             return NextResponse.json({ error: "请求内容过大：单张或多张参考素材的总请求体超过代理限制。请压缩图片、减少参考素材，或改用公网素材 URL。" }, { status: 413 });
@@ -90,7 +95,8 @@ export async function POST(req: NextRequest) {
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
             if (response.status >= 400) {
                 const snippet = typeof data === "object" && data !== null ? JSON.stringify(data).slice(0, 400) : String(data).slice(0, 400);
-                console.error(`[proxy] 上游 ${response.status} ${method} ${target}: ${snippet}`);
+                const masked = safeHeaders.authorization ? safeHeaders.authorization.replace(/^Bearer\s+/i, "").replace(/^(.{6}).*(.{4})$/, "$1****$2") : "none";
+                console.error(`[proxy] 上游 ${response.status} ${method} ${target} key=${masked}: ${snippet}`);
             }
             return NextResponse.json(data, { status: response.status });
         } finally {
