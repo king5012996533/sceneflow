@@ -7,6 +7,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MAX_PROXY_REQUEST_BYTES = 32 * 1024 * 1024;
+// 原始文件上传（Replicate Files API 等）：base64 包一层后约 40MB，兼容服务器 nginx 50m 限制
+const MAX_PROXY_RAW_BYTES = 30 * 1024 * 1024;
+const MAX_PROXY_ENVELOPE_BYTES = 41 * 1024 * 1024;
 const PROXY_TIMEOUT_MS = 120_000;
 const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "prefer", "x-api-key", "x-request-id"]);
 
@@ -15,12 +18,12 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
 
     const contentLength = Number(req.headers.get("content-length") || 0);
-    if (contentLength > MAX_PROXY_REQUEST_BYTES) {
-        return NextResponse.json({ error: "请求内容过大：单张或多张参考素材的总请求体超过代理限制。请压缩图片、减少参考素材，或改用公网素材 URL。" }, { status: 413 });
+    if (contentLength > MAX_PROXY_ENVELOPE_BYTES) {
+        return NextResponse.json({ error: "请求内容过大：素材总请求体超过代理限制。请压缩素材、减少参考素材数量，或改用公网素材 URL。" }, { status: 413 });
     }
 
     try {
-        const { url, method = "POST", headers = {}, body, responseType } = await req.json();
+        const { url, method = "POST", headers = {}, body, bodyBase64, responseType } = await req.json();
 
         // 优先从数据库读取用户的 API Key：按目标地址匹配对应渠道的 key（多渠道场景），
         // 找不到匹配渠道时回退到默认 key；数据库不可用或没存时回退到请求头自带的 Key（BYOK）
@@ -88,9 +91,13 @@ export async function POST(req: NextRequest) {
         }
         if (finalToken) safeHeaders["authorization"] = `Bearer ${finalToken}`;
         console.log(`[proxy] key-source=${keySource} target=${target.hostname}${target.pathname}`);
-        const upstreamBody = buildBody(body, safeHeaders);
-        if (upstreamBody.byteLength > MAX_PROXY_REQUEST_BYTES) {
-            return NextResponse.json({ error: "请求内容过大：单张或多张参考素材的总请求体超过代理限制。请压缩图片、减少参考素材，或改用公网素材 URL。" }, { status: 413 });
+        const upstreamBody = buildUpstreamBody(body, bodyBase64, safeHeaders);
+        const isRawUpload = typeof bodyBase64 === "string" && bodyBase64.length > 0;
+        if (upstreamBody.byteLength > (isRawUpload ? MAX_PROXY_RAW_BYTES : MAX_PROXY_REQUEST_BYTES)) {
+            return NextResponse.json(
+                { error: isRawUpload ? "素材文件过大：单个参考素材超过 30MB，请压缩后重试或改用公网素材 URL。" : "请求内容过大：单张或多张参考素材的总请求体超过代理限制。请压缩图片、减少参考素材，或改用公网素材 URL。" },
+                { status: 413 },
+            );
         }
 
         const controller = new AbortController();
@@ -159,6 +166,15 @@ function sanitizeHeaders(headers: unknown) {
     }
 
     return safe;
+}
+
+// bodyBase64：客户端把本地文件 base64 后放进 JSON 信封，这里解码成二进制再转发（用于 Replicate Files API 等原始上传）
+function buildUpstreamBody(body: unknown, bodyBase64: unknown, headers: Record<string, string>) {
+    if (typeof bodyBase64 === "string" && bodyBase64.length > 0) {
+        const buffer = Buffer.from(bodyBase64, "base64");
+        return { value: buffer, byteLength: buffer.byteLength };
+    }
+    return buildBody(body, headers);
 }
 
 function buildBody(body: unknown, headers: Record<string, string>) {

@@ -71,10 +71,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
         return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
     if (requestConfig.apiFormat === "replicate") {
-        if (videoReferences.length || audioReferences.length) {
-            throw new Error("Replicate 视频模型暂不支持直接引用视频或音频，请先只使用提示词和参考图。");
-        }
-        return createReplicateVideoTask(requestConfig, selectedModel, prompt, references, options);
+        return createReplicateVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
     if (requestConfig.apiFormat === "minimax") {
         return createMiniMaxVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
@@ -310,8 +307,8 @@ async function pollMiniMaxVideoTask(config: AiConfig, task: VideoGenerationTask,
     }
 }
 
-async function createReplicateVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<VideoGenerationTask> {
-    const input = await buildReplicateVideoInput(config, model, prompt, references);
+async function createReplicateVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+    const input = await buildReplicateVideoInput(config, model, prompt, references, videoReferences, audioReferences);
     try {
         const prediction = await proxyFetch<ReplicatePrediction>({
             url: replicateApiUrl(config, model),
@@ -344,7 +341,7 @@ async function pollReplicateVideoTask(config: AiConfig, task: VideoGenerationTas
     }
 }
 
-async function buildReplicateVideoInput(config: AiConfig, model: string, prompt: string, references: ReferenceImage[]) {
+async function buildReplicateVideoInput(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[]) {
     const input: Record<string, unknown> = { prompt };
     const modelName = modelOptionName(model).toLowerCase();
     const aspectRatio = normalizeReplicateAspectRatio(config.size);
@@ -355,6 +352,35 @@ async function buildReplicateVideoInput(config: AiConfig, model: string, prompt:
 
     const resolution = normalizeReplicateResolution(config.vquality, modelName);
     if (resolution) input.resolution = resolution;
+
+    // Seedance 2.0：支持多张参考图 + 参考视频 + 参考音频（与火山 Agent API 同一套多模态输入）
+    if (modelName.includes("seedance") || modelName.includes("doubao-seedance")) {
+        if (audioReferences.length && !references.length && !videoReferences.length) {
+            throw new Error("Seedance 参考音频不能单独使用，请同时添加参考图或参考视频");
+        }
+        assertSeedanceVideoReferences(videoReferences);
+        assertSeedanceAudioReferences(audioReferences);
+        input.generate_audio = boolConfig(config.videoGenerateAudio, true);
+        const images = references.slice(0, SEEDANCE_REFERENCE_LIMITS.images);
+        if (images.length === 1 && !videoReferences.length && !audioReferences.length) {
+            const imageUrl = await resolveReplicateVideoImageInput(images[0]);
+            if (imageUrl) input.image = imageUrl;
+        } else if (images.length) {
+            input.reference_images = await Promise.all(images.map((image) => resolveReplicateVideoImageInput(image)));
+        }
+        if (videoReferences.length) {
+            input.reference_videos = await Promise.all(videoReferences.slice(0, SEEDANCE_REFERENCE_LIMITS.videos).map((video) => resolveReplicateReferenceFile(config, video)));
+        }
+        if (audioReferences.length) {
+            input.reference_audios = await Promise.all(audioReferences.slice(0, SEEDANCE_REFERENCE_LIMITS.audios).map((audio) => resolveReplicateReferenceFile(config, audio)));
+        }
+        return input;
+    }
+
+    // 其它 Replicate 视频模型：仅支持提示词 + 首帧参考图
+    if (videoReferences.length || audioReferences.length) {
+        throw new Error("当前 Replicate 视频模型只支持提示词和参考图，参考视频/音频仅 bytedance/seedance-2.0 支持");
+    }
 
     if (modelName.includes("prunaai/p-video")) {
         input.draft = true;
@@ -373,6 +399,40 @@ async function buildReplicateVideoInput(config: AiConfig, model: string, prompt:
     }
 
     return input;
+}
+
+// Replicate 参考视频/音频：公网 URL 直接用；本地文件先上传到 Replicate Files API 拿临时 URL（数据 URI 对视频/音频体积不现实）
+const REPLICATE_REFERENCE_MAX_BYTES = 30 * 1024 * 1024;
+
+async function resolveReplicateReferenceFile(config: AiConfig, file: ReferenceVideo | ReferenceAudio) {
+    const directUrl = file.url || "";
+    if (isPublicMediaUrl(directUrl)) return directUrl;
+    let blob: Blob | null = null;
+    if (file.storageKey) blob = await getMediaBlob(file.storageKey);
+    if (!blob && directUrl.startsWith("blob:")) blob = await (await fetch(directUrl)).blob();
+    if (!blob) throw new Error("参考素材读取失败，请重新上传或改用公网 URL");
+    if (blob.size > REPLICATE_REFERENCE_MAX_BYTES) {
+        throw new Error(`参考素材 ${(blob.size / 1024 / 1024).toFixed(1)}MB 超过 30MB 限制，请压缩后重试或改用公网 URL`);
+    }
+    return uploadReplicateFile(config, blob);
+}
+
+async function uploadReplicateFile(config: AiConfig, blob: Blob) {
+    const dataUrl = await blobToDataUrl(blob);
+    const base64 = dataUrl.includes(",") ? dataUrl.split(",", 2)[1] : dataUrl;
+    if (!base64) throw new Error("参考素材读取失败，请重新上传");
+    const result = await proxyFetch<{ urls?: { get?: string } }>({
+        url: buildApiUrl(config.baseUrl, "/files"),
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${config.apiKey}`,
+            "Content-Type": blob.type || "application/octet-stream",
+        },
+        bodyBase64: base64,
+    });
+    const uploaded = result?.urls?.get;
+    if (!uploaded) throw new Error("参考素材上传 Replicate 失败，请重试");
+    return uploaded;
 }
 
 function normalizeReplicateResolution(value: string, model: string) {

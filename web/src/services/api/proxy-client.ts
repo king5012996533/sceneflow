@@ -7,13 +7,22 @@ export interface ProxyRequestOptions {
     method?: string;
     headers?: Record<string, string>;
     body?: unknown;
+    /** 原始文件上传：本地文件 base64 编码后的内容（代理服务端会解码成二进制转发，如 Replicate Files API） */
+    bodyBase64?: string;
     responseType?: "json" | "blob";
 }
 
 export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Promise<T> {
     const payload = JSON.stringify(options);
-    if (payload.length > PROXY_WARNING_BYTES) {
-        throw new Error(`请求内容过大：本次代理请求约 ${formatProxyBytes(payload.length)}，超过 ${formatProxyBytes(PROXY_WARNING_BYTES)}。单张参考图也可能因原图体积或 base64 编码膨胀触发限制，请压缩图片、减少参考素材，或改用公网素材 URL。`);
+    const isRawUpload = typeof options.bodyBase64 === "string" && options.bodyBase64.length > 0;
+    // 原始上传（参考视频/音频）体积大，用独立的宽松上限；普通 JSON 请求保持原来的预警线
+    const warningBytes = isRawUpload ? 50 * 1024 * 1024 : PROXY_WARNING_BYTES;
+    if (payload.length > warningBytes) {
+        throw new Error(
+            isRawUpload
+                ? "素材文件过大：单个参考素材超过 30MB，请压缩后重试或改用公网素材 URL。"
+                : `请求内容过大：本次代理请求约 ${formatProxyBytes(payload.length)}，超过 ${formatProxyBytes(PROXY_WARNING_BYTES)}。单张参考图也可能因原图体积或 base64 编码膨胀触发限制，请压缩图片、减少参考素材，或改用公网素材 URL。`,
+        );
     }
     const res = await fetch(PROXY_PATH, {
         method: "POST",
