@@ -8,7 +8,7 @@ type UserConfigDelegate = {
 };
 
 function getUserConfigDelegate(): UserConfigDelegate | null {
-    return prisma && "userConfig" in prisma ? (prisma.userConfig as UserConfigDelegate) : null;
+    return prisma && "userConfig" in prisma ? (prisma.userConfig as unknown as UserConfigDelegate) : null;
 }
 
 // 获取用户配置

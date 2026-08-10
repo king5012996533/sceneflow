@@ -137,3 +137,34 @@ export async function reserveGenerationUsage(userId: string, count: number) {
         limit: generationLimit,
     };
 }
+
+// 通用每日配额（非生成类消耗，如 Agent Lab / 体验官聊天）。
+// 数据库不可用时保守拒绝（fail-closed）——宁可暂时不可用，也不能无限制消耗服务器 API Key。
+export async function reserveDailyUsage(userId: string, metric: string, limit: number): Promise<{ allowed: boolean; remaining: number; limit: number | null }> {
+    if (!prisma) return { allowed: false, remaining: 0, limit: null };
+    const period = dailyPeriod();
+    const current = await prisma.usageRecord.upsert({
+        where: { userId_metric_period: { userId, metric, period } },
+        update: {},
+        create: {
+            userId,
+            metric,
+            period,
+            used: 0,
+            limit,
+            resetAt: nextDayStart(),
+        },
+    });
+
+    const updatedCount = await prisma.usageRecord.updateMany({
+        where: { id: current.id, used: { lte: limit - 1 } },
+        data: { used: { increment: 1 }, limit, resetAt: nextDayStart() },
+    });
+
+    if (!updatedCount.count) {
+        return { allowed: false, remaining: 0, limit };
+    }
+
+    const updated = await prisma.usageRecord.findUniqueOrThrow({ where: { id: current.id } });
+    return { allowed: true, remaining: Math.max(0, limit - updated.used), limit };
+}

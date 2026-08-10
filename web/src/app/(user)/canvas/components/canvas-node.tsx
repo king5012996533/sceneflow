@@ -393,6 +393,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                         renderNodeContent={renderNodeContent}
                         mentionReferences={mentionReferences}
                         onContentChange={onContentChange}
+                        onTitleChange={onTitleChange}
                         onStopEditing={() => setIsEditingContent(false)}
                         onRetry={onRetry}
                         onGenerateImage={onGenerateImage}

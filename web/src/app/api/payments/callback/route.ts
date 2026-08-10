@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 
 import { activateSubscription, type BillingCycle, type PaymentProvider } from "@/lib/billing";
 import { prisma } from "@/lib/ic-prisma";
@@ -9,7 +10,11 @@ export async function POST(req: NextRequest) {
 
         const callbackSecret = process.env.PAYMENT_CALLBACK_SECRET;
         if (!callbackSecret) return NextResponse.json({ error: "支付回调尚未启用" }, { status: 403 });
-        if (req.headers.get("x-payment-callback-secret") !== callbackSecret) {
+
+        // 恒时比较，避免时序侧信道
+        const received = Buffer.from(req.headers.get("x-payment-callback-secret") || "", "utf8");
+        const expected = Buffer.from(callbackSecret, "utf8");
+        if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
             return NextResponse.json({ error: "回调签名无效" }, { status: 401 });
         }
 
@@ -43,14 +48,20 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ order: failed });
         }
 
-        const updatedOrder = await prisma.order.update({
-            where: { id: order.id },
-            data: {
-                status: "paid",
-                paidAt: new Date(),
-                providerOrderNo,
-            },
+        // 幂等领取：只有订单还不是「已支付」时才置为已支付并激活订阅。
+        // 重复回调（重放/支付平台重试）会在这里被拦截，不会重复延长订阅期。
+        const claimed = await prisma.order.updateMany({
+            where: { id: order.id, status: { not: "paid" } },
+            data: { status: "paid", paidAt: new Date(), providerOrderNo },
         });
+
+        if (!claimed.count) {
+            // 已处理过的订单（重复回调）：直接返回当前状态，不重复激活订阅
+            const existing = await prisma.order.findUnique({ where: { id: order.id } });
+            return NextResponse.json({ order: existing });
+        }
+
+        const updatedOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
 
         const subscription = await activateSubscription({
             userId: order.userId,

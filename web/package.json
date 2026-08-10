@@ -12,6 +12,7 @@
         "director:test:agent": "npm --prefix ../apps/agentic-3d-director run test:agent",
         "build:with-director": "npm run director:build && npm run director:sync-static && next build --webpack",
         "build": "next build --webpack",
+        "typecheck": "tsc --noEmit",
         "guard": "node scripts/regression-guards.mjs",
         "start": "next start",
         "format": "prettier --write .",

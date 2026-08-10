@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
             fieldNames.push(safeKey);
             if (typeof value === "string") {
                 form.append(safeKey, value);
-            } else if (value instanceof File || (typeof Blob !== "undefined" && value instanceof Blob)) {
+            } else if (value instanceof File || (typeof Blob !== "undefined" && (value as unknown) instanceof Blob)) {
                 const buffer = Buffer.from(await (value as File).arrayBuffer());
                 form.append(safeKey, buffer, { filename: stripCrlf((value as File).name), contentType: (value as File).type || "application/octet-stream" });
             } else {
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
                     "content-type": `multipart/form-data; boundary=${form.getBoundary()}`,
                     "content-length": String(bodyBuffer.length),
                 },
-                body: bodyBuffer,
+                body: bodyBuffer as unknown as BodyInit,
                 signal: controller.signal,
             });
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));

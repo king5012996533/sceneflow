@@ -2,14 +2,22 @@ import { buildAgentLabMessages, fallbackAgentLabAnswer } from "@/lib/agent-lab/s
 import { splitAgentLabArtifact } from "@/lib/agent-lab/parser";
 import { requireCurrentUser } from "@/lib/current-user";
 import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { reserveDailyUsage } from "@/lib/server-entitlements";
 import type { AgentLabRequest, AgentLabResponse } from "@/lib/agent-lab/types";
+import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const TRUSTED_PROVIDER_HOSTS = new Set(["api.deepseek.com", "api.openai.com", "api.anthropic.com"]);
 
-export async function POST(request: Request) {
+// 服务器 Key 成本保护：只有当请求使用服务器的 API Key（用户未自带 Key）时才计配额。
+// 用户自带 Key 时费用由用户承担，不限制。
+const AGENT_LAB_DAILY_LIMIT = 60;
+const AGENT_LAB_RATE_LIMIT = { windowMs: 60_000, maxRequests: 10 } as const;
+
+export async function POST(request: NextRequest) {
     try {
         // 防止未登录用户无限调用消耗服务器 API Key
         const user = await requireCurrentUser(request);
@@ -27,6 +35,17 @@ export async function POST(request: Request) {
         if (!provider.apiKey) {
             const fallback = fallbackAgentLabAnswer(lastUser);
             return Response.json({ ...fallback, model: "fallback-local" } satisfies AgentLabResponse);
+        }
+
+        // 使用服务器 Key 才计配额（用户自带 Key 不限制），防脚本无限调用烧钱
+        if (provider.usesServerKey) {
+            const quota = await reserveDailyUsage(user.id, "agent_chats", AGENT_LAB_DAILY_LIMIT);
+            if (!quota.allowed) {
+                return Response.json({ error: "今日 Agent Lab 免费调用次数已用完，请自带 API Key 或明天再试" }, { status: 429 });
+            }
+            if (!(await checkRateLimit(`agentlab:${user.id}`, AGENT_LAB_RATE_LIMIT))) {
+                return Response.json({ error: "操作太频繁，请稍后再试" }, { status: 429 });
+            }
         }
 
         const response = await fetchSafely(`${provider.baseUrl}/chat/completions`, {
@@ -81,6 +100,7 @@ async function resolveProvider(body: AgentLabRequest) {
     return {
         baseUrl,
         apiKey,
+        usesServerKey: !userProvidedKey && !!apiKey,
         model: (body.provider?.model || process.env.AGENT_LAB_MODEL || process.env.DEEPSEEK_MODEL || "deepseek-chat").trim(),
     };
 }

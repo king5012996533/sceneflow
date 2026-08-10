@@ -1,8 +1,15 @@
 import { requireCurrentUser } from "@/lib/current-user";
 import { fetchSafely } from "@/lib/url-safety";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { reserveDailyUsage } from "@/lib/server-entitlements";
+import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// 服务器 Key 成本保护：每日上限 + 每分钟突发限流（按用户）
+const EXPERIENCE_DAILY_LIMIT = 60;
+const EXPERIENCE_RATE_LIMIT = { windowMs: 60_000, maxRequests: 10 } as const;
 
 type ExperienceMessage = {
     role: "user" | "assistant";
@@ -40,7 +47,7 @@ API 接入重点：
 - 不要承诺你能替用户申请 API 或查看用户账号。
 - 回复尽量短，必要时使用项目符号。`;
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
         // 防止未登录用户无限调用消耗服务器 API Key
         const user = await requireCurrentUser(request);
@@ -48,13 +55,26 @@ export async function POST(request: Request) {
 
         const body = (await request.json()) as { messages?: ExperienceMessage[] };
         const messages = (body.messages || []).filter((item) => (item.role === "user" || item.role === "assistant") && item.content?.trim()).slice(-8);
-        const lastUser = [...messages].reverse().find((item) => item.role === "user")?.content.trim();
+        const lastUser = [...messages]
+            .reverse()
+            .find((item) => item.role === "user")
+            ?.content.trim();
         if (!lastUser) return Response.json({ error: "请输入问题" }, { status: 400 });
         const preset = presetAnswer(lastUser);
         if (preset) return Response.json({ answer: preset });
 
         const apiKey = process.env.DEEPSEEK_API_KEY || process.env.EXPERIENCE_AGENT_API_KEY;
         if (!apiKey) return Response.json({ error: "体验官暂未配置模型，请稍后再试" }, { status: 503 });
+
+        // 每日配额（fail-closed：数据库不可用时拒绝，防止无限消耗服务器 Key）
+        const quota = await reserveDailyUsage(user.id, "experience_chats", EXPERIENCE_DAILY_LIMIT);
+        if (!quota.allowed) {
+            return Response.json({ error: "今日体验官次数已用完，明天再来吧" }, { status: 429 });
+        }
+        // 突发限流（每分钟每人最多 10 次，防止脚本刷）
+        if (!(await checkRateLimit(`experience:${user.id}`, EXPERIENCE_RATE_LIMIT))) {
+            return Response.json({ error: "操作太频繁，请稍后再试" }, { status: 429 });
+        }
 
         const baseUrl = (process.env.DEEPSEEK_BASE_URL || process.env.EXPERIENCE_AGENT_BASE_URL || "https://api.deepseek.com").replace(/\/+$/, "");
         const model = process.env.DEEPSEEK_MODEL || process.env.EXPERIENCE_AGENT_MODEL || "deepseek-chat";
@@ -67,10 +87,7 @@ export async function POST(request: Request) {
             body: JSON.stringify({
                 model,
                 temperature: 0.2,
-                messages: [
-                    { role: "system", content: SYSTEM_PROMPT },
-                    ...messages,
-                ],
+                messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
             }),
         });
 

@@ -113,7 +113,7 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
             data: {
                 status,
                 error: error?.slice(0, 1000),
-                metadata: resultUrl ? { resultUrl } : undefined,
+                resultUrl: resultUrl ?? undefined,
                 quotaRefunded: status !== "succeeded",
                 finishedAt: new Date(),
             },

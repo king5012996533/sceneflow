@@ -17,9 +17,6 @@ return {
         output: "standalone",
         basePath: "/canvas",
         allowedDevOrigins: isDev ? ["*.*.*.*"] : [],
-        typescript: {
-            ignoreBuildErrors: true,
-        },
         async headers() {
             return [
                 {

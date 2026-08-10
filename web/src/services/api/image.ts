@@ -1003,7 +1003,7 @@ export async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKe
             method: "GET",
             headers: { Authorization: `Bearer ${config.apiKey}` },
         });
-        return (response.data.data || [])
+        return (response.data || [])
             .map((model) => model.id)
             .filter((id): id is string => Boolean(id))
             .sort((a, b) => a.localeCompare(b));
