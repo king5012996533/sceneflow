@@ -128,7 +128,7 @@ export default function Home() {
                                 <small>16:9 / 35mm</small>
                             </div>
                             <div className="sf-film-frame">
-                                <Image src="/hero-frame.webp" fill priority sizes="(max-width: 940px) 100vw, 55vw" alt="SceneFlow 电影级视觉画面" />
+                                <Image src="/hero-frame.webp" fill priority unoptimized sizes="(max-width: 940px) 100vw, 55vw" alt="SceneFlow 电影级视觉画面" />
                                 <div className="sf-lock">
                                     IDENTITY LOCK <b>98.7%</b>
                                 </div>
@@ -146,7 +146,7 @@ export default function Home() {
             <section className="sf-assets" id="assets">
                 <p className="sf-section-number">02 / VIRTUAL ASSET LIBRARY</p>
                 <div className="sf-asset-image">
-                    <Image src="/character-asset.webp" fill sizes="(max-width: 940px) 100vw, 45vw" alt="SceneFlow 虚拟角色资产" />
+                    <Image src="/character-asset.webp" fill unoptimized sizes="(max-width: 940px) 100vw, 45vw" alt="SceneFlow 虚拟角色资产" />
                     <span>ACTOR ID / A017</span>
                 </div>
                 <div className="sf-asset-copy">
@@ -173,15 +173,15 @@ export default function Home() {
                 </div>
                 <div className="sf-range-gallery">
                     <figure className="sf-range-large">
-                        <Image src="/commerce-visual.webp" fill sizes="(max-width: 940px) 100vw, 40vw" alt="SceneFlow 电商商业视觉作品" />
+                        <Image src="/commerce-visual.webp" fill unoptimized sizes="(max-width: 940px) 100vw, 40vw" alt="SceneFlow 电商商业视觉作品" />
                         <figcaption>COMMERCIAL / PRODUCT</figcaption>
                     </figure>
                     <figure>
-                        <Image src="/brand-visual.webp" fill sizes="(max-width: 940px) 100vw, 30vw" alt="SceneFlow 品牌视觉作品" />
+                        <Image src="/brand-visual.webp" fill unoptimized sizes="(max-width: 940px) 100vw, 30vw" alt="SceneFlow 品牌视觉作品" />
                         <figcaption>BRAND / CAMPAIGN</figcaption>
                     </figure>
                     <figure>
-                        <Image src="/hero-frame.webp" fill sizes="(max-width: 940px) 100vw, 40vw" alt="SceneFlow 电影分镜视觉作品" />
+                        <Image src="/hero-frame.webp" fill unoptimized sizes="(max-width: 940px) 100vw, 40vw" alt="SceneFlow 电影分镜视觉作品" />
                         <figcaption>STORY / CINEMA</figcaption>
                     </figure>
                 </div>
