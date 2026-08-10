@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -10,6 +11,32 @@ const metrics = [
 ];
 
 const flow = ["剧本", "角色", "场景", "分镜", "关键帧", "视频", "资产"];
+
+export const metadata: Metadata = {
+    title: {
+        absolute: "SceneFlow｜AI 视觉生产系统 —— 从剧本、角色到视频的无限画布",
+    },
+    description: "SceneFlow 是面向电商视觉、品牌内容、虚拟角色、分镜和视频创作的 AI 视觉生产系统：把提示词、参考图、角色资产、镜头规划和生成结果沉淀进同一套可持续生产的视觉画布。",
+    alternates: {
+        canonical: "https://xingtudesign.com/canvas",
+    },
+    openGraph: {
+        title: "SceneFlow｜AI 视觉生产系统",
+        description: "从剧本、角色、分镜到关键帧与视频，把每一次创作沉淀为可复用的视觉资产。",
+        url: "https://xingtudesign.com/canvas",
+        siteName: "SceneFlow",
+        locale: "zh_CN",
+        type: "website",
+        images: [
+            {
+                url: "/og.png",
+                width: 1200,
+                height: 630,
+                alt: "SceneFlow AI 视觉生产系统",
+            },
+        ],
+    },
+};
 
 export default function Home() {
     return (
@@ -201,6 +228,21 @@ export default function Home() {
                     <small>© 2026</small>
                 </footer>
             </section>
+
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify({
+                        "@context": "https://schema.org",
+                        "@type": "WebSite",
+                        name: "SceneFlow",
+                        alternateName: "SceneFlow AI 视觉生产系统",
+                        url: "https://xingtudesign.com/canvas",
+                        inLanguage: "zh-CN",
+                        description: "面向电商视觉、品牌内容、虚拟角色、分镜和视频创作的 AI 视觉生产系统，把提示词、参考图、角色资产、镜头规划和生成结果沉淀进同一套可持续生产的视觉画布。",
+                    }),
+                }}
+            />
         </main>
     );
 }

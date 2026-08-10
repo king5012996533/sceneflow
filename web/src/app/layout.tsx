@@ -9,6 +9,7 @@ import "antd/dist/reset.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
+    metadataBase: new URL("https://xingtudesign.com"),
     title: {
         default: "SceneFlow｜AI 视觉生产系统",
         template: "%s | SceneFlow",

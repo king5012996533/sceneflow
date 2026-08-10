@@ -40,6 +40,8 @@ const STATIC_PREFIXES = [
     "/canvas/brand-visual.webp",
 ];
 
+const NOINDEX_HEADER = "noindex, nofollow";
+
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
@@ -58,6 +60,12 @@ export function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
+    // 登录后才能访问的页面（产品页）对搜索引擎声明不收录
+    const noindex = (res: NextResponse) => {
+        res.headers.set("X-Robots-Tag", NOINDEX_HEADER);
+        return res;
+    };
+
     const token = request.cookies.get("ic_token")?.value;
     if (!token || token.length < 20) {
         if (pathname.startsWith("/api/") || pathname.startsWith("/canvas/api/")) {
@@ -66,10 +74,10 @@ export function middleware(request: NextRequest) {
 
         const loginUrl = new URL("/canvas/login", request.url);
         loginUrl.searchParams.set("from", pathname);
-        return NextResponse.redirect(loginUrl);
+        return noindex(NextResponse.redirect(loginUrl));
     }
 
-    return NextResponse.next();
+    return noindex(NextResponse.next());
 }
 
 export const config = {
