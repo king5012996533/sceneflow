@@ -1,6 +1,7 @@
+import Image from "next/image";
 import Link from "next/link";
 
-import { publicPath } from "@/lib/app-paths";
+import "@fontsource/noto-serif-sc/400.css";
 
 const metrics = [
     ["80+", "真实创作者参与内测"],
@@ -36,12 +37,14 @@ export default function Home() {
                     <br />
                     <em>可持续的生产能力。</em>
                 </h1>
-                <p className="sf-hero-note">
-                    SceneFlow 面向电商视觉、品牌内容、虚拟角色、分镜和视频创作。它不是再给你一次生成结果，而是把提示词、参考图、角色资产、镜头规划和生成结果沉淀进同一套视觉生产系统。
-                </p>
+                <p className="sf-hero-note">SceneFlow 面向电商视觉、品牌内容、虚拟角色、分镜和视频创作。它不是再给你一次生成结果，而是把提示词、参考图、角色资产、镜头规划和生成结果沉淀进同一套视觉生产系统。</p>
                 <div className="sf-hero-actions" aria-label="快速入口">
-                    <Link href="/canvas">进入生产画布 <span>↗</span></Link>
-                    <Link href="/pricing">申请开通权益 <span>↗</span></Link>
+                    <Link href="/canvas">
+                        进入生产画布 <span>↗</span>
+                    </Link>
+                    <Link href="/pricing">
+                        申请开通权益 <span>↗</span>
+                    </Link>
                 </div>
                 <div className="sf-metrics" aria-label="SceneFlow 关键指标">
                     {metrics.map(([value, label]) => (
@@ -98,7 +101,7 @@ export default function Home() {
                                 <small>16:9 / 35mm</small>
                             </div>
                             <div className="sf-film-frame">
-                                <img src={publicPath("/hero-frame.png")} alt="SceneFlow 电影级视觉画面" />
+                                <Image src="/hero-frame.webp" fill priority sizes="(max-width: 940px) 100vw, 55vw" alt="SceneFlow 电影级视觉画面" />
                                 <div className="sf-lock">
                                     IDENTITY LOCK <b>98.7%</b>
                                 </div>
@@ -116,7 +119,7 @@ export default function Home() {
             <section className="sf-assets" id="assets">
                 <p className="sf-section-number">02 / VIRTUAL ASSET LIBRARY</p>
                 <div className="sf-asset-image">
-                    <img src={publicPath("/character-asset.png")} alt="SceneFlow 虚拟角色资产" />
+                    <Image src="/character-asset.webp" fill sizes="(max-width: 940px) 100vw, 45vw" alt="SceneFlow 虚拟角色资产" />
                     <span>ACTOR ID / A017</span>
                 </div>
                 <div className="sf-asset-copy">
@@ -127,9 +130,7 @@ export default function Home() {
                         <br />
                         <em>是你的角色、流程与作品资产。</em>
                     </h2>
-                    <p>
-                        每一次创作都在积累下一次生产所需的上下文。角色身份、三视图、世界设定、镜头语言、分镜模板和项目经验，不再随着一次生成结束而消失。
-                    </p>
+                    <p>每一次创作都在积累下一次生产所需的上下文。角色身份、三视图、世界设定、镜头语言、分镜模板和项目经验，不再随着一次生成结束而消失。</p>
                 </div>
             </section>
 
@@ -145,15 +146,15 @@ export default function Home() {
                 </div>
                 <div className="sf-range-gallery">
                     <figure className="sf-range-large">
-                        <img src={publicPath("/commerce-visual.png")} alt="SceneFlow 电商商业视觉作品" />
+                        <Image src="/commerce-visual.webp" fill sizes="(max-width: 940px) 100vw, 40vw" alt="SceneFlow 电商商业视觉作品" />
                         <figcaption>COMMERCIAL / PRODUCT</figcaption>
                     </figure>
                     <figure>
-                        <img src={publicPath("/brand-visual.png")} alt="SceneFlow 品牌视觉作品" />
+                        <Image src="/brand-visual.webp" fill sizes="(max-width: 940px) 100vw, 30vw" alt="SceneFlow 品牌视觉作品" />
                         <figcaption>BRAND / CAMPAIGN</figcaption>
                     </figure>
                     <figure>
-                        <img src={publicPath("/hero-frame.png")} alt="SceneFlow 电影分镜视觉作品" />
+                        <Image src="/hero-frame.webp" fill sizes="(max-width: 940px) 100vw, 40vw" alt="SceneFlow 电影分镜视觉作品" />
                         <figcaption>STORY / CINEMA</figcaption>
                     </figure>
                 </div>
@@ -184,9 +185,15 @@ export default function Home() {
                     从同一张画布开始。
                 </h2>
                 <div className="sf-cta-links">
-                    <Link href="/canvas">进入画布 <span>→</span></Link>
-                    <Link href="/canvas">配置 API <span>→</span></Link>
-                    <Link href="/pricing">申请开通权益 <span>→</span></Link>
+                    <Link href="/canvas">
+                        进入画布 <span>→</span>
+                    </Link>
+                    <Link href="#process">
+                        了解工作流 <span>→</span>
+                    </Link>
+                    <Link href="/pricing">
+                        申请开通权益 <span>→</span>
+                    </Link>
                 </div>
                 <footer>
                     <b>SceneFlow</b>

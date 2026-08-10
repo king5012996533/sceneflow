@@ -740,7 +740,7 @@
 .sf-range-intro > p {
     margin: 16px 0 0;
     color: var(--sf-red);
-    font-size: 8px;
+    font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.18em;
 }
@@ -757,7 +757,7 @@
 .sf-hero h1 {
     grid-column: 2 / 4;
     margin: 0;
-    font-family: Georgia, "Times New Roman", "Songti SC", "STSong", serif;
+    font-family: Georgia, "Noto Serif SC", "Songti SC", "STSong", serif;
     font-size: clamp(72px, 6.8vw, 112px);
     font-weight: 400;
     letter-spacing: -0.065em;
@@ -864,7 +864,7 @@
 .sf-cta h2,
 .sf-asset-copy h2 {
     margin: 0;
-    font-family: Georgia, "Songti SC", serif;
+    font-family: Georgia, "Noto Serif SC", "Songti SC", serif;
     font-weight: 400;
     letter-spacing: -0.06em;
 }
@@ -1234,7 +1234,7 @@
 }
 
 .sf-process li b {
-    font-family: Georgia, "Songti SC", serif;
+    font-family: Georgia, "Noto Serif SC", "Songti SC", serif;
     font-size: 34px;
     font-weight: 400;
 }
