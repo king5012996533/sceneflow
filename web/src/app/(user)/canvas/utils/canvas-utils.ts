@@ -170,6 +170,28 @@ export function createCanvasNode(type: CanvasNodeType, position: Position, metad
     };
 }
 
+// 把一组子节点包进一个编组框：按子节点的包围盒 + 内边距生成组节点
+const GROUP_PADDING = 48;
+
+export function createCanvasGroup(children: CanvasNodeData[]): CanvasNodeData | null {
+    if (!children.length) return null;
+    const spec = getNodeSpec(CanvasNodeType.Group);
+    const minX = Math.min(...children.map((node) => node.position.x)) - GROUP_PADDING;
+    const minY = Math.min(...children.map((node) => node.position.y)) - GROUP_PADDING;
+    const maxX = Math.max(...children.map((node) => node.position.x + node.width)) + GROUP_PADDING;
+    const maxY = Math.max(...children.map((node) => node.position.y + node.height)) + GROUP_PADDING;
+
+    return {
+        id: `${CanvasNodeType.Group}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        type: CanvasNodeType.Group,
+        title: "编组",
+        position: { x: minX, y: minY },
+        width: Math.max(spec.width, maxX - minX),
+        height: Math.max(spec.height, maxY - minY),
+        metadata: { status: "idle", groupChildIds: children.map((node) => node.id) },
+    };
+}
+
 // ========== 连线函数 ==========
 
 export function getConnectionTargetAnchor(node: CanvasNodeData, current: ConnectionHandle) {

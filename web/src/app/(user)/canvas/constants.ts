@@ -15,6 +15,7 @@ export const NODE_DEFAULT_SIZE = {
     [CanvasNodeType.Video]: { width: 420, height: 236, title: "Video" },
     [CanvasNodeType.Audio]: { width: 340, height: 120, title: "Audio" },
     [CanvasNodeType.DirectorShot]: { width: 420, height: 280, title: "3D 镜头" },
+    [CanvasNodeType.Group]: { width: 480, height: 320, title: "编组" },
 } satisfies Record<CanvasNodeType, { width: number; height: number; title: string }>;
 
 export const NODE_SPECS = {
@@ -41,6 +42,10 @@ export const NODE_SPECS = {
     [CanvasNodeType.DirectorShot]: {
         ...NODE_DEFAULT_SIZE[CanvasNodeType.DirectorShot],
         metadata: { content: "", status: "idle", pipelineKind: "director-shot", pipelineLabel: "3D 镜头", assetCategory: "storyboard", assetSource: "manual", assetReusable: true },
+    },
+    [CanvasNodeType.Group]: {
+        ...NODE_DEFAULT_SIZE[CanvasNodeType.Group],
+        metadata: { status: "idle", groupChildIds: [] },
     },
 } satisfies Record<CanvasNodeType, CanvasNodeSpec>;
 

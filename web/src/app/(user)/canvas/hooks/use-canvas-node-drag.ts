@@ -64,7 +64,11 @@ export function useCanvasNodeDrag(options: UseCanvasNodeDragOptions) {
             setSelectedNodeIds(nextSelected);
             const dragIds = new Set(nextSelected);
             currentNodes.forEach((node) => {
-                if (nextSelected.has(node.id)) node.metadata?.batchChildIds?.forEach((childId) => dragIds.add(childId));
+                if (!nextSelected.has(node.id)) return;
+                // 批量图：拖根节点联动所有子图
+                node.metadata?.batchChildIds?.forEach((childId) => dragIds.add(childId));
+                // 编组：拖组框联动组内所有资产
+                if (node.type === CanvasNodeType.Group) node.metadata?.groupChildIds?.forEach((childId) => dragIds.add(childId));
             });
             dragRef.current = {
                 isDraggingNode: true,
@@ -146,7 +150,7 @@ export function useCanvasNodeDrag(options: UseCanvasNodeDragOptions) {
                 const clickedNode = nodesRef.current.find((node) => node.id === clickedNodeId);
                 if (clickedNode?.type === CanvasNodeType.Text) {
                     setDialogNodeId((current) => (current === clickedNodeId ? current : null));
-                } else {
+                } else if (clickedNode?.type !== CanvasNodeType.Group) {
                     setDialogNodeId(clickedNodeId);
                 }
             }

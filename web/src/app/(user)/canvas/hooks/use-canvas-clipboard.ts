@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import { CanvasNodeType } from "../types";
 import type { CanvasConnection, CanvasNodeData, ContextMenuState, Position } from "../types";
 import type { CanvasClipboard } from "../utils/canvas-utils";
 
@@ -34,8 +35,15 @@ export function useCanvasClipboard(options: UseCanvasClipboardOptions) {
     const clipboardRef = useRef<CanvasClipboard | null>(null);
 
     const copySelectedNodes = useCallback(() => {
-        const selectedIds = selectedNodeIdsRef.current;
+        const selectedIds = new Set(selectedNodeIdsRef.current);
         if (!selectedIds.size) return;
+
+        // 复制编组时连带复制组内资产，否则粘贴后组的子节点引用会失效
+        nodesRef.current.forEach((node) => {
+            if (selectedIds.has(node.id) && node.type === CanvasNodeType.Group) {
+                node.metadata?.groupChildIds?.forEach((childId) => selectedIds.add(childId));
+            }
+        });
 
         const copiedNodes = nodesRef.current
             .filter((node) => selectedIds.has(node.id))
@@ -72,20 +80,23 @@ export function useCanvasClipboard(options: UseCanvasClipboardOptions) {
         const dx = center.x - (bounds.left + bounds.right) / 2;
         const dy = center.y - (bounds.top + bounds.bottom) / 2;
         const idMap = new Map<string, string>();
-        const nextNodes = clipboard.nodes.map((node, index) => {
-            const id = `${node.type}-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`;
-            idMap.set(node.id, id);
-            return {
-                ...node,
-                id,
-                title: node.title.endsWith(" Copy") ? node.title : `${node.title} Copy`,
-                position: {
-                    x: node.position.x + dx,
-                    y: node.position.y + dy,
-                },
-                metadata: node.metadata ? { ...node.metadata } : undefined,
-            };
-        });
+        const nextNodes = clipboard.nodes
+            .map((node, index) => {
+                const id = `${node.type}-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`;
+                idMap.set(node.id, id);
+                return {
+                    ...node,
+                    id,
+                    title: node.title.endsWith(" Copy") ? node.title : `${node.title} Copy`,
+                    position: {
+                        x: node.position.x + dx,
+                        y: node.position.y + dy,
+                    },
+                    metadata: node.metadata ? { ...node.metadata } : undefined,
+                };
+            })
+            // 粘贴的编组框：子节点 id 已重新生成，需同步重映射 groupChildIds
+            .map((node) => (node.metadata?.groupChildIds ? { ...node, metadata: { ...node.metadata, groupChildIds: node.metadata.groupChildIds.map((childId) => idMap.get(childId) ?? childId) } } : node));
 
         const nextConnections = clipboard.connections.flatMap((connection, index) => {
             const fromNodeId = idMap.get(connection.fromNodeId);

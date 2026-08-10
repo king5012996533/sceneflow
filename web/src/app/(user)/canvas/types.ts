@@ -16,6 +16,7 @@ export enum CanvasNodeType {
     Video = "video",
     Audio = "audio",
     DirectorShot = "director-shot",
+    Group = "group",
 }
 
 export type CanvasNodeStatus = "idle" | "success" | "loading" | "error";
@@ -106,6 +107,7 @@ export type CanvasNodeMetadata = {
     directorProjectUpdatedAt?: string;
     directorLastCaptureAt?: string;
     directorCaptureCount?: number;
+    groupChildIds?: string[];
 };
 
 export type CanvasNodeData = {

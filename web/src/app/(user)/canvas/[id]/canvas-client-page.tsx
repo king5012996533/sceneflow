@@ -111,6 +111,7 @@ import {
     isAudioFile,
     isHiddenBatchChild,
     isHiddenBatchConnectionEndpoint,
+    createCanvasGroup,
 } from "../utils/canvas-utils";
 import {
     CanvasNodeType,
@@ -1159,6 +1160,38 @@ function InfiniteCanvasPage() {
         if (createTextNodeFromClipboard(text)) message.success("已从剪切板添加文本");
     }, [createImageFileNode, createTextNodeFromClipboard, getCanvasCenter, message]);
 
+    // Ctrl+G：把选中的节点合并为一个编组框
+    const createGroup = useCallback(() => {
+        const selected = selectedNodeIdsRef.current;
+        const children = nodesRef.current.filter((node) => selected.has(node.id) && node.type !== CanvasNodeType.Group);
+        if (children.length < 2) return;
+        const groupNode = createCanvasGroup(children);
+        if (!groupNode) return;
+        setNodes((prev) => {
+            // 插到第一个子节点前面，保持数据里组在子节点之前
+            const firstChildIndex = prev.findIndex((node) => node.id === children[0].id);
+            const next = [...prev];
+            next.splice(firstChildIndex === -1 ? 0 : firstChildIndex, 0, groupNode);
+            return next;
+        });
+        setSelectedNodeIds(new Set([groupNode.id]));
+        setSelectedConnectionId(null);
+        setContextMenu(null);
+    }, [nodesRef, selectedNodeIdsRef, setNodes, setSelectedConnectionId, setSelectedNodeIds, setContextMenu]);
+
+    // Ctrl+Shift+G：拆组，子节点保留并选中
+    const ungroup = useCallback(() => {
+        const selected = selectedNodeIdsRef.current;
+        const groupNodes = nodesRef.current.filter((node) => selected.has(node.id) && node.type === CanvasNodeType.Group);
+        if (!groupNodes.length) return;
+        const groupSet = new Set(groupNodes.map((node) => node.id));
+        const childIds = groupNodes.flatMap((node) => node.metadata?.groupChildIds || []);
+        setNodes((prev) => prev.filter((node) => !groupSet.has(node.id)));
+        setSelectedNodeIds(new Set(childIds));
+        setSelectedConnectionId(null);
+        setContextMenu(null);
+    }, [nodesRef, selectedNodeIdsRef, setNodes, setSelectedConnectionId, setSelectedNodeIds, setContextMenu]);
+
     useCanvasKeyboardShortcuts({
         onUndo: undoCanvas,
         onRedo: redoCanvas,
@@ -1179,6 +1212,8 @@ function InfiniteCanvasPage() {
         onPaste: () => {
             if (!pasteCopiedNodes()) void pasteSystemClipboard();
         },
+        onGroup: createGroup,
+        onUngroup: ungroup,
         onEscape: () => {
             setSelectedNodeIds(new Set());
             setSelectedConnectionId(null);
@@ -1664,98 +1699,101 @@ function InfiniteCanvasPage() {
                         {connectingParams ? <ActiveConnectionPath node={nodeById.get(connectingParams.nodeId)} handle={connectingParams} mouseWorld={mouseWorld} target={connectionTargetNodeId ? nodeById.get(connectionTargetNodeId) : undefined} /> : null}
                     </svg>
 
-                    {visibleNodes.map((node) => (
-                        <CanvasNode
-                            key={node.id}
-                            data={node}
-                            scale={viewport.k}
-                            isSelected={selectedNodeIds.has(node.id)}
-                            isDragging={draggingNodeIds.has(node.id)}
-                            isRelated={relatedHighlight.nodeIds.has(node.id)}
-                            isFocusRelated={activeNodeId === node.id}
-                            isConnectionTarget={connectionTargetNodeId === node.id}
-                            isConnecting={Boolean(connectingParams)}
-                            editRequestNonce={editingNodeId === node.id ? editRequestNonce : 0}
-                            showPanel={dialogNodeId === node.id && !selectionBox}
-                            batchCount={batchChildCountById.get(node.id) || 0}
-                            batchExpanded={Boolean(node.metadata?.imageBatchExpanded)}
-                            batchClosing={Boolean(node.metadata?.batchRootId && collapsingBatchIds.has(node.metadata.batchRootId))}
-                            batchOpening={openingBatchIds.has(node.id)}
-                            batchRecovering={collapsingBatchIds.has(node.id)}
-                            batchMotion={batchMotionById.get(node.id)}
-                            showImageInfo={showImageInfo}
-                            resourceLabel={resourceReferenceByNodeId.get(node.id)}
-                            mentionReferences={mentionReferencesByNodeId.get(node.id) || []}
-                            renderPanel={(panelNode) =>
-                                panelNode.metadata?.pipelineKind === "director-shot" ? null : panelNode.type === CanvasNodeType.Config ? (
-                                    <CanvasConfigComposer
-                                        value={panelNode.metadata?.composerContent ?? panelNode.metadata?.prompt ?? ""}
-                                        inputs={configInputsById.get(panelNode.id) || []}
-                                        onChange={(composerContent) => patchNodeConfig(panelNode.id, { composerContent })}
-                                        onClose={() => setDialogNodeId(null)}
-                                    />
-                                ) : (
-                                    <CanvasNodePromptPanel
-                                        node={panelNode}
-                                        isRunning={runningNodeId === panelNode.id}
-                                        mentionReferences={mentionReferencesByNodeId.get(panelNode.id) || []}
-                                        onPromptChange={updateNodePrompt}
-                                        onConfigChange={patchNodeConfig}
-                                        onGenerate={handleGenerateNode}
-                                        onStop={confirmStopGeneration}
-                                        onImageSettingsOpenChange={(open) => {
-                                            setNodeImageSettingsOpen(open);
-                                            if (open) setToolbarNodeId(null);
-                                        }}
-                                    />
-                                )
-                            }
-                            renderNodeContent={(contentNode) =>
-                                contentNode.metadata?.pipelineKind === "director-shot" ? (
-                                    <DirectorShotNodeContent node={contentNode} onOpen={openDirectorShot} />
-                                ) : contentNode.metadata?.pipelineKind === "shot-pack" ? (
-                                    <ShotPackNodeContent node={contentNode} />
-                                ) : (
-                                    <CanvasConfigNodePanel
-                                        node={contentNode}
-                                        isRunning={runningNodeId === contentNode.id}
-                                        inputSummary={getInputSummary(configInputsById.get(contentNode.id) || [])}
-                                        onConfigChange={patchNodeConfig}
-                                        onComposerToggle={() => setDialogNodeId((current) => (current === contentNode.id ? null : contentNode.id))}
-                                        onStop={confirmStopGeneration}
-                                        onGenerate={(nodeId) => {
-                                            const target = nodesRef.current.find((item) => item.id === nodeId);
-                                            void handleGenerateNode(nodeId, target?.metadata?.generationMode || "image", target?.metadata?.composerContent ?? target?.metadata?.prompt ?? "");
-                                        }}
-                                    />
-                                )
-                            }
-                            onMouseDown={handleNodeMouseDown}
-                            onHoverStart={(nodeId) => {
-                                if (nodeDraggingRef.current) return;
-                                setHoveredNodeId(nodeId);
-                                keepNodeToolbar(nodeId);
-                            }}
-                            onHoverEnd={(nodeId) => {
-                                setHoveredNodeId((current) => (current === nodeId ? null : current));
-                                hideNodeToolbar();
-                            }}
-                            onConnectStart={handleConnectStart}
-                            onResize={resizeNode}
-                            onContentChange={updateNodeContent}
-                            onTitleChange={updateNodeTitle}
-                            onToggleBatch={toggleBatchExpanded}
-                            onSetBatchPrimary={setBatchPrimary}
-                            onRetry={(node) => void retryNode(node)}
-                            onGenerateImage={generateImageFromTextNode}
-                            onViewImage={(node) => setPreviewNodeId(node.id)}
-                            onContextMenu={(event, id) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                setContextMenu({ type: "node", x: event.clientX, y: event.clientY, nodeId: id });
-                            }}
-                        />
-                    ))}
+                    {visibleNodes
+                        .slice()
+                        .sort((a, b) => Number(b.type === CanvasNodeType.Group) - Number(a.type === CanvasNodeType.Group))
+                        .map((node) => (
+                            <CanvasNode
+                                key={node.id}
+                                data={node}
+                                scale={viewport.k}
+                                isSelected={selectedNodeIds.has(node.id)}
+                                isDragging={draggingNodeIds.has(node.id)}
+                                isRelated={relatedHighlight.nodeIds.has(node.id)}
+                                isFocusRelated={activeNodeId === node.id}
+                                isConnectionTarget={connectionTargetNodeId === node.id}
+                                isConnecting={Boolean(connectingParams)}
+                                editRequestNonce={editingNodeId === node.id ? editRequestNonce : 0}
+                                showPanel={dialogNodeId === node.id && !selectionBox}
+                                batchCount={batchChildCountById.get(node.id) || 0}
+                                batchExpanded={Boolean(node.metadata?.imageBatchExpanded)}
+                                batchClosing={Boolean(node.metadata?.batchRootId && collapsingBatchIds.has(node.metadata.batchRootId))}
+                                batchOpening={openingBatchIds.has(node.id)}
+                                batchRecovering={collapsingBatchIds.has(node.id)}
+                                batchMotion={batchMotionById.get(node.id)}
+                                showImageInfo={showImageInfo}
+                                resourceLabel={resourceReferenceByNodeId.get(node.id)}
+                                mentionReferences={mentionReferencesByNodeId.get(node.id) || []}
+                                renderPanel={(panelNode) =>
+                                    panelNode.metadata?.pipelineKind === "director-shot" ? null : panelNode.type === CanvasNodeType.Config ? (
+                                        <CanvasConfigComposer
+                                            value={panelNode.metadata?.composerContent ?? panelNode.metadata?.prompt ?? ""}
+                                            inputs={configInputsById.get(panelNode.id) || []}
+                                            onChange={(composerContent) => patchNodeConfig(panelNode.id, { composerContent })}
+                                            onClose={() => setDialogNodeId(null)}
+                                        />
+                                    ) : (
+                                        <CanvasNodePromptPanel
+                                            node={panelNode}
+                                            isRunning={runningNodeId === panelNode.id}
+                                            mentionReferences={mentionReferencesByNodeId.get(panelNode.id) || []}
+                                            onPromptChange={updateNodePrompt}
+                                            onConfigChange={patchNodeConfig}
+                                            onGenerate={handleGenerateNode}
+                                            onStop={confirmStopGeneration}
+                                            onImageSettingsOpenChange={(open) => {
+                                                setNodeImageSettingsOpen(open);
+                                                if (open) setToolbarNodeId(null);
+                                            }}
+                                        />
+                                    )
+                                }
+                                renderNodeContent={(contentNode) =>
+                                    contentNode.metadata?.pipelineKind === "director-shot" ? (
+                                        <DirectorShotNodeContent node={contentNode} onOpen={openDirectorShot} />
+                                    ) : contentNode.metadata?.pipelineKind === "shot-pack" ? (
+                                        <ShotPackNodeContent node={contentNode} />
+                                    ) : (
+                                        <CanvasConfigNodePanel
+                                            node={contentNode}
+                                            isRunning={runningNodeId === contentNode.id}
+                                            inputSummary={getInputSummary(configInputsById.get(contentNode.id) || [])}
+                                            onConfigChange={patchNodeConfig}
+                                            onComposerToggle={() => setDialogNodeId((current) => (current === contentNode.id ? null : contentNode.id))}
+                                            onStop={confirmStopGeneration}
+                                            onGenerate={(nodeId) => {
+                                                const target = nodesRef.current.find((item) => item.id === nodeId);
+                                                void handleGenerateNode(nodeId, target?.metadata?.generationMode || "image", target?.metadata?.composerContent ?? target?.metadata?.prompt ?? "");
+                                            }}
+                                        />
+                                    )
+                                }
+                                onMouseDown={handleNodeMouseDown}
+                                onHoverStart={(nodeId) => {
+                                    if (nodeDraggingRef.current) return;
+                                    setHoveredNodeId(nodeId);
+                                    keepNodeToolbar(nodeId);
+                                }}
+                                onHoverEnd={(nodeId) => {
+                                    setHoveredNodeId((current) => (current === nodeId ? null : current));
+                                    hideNodeToolbar();
+                                }}
+                                onConnectStart={handleConnectStart}
+                                onResize={resizeNode}
+                                onContentChange={updateNodeContent}
+                                onTitleChange={updateNodeTitle}
+                                onToggleBatch={toggleBatchExpanded}
+                                onSetBatchPrimary={setBatchPrimary}
+                                onRetry={(node) => void retryNode(node)}
+                                onGenerateImage={generateImageFromTextNode}
+                                onViewImage={(node) => setPreviewNodeId(node.id)}
+                                onContextMenu={(event, id) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    setContextMenu({ type: "node", x: event.clientX, y: event.clientY, nodeId: id });
+                                }}
+                            />
+                        ))}
 
                     {selectionBox ? (
                         <div

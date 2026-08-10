@@ -57,27 +57,38 @@ export function useCanvasNodeActions(options: UseCanvasNodeActionsOptions) {
             if (!ids.size) return;
             const allIds = new Set(ids);
             nodesRef.current.forEach((node) => {
-                if (ids.has(node.id)) node.metadata?.batchChildIds?.forEach((childId) => allIds.add(childId));
+                // 编组框本身删除时子节点保留（不联动删除）
+                if (ids.has(node.id) && node.type !== CanvasNodeType.Group) node.metadata?.batchChildIds?.forEach((childId) => allIds.add(childId));
             });
             setNodes((prev) => {
                 const next = prev.filter((node) => !allIds.has(node.id));
-                return next.map((node) => {
-                    const childIds = node.metadata?.batchChildIds?.filter((childId) => !allIds.has(childId));
-                    if (!node.metadata?.isBatchRoot || childIds?.length === node.metadata.batchChildIds?.length) return node;
-                    const primaryImageId = childIds?.includes(node.metadata.primaryImageId || "") ? node.metadata.primaryImageId : childIds?.[0];
-                    const primaryNode = next.find((item) => item.id === primaryImageId);
-                    return {
-                        ...node,
-                        metadata: {
-                            ...node.metadata,
-                            batchChildIds: childIds,
-                            primaryImageId,
-                            content: primaryNode?.metadata?.content || node.metadata.content,
-                            naturalWidth: primaryNode?.metadata?.naturalWidth || node.metadata.naturalWidth,
-                            naturalHeight: primaryNode?.metadata?.naturalHeight || node.metadata.naturalHeight,
-                        },
-                    };
-                });
+                return (
+                    next
+                        .map((node) => {
+                            // 删子节点时同步从所属编组中移除
+                            if (node.type === CanvasNodeType.Group && node.metadata?.groupChildIds) {
+                                const remaining = node.metadata.groupChildIds.filter((childId) => !allIds.has(childId));
+                                return remaining.length === node.metadata.groupChildIds.length ? node : { ...node, metadata: { ...node.metadata, groupChildIds: remaining } };
+                            }
+                            const childIds = node.metadata?.batchChildIds?.filter((childId) => !allIds.has(childId));
+                            if (!node.metadata?.isBatchRoot || childIds?.length === node.metadata.batchChildIds?.length) return node;
+                            const primaryImageId = childIds?.includes(node.metadata.primaryImageId || "") ? node.metadata.primaryImageId : childIds?.[0];
+                            const primaryNode = next.find((item) => item.id === primaryImageId);
+                            return {
+                                ...node,
+                                metadata: {
+                                    ...node.metadata,
+                                    batchChildIds: childIds,
+                                    primaryImageId,
+                                    content: primaryNode?.metadata?.content || node.metadata.content,
+                                    naturalWidth: primaryNode?.metadata?.naturalWidth || node.metadata.naturalWidth,
+                                    naturalHeight: primaryNode?.metadata?.naturalHeight || node.metadata.naturalHeight,
+                                },
+                            };
+                        })
+                        // 组内资产全部删除后，空组框一并移除
+                        .filter((node) => !(node.type === CanvasNodeType.Group && (node.metadata?.groupChildIds?.length ?? 0) === 0))
+                );
             });
             setConnections((prev) => prev.filter((conn) => !allIds.has(conn.fromNodeId) && !allIds.has(conn.toNodeId)));
             setSelectedNodeIds(new Set());
@@ -152,10 +163,24 @@ export function useCanvasNodeActions(options: UseCanvasNodeActionsOptions) {
                 position: { x: source.position.x + 36, y: source.position.y + 36 },
             };
 
-            setNodes((prev) => [...prev, next]);
+            setNodes((prev) => {
+                // 编组：连同组内资产一起复制并重映射引用，否则副本组框会指向原资产（拖动副本会拖走原件）
+                if (source.type === CanvasNodeType.Group && source.metadata?.groupChildIds?.length) {
+                    const childCopies = source.metadata.groupChildIds
+                        .map((childId) => prev.find((child) => child.id === childId))
+                        .filter((child): child is CanvasNodeData => Boolean(child))
+                        .map((child) => {
+                            const newId = `${child.type}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+                            return { ...child, id: newId, title: `${child.title} Copy`, position: { x: child.position.x + 36, y: child.position.y + 36 } };
+                        });
+                    const groupCopy = { ...next, metadata: { ...next.metadata, groupChildIds: childCopies.map((child) => child.id) } };
+                    return [...prev, groupCopy, ...childCopies];
+                }
+                return [...prev, next];
+            });
             setSelectedNodeIds(new Set([id]));
             setSelectedConnectionId(null);
-            setDialogNodeId(id);
+            setDialogNodeId(source.type === CanvasNodeType.Group ? null : id);
         },
         [nodesRef, setDialogNodeId, setNodes, setSelectedConnectionId, setSelectedNodeIds],
     );

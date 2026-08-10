@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { ChevronRight, Image as ImageIcon, Music2, RefreshCw, Star, Video } from "lucide-react";
+import { ChevronRight, Image as ImageIcon, Layers, Music2, RefreshCw, Star, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
@@ -116,6 +116,7 @@ export const CanvasNode = React.memo(function CanvasNode({
     const hasVideoContent = data.type === CanvasNodeType.Video && Boolean(data.metadata?.content);
     const hasAudioContent = data.type === CanvasNodeType.Audio && Boolean(data.metadata?.content);
     const hasDirectorShotContent = data.type === CanvasNodeType.DirectorShot;
+    const isGroup = data.type === CanvasNodeType.Group;
     const isBatchRoot = data.type === CanvasNodeType.Image && Boolean(data.metadata?.isBatchRoot) && batchCount > 1;
     const isBatchChild = data.type === CanvasNodeType.Image && Boolean(data.metadata?.batchRootId);
     const isActive = isConnectionTarget || isSelected || isFocusRelated;
@@ -279,7 +280,7 @@ export const CanvasNode = React.memo(function CanvasNode({
     return (
         <div
             data-node-id={data.id}
-            className={`node-element absolute flex select-none flex-col transition-shadow duration-200 ${isDragging ? "z-[60]" : isSelected ? "z-50" : "z-10"}`}
+            className={`node-element absolute flex select-none flex-col transition-shadow duration-200 ${isGroup ? "z-[5]" : isDragging ? "z-[60]" : isSelected ? "z-50" : "z-10"}`}
             style={{
                 transform: `translate(${data.position.x}px, ${data.position.y}px)`,
                 width: data.width,
@@ -336,7 +337,7 @@ export const CanvasNode = React.memo(function CanvasNode({
             <div
                 className="relative h-full w-full overflow-visible rounded-2xl border transition-[box-shadow,border-color] duration-150"
                 style={{
-                    background: hasImageContent || hasVideoContent || hasDirectorShotContent ? "transparent" : theme.node.fill,
+                    background: hasImageContent || hasVideoContent || hasDirectorShotContent || isGroup ? "transparent" : theme.node.fill,
                     borderColor: hasImageContent ? (hovered && !isActive && !isBatchChild ? theme.node.muted : imageBorderColor) : isActive ? selectionBlue : isRelated ? theme.node.muted : hovered ? theme.node.muted : theme.node.stroke,
                     transform: isDragging ? "scale(1.02)" : undefined,
                     transition: "transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease",
@@ -371,7 +372,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                     className={`relative flex h-full w-full items-center justify-center rounded-[inherit] ${isBatchRoot ? "overflow-visible" : "overflow-hidden"}`}
                     style={
                         {
-                            background: hasImageContent || hasVideoContent || hasDirectorShotContent ? "transparent" : theme.node.fill,
+                            background: hasImageContent || hasVideoContent || hasDirectorShotContent || isGroup ? "transparent" : theme.node.fill,
                             "--batch-from-x": `${batchMotion?.x || 0}px`,
                             "--batch-from-y": `${batchMotion?.y || 0}px`,
                             "--batch-from-rotate": `${6 + (batchMotion?.index || 0) * 4}deg`,
@@ -406,7 +407,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                 {resourceLabel ? <ResourceLabelBadge reference={resourceLabel} /> : null}
                 {data.metadata?.pipelineLabel ? <PipelineBadge node={data} /> : null}
 
-                {!hasImageContent && !hasVideoContent && !hasAudioContent && !hasDirectorShotContent ? (
+                {!hasImageContent && !hasVideoContent && !hasAudioContent && !hasDirectorShotContent && !isGroup ? (
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(to top, ${theme.canvas.background}66, transparent)` }} />
                 ) : null}
 
@@ -429,8 +430,8 @@ export const CanvasNode = React.memo(function CanvasNode({
                 <ResizeHandle corner="bottom-right" onMouseDown={handleResizeMouseDown} />
             </div>
 
-            <ConnectionHandleDot side="left" visible={hovered || isSelected || isConnecting} onMouseDown={(event) => onConnectStart(event, data.id, "target")} />
-            <ConnectionHandleDot side="right" visible={data.type !== CanvasNodeType.Config && (hovered || isSelected || isConnecting)} onMouseDown={(event) => onConnectStart(event, data.id, "source")} />
+            <ConnectionHandleDot side="left" visible={!isGroup && (hovered || isSelected || isConnecting)} onMouseDown={(event) => onConnectStart(event, data.id, "target")} />
+            <ConnectionHandleDot side="right" visible={!isGroup && data.type !== CanvasNodeType.Config && (hovered || isSelected || isConnecting)} onMouseDown={(event) => onConnectStart(event, data.id, "source")} />
 
             {showPanel && renderPanel ? <div className="absolute left-1/2 top-full z-[70] w-[600px] -translate-x-1/2 pt-4">{renderPanel(data)}</div> : null}
         </div>
@@ -464,7 +465,25 @@ const nodeContentRenderers = {
     [CanvasNodeType.Video]: VideoNodeContent,
     [CanvasNodeType.Audio]: AudioNodeContent,
     [CanvasNodeType.DirectorShot]: EmptyImageContent,
+    [CanvasNodeType.Group]: GroupContent,
 } satisfies Record<CanvasNodeType, (props: NodeContentRendererProps) => ReactNode>;
+
+function GroupContent({ node, theme }: NodeContentRendererProps) {
+    const childCount = node.metadata?.groupChildIds?.length || 0;
+    return (
+        <div className="relative flex h-full w-full items-center justify-center rounded-[inherit]">
+            {/* 虚线框：pointer-events-none，让点击穿透到组框本体或更上层的子节点 */}
+            <div className="pointer-events-none absolute inset-0 rounded-[inherit] border-2 border-dashed" style={{ borderColor: theme.node.muted }} />
+            <div
+                className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-medium backdrop-blur-md"
+                style={{ background: `${theme.toolbar.panel}dd`, borderColor: theme.node.stroke, color: theme.node.text }}
+            >
+                <Layers className="size-3" />
+                <span>{childCount} 项</span>
+            </div>
+        </div>
+    );
+}
 
 function LoadingContent({ theme }: Pick<NodeContentRendererProps, "theme">) {
     return (
