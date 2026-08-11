@@ -17,16 +17,17 @@ compatibility: Requires npx(Windows node)、Windows Chrome、deepseek-vision-ass
 - 本地构建（WSL 无原生 node，用 Windows node）：
   `cd web && "/mnt/c/Program Files/nodejs/node.exe" "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js" run build`
 - 生产环境：`https://xingtudesign.com`（部署由用户在 VPS 手动执行：`git pull && bash deploy.sh`，需要时提示用户部署）
-- 浏览器 MCP：`playwright`（无头 Chrome，已配置 executable-path + user-data-dir，登录态可持久化）
+- 浏览器 MCP：`browser-verify`（WSL 原生 stdio，工具：`browser_screenshot` 无头 Chrome 截图、`browser_dump_dom` 导出 DOM 文本、`page_http_status` 状态检查）。截图/结果文件在 `AppData/Local/Temp/ui-shots/`
 - 视觉检查：`deepseek-vision-assistant` 技能的 `scripts/analyze_image.py`，模型 `gpt-5.6-terra`，必须后台运行
 
 ## 校验步骤
 
 1. **先构建**：`npm run build` 必须通过（构建失败直接修，不用开浏览器）。
 2. **确定受影响的页面**：这次改动涉及哪些路由？列出 URL（见下），不要只截一个页面。
-3. **浏览器打开**：用 playwright MCP 依次打开每个页面：
-   - 用 `search_tool` 查 playwright 的工具（`browser_navigate`、`browser_screenshot`、`browser_click` 等），按 schema 调用。
-   - 需登录的页面：先导航到 `https://xingtudesign.com/canvas/login`，用测试账号登录（user-data-dir 已持久化，首次登录后后续免登录）。
+3. **浏览器打开**：用 browser-verify MCP 依次检查每个页面：
+   - 用 `search_tool` 查 `browser-verify` 的工具，按 schema 调用 `browser_screenshot` / `browser_dump_dom` / `page_http_status`。
+   - 先 `page_http_status` 确认页面可达（200），再 `browser_screenshot` 截图。
+   - 需登录的页面：产品内页多数需要登录，先用浏览器 MCP 打开登录页说明情况；无登录态时可对未登录态页面截图，并注明"需登录验证"。
 4. **截图**：每个页面截一张 1440 宽度的图，存到 `AppData/Local/Temp/ui-shots/`（Windows 可见路径，Chrome/脚本才能读写）。
 5. **视觉检查**：把截图交给视觉模型分析（后台跑，不要同步等）：
    ```
