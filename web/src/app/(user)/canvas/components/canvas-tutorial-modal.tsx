@@ -40,7 +40,7 @@ export function CanvasTutorialModal({
                 <div className="flex flex-col gap-4 border-b pb-5 md:flex-row md:items-start md:justify-between" style={{ borderColor: theme.node.stroke }}>
                     <div>
                         <div className="text-xs font-semibold uppercase tracking-[0.22em] text-stone-500">SceneFlow Quick Start</div>
-                        <h2 className="mt-2 text-2xl font-semibold tracking-tight">5 分钟跑通第一个视觉片段</h2>
+                        <h2 className="mt-2 text-base font-semibold tracking-tight">5 分钟跑通第一个视觉片段</h2>
                         <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-500 dark:text-stone-400">推荐从一个 10-20 秒片段开始，例如“竹林雨夜，两名武侠角色交手”。先搭流程，再逐步生成，最后把可复用资产沉淀到素材库。</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">

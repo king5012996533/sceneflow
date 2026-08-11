@@ -460,7 +460,7 @@ function PlanList({ title, items, empty, tone = "default" }: { title: string; it
     const toneClass = tone === "warn" ? "border-[#d58b29]/20 bg-[#fff4e5] text-[#7a4a0b]" : tone === "ok" ? "border-[#2f9c66]/20 bg-[#edf8f1] text-[#1d6b43]" : "border-black/10 bg-black/[0.035] text-black/70";
     return (
         <div className="mt-3">
-            <div className="mb-2 text-xs font-semibold text-black/50">{title}</div>
+            <div className="mb-2 text-xs font-medium text-black/50">{title}</div>
             {items.length ? (
                 <div className="flex flex-wrap gap-2">
                     {items.map((item, index) => (
@@ -503,7 +503,7 @@ function CompactArtifact({ artifact, onCopy, onConfirm, onReject }: { artifact: 
                         <PlanList title="缺失素材" items={artifact.plan.missingAssets} empty="暂无明显缺口" tone="warn" />
                         <PlanList title="现在可直接做" items={artifact.plan.executableNow} empty="等待用户补充信息" tone="ok" />
                         <div className="mt-3 rounded-xl bg-white/60 p-3">
-                            <div className="text-xs font-semibold text-black/50">下一步关键问题</div>
+                            <div className="text-xs font-medium text-black/50">下一步关键问题</div>
                             <p className="mt-1 text-sm leading-6 text-black/70">{artifact.plan.nextQuestion || "无需追问，可以先执行第一版方案。"}</p>
                         </div>
                     </div>
@@ -511,7 +511,7 @@ function CompactArtifact({ artifact, onCopy, onConfirm, onReject }: { artifact: 
 
                 {artifact.toolActions?.length ? (
                     <div className="space-y-2">
-                        <div className="text-xs font-semibold text-black/50">待确认动作</div>
+                        <div className="text-xs font-medium text-black/50">待确认动作</div>
                         {artifact.toolActions.map((action) => (
                             <div key={action.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black/10 bg-white/55 px-3 py-2">
                                 <div className="min-w-0">
@@ -543,7 +543,7 @@ function CompactArtifact({ artifact, onCopy, onConfirm, onReject }: { artifact: 
 
                 {artifact.nextSteps.length ? (
                     <div>
-                        <div className="mb-2 text-xs font-semibold text-black/50">下一步</div>
+                        <div className="mb-2 text-xs font-medium text-black/50">下一步</div>
                         <ol className="space-y-1 text-sm leading-6 text-black/65">
                             {artifact.nextSteps.map((item, index) => (
                                 <li key={index}>

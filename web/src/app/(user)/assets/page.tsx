@@ -192,7 +192,7 @@ export default function AssetsPage() {
             <main className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(rgba(79,93,255,.08)_1px,transparent_1px)] px-6 py-8 [background-size:18px_18px]">
                 <div className="pb-8">
                     <div className="mx-auto max-w-5xl text-center">
-                        <h1 className="text-4xl font-semibold tracking-tight text-[#172033]">我的素材</h1>
+                        <h1 className="text-2xl font-semibold tracking-tight text-[#172033]">我的素材</h1>
                         <p className="mt-3 text-sm text-[#6d6472]">收藏常用文本、图片和视频资产，按类型、标题和标签快速查找。</p>
                     </div>
 
@@ -426,7 +426,7 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
                 <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                            <h2 className="line-clamp-1 text-sm font-semibold text-[#172033]">{asset.title}</h2>
+                            <h2 className="line-clamp-1 text-sm font-medium text-[#172033]">{asset.title}</h2>
                             <Typography.Text type="secondary" className="mt-1 block text-xs">
                                 {asset.source || "未标注来源"}
                             </Typography.Text>

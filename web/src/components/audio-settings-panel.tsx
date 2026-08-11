@@ -27,7 +27,7 @@ export function AudioSettingsPanel({ config, onConfigChange, theme, showTitle = 
     return (
         <ImageSettingsTheme theme={theme}>
             <div className={className} style={{ color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()}>
-                {showTitle ? <div className="text-lg font-semibold">音频设置</div> : null}
+                {showTitle ? <div className="text-sm font-medium">音频设置</div> : null}
                 <SettingGroup title="声音" color={theme.node.muted}>
                     <div className="grid grid-cols-3 gap-2.5">
                         {audioVoiceOptions.map((item) => (

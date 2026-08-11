@@ -83,7 +83,7 @@ function ConnectionCreateOption({
                 {icon}
             </span>
             <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2 text-base font-semibold leading-5">{title}</span>
+                <span className="flex items-center gap-2 text-sm font-medium leading-5">{title}</span>
                 {description ? (
                     <span className="mt-1 block truncate text-sm" style={{ color: theme.node.muted }}>
                         {description}

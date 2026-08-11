@@ -69,7 +69,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
                     if (document.activeElement instanceof HTMLInputElement && event.currentTarget.contains(document.activeElement)) document.activeElement.blur();
                 }}
             >
-                {showTitle ? <div className="text-lg font-semibold">图像设置</div> : null}
+                {showTitle ? <div className="text-sm font-medium">图像设置</div> : null}
                 <div className="space-y-2.5">
                     <SettingTitle color={theme.node.muted}>质量</SettingTitle>
                     <div className="grid grid-cols-4 gap-2.5">

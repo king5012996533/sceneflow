@@ -224,7 +224,7 @@ export function AppConfigModal() {
         <Modal
             title={
                 <div>
-                    <div className="text-lg font-semibold">配置与用户偏好</div>
+                    <div className="text-base font-semibold">配置与用户偏好</div>
                     <div className="mt-1 text-xs font-normal text-stone-500">渠道聚合、模型选择和同步偏好</div>
                 </div>
             }

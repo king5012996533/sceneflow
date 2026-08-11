@@ -115,7 +115,7 @@ export default function PricingPage() {
                 <div className="space-y-4">
                     <div className="rounded-2xl border border-[#eadfce] bg-[#fffaf2] p-4">
                         <div className="text-xs tracking-[0.16em] text-stone-500">{copy.amountDue}</div>
-                        <div className="mt-1 text-4xl font-semibold tracking-tight text-[#172033]">{formatPrice(amount)}</div>
+                        <div className="mt-1 text-2xl font-semibold tracking-tight text-[#172033]">{formatPrice(amount)}</div>
                         <div className="mt-2 text-sm leading-6 text-stone-600">
                             {plan.name} / {cycle === "yearly" ? copy.yearlyRights : copy.monthlyRights}
                         </div>

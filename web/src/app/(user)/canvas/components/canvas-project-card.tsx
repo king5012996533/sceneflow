@@ -51,7 +51,7 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
                             open();
                         }}
                     >
-                        <h2 className="truncate text-xl font-semibold">{project.title}</h2>
+                        <h2 className="truncate text-base font-medium">{project.title}</h2>
                         <p className="mt-3 text-sm leading-6 text-[#6d6472]">
                             {project.nodes.length} 个节点 · {project.connections.length} 条连线
                         </p>

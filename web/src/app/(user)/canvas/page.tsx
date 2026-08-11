@@ -194,7 +194,7 @@ function CanvasPageInner() {
                 <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[#ded3c4] pb-6">
                     <div>
                         <p className="text-xs text-[#8a7f91]">画布库</p>
-                        <h1 className="mt-3 text-3xl font-semibold">无限画布</h1>
+                        <h1 className="mt-3 text-2xl font-semibold tracking-tight">无限画布</h1>
                         <p className="mt-2 text-sm text-[#746b7a]">
                             当前项目数：{projects.length}
                             {projectLimit === null ? " / 不限" : ` / ${projectLimit}`}

@@ -162,13 +162,13 @@ export function CanvasTopBar({
                                     if (event.key === "Enter") onFinishTitleEditing();
                                     if (event.key === "Escape") onCancelTitleEditing();
                                 }}
-                                className="max-w-[280px] bg-transparent p-0 text-left text-lg font-semibold tracking-normal outline-none"
+                                className="max-w-[280px] bg-transparent p-0 text-left text-sm font-medium tracking-normal outline-none"
                                 style={{ color: theme.node.text }}
                             />
                         ) : (
                             <button
                                 type="button"
-                                className="max-w-[280px] truncate border-b border-dashed border-transparent text-left text-lg font-semibold tracking-normal transition hover:border-current"
+                                className="max-w-[280px] truncate border-b border-dashed border-transparent text-left text-sm font-medium tracking-normal transition hover:border-current"
                                 onDoubleClick={onStartTitleEditing}
                                 title="双击修改画布名称"
                             >

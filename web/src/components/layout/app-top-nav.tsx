@@ -246,7 +246,7 @@ function ExperienceOfficerModal({ open, onClose, onOpenConfig }: { open: boolean
                         <Bot className="size-3.5" />
                         SceneFlow 体验官
                     </div>
-                    <h2 className="mt-3 text-xl font-semibold tracking-tight text-[#172033]">直接问我问题</h2>
+                    <h2 className="mt-3 text-base font-semibold tracking-tight text-[#172033]">直接问我问题</h2>
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-4">

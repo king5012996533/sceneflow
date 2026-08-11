@@ -31,7 +31,7 @@ export function CanvasNodeAngleDialog({ dataUrl, open, onClose, onConfirm }: { d
         <Modal title={null} open={open && Boolean(dataUrl)} onCancel={onClose} footer={null} width={860} centered destroyOnHidden>
             <div className="space-y-5">
                 <div>
-                    <h2 className="text-xl font-semibold">AI 多角度</h2>
+                    <h2 className="text-base font-semibold">AI 多角度</h2>
                     <p className="mt-1 text-sm opacity-60">左侧只预览方向，结果会基于原图重新生成</p>
                 </div>
                 <div className="grid gap-6 md:grid-cols-[minmax(260px,1fr)_360px]">

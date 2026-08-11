@@ -180,7 +180,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
       styles={{ body: { padding: "32px 28px 24px" } }}
     >
       <div className="text-center mb-6">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
           {mode === "register" ? (step === 1 ? "注册账号" : step === 2 ? "输入验证码" : "设置密码") : "登录"}
         </h2>
         <p className="text-sm text-gray-500 mt-1.5">

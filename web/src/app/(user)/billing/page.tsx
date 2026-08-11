@@ -81,7 +81,7 @@ export default function BillingPage() {
                 <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
                     <div>
                         <div className="mb-3 text-xs font-medium tracking-[0.18em] text-[#8a7f91]">BETA ACCESS</div>
-                        <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">当前权益与用量</h1>
+                        <h1 className="text-2xl font-semibold tracking-tight">当前权益与用量</h1>
                     </div>
                     <Link href="/pricing" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#4f5dff] px-4 text-sm font-medium text-white shadow-[0_12px_30px_rgba(79,93,255,.22)]">
                         申请开通联系管理员
@@ -91,14 +91,14 @@ export default function BillingPage() {
 
                 <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
                     <section className="rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
-                        <div className="mb-5 flex items-center gap-2 text-lg font-semibold">
+                        <div className="mb-5 flex items-center gap-2 text-sm font-medium">
                             <PackageCheck className="size-5" />
                             权益状态
                         </div>
                         {subscription ? (
                             <div className="space-y-4">
                                 <div>
-                                    <div className="text-3xl font-semibold">{subscription.plan?.name || "免费版"}</div>
+                                    <div className="text-xl font-semibold">{subscription.plan?.name || "免费版"}</div>
                                     <div className="mt-2 flex flex-wrap gap-2">
                                         <Tag color={subscription.status === "active" ? "green" : "default"}>{subscription.status}</Tag>
                                         <Tag>{subscription.billingCycle}</Tag>
@@ -119,7 +119,7 @@ export default function BillingPage() {
                     </section>
 
                     <section className="rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
-                        <div className="mb-5 flex items-center gap-2 text-lg font-semibold">
+                        <div className="mb-5 flex items-center gap-2 text-sm font-medium">
                             <Gauge className="size-5" />
                             权益与用量
                         </div>
@@ -156,7 +156,7 @@ export default function BillingPage() {
                 </div>
 
                 <section className="mt-4 rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
-                    <div className="mb-5 flex items-center gap-2 text-lg font-semibold">
+                    <div className="mb-5 flex items-center gap-2 text-sm font-medium">
                         <CreditCard className="size-5" />
                         开通申请记录
                     </div>

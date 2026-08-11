@@ -443,7 +443,7 @@ export default function VideoPage() {
                         <div className="mt-6 space-y-5">
                             <div>
                                 <div className="mb-2 flex items-center justify-between gap-3">
-                                    <span className="text-base font-semibold">提示词</span>
+                                    <span className="text-sm font-medium">提示词</span>
                                     <div className="flex gap-2">
                                         <Button size="small" icon={<BookOpen className="size-3.5" />} onClick={() => setPromptDialogOpen(true)}>
                                             查看提示词库
@@ -458,7 +458,7 @@ export default function VideoPage() {
 
                             <div className="min-w-0">
                                 <div className="mb-2 flex items-center justify-between gap-3">
-                                    <span className="text-base font-semibold">参考图</span>
+                                    <span className="text-sm font-medium">参考图</span>
                                     <div className="flex gap-2">
                                         <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={() => void addReferencesFromClipboard()}>
                                             剪切板
@@ -490,7 +490,7 @@ export default function VideoPage() {
 
                             <div className="min-w-0">
                                 <div className="mb-2 flex items-center justify-between gap-3">
-                                    <span className="text-base font-semibold">参考视频</span>
+                                    <span className="text-sm font-medium">参考视频</span>
                                     <Button size="small" icon={<Upload className="size-3.5" />} onClick={() => fileInputRef.current?.click()}>
                                         上传
                                     </Button>
@@ -517,7 +517,7 @@ export default function VideoPage() {
 
                             <div className="min-w-0">
                                 <div className="mb-2 flex items-center justify-between gap-3">
-                                    <span className="text-base font-semibold">参考音频</span>
+                                    <span className="text-sm font-medium">参考音频</span>
                                     <Button size="small" icon={<Upload className="size-3.5" />} onClick={() => fileInputRef.current?.click()}>
                                         上传
                                     </Button>
@@ -569,7 +569,7 @@ export default function VideoPage() {
 
                     <div className="thin-scrollbar rounded-lg border border-stone-200 bg-card p-4 shadow-sm dark:border-stone-800 lg:min-h-0 lg:overflow-y-auto lg:p-5">
                         <div className="mb-4 flex items-center justify-between gap-3">
-                            <h2 className="text-xl font-semibold">生成结果</h2>
+                            <h2 className="text-base font-medium">生成结果</h2>
                             {running ? <Tag className="m-0 px-2 py-1">等待 {formatDuration(elapsedMs)}</Tag> : null}
                         </div>
                         {results.length ? (
@@ -636,7 +636,7 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
     return (
         <>
             <label className="col-span-2 block min-w-0 sm:col-span-1">
-                <span className="mb-1.5 block text-sm font-semibold sm:mb-2 sm:text-base">模型</span>
+                <span className="mb-1.5 block text-sm font-medium sm:mb-2">模型</span>
                 <ModelPicker config={config} value={model} onChange={(value) => updateConfig("videoModel", value)} capability="video" fullWidth onMissingConfig={() => openConfigDialog(false)} />
             </label>
             <div className="col-span-2">
@@ -723,7 +723,7 @@ function LogPanel({
     return (
         <>
             <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-base font-semibold">生成记录</h2>
+                <h2 className="text-sm font-medium">生成记录</h2>
                 <Tag className="m-0">{logs.length}</Tag>
             </div>
             <div className="mb-4 flex flex-wrap gap-2">
@@ -764,7 +764,7 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
             <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2">
                 <Checkbox className="mt-0.5" checked={selected} onClick={(event) => event.stopPropagation()} onChange={(event) => onSelectedChange(event.target.checked)} />
                 <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold leading-5">{log.title}</div>
+                    <div className="truncate text-sm font-medium leading-5">{log.title}</div>
                     <div className="mt-2 flex flex-wrap gap-1">
                         <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{log.size}</Tag>
                         <Tag className="m-0 flex h-6 items-center rounded-md px-1.5 text-xs leading-none">{log.resolution}p</Tag>

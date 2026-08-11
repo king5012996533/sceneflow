@@ -286,7 +286,7 @@ export default function AdminPage() {
                             <Shield className="size-4" />
                             ADMIN
                         </div>
-                        <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">管理后台</h1>
+                        <h1 className="text-2xl font-semibold tracking-tight">管理后台</h1>
                         <p className="mt-2 text-sm text-stone-500">内测阶段暂不接入在线收银台，管理员确认用户套餐后人工开通权益。</p>
                     </div>
                     <Button loading={loading} onClick={() => void loadAll()}>
