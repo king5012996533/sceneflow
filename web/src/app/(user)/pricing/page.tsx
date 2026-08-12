@@ -201,7 +201,7 @@ export default function PricingPage() {
                                     </div>
                                     <div className="min-w-0">
                                         <h2 className="truncate text-lg font-semibold leading-6">{plan.name}</h2>
-                                        <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-[#8a8a96]">{plan.description}</p>
+                                        <p className="mt-0.5 line-clamp-3 text-xs leading-5 text-[#8a8a96]">{plan.description}</p>
                                     </div>
                                 </div>
 
