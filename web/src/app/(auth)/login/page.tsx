@@ -78,10 +78,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#faf5ec] to-[#f3ead9]">
+      <div className="w-full max-w-sm bg-white rounded-2xl border border-[#eadfce] shadow-[0_22px_68px_rgba(38,28,18,0.08)] p-8">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">登录</h1>
+          <div className="mb-5 flex items-center justify-center gap-2.5">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#4f5cff] text-sm font-bold text-white">S</span>
+            <span className="text-sm font-bold tracking-[0.06em] text-[#172033]">SceneFlow</span>
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">登录</h1>
           <p className="text-sm text-gray-500 mt-2">登录以同步你的画布数据</p>
         </div>
 
@@ -101,8 +105,8 @@ export default function LoginPage() {
             登录
           </Button>
           <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
-            <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">或者</span></div>
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-[#eae4d8]" /></div>
+            <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-[#8a8a96]">或者</span></div>
           </div>
           <Button size="large" block icon={<GithubOutlined />} onClick={() => { window.location.href = "/canvas/api/auth/github"; }} className="!rounded-lg !h-11">
             使用 GitHub 登录

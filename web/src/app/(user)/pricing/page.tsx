@@ -164,7 +164,7 @@ export default function PricingPage() {
                             <span className="text-xs uppercase tracking-[0.36em] text-[#8a7182]">{copy.betaAccess}</span>
                             <Tag color="blue">{copy.betaTag}</Tag>
                         </div>
-                        <h1 className="text-4xl font-semibold tracking-tight md:text-5xl">{copy.title}</h1>
+                        <h1 className="text-2xl font-semibold tracking-tight">{copy.title}</h1>
                         <p className="mt-5 max-w-2xl text-base leading-8 text-[#5f6170]">{copy.intro}</p>
                     </div>
 
@@ -206,7 +206,7 @@ export default function PricingPage() {
                                 </div>
 
                                 <div className="flex items-baseline gap-1.5">
-                                    <span className="text-[40px] font-semibold leading-none tracking-tight">{formatPrice(price)}</span>
+                                    <span className={cn(isFree ? "text-2xl font-medium text-[#8a8a96]" : "text-[40px] font-semibold leading-none tracking-tight")}>{formatPrice(price)}</span>
                                     {!isFree ? <span className="text-sm text-stone-500">/ {cycle === "yearly" ? copy.perYear : copy.perMonth}</span> : null}
                                 </div>
                                 {!isFree ? <span className="mt-2 inline-block text-xs text-stone-400">{copy.betaPrice}</span> : <span className="mt-2 inline-block text-xs text-stone-400">{copy.freeInfo}</span>}
@@ -218,7 +218,7 @@ export default function PricingPage() {
                                         <li key={item.id || item.key} className="flex items-center justify-between gap-3">
                                             <span className="flex min-w-0 items-center gap-2">
                                                 <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                                                <span className="truncate">{item.label}</span>
+                                                <span className="line-clamp-2">{item.label}</span>
                                             </span>
                                             <span className="shrink-0 text-xs font-medium text-stone-500">{formatEntitlement(item.value, item.unit)}</span>
                                         </li>
