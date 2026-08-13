@@ -113,18 +113,18 @@ export default function PricingPage() {
             okText: copy.ok,
             content: (
                 <div className="space-y-4">
-                    <div className="rounded-2xl border border-[#eadfce] bg-[#fffaf2] p-4">
-                        <div className="text-xs tracking-[0.16em] text-stone-500">{copy.amountDue}</div>
-                        <div className="mt-1 text-2xl font-semibold tracking-tight text-[#172033]">{formatPrice(amount)}</div>
-                        <div className="mt-2 text-sm leading-6 text-stone-600">
+                    <div className="rounded-2xl border border-[#e6e8ec] bg-[#f8fafc] p-4">
+                        <div className="text-xs tracking-[0.16em] text-[#667085]">{copy.amountDue}</div>
+                        <div className="mt-1 text-2xl font-semibold tracking-tight text-[#101828]">{formatPrice(amount)}</div>
+                        <div className="mt-2 text-sm leading-6 text-[#475467]">
                             {plan.name} / {cycle === "yearly" ? copy.yearlyRights : copy.monthlyRights}
                         </div>
-                        <div className="mt-2 break-all rounded-xl bg-white px-3 py-2 text-xs text-stone-500">
+                        <div className="mt-2 break-all rounded-xl bg-white px-3 py-2 text-xs text-[#667085]">
                             {copy.paymentNote}: {paymentNote}
                         </div>
                     </div>
-                    <img src={paymentQrSrc} alt={copy.qrAlt} className="mx-auto w-64 rounded-2xl border border-stone-200 bg-white p-2" />
-                    <p className="text-sm leading-6 text-stone-600">{copy.qrTip}</p>
+                    <img src={paymentQrSrc} alt={copy.qrAlt} className="mx-auto w-64 rounded-2xl border border-[#e6e8ec] bg-white p-2" />
+                    <p className="text-sm leading-6 text-[#475467]">{copy.qrTip}</p>
                 </div>
             ),
         });
@@ -156,16 +156,16 @@ export default function PricingPage() {
     }
 
     return (
-        <main className="h-full overflow-y-auto bg-[#f7f2ea] text-[#172033]">
+        <main className="h-full overflow-y-auto bg-[#f7f8fa] text-[#101828]">
             <section className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-10 md:px-10">
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                     <div className="max-w-3xl">
                         <div className="mb-4 flex flex-wrap items-center gap-3">
-                            <span className="text-xs uppercase tracking-[0.36em] text-[#8a7182]">{copy.betaAccess}</span>
+                            <span className="text-xs uppercase tracking-[0.36em] text-[#98a2b3]">{copy.betaAccess}</span>
                             <Tag color="blue">{copy.betaTag}</Tag>
                         </div>
-                        <h1 className="text-2xl font-semibold tracking-tight">{copy.title}</h1>
-                        <p className="mt-5 max-w-2xl text-base leading-8 text-[#5f6170]">{copy.intro}</p>
+                        <h1 className="text-3xl font-semibold tracking-tight">{copy.title}</h1>
+                        <p className="mt-5 max-w-2xl text-base leading-8 text-[#667085]">{copy.intro}</p>
                     </div>
 
                     <Segmented
@@ -189,14 +189,14 @@ export default function PricingPage() {
                             <article
                                 key={plan.id}
                                 className={cn(
-                                    "relative flex min-h-[470px] flex-col rounded-3xl border bg-white/85 p-6 shadow-[0_22px_68px_rgba(38,28,18,0.08)] backdrop-blur transition-transform duration-300 hover:-translate-y-1",
-                                    plan.isPopular ? "border-[#4f5cff] ring-1 ring-[#4f5cff]" : "border-[#eadfce]",
+                                    "relative flex min-h-[470px] flex-col rounded-3xl border bg-white p-6 shadow-[0_4px_24px_rgba(16,24,40,0.06)] transition-transform duration-300 hover:-translate-y-1",
+                                    plan.isPopular ? "border-[#4f6bff] ring-1 ring-[#4f6bff]" : "border-[#e6e8ec]",
                                 )}
                             >
-                                {plan.isPopular ? <span className="absolute right-5 top-5 rounded-full bg-[#4f5cff] px-2.5 py-0.5 text-[11px] font-medium text-white">{copy.popular}</span> : null}
+                                {plan.isPopular ? <span className="absolute right-5 top-5 rounded-full bg-[#4f6bff] px-2.5 py-0.5 text-[11px] font-medium text-white">{copy.popular}</span> : null}
 
                                 <div className="mb-4 flex items-center gap-3">
-                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f0eaff] text-[#4f5cff]">
+                                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#eef1ff] text-[#4f6bff]">
                                         <Icon className="h-5 w-5" />
                                     </div>
                                     <div className="min-w-0">
@@ -207,11 +207,11 @@ export default function PricingPage() {
 
                                 <div className="flex items-baseline gap-1.5">
                                     <span className={cn(isFree ? "text-2xl font-medium text-[#8a8a96]" : "text-[40px] font-semibold leading-none tracking-tight")}>{formatPrice(price)}</span>
-                                    {!isFree ? <span className="text-sm text-stone-500">/ {cycle === "yearly" ? copy.perYear : copy.perMonth}</span> : null}
+                                    {!isFree ? <span className="text-sm text-[#667085]">/ {cycle === "yearly" ? copy.perYear : copy.perMonth}</span> : null}
                                 </div>
-                                {!isFree ? <span className="mt-2 inline-block text-xs text-stone-400">{copy.betaPrice}</span> : <span className="mt-2 inline-block text-xs text-stone-400">{copy.freeInfo}</span>}
+                                {!isFree ? <span className="mt-2 inline-block text-xs text-[#98a2b3]">{copy.betaPrice}</span> : <span className="mt-2 inline-block text-xs text-[#98a2b3]">{copy.freeInfo}</span>}
 
-                                <div className="my-5 h-px bg-[#eae4d8]" />
+                                <div className="my-5 h-px bg-[#eaecf0]" />
 
                                 <ul className="flex-1 space-y-2.5 text-sm text-[#344054]">
                                     {plan.entitlements.map((item) => (
@@ -220,19 +220,13 @@ export default function PricingPage() {
                                                 <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
                                                 <span className="line-clamp-2">{item.label}</span>
                                             </span>
-                                            <span className="shrink-0 text-xs font-medium text-stone-500">{formatEntitlement(item.value, item.unit)}</span>
+                                            <span className="shrink-0 text-xs font-medium text-[#667085]">{formatEntitlement(item.value, item.unit)}</span>
                                         </li>
                                     ))}
                                 </ul>
 
-                                {!isFree ? <p className="mb-3 text-xs leading-5 text-stone-400">{copy.paidHint}</p> : null}
-                                <Button
-                                    type={plan.isPopular ? "primary" : "default"}
-                                    size="large"
-                                    className={cn("h-11 w-full rounded-xl", plan.isPopular ? "!bg-[#111] !text-white" : "")}
-                                    loading={loadingPlan === plan.id}
-                                    onClick={() => void applyPlan(plan)}
-                                >
+                                {!isFree ? <p className="mb-3 text-xs leading-5 text-[#98a2b3]">{copy.paidHint}</p> : null}
+                                <Button type={plan.isPopular ? "primary" : "default"} size="large" className="h-11 w-full rounded-xl" loading={loadingPlan === plan.id} onClick={() => void applyPlan(plan)}>
                                     {isFree ? copy.freeStart : copy.contactAdmin}
                                 </Button>
                             </article>
@@ -240,9 +234,9 @@ export default function PricingPage() {
                     })}
                 </div>
 
-                <div className="rounded-3xl border border-[#eadfce] bg-white/70 p-6 text-sm leading-7 text-[#5f6170]">
+                <div className="rounded-3xl border border-[#e6e8ec] bg-white p-6 text-sm leading-7 text-[#667085]">
                     <p>{copy.footer}</p>
-                    <Link href="/canvas" className="mt-4 inline-flex items-center gap-2 font-medium text-[#4f5cff]">
+                    <Link href="/canvas" className="mt-4 inline-flex items-center gap-2 font-medium text-[#4f6bff]">
                         {copy.backCanvas}
                         <ArrowRight className="h-4 w-4" />
                     </Link>

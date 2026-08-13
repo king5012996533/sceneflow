@@ -48,38 +48,38 @@
 }
 
 :root {
-    --radius: 0.625rem;
-    --border: #ded3c4;
-    --ring: rgba(94, 108, 255, 0.3);
-    --background: #f7f3ea;
-    --foreground: #172033;
-    --card: #fffdfa;
-    --card-foreground: #172033;
-    --popover: #fffdfa;
-    --popover-foreground: #172033;
-    --primary: #4f5dff;
+    --radius: 0.75rem;
+    --border: #e6e8ec;
+    --ring: rgba(79, 107, 255, 0.35);
+    --background: #f7f8fa;
+    --foreground: #101828;
+    --card: #ffffff;
+    --card-foreground: #101828;
+    --popover: #ffffff;
+    --popover-foreground: #101828;
+    --primary: #4f6bff;
     --primary-foreground: #ffffff;
-    --secondary: #f2ede4;
-    --secondary-foreground: #253149;
-    --muted: #f3eee6;
-    --muted-foreground: #746b7a;
-    --accent: #e8f7f2;
-    --accent-foreground: #144239;
+    --secondary: #f2f4f7;
+    --secondary-foreground: #1d2939;
+    --muted: #f2f4f7;
+    --muted-foreground: #667085;
+    --accent: #eef4ff;
+    --accent-foreground: #1d2939;
     --destructive: #dc4446;
-    --input: #ddd2c3;
-    --chart-1: #4f5dff;
+    --input: #e6e8ec;
+    --chart-1: #4f6bff;
     --chart-2: #18a889;
     --chart-3: #f2a541;
     --chart-4: #c96df0;
     --chart-5: #64748b;
-    --sidebar: #fffdf8;
-    --sidebar-foreground: #172033;
-    --sidebar-primary: #4f5dff;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #101828;
+    --sidebar-primary: #4f6bff;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #f1ebe0;
-    --sidebar-accent-foreground: #253149;
-    --sidebar-border: #ded3c4;
-    --sidebar-ring: rgba(94, 108, 255, 0.3);
+    --sidebar-accent: #f2f4f7;
+    --sidebar-accent-foreground: #1d2939;
+    --sidebar-border: #e6e8ec;
+    --sidebar-ring: rgba(79, 107, 255, 0.35);
 }
 
 .dark {
@@ -134,17 +134,17 @@
         color: #1f2937 !important;
     }
     .sceneflow-top-nav button {
-        background: #fffefa !important;
-        border-color: #ded3c4 !important;
-        box-shadow: 0 6px 14px rgba(35, 28, 20, 0.06) !important;
+        background: #ffffff !important;
+        border-color: #e6e8ec !important;
+        box-shadow: 0 6px 14px rgba(16, 24, 40, 0.06) !important;
     }
     .sceneflow-top-nav .sceneflow-nav-active {
         color: #1722b8 !important;
     }
     .sceneflow-top-nav .sceneflow-register-action {
-        background: #4f5dff !important;
+        background: #4f6bff !important;
         color: #ffffff !important;
-        box-shadow: 0 10px 24px rgba(79, 93, 255, 0.18) !important;
+        box-shadow: 0 10px 24px rgba(79, 107, 255, 0.18) !important;
     }
     .sceneflow-top-nav button[aria-label*="切换"] {
         display: none !important;
@@ -153,8 +153,8 @@
         stroke: currentColor;
     }
     .sceneflow-experience-modal .ant-modal-content {
-        background: #fffefa !important;
-        border: 1px solid #ded3c4;
+        background: #ffffff !important;
+        border: 1px solid #e6e8ec;
         box-shadow: 0 28px 90px rgba(23, 32, 51, 0.22);
     }
     .sceneflow-experience-modal,
@@ -166,7 +166,7 @@
     }
     .sceneflow-experience-modal .ant-modal-close:hover {
         color: #111827 !important;
-        background: #f2ede4 !important;
+        background: #f2f4f7 !important;
     }
     .sceneflow-experience-modal h2,
     .sceneflow-experience-modal p,
@@ -177,20 +177,20 @@
     .sceneflow-experience-modal .ant-input,
     .sceneflow-experience-modal .ant-input-outlined {
         background: #ffffff !important;
-        border-color: #ded3c4 !important;
-        color: #172033 !important;
+        border-color: #e6e8ec !important;
+        color: #101828 !important;
     }
     .sceneflow-experience-modal .ant-input::placeholder {
         color: #8a7f91 !important;
     }
     .sceneflow-experience-modal .ant-btn-default {
         background: #ffffff !important;
-        border-color: #ded3c4 !important;
-        color: #172033 !important;
+        border-color: #e6e8ec !important;
+        color: #101828 !important;
     }
     .sceneflow-experience-modal .ant-btn-primary {
-        background: #4f5dff !important;
-        border-color: #4f5dff !important;
+        background: #4f6bff !important;
+        border-color: #4f6bff !important;
         color: #ffffff !important;
     }
     .ant-modal .ant-modal-content,
@@ -199,16 +199,16 @@
     .ant-popover .ant-popover-inner,
     .ant-select-dropdown,
     .ant-dropdown .ant-dropdown-menu {
-        background: #fffefa !important;
-        color: #172033;
+        background: #ffffff !important;
+        color: #101828;
     }
     .ant-modal .ant-modal-content,
     .ant-drawer .ant-drawer-content,
     .ant-popover .ant-popover-inner,
     .ant-select-dropdown,
     .ant-dropdown .ant-dropdown-menu {
-        border: 1px solid #ded3c4;
-        box-shadow: 0 24px 80px rgba(35, 28, 20, 0.18);
+        border: 1px solid #e6e8ec;
+        box-shadow: 0 24px 80px rgba(16, 24, 40, 0.18);
     }
     .ant-modal .ant-modal-mask,
     .ant-drawer .ant-drawer-mask {
@@ -570,11 +570,11 @@
 
 .dark .sceneflow-experience-modal .ant-modal-content,
 .sceneflow-experience-modal .ant-modal-content {
-    background: #fffefa !important;
-    border: 1px solid #ded3c4 !important;
+    background: #ffffff !important;
+    border: 1px solid #e6e8ec !important;
     border-radius: 18px !important;
     box-shadow: 0 28px 90px rgba(23, 32, 51, 0.22) !important;
-    color: #172033 !important;
+    color: #101828 !important;
     overflow: hidden;
     padding: 0 !important;
 }
@@ -587,7 +587,7 @@
 
 .dark .sceneflow-experience-modal .ant-modal-body,
 .sceneflow-experience-modal .ant-modal-body {
-    background: #fffefa !important;
+    background: #ffffff !important;
     margin: 0 !important;
     padding: 0 !important;
 }
@@ -601,7 +601,7 @@
 
 .dark .sceneflow-experience-modal .ant-modal-close:hover,
 .sceneflow-experience-modal .ant-modal-close:hover {
-    background: #f2ede4 !important;
+    background: #f2f4f7 !important;
     color: #111827 !important;
 }
 
@@ -609,8 +609,8 @@
 .sceneflow-experience-dialog .ant-input-outlined,
 .sceneflow-experience-dialog textarea {
     background: #ffffff !important;
-    border-color: #ded3c4 !important;
-    color: #172033 !important;
+    border-color: #e6e8ec !important;
+    color: #101828 !important;
 }
 
 .sceneflow-experience-dialog .ant-input::placeholder,
@@ -620,13 +620,13 @@
 
 .sceneflow-experience-dialog .ant-btn-default {
     background: #ffffff !important;
-    border-color: #ded3c4 !important;
-    color: #172033 !important;
+    border-color: #e6e8ec !important;
+    color: #101828 !important;
 }
 
 .sceneflow-experience-dialog .ant-btn-primary {
-    background: #4f5dff !important;
-    border-color: #4f5dff !important;
+    background: #4f6bff !important;
+    border-color: #4f6bff !important;
     color: #ffffff !important;
 }
 

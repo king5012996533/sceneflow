@@ -91,7 +91,7 @@ export function AppTopNav() {
     return (
         <>
             {!hideHeader ? (
-                <header className={cn("sceneflow-top-nav sticky top-0 z-20 h-16 shrink-0 border-b", useDarkHome ? "border-white/10 bg-[#090a0c]" : "border-[#beb2a3] bg-[#fffefa] shadow-[0_1px_0_rgba(255,255,255,1)_inset,0_14px_34px_rgba(35,28,20,0.16)]")}>
+                <header className={cn("sceneflow-top-nav sticky top-0 z-20 h-16 shrink-0 border-b", useDarkHome ? "border-white/10 bg-[#090a0c]" : "border-[#e6e8ec] bg-[#ffffff] shadow-[0_1px_0_rgba(255,255,255,1)_inset,0_14px_34px_rgba(35,28,20,0.16)]")}>
                     <div className="flex h-full w-full items-stretch gap-3 px-4 2xl:px-8">
                         <div className="flex min-w-0 flex-1 items-center">
                             <Link href="/" className={cn("flex h-full shrink-0 items-center gap-2 text-sm font-semibold leading-none tracking-tight transition", useDarkHome ? "text-white hover:text-white/72" : "text-[#050816] hover:text-[#2432c9]")}>
@@ -107,7 +107,7 @@ export function AppTopNav() {
 
                             <button
                                 type="button"
-                                className={cn("ml-3 inline-flex size-8 shrink-0 items-center justify-center transition md:hidden", useDarkHome ? "text-white/72 hover:text-white" : "text-[#746b7a] hover:text-[#172033]")}
+                                className={cn("ml-3 inline-flex size-8 shrink-0 items-center justify-center transition md:hidden", useDarkHome ? "text-white/72 hover:text-white" : "text-[#746b7a] hover:text-[#101828]")}
                                 onClick={() => setMobileNavOpen(true)}
                                 aria-label="打开导航菜单"
                                 title="导航菜单"
@@ -131,7 +131,7 @@ export function AppTopNav() {
                                                         : "sceneflow-nav-active bg-[#e6e9ff] font-semibold text-[#1722b8] shadow-[0_1px_0_rgba(255,255,255,1)_inset,0_8px_20px_rgba(79,93,255,0.16)]"
                                                     : useDarkHome
                                                       ? "text-white/54 hover:bg-white/8 hover:text-white/88"
-                                                      : "font-semibold text-[#1f2937] hover:bg-[#f2ede4] hover:text-[#050816]",
+                                                      : "font-semibold text-[#1f2937] hover:bg-[#f2f4f7] hover:text-[#050816]",
                                             )}
                                         >
                                             <Icon className="size-4" />
@@ -141,7 +141,7 @@ export function AppTopNav() {
                                 })}
                                 <button
                                     type="button"
-                                    className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-[#ded3c4] bg-[#fffefa] px-2.5 text-sm font-semibold leading-6 text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] transition hover:border-[#cfc5ff] hover:bg-[#f5f2ff] hover:text-[#4f5dff]"
+                                    className="relative flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-[#e6e8ec] bg-[#ffffff] px-2.5 text-sm font-semibold leading-6 text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] transition hover:border-[#c7d2fe] hover:bg-[#eef1ff] hover:text-[#4f6bff]"
                                     onClick={() => setExperienceOpen(true)}
                                 >
                                     <Bot className="size-4" />
@@ -150,7 +150,7 @@ export function AppTopNav() {
                             </nav>
                         </div>
 
-                        <div className="my-auto ml-auto flex h-9 min-w-0 shrink-0 items-center justify-end gap-1.5 border-l border-[#e6dccd] pl-3 whitespace-nowrap">
+                        <div className="my-auto ml-auto flex h-9 min-w-0 shrink-0 items-center justify-end gap-1.5 border-l border-[#e6e8ec] pl-3 whitespace-nowrap">
                             <UserStatusActions variant={useDarkHome ? "home" : "default"} showThemeToggle={false} />
                         </div>
                     </div>
@@ -236,26 +236,26 @@ function ExperienceOfficerModal({ open, onClose, onOpenConfig }: { open: boolean
     if (!open) return null;
 
     return (
-        <div className="sceneflow-experience-dialog fixed inset-0 z-50 flex items-center justify-center bg-[#172033]/38 p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" onMouseDown={onClose}>
-            <div className="relative flex h-[560px] max-h-[76vh] w-full max-w-[720px] flex-col overflow-hidden rounded-[18px] border border-[#ded3c4] bg-[#fffefa] p-5 text-[#172033] shadow-[0_28px_90px_rgba(23,32,51,0.22)]" onMouseDown={(event) => event.stopPropagation()}>
-                <button type="button" className="absolute right-3 top-3 inline-flex size-8 items-center justify-center rounded-lg text-[#4b5567] transition hover:bg-[#f2ede4] hover:text-[#111827]" onClick={onClose} aria-label="关闭">
+        <div className="sceneflow-experience-dialog fixed inset-0 z-50 flex items-center justify-center bg-[#101828]/38 p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" onMouseDown={onClose}>
+            <div className="relative flex h-[560px] max-h-[76vh] w-full max-w-[720px] flex-col overflow-hidden rounded-[18px] border border-[#e6e8ec] bg-[#ffffff] p-5 text-[#101828] shadow-[0_28px_90px_rgba(23,32,51,0.22)]" onMouseDown={(event) => event.stopPropagation()}>
+                <button type="button" className="absolute right-3 top-3 inline-flex size-8 items-center justify-center rounded-lg text-[#4b5567] transition hover:bg-[#f2f4f7] hover:text-[#111827]" onClick={onClose} aria-label="关闭">
                     <X className="size-4" />
                 </button>
-                <div className="border-b border-[#ded3c4] pb-4">
-                    <div className="inline-flex items-center gap-2 rounded-full bg-[#f4f1ff] px-3 py-1 text-xs font-medium text-[#4f5dff]">
+                <div className="border-b border-[#e6e8ec] pb-4">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-[#eef1ff] px-3 py-1 text-xs font-medium text-[#4f6bff]">
                         <Bot className="size-3.5" />
                         SceneFlow 体验官
                     </div>
-                    <h2 className="mt-3 text-base font-semibold tracking-tight text-[#172033]">直接问我问题</h2>
+                    <h2 className="mt-3 text-base font-semibold tracking-tight text-[#101828]">直接问我问题</h2>
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-3 overflow-y-auto py-4">
                     {messages.map((message, index) => (
                         <div key={`${message.role}-${index}`} className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}>
-                            <div className={cn("max-w-[84%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6", message.role === "user" ? "bg-[#4f5dff] text-white" : "bg-[#fff7eb] text-[#263043]")}>
+                            <div className={cn("max-w-[84%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-6", message.role === "user" ? "bg-[#4f6bff] text-white" : "bg-[#f8fafc] text-[#1d2939]")}>
                                 {message.content}
                                 {message.apiDraft ? (
-                                    <div className="mt-3 rounded-xl border border-[#eadfce] bg-white/75 p-3 text-xs leading-5 text-[#263043]">
+                                    <div className="mt-3 rounded-xl border border-[#e6e8ec] bg-white/75 p-3 text-xs leading-5 text-[#1d2939]">
                                         <div className="font-semibold">识别到的配置</div>
                                         <div className="mt-1 break-all">Base URL：{message.apiDraft.baseUrl}</div>
                                         <div className="break-all">API Key：{maskApiKey(message.apiDraft.apiKey)}</div>
@@ -267,7 +267,7 @@ function ExperienceOfficerModal({ open, onClose, onOpenConfig }: { open: boolean
                                             {message.apiDraft.defaultAudioModel ? <div>音频默认：{message.apiDraft.defaultAudioModel}</div> : null}
                                         </div>
                                         {message.apiDraft.videoDefaults ? (
-                                            <div className="mt-2 rounded-lg bg-[#f7f5ff] px-2 py-1.5">
+                                            <div className="mt-2 rounded-lg bg-[#eef1ff] px-2 py-1.5">
                                                 视频参数：{message.apiDraft.videoDefaults.resolution} · {message.apiDraft.videoDefaults.ratio} · {message.apiDraft.videoDefaults.seconds}s
                                                 {message.apiDraft.videoDefaults.generateAudio === "true" ? " · 生成音频" : ""}
                                             </div>
@@ -285,10 +285,10 @@ function ExperienceOfficerModal({ open, onClose, onOpenConfig }: { open: boolean
                     {sending ? <div className="text-xs text-[#8a7f91]">体验官正在回复...</div> : null}
                 </div>
 
-                <div className="border-t border-[#ded3c4] pt-3">
+                <div className="border-t border-[#e6e8ec] pt-3">
                     <div className="mb-2 flex flex-wrap gap-2">
                         {quickQuestions.map((question) => (
-                            <button key={question} type="button" className="rounded-full bg-[#f6f0e6] px-3 py-1.5 text-xs font-medium text-[#6d6472] transition hover:bg-[#ebe7ff] hover:text-[#4f5dff]" onClick={() => void sendQuestion(question)}>
+                            <button key={question} type="button" className="rounded-full bg-[#f2f4f7] px-3 py-1.5 text-xs font-medium text-[#6d6472] transition hover:bg-[#e6e9ff] hover:text-[#4f6bff]" onClick={() => void sendQuestion(question)}>
                                 {question}
                             </button>
                         ))}
@@ -329,7 +329,7 @@ function ExperienceLinks({ links }: { links: ExperienceLink[] }) {
                     href={link.href}
                     target="_blank"
                     rel="noreferrer"
-                    className="block rounded-xl border border-[#eadfce] bg-white/75 px-3 py-2 text-xs leading-5 text-[#263043] transition hover:border-[#c8c4ff] hover:bg-[#f7f5ff]"
+                    className="block rounded-xl border border-[#e6e8ec] bg-white/75 px-3 py-2 text-xs leading-5 text-[#1d2939] transition hover:border-[#c7d2fe] hover:bg-[#eef1ff]"
                 >
                     <span className="block font-semibold text-[#303bff]">{link.label}</span>
                     <span className="block text-[#6d6472]">{link.description}</span>
