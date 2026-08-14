@@ -38,6 +38,10 @@ const STATIC_PREFIXES = [
     "/canvas/character-asset.webp",
     "/canvas/commerce-visual.webp",
     "/canvas/brand-visual.webp",
+    "/landing",
+    "/fonts",
+    "/canvas/landing",
+    "/canvas/fonts",
 ];
 
 const NOINDEX_HEADER = "noindex, nofollow";
