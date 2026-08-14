@@ -383,7 +383,8 @@ async function buildReplicateVideoInput(config: AiConfig, model: string, prompt:
     }
 
     if (modelName.includes("prunaai/p-video")) {
-        input.draft = true;
+        // draft=true（默认）走低质量预览：更快更便宜；关掉后走完整推理，质量更好
+        input.draft = boolConfig(config.videoDraft, true);
         input.fps = 24;
         input.prompt_upsampling = true;
         input.save_audio = boolConfig(config.videoGenerateAudio, true);
