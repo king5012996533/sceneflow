@@ -41,9 +41,12 @@ export async function POST(req: NextRequest) {
 
         const hasAliyun = !!process.env.ALIYUN_SMS_ACCESS_KEY_ID;
         if (hasAliyun) {
-            const result = await sendSmsVerifyCode(target, code);
+            const result = await sendSmsVerifyCode(target);
             if (!result.ok) return NextResponse.json({ error: result.error || "短信发送失败" }, { status: 502 });
-            await storeCode(target, "phone", code);
+            if (!result.code) return NextResponse.json({ error: "短信发送失败" }, { status: 502 });
+            // 短信内容里的验证码由阿里云生成（returnVerifyCode 带回），以此落库，
+            // 与用户实际收到的短信保持一致
+            await storeCode(target, "phone", result.code);
             return NextResponse.json({ ok: true });
         }
 
