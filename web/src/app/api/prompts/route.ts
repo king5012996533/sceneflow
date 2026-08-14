@@ -1,5 +1,7 @@
 import type { NextRequest } from "next/server";
 
+import { apiPath } from "@/lib/app-paths";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -54,13 +56,28 @@ export async function GET(request: NextRequest) {
     const items = await getPrompts(category);
     const withoutTagFilter = filterPrompts(items, { keyword, category, tags: [] });
     const filtered = filterPrompts(items, { keyword, category, tags });
+    const origin = request.nextUrl.origin;
 
     return Response.json({
-        items: filtered.slice((page - 1) * pageSize, page * pageSize),
+        items: filtered.slice((page - 1) * pageSize, page * pageSize).map((item) => ({ ...item, coverUrl: toCoverProxy(origin, item.coverUrl) })),
         tags: collectTags(withoutTagFilter),
         categories: categories.map((item) => item.category),
         total: filtered.length,
     });
+}
+
+// 封面图统一走本域代理（/api/prompts/cover），避免浏览器直连被墙的
+// raw.githubusercontent.com / pbs.twimg.com；shields.io 徽章不算封面，置空走占位图。
+function toCoverProxy(origin: string, coverUrl: string) {
+    if (!coverUrl) return "";
+    let host: string;
+    try {
+        host = new URL(coverUrl).hostname;
+    } catch {
+        return "";
+    }
+    if (host === "img.shields.io" || host.endsWith(".shields.io")) return "";
+    return `${origin}${apiPath(`/api/prompts/cover?url=${encodeURIComponent(coverUrl)}`)}`;
 }
 
 async function getPrompts(category = "") {
@@ -78,7 +95,11 @@ async function getPrompts(category = "") {
 
 async function loadPrompts() {
     const items = await loadPromptCategories(categories);
-    memoryCache = { items, fetchedAt: Date.now() };
+    // GitHub 抓取波动时只成功少数分类：残缺结果不写缓存，避免空库被锁 1 小时
+    const succeededCategories = new Set(items.map((item) => item.category)).size;
+    if (succeededCategories >= categories.length / 2) {
+        memoryCache = { items, fetchedAt: Date.now() };
+    }
     return items;
 }
 
@@ -115,7 +136,16 @@ async function buildGptImage2Prompts() {
         const prompt = cases.get(item.tweet_url || "");
         if (!item.title || !prompt || !item.image_dir) return;
         const image = `${gptImage2RawBase}/${item.image_dir}/output.jpg`;
-        items.push({ id: `gpt-image-2-prompts-${leftPad(items.length + 1)}`, title: item.title, coverUrl: image, prompt, tags: tagsFromCategory(item.category || ""), preview: markdownPreview([image]), createdAt: item.added_at || "", updatedAt: item.added_at || "" });
+        items.push({
+            id: `gpt-image-2-prompts-${leftPad(items.length + 1)}`,
+            title: item.title,
+            coverUrl: image,
+            prompt,
+            tags: tagsFromCategory(item.category || ""),
+            preview: markdownPreview([image]),
+            createdAt: item.added_at || "",
+            updatedAt: item.added_at || "",
+        });
     });
     return items;
 }
@@ -132,7 +162,9 @@ async function buildAwesomeGptImagePrompts() {
     for (const section of splitBeforeHeading(markdown, "## ")) {
         const tags = tagsFromHeading(firstMatch(section, /^##\s+(.+)$/m));
         for (const block of splitBeforeHeading(section, "### ")) {
-            const title = firstMatch(block, /^###\s+(.+)$/m).replace(/\[([^\]]+)]\([^)]+\)/g, "$1").trim();
+            const title = firstMatch(block, /^###\s+(.+)$/m)
+                .replace(/\[([^\]]+)]\([^)]+\)/g, "$1")
+                .trim();
             const prompt = firstMatch(block, /\*\*提示词:\*\*\s*\r?\n\s*```[\w-]*\r?\n([\s\S]*?)\r?\n```/).trim();
             if (!title || !prompt) continue;
             const images = extractMarkdownImages(awesomeGptImageRawBase, block);
@@ -169,7 +201,10 @@ async function buildYouMindPrompts(baseUrl: string, idPrefix: string, modelTag: 
 }
 
 async function buildDavidWuGptImage2Prompts() {
-    const data = await fetchJson<Array<{ id?: number; title_en?: string; title_cn?: string; category?: string; category_cn?: string; prompt?: string; note?: string; author?: string; source?: string; needs_ref?: boolean; image?: string }>>(davidWuGptImage2RawBase, "prompts.json");
+    const data = await fetchJson<Array<{ id?: number; title_en?: string; title_cn?: string; category?: string; category_cn?: string; prompt?: string; note?: string; author?: string; source?: string; needs_ref?: boolean; image?: string }>>(
+        davidWuGptImage2RawBase,
+        "prompts.json",
+    );
     return data
         .map((item, index) => {
             const title = (item.title_cn || item.title_en || "").trim();
@@ -439,7 +474,10 @@ function splitTags(value: string, pattern: RegExp) {
 }
 
 function markdownPreview(images: string[]) {
-    return images.filter(Boolean).map((image) => `![](${image})`).join("\n\n");
+    return images
+        .filter(Boolean)
+        .map((image) => `![](${image})`)
+        .join("\n\n");
 }
 
 function collectTags(items: Prompt[]) {
