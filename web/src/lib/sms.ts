@@ -31,9 +31,10 @@ export async function sendSmsVerifyCode(phoneNumber: string): Promise<{ ok: bool
             signName,
             templateCode,
             // 验证码由阿里云生成并写入短信，模板变量用 ##code## 占位；
+            // min 为模板内的 ${min} 变量（"有效期${min}分钟"），缺失会报"模板内容与模板参数不匹配"；
             // returnVerifyCode: true 让响应把生成的验证码带回，由我方落库验证。
             // （若把真实验证码值填进 templateParam，阿里云内部生成流程会失败，返回 UNKNOWN）
-            templateParam: JSON.stringify({ code: "##code##" }),
+            templateParam: JSON.stringify({ code: "##code##", min: "5" }),
             validTime: 300,
             codeLength: 6,
             returnVerifyCode: true,
