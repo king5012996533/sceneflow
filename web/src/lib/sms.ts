@@ -26,8 +26,10 @@ export async function sendSmsVerifyCode(phoneNumber: string): Promise<{ ok: bool
 
     try {
         const req = new Dysmsapi.SendSmsVerifyCodeRequest({
-            // 号码认证服务要求手机号带国家码前缀（官方示例 86130****0000）
-            phoneNumber: `86${phoneNumber}`,
+            // SendSmsVerifyCode 的 PhoneNumber 为纯手机号，国家码由独立字段 CountryCode 指定（默认 86）；
+            // 切勿像普通短信接口 SendSms 那样把 86 拼进号码，否则阿里云报"手机格式不正确"
+            phoneNumber,
+            countryCode: "86",
             signName,
             templateCode,
             // 验证码由阿里云生成并写入短信，模板变量用 ##code## 占位；
