@@ -32,7 +32,7 @@ export function PromptCard({
             styles={{ body: { padding: 0 } }}
             cover={
                 <button type="button" className="block w-full text-left" onClick={onOpen}>
-                    <PromptCoverImage src={item.coverUrl} alt={item.title} />
+                    <PromptCoverImage src={item.coverUrl} alt={item.title} category={item.category} />
                 </button>
             }
         >

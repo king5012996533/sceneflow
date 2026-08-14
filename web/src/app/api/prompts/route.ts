@@ -56,10 +56,9 @@ export async function GET(request: NextRequest) {
     const items = await getPrompts(category);
     const withoutTagFilter = filterPrompts(items, { keyword, category, tags: [] });
     const filtered = filterPrompts(items, { keyword, category, tags });
-    const origin = request.nextUrl.origin;
 
     return Response.json({
-        items: filtered.slice((page - 1) * pageSize, page * pageSize).map((item) => ({ ...item, coverUrl: toCoverProxy(origin, item.coverUrl) })),
+        items: filtered.slice((page - 1) * pageSize, page * pageSize).map((item) => ({ ...item, coverUrl: toCoverProxy(item.coverUrl) })),
         tags: collectTags(withoutTagFilter),
         categories: categories.map((item) => item.category),
         total: filtered.length,
@@ -67,8 +66,10 @@ export async function GET(request: NextRequest) {
 }
 
 // 封面图统一走本域代理（/api/prompts/cover），避免浏览器直连被墙的
-// raw.githubusercontent.com / pbs.twimg.com；shields.io 徽章不算封面，置空走占位图。
-function toCoverProxy(origin: string, coverUrl: string) {
+// raw.githubusercontent.com / pbs.twimg.com。代理 URL 用根相对路径，
+// 浏览器按当前域名自动解析——不依赖 request 的 origin（VPS 反代下会拿到 0.0.0.0 内网地址）。
+// shields.io 徽章不算封面；pbs.twimg.com 浏览器与服务器都不可达，直接置空走设计化封面。
+function toCoverProxy(coverUrl: string) {
     if (!coverUrl) return "";
     let host: string;
     try {
@@ -76,8 +77,8 @@ function toCoverProxy(origin: string, coverUrl: string) {
     } catch {
         return "";
     }
-    if (host === "img.shields.io" || host.endsWith(".shields.io")) return "";
-    return `${origin}${apiPath(`/api/prompts/cover?url=${encodeURIComponent(coverUrl)}`)}`;
+    if (host === "img.shields.io" || host.endsWith(".shields.io") || host === "pbs.twimg.com" || host.endsWith(".twimg.com")) return "";
+    return apiPath(`/api/prompts/cover?url=${encodeURIComponent(coverUrl)}`);
 }
 
 async function getPrompts(category = "") {
