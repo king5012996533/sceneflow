@@ -1,10 +1,11 @@
-import { dailyPeriod, getServerEntitlements, nextDayStart } from "@/lib/server-entitlements";
+import { getServerEntitlements } from "@/lib/server-entitlements";
 import { prisma } from "@/lib/ic-prisma";
 import { Prisma } from "@/generated/ic-prisma/client";
+import { deductCredits, ensureDailyCreditGrant, refundCredits } from "@/lib/credit-ledger";
+import { estimateGenerationCostCents, getGenerationCreditsCost, type GenerationKind } from "@/lib/credit-pricing";
+import { getOperationNumber } from "@/lib/operation-config";
 
 const STALE_JOB_MS = 30 * 60 * 1000;
-
-export type GenerationKind = "image" | "video" | "audio" | "text" | "tool";
 
 type BeginGenerationInput = {
     requestKey: string;
@@ -25,9 +26,11 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
 
     const [user, entitlements] = await Promise.all([prisma.user.findUnique({ where: { id: userId }, select: { role: true } }), getServerEntitlements(userId)]);
     const isAdmin = user?.role === "admin";
-    // 每日生成限额来自套餐权益 daily_generations（admin 后台可改），
-    // 免费版兜底 3 次/天；不存在权益值时免费版仍按 3 次限制，避免回退成无限。
-    const generationLimit = !isAdmin ? entitlements.dailyGenerations : null;
+    // 积分制：非 admin 按「模型 × 类型 × 档位」扣积分；免费用户每日自动赠送积分（后台可配）
+    const creditsCost = !isAdmin ? getGenerationCreditsCost(input.kind, input.metadata) : 0;
+    const costCents = estimateGenerationCostCents(input.kind, input.metadata);
+    // 每日赠送积分在事务外读取（操作配置走进程内缓存，避免在事务内发起独立连接）
+    const dailyGrant = !isAdmin ? await getOperationNumber("daily_credit_grant", 3) : 0;
     const staleBefore = new Date(Date.now() - STALE_JOB_MS);
 
     return prisma.$transaction(async (tx) => {
@@ -46,10 +49,7 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
                 where: { id: staleJob.id },
                 data: { status: "failed", error: "任务超时自动关闭", quotaRefunded: true, finishedAt: new Date() },
             });
-            await tx.usageRecord.updateMany({
-                where: { userId, metric: "generations", period: dailyPeriod(staleJob.startedAt), used: { gte: staleJob.count } },
-                data: { used: { decrement: staleJob.count } },
-            });
+            await refundCredits(tx, userId, staleJob.creditsCost, staleJob.requestKey, "任务超时自动关闭");
         }
 
         if (!isAdmin && entitlements.concurrentJobs !== null) {
@@ -61,20 +61,17 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
             }
         }
 
-        if (generationLimit !== null) {
-            const period = dailyPeriod();
-            const metric = "generations";
-            const usage = await tx.usageRecord.upsert({
-                where: { userId_metric_period: { userId, metric, period } },
-                update: {},
-                create: { userId, metric, period, used: 0, limit: generationLimit, resetAt: nextDayStart() },
-            });
-            const reserved = await tx.usageRecord.updateMany({
-                where: { id: usage.id, used: { lte: generationLimit - count } },
-                data: { used: { increment: count }, limit: generationLimit, resetAt: nextDayStart() },
-            });
-            if (!reserved.count) {
-                throw new GenerationPolicyError(`今日免费生成次数已用完（${generationLimit} 次/天）`, 403);
+        // 免费策略：每日赠送积分（幂等，一天一次）
+        if (dailyGrant > 0) {
+            await ensureDailyCreditGrant(tx, userId, dailyGrant);
+        }
+
+        // 原子扣积分（余额不足时守卫拦截，不写流水）
+        const totalCost = creditsCost * count;
+        if (totalCost > 0) {
+            const deducted = await deductCredits(tx, userId, totalCost, input.requestKey, `生成任务扣费（${input.kind}${count > 1 ? ` ×${count}` : ""}）`);
+            if (!deducted.allowed) {
+                throw new GenerationPolicyError(`积分不足：本次生成需要 ${totalCost} 积分，当前余额 ${deducted.balance} 积分。可前往定价页充值或等待每日赠送。`, 403);
             }
         }
 
@@ -84,6 +81,8 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
                 requestKey: input.requestKey,
                 kind: input.kind,
                 count,
+                creditsCost,
+                costCents,
                 metadata: input.metadata as Prisma.InputJsonValue | undefined,
             },
         });
@@ -100,12 +99,9 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
         if (!job) throw new GenerationPolicyError("生成任务不存在", 404);
         if (job.status !== "running") return job;
 
-        if (status !== "succeeded" && !job.quotaRefunded) {
-            const period = dailyPeriod(job.startedAt);
-            await tx.usageRecord.updateMany({
-                where: { userId, metric: "generations", period, used: { gte: job.count } },
-                data: { used: { decrement: job.count } },
-            });
+        // 失败/取消/超时：退还积分（幂等，重复结算不会重复退）
+        if (status !== "succeeded" && !job.quotaRefunded && job.creditsCost > 0) {
+            await refundCredits(tx, userId, job.creditsCost, job.requestKey, `生成任务${status === "cancelled" ? "已取消" : "失败"}退款`);
         }
 
         return tx.generationJob.update({

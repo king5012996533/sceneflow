@@ -30,6 +30,8 @@ model User {
   generationJobs GenerationJob[]
   auditLogs     AdminAuditLog[] @relation("AdminAuditActor")
   config        UserConfig?
+  creditBalance CreditBalance?
+  creditTransactions CreditTransaction[]
 }
 
 // 用户配置（API Key、模型设置等，跨设备同步）
@@ -124,6 +126,8 @@ model GenerationJob {
   metadata       Json?
   resultUrl      String?                       // 生成结果 URL（图片/视频）
   quotaRefunded  Boolean  @default(false)
+  creditsCost    Int      @default(0)          // 本次消耗积分（失败退款依据）
+  costCents      Int?                          // 平台估算成本（分，供对账与定价校准）
   startedAt      DateTime @default(now())
   finishedAt     DateTime?
   createdAt      DateTime @default(now())
@@ -131,6 +135,32 @@ model GenerationJob {
 
   @@index([userId, status])
   @@index([userId, createdAt])
+}
+
+// 积分余额（一用户一行；平台统一 Key + 积分制）
+model CreditBalance {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Int      @default(0) // 单位：积分（整数）
+  updatedAt DateTime @updatedAt
+}
+
+// 积分流水（审计必需：充值/赠送/消费/退款/调整/过期）
+model CreditTransaction {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String   // purchase | grant | consume | refund | adjust | expire
+  amount       Int      // 正负：充值/赠送为正，消费为负
+  balanceAfter Int
+  refType      String?  // generation_job | order | manual | daily_grant
+  refId        String?
+  note         String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([refType, refId])
 }
 
 model Order {

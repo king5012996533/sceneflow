@@ -80,6 +80,11 @@ export function nextDayStart(date = new Date()) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 }
 
+/**
+ * @deprecated 积分制上线后此路径废弃（全仓库无客户端调用）。
+ * 真实配额卡点已改为 beginGenerationJob 内的积分扣减（见 credit-ledger.ts）。
+ * Phase 6 收尾时删除本函数及 /api/billing/usage/generation。
+ */
 export async function reserveGenerationUsage(userId: string, count: number) {
     if (!prisma) throw new Error("Database unavailable");
     const safeCount = Math.max(1, Math.min(50, Math.floor(count || 1)));

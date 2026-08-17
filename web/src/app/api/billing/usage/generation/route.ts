@@ -4,6 +4,9 @@ import { requireCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 import { reserveGenerationUsage } from "@/lib/server-entitlements";
 
+// @deprecated 积分制上线后此 API 废弃（无客户端调用）；真实卡点在 /api/generation/jobs（beginGenerationJob 扣积分）。
+// Phase 6 收尾时删除本路由。
+
 export async function POST(req: NextRequest) {
     try {
         if (!prisma) return NextResponse.json({ error: "Database unavailable" }, { status: 503 });

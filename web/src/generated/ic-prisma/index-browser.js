@@ -210,10 +210,31 @@ exports.Prisma.GenerationJobScalarFieldEnum = {
   metadata: 'metadata',
   resultUrl: 'resultUrl',
   quotaRefunded: 'quotaRefunded',
+  creditsCost: 'creditsCost',
+  costCents: 'costCents',
   startedAt: 'startedAt',
   finishedAt: 'finishedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
+};
+
+exports.Prisma.CreditBalanceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  balance: 'balance',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.CreditTransactionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  type: 'type',
+  amount: 'amount',
+  balanceAfter: 'balanceAfter',
+  refType: 'refType',
+  refId: 'refId',
+  note: 'note',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.OrderScalarFieldEnum = {
@@ -355,6 +376,8 @@ exports.Prisma.ModelName = {
   Subscription: 'Subscription',
   UsageRecord: 'UsageRecord',
   GenerationJob: 'GenerationJob',
+  CreditBalance: 'CreditBalance',
+  CreditTransaction: 'CreditTransaction',
   Order: 'Order',
   PaymentEvent: 'PaymentEvent',
   AdminAuditLog: 'AdminAuditLog',

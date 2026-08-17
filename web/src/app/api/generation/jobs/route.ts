@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireCurrentUser } from "@/lib/current-user";
-import { beginGenerationJob, GenerationPolicyError, type GenerationKind } from "@/lib/generation/generation-jobs.server";
+import { beginGenerationJob, GenerationPolicyError } from "@/lib/generation/generation-jobs.server";
+import type { GenerationKind } from "@/lib/credit-pricing";
 
 const KINDS = new Set<GenerationKind>(["image", "video", "audio", "text", "tool"]);
 
