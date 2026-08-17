@@ -3,15 +3,11 @@ import { saveAs } from "file-saver";
 import { createZip } from "@/lib/zip";
 import { getMediaBlob } from "@/services/file-storage";
 import { getImageBlob } from "@/services/image-storage";
-import { fetchClientEntitlements } from "@/lib/client-entitlements";
 import type { CanvasExportAsset, CanvasExportFile } from "../export-types";
 import type { CanvasProject } from "../stores/use-canvas-store";
 
 export async function exportCanvasProjects(projects: CanvasProject[], fileName = "无限画布") {
-    const entitlements = await fetchClientEntitlements();
-    if (!entitlements.hdExport) {
-        throw new Error("当前套餐不支持高清导出，升级后可去除该限制。");
-    }
+    // 套餐系统已下线：高清导出不再设限
     const zipFiles: { name: string; data: BlobPart }[] = [];
     const exportedProjects = await Promise.all(
         projects.map(async (project) => {

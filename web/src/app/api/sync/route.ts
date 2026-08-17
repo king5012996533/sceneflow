@@ -4,68 +4,61 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
-import { getServerEntitlements } from "@/lib/server-entitlements";
 
 function privateJson(body: unknown, init?: ResponseInit) {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store, private, max-age=0");
-  response.headers.set("Vary", "Cookie");
-  return response;
+    const response = NextResponse.json(body, init);
+    response.headers.set("Cache-Control", "no-store, private, max-age=0");
+    response.headers.set("Vary", "Cookie");
+    return response;
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    if (!prisma) return privateJson({ error: "数据库不可用" }, { status: 503 });
+    try {
+        if (!prisma) return privateJson({ error: "数据库不可用" }, { status: 503 });
 
-    const user = await requireCurrentUser(req);
-    if (!user) return privateJson({ error: "请先登录" }, { status: 401 });
+        const user = await requireCurrentUser(req);
+        if (!user) return privateJson({ error: "请先登录" }, { status: 401 });
 
-    const { type, data } = await req.json();
-    if (!type || data === undefined) {
-      return privateJson({ error: "缺少 type 或 data" }, { status: 400 });
+        const { type, data } = await req.json();
+        if (!type || data === undefined) {
+            return privateJson({ error: "缺少 type 或 data" }, { status: 400 });
+        }
+
+        const validTypes = ["projects", "assets", "image-workbench", "video-workbench"];
+        if (!validTypes.includes(type)) {
+            return privateJson({ error: "无效的同步类型" }, { status: 400 });
+        }
+
+        // 套餐系统已下线：不再限制画布项目数（积分是唯一收费门槛）。
+
+        const record = await prisma.canvasBackup.upsert({
+            where: { userId_type: { userId: user.id, type } },
+            update: { data, version: { increment: 1 } },
+            create: { userId: user.id, type, data },
+        });
+
+        return privateJson({ ok: true, version: record.version });
+    } catch (err: any) {
+        console.error("[sync:post]", err?.message);
+        return privateJson({ error: "保存失败" }, { status: 500 });
     }
-
-    const validTypes = ["projects", "assets", "image-workbench", "video-workbench"];
-    if (!validTypes.includes(type)) {
-      return privateJson({ error: "无效的同步类型" }, { status: 400 });
-    }
-
-    if (type === "projects" && Array.isArray(data)) {
-      // 与前端 client-entitlements 及其他后端接口保持一致：admin 角色不受套餐项目数限制
-      const projectLimit = user.role === "admin" ? null : (await getServerEntitlements(user.id)).projects;
-      if (projectLimit !== null && data.length > projectLimit) {
-        return privateJson({ error: `当前套餐最多保存 ${projectLimit} 个画布项目` }, { status: 403 });
-      }
-    }
-
-    const record = await prisma.canvasBackup.upsert({
-      where: { userId_type: { userId: user.id, type } },
-      update: { data, version: { increment: 1 } },
-      create: { userId: user.id, type, data },
-    });
-
-    return privateJson({ ok: true, version: record.version });
-  } catch (err: any) {
-    console.error("[sync:post]", err?.message);
-    return privateJson({ error: "保存失败" }, { status: 500 });
-  }
 }
 
 export async function GET(req: NextRequest) {
-  try {
-    if (!prisma) return privateJson({ error: "数据库不可用" }, { status: 503 });
+    try {
+        if (!prisma) return privateJson({ error: "数据库不可用" }, { status: 503 });
 
-    const user = await requireCurrentUser(req);
-    if (!user) return privateJson({ error: "请先登录" }, { status: 401 });
+        const user = await requireCurrentUser(req);
+        if (!user) return privateJson({ error: "请先登录" }, { status: 401 });
 
-    const type = req.nextUrl.searchParams.get("type") || "projects";
-    const record = await prisma.canvasBackup.findUnique({
-      where: { userId_type: { userId: user.id, type } },
-    });
+        const type = req.nextUrl.searchParams.get("type") || "projects";
+        const record = await prisma.canvasBackup.findUnique({
+            where: { userId_type: { userId: user.id, type } },
+        });
 
-    return privateJson({ data: record?.data || null, version: record?.version || 0 });
-  } catch (err: any) {
-    console.error("[sync:get]", err?.message);
-    return privateJson({ error: "读取失败" }, { status: 500 });
-  }
+        return privateJson({ data: record?.data || null, version: record?.version || 0 });
+    } catch (err: any) {
+        console.error("[sync:get]", err?.message);
+        return privateJson({ error: "读取失败" }, { status: 500 });
+    }
 }

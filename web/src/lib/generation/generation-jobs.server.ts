@@ -1,4 +1,3 @@
-import { getServerEntitlements } from "@/lib/server-entitlements";
 import { prisma } from "@/lib/ic-prisma";
 import { Prisma } from "@/generated/ic-prisma/client";
 import { deductCredits, ensureDailyCreditGrant, refundCredits } from "@/lib/credit-ledger";
@@ -6,6 +5,9 @@ import { estimateGenerationCostCents, getGenerationCreditsCost, type GenerationK
 import { getOperationNumber } from "@/lib/operation-config";
 
 const STALE_JOB_MS = 30 * 60 * 1000;
+
+// 套餐系统已下线：不再有并发权益。保留固定并发守卫防止单用户打爆上游（防滥用常量，非权益概念，可调）。
+const MAX_CONCURRENT_JOBS = 3;
 
 type BeginGenerationInput = {
     requestKey: string;
@@ -24,7 +26,7 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
         return { job: existing, reused: true };
     }
 
-    const [user, entitlements] = await Promise.all([prisma.user.findUnique({ where: { id: userId }, select: { role: true } }), getServerEntitlements(userId)]);
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     const isAdmin = user?.role === "admin";
     // 积分制：非 admin 按「模型 × 类型 × 档位」扣积分；免费用户每日自动赠送积分（后台可配）
     const creditsCost = !isAdmin ? getGenerationCreditsCost(input.kind, input.metadata) : 0;
@@ -52,12 +54,12 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
             await refundCredits(tx, userId, staleJob.creditsCost, staleJob.requestKey, "任务超时自动关闭");
         }
 
-        if (!isAdmin && entitlements.concurrentJobs !== null) {
+        if (!isAdmin) {
             const runningJobs = await tx.generationJob.count({
                 where: { userId, status: "running" },
             });
-            if (runningJobs + 1 > entitlements.concurrentJobs) {
-                throw new GenerationPolicyError(`当前套餐最多同时运行 ${entitlements.concurrentJobs} 个生成任务`, 429);
+            if (runningJobs + 1 > MAX_CONCURRENT_JOBS) {
+                throw new GenerationPolicyError(`同时运行的任务数已达上限（${MAX_CONCURRENT_JOBS}），请等待已有任务完成`, 429);
             }
         }
 

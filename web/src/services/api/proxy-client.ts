@@ -68,7 +68,7 @@ export async function proxyFetchStream(options: ProxyRequestOptions): Promise<Re
 
 function proxyStatusMessage(status: number) {
     if (status === 413) return `请求内容过大：代理请求超过 ${formatProxyBytes(PROXY_WARNING_BYTES)}。单张参考图也可能因原图体积或 base64 编码膨胀触发限制，请压缩图片、减少参考素材，或改用公网素材 URL。`;
-    if (status === 401 || status === 403) return "鉴权失败，请检查 API Key、模型权限或套餐权限。";
+    if (status === 401 || status === 403) return "鉴权失败，请检查 API Key 或模型权限。";
     if (status === 429) return "请求被限流或额度不足，请稍后重试。";
     return `请求失败: ${status}`;
 }

@@ -1,12 +1,11 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { App, Button } from "antd";
 import { Download, FileUp, Plus } from "lucide-react";
 
 import { LoginModal } from "@/components/layout/login-modal";
-import { fetchClientEntitlements, isOverLimit, type ClientEntitlements } from "@/lib/client-entitlements";
 import { readZip } from "@/lib/zip";
 import { setMediaBlob } from "@/services/file-storage";
 import { setImageBlob } from "@/services/image-storage";
@@ -39,33 +38,24 @@ function CanvasPageInner() {
     const importProject = useCanvasStore((state) => state.importProject);
     const selectedIds = useCanvasUiStore((state) => state.selectedProjectIds);
     const setDeleteIds = useCanvasUiStore((state) => state.setDeleteProjectIds);
-    const [entitlements, setEntitlements] = useState<ClientEntitlements | null>(null);
 
     const mode = searchParams.get("mode");
     const agentMode = mode === "new" || mode === "recent" || mode === "choose";
     const agentQuery = agentMode ? `?${searchParams.toString()}` : "";
-    const projectLimit = user?.role === "admin" ? null : (entitlements?.projects ?? null);
-    const projectLimitReached = isOverLimit(projects.length, projectLimit);
 
     const enterProject = (id: string) => {
         router.push(`/canvas/${id}${agentQuery}`);
     };
 
-    const warnProjectLimit = () => {
-        if (projectLimit === null) return;
-        message.warning(`当前套餐最多创建 ${projectLimit} 个画布项目，请联系管理员申请开通套餐权益。`);
-    };
-
     const handleExport = async (projectsToExport: CanvasProject[], name: string) => {
-        try { await exportCanvasProjects(projectsToExport, name); }
-        catch (err) { message.error(err instanceof Error ? err.message : "导出失败"); }
+        try {
+            await exportCanvasProjects(projectsToExport, name);
+        } catch (err) {
+            message.error(err instanceof Error ? err.message : "导出失败");
+        }
     };
 
     const createAndEnter = () => {
-        if (projectLimitReached) {
-            warnProjectLimit();
-            return;
-        }
         enterProject(createProject(`无限画布 ${projects.length + 1}`));
     };
 
@@ -76,11 +66,6 @@ function CanvasPageInner() {
             const projectFile = zip.get("projects.json");
             if (!projectFile) throw new Error("missing projects.json");
             const data = JSON.parse(await projectFile.text()) as CanvasExportFile;
-
-            if (projectLimit !== null && projects.length + data.projects.length > projectLimit) {
-                message.warning(`当前套餐最多保留 ${projectLimit} 个画布项目，无法导入 ${data.projects.length} 个项目。`);
-                return;
-            }
 
             await Promise.all(
                 data.projects.flatMap((project) =>
@@ -101,39 +86,11 @@ function CanvasPageInner() {
         }
     };
 
-    const refreshEntitlements = useCallback(() => {
-        if (!user) {
-            setEntitlements(null);
-            return;
-        }
-        void fetchClientEntitlements().then(setEntitlements);
-    }, [user]);
-
-    useEffect(() => {
-        refreshEntitlements();
-        const handleFocus = () => refreshEntitlements();
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === "visible") refreshEntitlements();
-        };
-        window.addEventListener("focus", handleFocus);
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        return () => {
-            window.removeEventListener("focus", handleFocus);
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
-        };
-    }, [refreshEntitlements]);
-
     useEffect(() => {
         if (!hydrated || autoOpenRef.current || (mode !== "new" && mode !== "recent")) return;
-        if (mode === "new" && projectLimitReached) {
-            autoOpenRef.current = true;
-            warnProjectLimit();
-            router.replace("/canvas");
-            return;
-        }
         autoOpenRef.current = true;
         enterProject(mode === "new" ? createProject(`无限画布 ${projects.length + 1}`) : projects[0]?.id || createProject(`无限画布 ${projects.length + 1}`));
-    }, [createProject, hydrated, mode, projectLimitReached, projects, router]);
+    }, [createProject, hydrated, mode, projects, router]);
 
     // 云端同步：项目变更后自动备份
     useEffect(() => {
@@ -146,7 +103,9 @@ function CanvasPageInner() {
                     credentials: "include",
                     body: JSON.stringify({ type: "projects", data: projects }),
                 });
-            } catch { /* 静默失败，下次同步重试 */ }
+            } catch {
+                /* 静默失败，下次同步重试 */
+            }
         }, 5000);
         return () => clearTimeout(timer);
     }, [hydrated, user, projects]);
@@ -195,15 +154,21 @@ function CanvasPageInner() {
                     <div>
                         <p className="text-xs text-[#8a7f91]">画布库</p>
                         <h1 className="mt-3 text-2xl font-semibold tracking-tight">无限画布</h1>
-                        <p className="mt-2 text-sm text-[#746b7a]">
-                            当前项目数：{projects.length}
-                            {projectLimit === null ? " / 不限" : ` / ${projectLimit}`}
-                        </p>
+                        <p className="mt-2 text-sm text-[#746b7a]">当前项目数：{projects.length}</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {selectedIds.length ? (
                             <>
-                                <Button disabled={!hydrated} icon={<Download className="size-4" />} onClick={() => void handleExport(projects.filter((project) => selectedIds.includes(project.id)), `无限画布-${selectedIds.length}个项目`)}>
+                                <Button
+                                    disabled={!hydrated}
+                                    icon={<Download className="size-4" />}
+                                    onClick={() =>
+                                        void handleExport(
+                                            projects.filter((project) => selectedIds.includes(project.id)),
+                                            `无限画布-${selectedIds.length}个项目`,
+                                        )
+                                    }
+                                >
                                     导出选中
                                 </Button>
                                 <Button disabled={!hydrated} onClick={() => setDeleteIds(selectedIds)}>
@@ -216,10 +181,10 @@ function CanvasPageInner() {
                                 删除全部
                             </Button>
                         ) : null}
-                        <Button disabled={!hydrated || projectLimitReached} icon={<FileUp className="size-4" />} onClick={() => inputRef.current?.click()}>
+                        <Button disabled={!hydrated} icon={<FileUp className="size-4" />} onClick={() => inputRef.current?.click()}>
                             导入画布
                         </Button>
-                        <Button disabled={!hydrated || projectLimitReached} type="primary" icon={<Plus className="size-4" />} onClick={createAndEnter}>
+                        <Button disabled={!hydrated} type="primary" icon={<Plus className="size-4" />} onClick={createAndEnter}>
                             新建画布
                         </Button>
                     </div>

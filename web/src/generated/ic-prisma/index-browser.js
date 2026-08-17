@@ -145,48 +145,6 @@ exports.Prisma.UserConfigScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
-exports.Prisma.PlanScalarFieldEnum = {
-  id: 'id',
-  name: 'name',
-  description: 'description',
-  monthlyPrice: 'monthlyPrice',
-  yearlyPrice: 'yearlyPrice',
-  currency: 'currency',
-  sortOrder: 'sortOrder',
-  isActive: 'isActive',
-  isPopular: 'isPopular',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
-exports.Prisma.EntitlementScalarFieldEnum = {
-  id: 'id',
-  planId: 'planId',
-  key: 'key',
-  label: 'label',
-  value: 'value',
-  unit: 'unit',
-  description: 'description',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
-exports.Prisma.SubscriptionScalarFieldEnum = {
-  id: 'id',
-  userId: 'userId',
-  planId: 'planId',
-  status: 'status',
-  billingCycle: 'billingCycle',
-  currentPeriodStart: 'currentPeriodStart',
-  currentPeriodEnd: 'currentPeriodEnd',
-  cancelAtPeriodEnd: 'cancelAtPeriodEnd',
-  autoRenew: 'autoRenew',
-  provider: 'provider',
-  providerSubId: 'providerSubId',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-};
-
 exports.Prisma.UsageRecordScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -253,7 +211,6 @@ exports.Prisma.OrderScalarFieldEnum = {
   id: 'id',
   orderNo: 'orderNo',
   userId: 'userId',
-  planId: 'planId',
   packageId: 'packageId',
   amount: 'amount',
   currency: 'currency',
@@ -385,9 +342,6 @@ exports.Prisma.JsonNullValueFilter = {
 exports.Prisma.ModelName = {
   User: 'User',
   UserConfig: 'UserConfig',
-  Plan: 'Plan',
-  Entitlement: 'Entitlement',
-  Subscription: 'Subscription',
   UsageRecord: 'UsageRecord',
   GenerationJob: 'GenerationJob',
   CreditPackage: 'CreditPackage',

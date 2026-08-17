@@ -2,7 +2,6 @@
 
 import { nanoid } from "nanoid";
 import { readImageMeta } from "@/lib/image-utils";
-import { fetchClientEntitlements } from "@/lib/client-entitlements";
 import { createScopedLocalForageStore, scopedStorageKey } from "@/lib/user-data-scope";
 
 export type UploadedImage = {
@@ -32,19 +31,8 @@ export function resetStorageUsage() {
     try { localStorage.removeItem(scopedStorageKey(STORAGE_KEY)); } catch { /* 同上 */ }
 }
 
-async function checkStorageAllowed(additionalBytes: number): Promise<boolean> {
-    const entitlements = await fetchClientEntitlements();
-    const limitBytes = entitlements.storageGb !== null ? entitlements.storageGb * 1024 * 1024 * 1024 : null;
-    if (limitBytes === null) return true; // 无限空间
-    const used = getStorageUsage() + additionalBytes;
-    return used <= limitBytes;
-}
-
 export async function uploadImage(input: string | Blob): Promise<UploadedImage> {
     const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
-    if (!(await checkStorageAllowed(blob.size))) {
-        throw new Error("存储空间不足，请清理旧素材或升级套餐。");
-    }
     const storageKey = `image:${nanoid()}`;
     await getStore().setItem(storageKey, blob);
     addStorageUsage(blob.size);
@@ -70,9 +58,6 @@ export async function getImageBlob(storageKey: string) {
 }
 
 export async function setImageBlob(storageKey: string, blob: Blob) {
-    if (!(await checkStorageAllowed(blob.size))) {
-        throw new Error("存储空间不足，请清理旧素材或升级套餐。");
-    }
     const previous = await getStore().getItem<Blob>(storageKey);
     await getStore().setItem(storageKey, blob);
     if (previous) removeStorageUsage(previous.size);

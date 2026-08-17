@@ -70,7 +70,7 @@ export function summarizeCanvasGenerationError(message?: string | null): CanvasG
     if (isQuotaError(text, lower)) {
         return {
             title: "额度或并发不足",
-            hint: "请稍后重试，或联系管理员确认套餐、余额和并发任务限制。",
+            hint: "请稍后重试，或检查积分余额是否充足（生成按次扣积分）。",
             requestId,
         };
     }
@@ -125,5 +125,5 @@ function isAuthError(text: string, lower: string) {
 }
 
 function isQuotaError(text: string, lower: string) {
-    return lower.includes("quota") || lower.includes("insufficient") || lower.includes("payment") || lower.includes("rate limit") || lower.includes("429") || text.includes("额度") || text.includes("套餐") || text.includes("免费生成次数");
+    return lower.includes("quota") || lower.includes("insufficient") || lower.includes("payment") || lower.includes("rate limit") || lower.includes("429") || text.includes("额度") || text.includes("积分余额不足") || text.includes("免费生成次数");
 }

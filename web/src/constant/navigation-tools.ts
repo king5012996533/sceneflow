@@ -33,7 +33,7 @@ export const navigationTools = [
     },
     {
         slug: "pricing",
-        label: "价格套餐",
+        label: "积分充值",
         icon: CreditCard,
     },
     {

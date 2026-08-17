@@ -18,7 +18,6 @@ import { deleteStoredMedia, resolveMediaUrl, uploadMediaFile } from "@/services/
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { createGeneratedVideoTask, persistGeneratedVideo, pollGeneratedVideoTask, type VideoGenerationTask } from "@/lib/generation/generation-request";
 import { useAssetStore } from "@/stores/use-asset-store";
-import { fetchClientEntitlements, type ClientEntitlements } from "@/lib/client-entitlements";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -77,34 +76,6 @@ const getLogStore = () => createScopedLocalForageStore("video_generation_logs");
 
 export default function VideoPage() {
     const user = useUserStore((state) => state.user);
-    const [entitlements, setEntitlements] = useState<ClientEntitlements | null>(null);
-    const [entitlementsLoading, setEntitlementsLoading] = useState(true);
-
-    const refreshEntitlements = useCallback(() => {
-        if (!user) {
-            setEntitlements(null);
-            setEntitlementsLoading(false);
-            return;
-        }
-        setEntitlementsLoading(true);
-        void fetchClientEntitlements()
-            .then(setEntitlements)
-            .finally(() => setEntitlementsLoading(false));
-    }, [user]);
-
-    useEffect(() => {
-        refreshEntitlements();
-        const handleFocus = () => refreshEntitlements();
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === "visible") refreshEntitlements();
-        };
-        window.addEventListener("focus", handleFocus);
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        return () => {
-            window.removeEventListener("focus", handleFocus);
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
-        };
-    }, [refreshEntitlements]);
     const { message } = App.useApp();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const activeLogIdsRef = useRef<Set<string>>(new Set());
@@ -206,10 +177,6 @@ export default function VideoPage() {
     const generate = async () => {
         const snapshot = buildRequestSnapshot();
         if (!snapshot) return;
-        if (entitlementsLoading) {
-            message.info("正在加载套餐权益，请稍候…");
-            return;
-        }
         // 积分预检（服务端为最终裁决，这里只做体验拦截）
         const required = getGenerationCreditsCost("video", { model, videoModel: model });
         if (user?.role !== "admin" && creditBalance !== null && creditBalance < required) {

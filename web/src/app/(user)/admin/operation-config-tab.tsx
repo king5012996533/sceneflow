@@ -24,7 +24,6 @@ type EditorSpec = {
 const EDITORS: EditorSpec[] = [
     { key: "daily_credit_grant", label: "免费用户每日赠送积分", description: "每次生成前自动赠送，按自然日幂等（0 = 不赠送）", kind: "number", defaultValue: 3 },
     { key: "signup_credit_grant", label: "新用户一次性赠送积分", description: "登录时自动发放一次（0 = 不赠送）", kind: "number", defaultValue: 50 },
-    { key: "sub_compensation_credits", label: "存量付费订阅折算补偿", description: "对存量 active 付费订阅一次性补偿积分（0 = 不补偿）", kind: "number", defaultValue: 500 },
 ];
 
 /** 运营配置（daily_credit_grant 等），保存后 ≤30s 生效（进程内缓存 TTL） */

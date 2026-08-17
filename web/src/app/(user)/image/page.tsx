@@ -17,7 +17,6 @@ import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { requestGeneratedImages } from "@/lib/generation/generation-request";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
-import { fetchClientEntitlements, type ClientEntitlements } from "@/lib/client-entitlements";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
@@ -81,34 +80,6 @@ export default function ImagePage() {
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const user = useUserStore((state) => state.user);
-    const [entitlements, setEntitlements] = useState<ClientEntitlements | null>(null);
-    const [entitlementsLoading, setEntitlementsLoading] = useState(true);
-
-    const refreshEntitlements = useCallback(() => {
-        if (!user) {
-            setEntitlements(null);
-            setEntitlementsLoading(false);
-            return;
-        }
-        setEntitlementsLoading(true);
-        void fetchClientEntitlements()
-            .then(setEntitlements)
-            .finally(() => setEntitlementsLoading(false));
-    }, [user]);
-
-    useEffect(() => {
-        refreshEntitlements();
-        const handleFocus = () => refreshEntitlements();
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === "visible") refreshEntitlements();
-        };
-        window.addEventListener("focus", handleFocus);
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        return () => {
-            window.removeEventListener("focus", handleFocus);
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
-        };
-    }, [refreshEntitlements]);
     const addAsset = useAssetStore((state) => state.addAsset);
     const [prompt, setPrompt] = useState("");
     const [references, setReferences] = useState<ReferenceImage[]>([]);
@@ -179,19 +150,10 @@ export default function ImagePage() {
             message.error("请输入生图提示词");
             return;
         }
-        if (entitlementsLoading) {
-            message.info("正在加载套餐权益，请稍候…");
-            return;
-        }
         // 积分预检（服务端为最终裁决，这里只做体验拦截）
         const required = getGenerationCreditsCost("image", { model, imageModel: model }) * generationCount;
         if (user?.role !== "admin" && creditBalance !== null && creditBalance < required) {
             quotaModalRef.current?.open({ balance: creditBalance, required });
-            return;
-        }
-        const concurrentLimit = entitlements ? entitlements.concurrentJobs : null;
-        if (concurrentLimit !== null && generationCount > concurrentLimit) {
-            message.warning(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请减少生成数量或升级套餐。`);
             return;
         }
         if (!isAiConfigReady(effectiveConfig, model)) {

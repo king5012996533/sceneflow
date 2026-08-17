@@ -20,6 +20,10 @@ function assertNotMatches(path, pattern, message) {
     assert(!pattern.test(read(path)), message || `${path} should not match ${pattern}`);
 }
 
+function assertNotExists(path, message) {
+    assert(!existsSync(join(root, path)), message || `${path} should not exist`);
+}
+
 function walkFiles(path) {
     const fullPath = join(root, path);
     if (!existsSync(fullPath)) return [];
@@ -71,21 +75,26 @@ assertIncludes("src/app/(user)/canvas/hooks/use-canvas-pipeline-runner.ts", "run
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "runPipeline", "the canvas page must keep pipeline execution wired through the pipeline runner hook.");
 assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "assetAutoArchived", "generated reusable assets must automatically return to the asset library.");
 
-const pricingPage = read("src/app/(user)/pricing/page.tsx");
-assert(!pricingPage.includes("\\u6682\\u4e0d\\u6536\\u6b3e") && !pricingPage.includes("\\u4e0d\\u6536\\u6b3e\\u5c31\\u53ef\\u4ee5\\u514d\\u8d39") && !pricingPage.includes("\\u514d\\u8d39\\u5f00\\u901a\\u6743\\u76ca"), "pricing copy must not imply beta packages are free.");
-assert(
-    pricingPage.includes("?????????????") || pricingPage.includes("\\u4ed8\\u8d39\\u624b\\u52a8\\u5f00\\u901a\\u6743\\u76ca"),
-    "pricing copy must keep paid manual opening clear.",
-);
-assert(
-    pricingPage.includes("???????????") || pricingPage.includes("\\u8054\\u7cfb\\u7ba1\\u7406\\u5458\\u5f00\\u901a"),
-    "pricing CTA should route paid plans to admin-assisted opening.",
-);
+assertIncludes("src/app/(user)/pricing/page.tsx", "CreditPackagesSection", "pricing 页必须保留积分包充值区（套餐已下线，纯积分充值）。");
+assertNotMatches("src/app/(user)/pricing/page.tsx", /applyPlan|\/api\/billing\/plans|setPlans|planIcons/, "pricing 页不得残留套餐卡片/下单逻辑（套餐已下线）。");
 
 assertNotMatches("src/app/(user)/image/page.tsx", /请升级套餐继续使用/, "image quota copy should route users to manual opening, not nonexistent online upgrade.");
 assertNotMatches("src/app/(user)/video/page.tsx", /请升级套餐继续使用/, "video quota copy should route users to manual opening, not nonexistent online upgrade.");
 assertNotMatches("src/app/(user)/canvas/[id]/canvas-client-page.tsx", /请升级套餐继续使用|申请内测或升级套餐/, "canvas quota copy should avoid misleading upgrade/beta wording.");
 assertNotMatches("src/components/layout/app-top-nav.tsx", /parseApiDraft|enrichExperienceApiDraft|体验官配置渠道|ExperienceOfficerModal/, "BYOK 下线：体验官「自行填 Key」助手已移除，不应残留自行配置 API Key 的入口。");
+
+// —— 套餐系统下线（纯积分制）：不得残留任何订阅/权益入口 ——
+assertNotExists("src/app/api/billing/plans/route.ts", "套餐已下线：/api/billing/plans 路由必须删除。");
+assertNotExists("src/app/api/billing/subscription/route.ts", "套餐已下线：/api/billing/subscription 路由必须删除。");
+assertNotExists("src/app/api/generation/quota/route.ts", "套餐已下线：/api/generation/quota 路由必须删除。");
+assertNotExists("src/lib/client-entitlements.ts", "套餐已下线：client-entitlements 必须删除。");
+assertNotMatches("prisma/schema.prisma", /model (Plan|Entitlement|Subscription)\b/, "套餐已下线：Prisma schema 不得保留 Plan/Entitlement/Subscription 模型。");
+assertNotMatches("src/app/(user)/admin/page.tsx", /planDrafts|套餐权益|手动开通|activeSubscriptions|当前套餐/, "套餐已下线：admin 后台不得保留套餐管理入口。");
+assertNotMatches("src/lib/billing.ts", /DEFAULT_PLANS|ensureDefaultPlans|activateSubscription|getPlanAmount|getPeriodEnd|sortPlanEntitlements/, "套餐已下线：billing 工具不得保留套餐相关函数。");
+assertNotMatches("src/lib/server-entitlements.ts", /getActiveSubscription|getServerEntitlements|parseEntitlementLimit/, "套餐已下线：server-entitlements 不得保留订阅/权益读取。");
+assertNotMatches("src/lib/credit-migration.ts", /sub_compensation/, "套餐已下线：存量订阅折算补偿逻辑必须移除。");
+assertNotMatches("src/app/api/billing/orders/route.ts", /planId|getPlanAmount/, "套餐已下线：订单接口只保留积分包下单。");
+assertNotMatches("src/middleware.ts", /\/api\/billing\/plans/, "套餐已下线：middleware 不得放行 /api/billing/plans。");
 
 if (failures.length) {
     console.error("Regression guards failed:");

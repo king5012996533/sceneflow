@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Empty, Input, InputNumber, Select, Switch, Tabs, Tag, Tooltip } from "antd";
-import { Ban, Boxes, Coins, CreditCard, Database, FileText, History, Settings, Shield, Users } from "lucide-react";
+import { App, Button, Empty, Input, Select, Tabs, Tag } from "antd";
+import { Ban, Coins, CreditCard, Database, FileText, History, Settings, Shield, Users } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
 import { formatCny } from "@/lib/format";
@@ -16,7 +16,6 @@ import OperationConfigTab from "./operation-config-tab";
 
 type Overview = {
     users: number;
-    activeSubscriptions: number;
     paidOrders: number;
     pendingOrders: number;
     revenue: number;
@@ -34,7 +33,6 @@ type AdminUser = {
     bannedAt?: string | null;
     banReason?: string | null;
     createdAt: string;
-    subscriptions: Array<{ planId?: string; plan?: { id: string; name: string } | null; status: string }>;
 };
 
 type AdminOrder = {
@@ -45,31 +43,12 @@ type AdminOrder = {
     provider: string;
     createdAt: string;
     user: { email: string; name: string };
-    plan: { name: string };
+    package: { name: string } | null;
 };
 
 type AdminConfig = {
-    plans: Array<{
-        id: string;
-        name: string;
-        monthlyPrice: number;
-        yearlyPrice: number;
-        isActive: boolean;
-        isPopular?: boolean;
-        entitlements: Array<{ key: string; label: string; value: string; unit: string }>;
-    }>;
     modelConfigs: Array<{ id: string; provider: string; model: string; displayName: string; type: string; enabled: boolean; isDefault: boolean }>;
     operationConfigs: Array<{ id: string; key: string; value: unknown; description: string }>;
-};
-
-type PlanEntitlementDraft = { key: string; label: string; value: string; unit: string };
-type PlanDraft = {
-    name: string;
-    monthlyPrice: number;
-    yearlyPrice: number;
-    isActive: boolean;
-    isPopular: boolean;
-    entitlements: PlanEntitlementDraft[];
 };
 
 type AuditLog = {
@@ -127,9 +106,6 @@ export default function AdminPage() {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(false);
     const [checkingAccess, setCheckingAccess] = useState(true);
-    const [selectedPlans, setSelectedPlans] = useState<Record<string, string>>({});
-    const [selectedCycles, setSelectedCycles] = useState<Record<string, "monthly" | "yearly">>({});
-    const [planDrafts, setPlanDrafts] = useState<Record<string, PlanDraft>>({});
 
     async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
         const res = await fetch(url, init);
@@ -155,8 +131,6 @@ export default function AdminPage() {
             setConfig(configData);
             setAuditLogs(auditData.logs);
             setGenerationJobs(jobsData.jobs);
-            setSelectedPlans(Object.fromEntries(usersData.users.map((user) => [user.id, user.subscriptions[0]?.plan?.id || "free"])));
-            setSelectedCycles(Object.fromEntries(usersData.users.map((user) => [user.id, "monthly"])));
         } catch (error) {
             message.error(error instanceof Error ? error.message : "加载后台失败");
         } finally {
@@ -177,31 +151,6 @@ export default function AdminPage() {
             mounted = false;
         };
     }, [fetchSession]);
-
-    useEffect(() => {
-        if (!config) return;
-        setPlanDrafts((prev) => {
-            const next = { ...prev };
-            for (const plan of config.plans) {
-                if (!next[plan.id]) {
-                    next[plan.id] = {
-                        name: plan.name,
-                        monthlyPrice: plan.monthlyPrice,
-                        yearlyPrice: plan.yearlyPrice,
-                        isActive: plan.isActive,
-                        isPopular: plan.isPopular ?? false,
-                        entitlements: plan.entitlements.map((item) => ({
-                            key: item.key,
-                            label: item.label,
-                            value: item.value,
-                            unit: item.unit,
-                        })),
-                    };
-                }
-            }
-            return next;
-        });
-    }, [config]);
 
     useEffect(() => {
         if (checkingAccess) return;
@@ -241,41 +190,6 @@ export default function AdminPage() {
         }
     }
 
-    function updatePlanDraft(planId: string, patch: Partial<PlanDraft>) {
-        setPlanDrafts((prev) => {
-            const draft = prev[planId];
-            if (!draft) return prev;
-            return { ...prev, [planId]: { ...draft, ...patch } };
-        });
-    }
-
-    function updatePlanEntitlement(planId: string, index: number, patch: Partial<PlanEntitlementDraft>) {
-        setPlanDrafts((prev) => {
-            const draft = prev[planId];
-            if (!draft) return prev;
-            const entitlements = draft.entitlements.map((item, i) => (i === index ? { ...item, ...patch } : item));
-            return { ...prev, [planId]: { ...draft, entitlements } };
-        });
-    }
-
-    async function savePlan(planId: string) {
-        const draft = planDrafts[planId];
-        if (!draft) return;
-        try {
-            await requestJson(apiPath("/api/admin/configs"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ type: "plan", planId, ...draft }),
-            });
-            message.success("套餐已保存，定价页立即生效");
-            await loadAll();
-        } catch (error) {
-            message.error(error instanceof Error ? error.message : "保存套餐失败");
-        }
-    }
-
-    const planOptions = (config?.plans || []).map((plan) => ({ label: plan.name, value: plan.id }));
-
     if (checkingAccess || user?.role !== "admin") {
         return (
             <main className="grid h-full place-items-center bg-[#f5f5f2] px-6 text-stone-950">
@@ -294,18 +208,17 @@ export default function AdminPage() {
                             ADMIN
                         </div>
                         <h1 className="text-2xl font-semibold tracking-tight">管理后台</h1>
-                        <p className="mt-2 text-sm text-stone-500">内测阶段暂不接入在线收银台，管理员确认用户套餐后人工开通权益。</p>
+                        <p className="mt-2 text-sm text-stone-500">内测阶段暂不接入在线收银台，管理员确认积分包订单后人工入账。</p>
                     </div>
                     <Button loading={loading} onClick={() => void loadAll()}>
                         刷新数据
                     </Button>
                 </div>
 
-                <div className="mb-4 grid gap-3 md:grid-cols-5">
+                <div className="mb-4 grid gap-3 md:grid-cols-4">
                     <Metric icon={Users} label="用户" value={overview?.users ?? "-"} />
-                    <Metric icon={Boxes} label="活跃订阅" value={overview?.activeSubscriptions ?? "-"} />
-                    <Metric icon={CreditCard} label="已开通记录" value={overview?.paidOrders ?? "-"} />
-                    <Metric icon={CreditCard} label="开通申请" value={overview?.pendingOrders ?? "-"} />
+                    <Metric icon={CreditCard} label="已支付订单" value={overview?.paidOrders ?? "-"} />
+                    <Metric icon={CreditCard} label="待处理订单" value={overview?.pendingOrders ?? "-"} />
                     <Metric icon={Database} label="参考金额" value={overview ? formatCny(overview.revenue) : "-"} />
                 </div>
                 <div className="mb-4 grid gap-3 md:grid-cols-5">
@@ -330,8 +243,6 @@ export default function AdminPage() {
                                                 <th className="py-3 font-medium">用户</th>
                                                 <th className="py-3 font-medium">注册时间</th>
                                                 <th className="py-3 font-medium">角色</th>
-                                                <th className="py-3 font-medium">当前套餐</th>
-                                                <th className="py-3 font-medium">手动开通</th>
                                                 <th className="py-3 font-medium">状态</th>
                                                 <th className="py-3 font-medium">操作</th>
                                             </tr>
@@ -353,40 +264,11 @@ export default function AdminPage() {
                                                             value={user.role}
                                                             options={[
                                                                 { label: "user", value: "user" },
-                                                                { label: "pro（无权益，请用套餐开通）", value: "pro", disabled: true },
                                                                 { label: "admin", value: "admin" },
                                                             ]}
                                                             onChange={(role) => void updateUser(user.id, "role", { role })}
                                                             className="w-28"
                                                         />
-                                                    </td>
-                                                    <td className="py-3">{user.subscriptions[0]?.plan?.name || "未开通"}</td>
-                                                    <td className="py-3">
-                                                        <div className="flex flex-wrap gap-2">
-                                                            <Select value={selectedPlans[user.id] || "free"} options={planOptions} onChange={(value) => setSelectedPlans((prev) => ({ ...prev, [user.id]: value }))} className="w-32" />
-                                                            <Select
-                                                                value={selectedCycles[user.id] || "monthly"}
-                                                                options={[
-                                                                    { label: "月度", value: "monthly" },
-                                                                    { label: "年度", value: "yearly" },
-                                                                ]}
-                                                                onChange={(value) => setSelectedCycles((prev) => ({ ...prev, [user.id]: value }))}
-                                                                className="w-24"
-                                                            />
-                                                            <Tooltip title="为用户开通所选套餐并创建订阅；用户刷新页面（或回到页面）后按新套餐生效">
-                                                                <Button
-                                                                    size="small"
-                                                                    type="primary"
-                                                                    onClick={() => {
-                                                                        const planId = selectedPlans[user.id] || "free";
-                                                                        const planName = planOptions.find((plan) => plan.value === planId)?.label || "免费版";
-                                                                        void updateUser(user.id, "subscription", { planId, billingCycle: selectedCycles[user.id] || "monthly" }, `已开通「${planName}」订阅，刷新后生效`);
-                                                                    }}
-                                                                >
-                                                                    开通·{planOptions.find((plan) => plan.value === (selectedPlans[user.id] || "free"))?.label || "免费版"}
-                                                                </Button>
-                                                            </Tooltip>
-                                                        </div>
                                                     </td>
                                                     <td className="py-3">{user.bannedAt ? <Tag color="red">已封禁</Tag> : <Tag color="green">正常</Tag>}</td>
                                                     <td className="py-3">
@@ -403,7 +285,7 @@ export default function AdminPage() {
                         },
                         {
                             key: "orders",
-                            label: "开通申请",
+                            label: "订单管理",
                             children: (
                                 <section className="rounded-lg border border-stone-200 bg-white p-5">
                                     <DataTable empty={!orders.length}>
@@ -411,7 +293,7 @@ export default function AdminPage() {
                                             <tr>
                                                 <th className="py-3 font-medium">记录号</th>
                                                 <th className="py-3 font-medium">用户</th>
-                                                <th className="py-3 font-medium">套餐</th>
+                                                <th className="py-3 font-medium">积分包</th>
                                                 <th className="py-3 font-medium">参考金额</th>
                                                 <th className="py-3 font-medium">来源</th>
                                                 <th className="py-3 font-medium">时间</th>
@@ -423,9 +305,9 @@ export default function AdminPage() {
                                                 <tr key={order.id} className="border-b border-stone-100">
                                                     <td className="py-3 font-mono text-xs">{order.orderNo}</td>
                                                     <td className="py-3">{order.user.email}</td>
-                                                    <td className="py-3">{order.plan.name}</td>
+                                                    <td className="py-3">{order.package?.name || "—"}</td>
                                                     <td className="py-3">{formatCny(order.amount)}</td>
-                                                    <td className="py-3">{order.provider === "manual" ? "开通申请" : order.provider}</td>
+                                                    <td className="py-3">{order.provider === "manual" ? "人工确认" : order.provider}</td>
                                                     <td className="py-3 text-sm text-stone-600">
                                                         <div>{formatDateTime(order.createdAt)}</div>
                                                         <div className="text-xs text-stone-400">{formatRelativeTime(order.createdAt)}</div>
@@ -551,62 +433,6 @@ export default function AdminPage() {
                             label: "模型/运营配置",
                             children: (
                                 <div className="grid gap-4 lg:grid-cols-2">
-                                    <section className="rounded-lg border border-stone-200 bg-white p-5">
-                                        <div className="mb-4 flex items-center justify-between gap-3">
-                                            <div className="flex items-center gap-2 text-lg font-semibold">
-                                                <Settings className="size-5" />
-                                                套餐权益
-                                            </div>
-                                            <span className="text-xs text-stone-400">修改保存后立即生效（定价页 / 开通均读取数据库）</span>
-                                        </div>
-                                        <div className="space-y-4">
-                                            {(config?.plans || []).map((plan) => {
-                                                const draft = planDrafts[plan.id];
-                                                if (!draft) return null;
-                                                return (
-                                                    <div key={plan.id} className="rounded-md border border-stone-200 p-4">
-                                                        <div className="flex flex-wrap items-center gap-3">
-                                                            <Input value={draft.name} maxLength={40} onChange={(event) => updatePlanDraft(plan.id, { name: event.target.value })} className="w-36" />
-                                                            <div className="flex items-center gap-2 text-sm text-stone-600">
-                                                                <Switch size="small" checked={draft.isActive} onChange={(checked) => updatePlanDraft(plan.id, { isActive: checked })} />
-                                                                上架
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-sm text-stone-600">
-                                                                <Switch size="small" checked={draft.isPopular} onChange={(checked) => updatePlanDraft(plan.id, { isPopular: checked })} />
-                                                                热门
-                                                            </div>
-                                                            <Button type="primary" size="small" className="ml-auto" onClick={() => void savePlan(plan.id)}>
-                                                                保存
-                                                            </Button>
-                                                        </div>
-                                                        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-                                                            <div className="flex items-center gap-2 text-stone-600">
-                                                                月度
-                                                                <InputNumber min={0} precision={2} value={draft.monthlyPrice / 100} onChange={(value) => updatePlanDraft(plan.id, { monthlyPrice: Math.round((value ?? 0) * 100) })} className="w-28" />
-                                                                <span className="text-stone-400">元</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-2 text-stone-600">
-                                                                年度
-                                                                <InputNumber min={0} precision={2} value={draft.yearlyPrice / 100} onChange={(value) => updatePlanDraft(plan.id, { yearlyPrice: Math.round((value ?? 0) * 100) })} className="w-28" />
-                                                                <span className="text-stone-400">元</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="mt-3 space-y-1.5">
-                                                            {draft.entitlements.map((item, index) => (
-                                                                <div key={item.key} className="flex items-center gap-2 text-sm">
-                                                                    <span className="w-36 shrink-0 truncate text-stone-500" title={item.label}>
-                                                                        {item.label}
-                                                                    </span>
-                                                                    <Input size="small" value={item.value} maxLength={100} onChange={(event) => updatePlanEntitlement(plan.id, index, { value: event.target.value })} className="w-24" />
-                                                                    <Input size="small" value={item.unit} maxLength={10} onChange={(event) => updatePlanEntitlement(plan.id, index, { unit: event.target.value })} className="w-12" />
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </section>
                                     <section className="rounded-lg border border-stone-200 bg-white p-5">
                                         <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
                                             <Settings className="size-5" />

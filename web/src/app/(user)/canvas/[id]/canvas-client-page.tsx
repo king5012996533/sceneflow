@@ -15,7 +15,6 @@ import { uploadMediaFile } from "@/services/file-storage";
 import { nanoid } from "nanoid";
 import { readImageMeta } from "@/lib/image-utils";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
-import { fetchClientEntitlements, isOverLimit, type ClientEntitlements } from "@/lib/client-entitlements";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -175,7 +174,6 @@ function InfiniteCanvasPage() {
     const [mouseWorld, setMouseWorld] = useState<Position>({ x: 0, y: 0 });
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
     const [runningNodeId, setRunningNodeId] = useState<string | null>(null);
-    const [entitlements, setEntitlements] = useState<ClientEntitlements | null>(null);
     const [isMiniMapOpen, setIsMiniMapOpen] = useState(false);
     const [backgroundMode, setBackgroundMode] = useState<CanvasBackgroundMode>("lines");
     const [showImageInfo, setShowImageInfo] = useState(false);
@@ -280,41 +278,15 @@ function InfiniteCanvasPage() {
         [cleanupAssetImages],
     );
 
-    const refreshEntitlements = useCallback(() => {
-        void fetchClientEntitlements().then(setEntitlements);
-    }, []);
-
-    useEffect(() => {
-        refreshEntitlements();
-        const handleFocus = () => refreshEntitlements();
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === "visible") refreshEntitlements();
-        };
-        window.addEventListener("focus", handleFocus);
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        return () => {
-            window.removeEventListener("focus", handleFocus);
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
-        };
-    }, [refreshEntitlements]);
-
     const { generationRequestsRef, startGenerationRequest, finishGenerationRequest, stopGenerationByRunningId, confirmStopGeneration } = useCanvasGenerationRequests({
-        entitlements,
         setRunningNodeId,
         setNodes,
         modal,
     });
 
-    const reserveCanvasGenerationQuota = useCallback(
-        async () => {
-            const concurrentLimit = entitlements ? entitlements.concurrentJobs : null;
-            const activeRunningTasks = new Set(Array.from(generationRequestsRef.current.values()).map((request) => request.runningNodeId)).size;
-            if (concurrentLimit !== null && activeRunningTasks + 1 > concurrentLimit) {
-                throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请等待已有任务完成或升级套餐。`);
-            }
-        },
-        [entitlements],
-    );
+    const reserveCanvasGenerationQuota = useCallback(async () => {
+        // 套餐系统已下线：并发额度限制移除，积分是唯一收费门槛（服务端另有固定并发守卫）
+    }, []);
 
     useEffect(() => {
         if (!hydrated) return;
@@ -904,32 +876,15 @@ function InfiniteCanvasPage() {
     );
 
     const createMangaWorkflowNodes = useCallback(() => {
-        // 先检查角色资产额度
-        const charLimit = entitlements?.privateCharacters ?? 0;
-        if (charLimit !== null) {
-            const existingChars = nodesRef.current.filter((node) => node.type === CanvasNodeType.Image && (node.metadata as Record<string, unknown> | undefined)?.label === "角色设定").length;
-            const workflow = createMangaWorkflow(getCanvasCenter(), effectiveConfig);
-            const newChars = workflow.nodes.filter((node) => node.type === CanvasNodeType.Image && (node.metadata as Record<string, unknown> | undefined)?.label === "角色设定").length;
-            if (existingChars + newChars > charLimit) {
-                message.warning(`当前套餐最多保存 ${charLimit} 个角色资产，请清理旧角色或升级套餐。`);
-                return;
-            }
-            setNodes((prev) => [...prev, ...workflow.nodes]);
-            setConnections((prev) => [...prev, ...workflow.connections]);
-            setSelectedNodeIds(new Set([workflow.nodes[0]?.id].filter(Boolean)));
-            setSelectedConnectionId(null);
-            setDialogNodeId(workflow.nodes[0]?.id || null);
-            message.success("已创建漫剧生产流程");
-        } else {
-            const workflow = createMangaWorkflow(getCanvasCenter(), effectiveConfig);
-            setNodes((prev) => [...prev, ...workflow.nodes]);
-            setConnections((prev) => [...prev, ...workflow.connections]);
-            setSelectedNodeIds(new Set([workflow.nodes[0]?.id].filter(Boolean)));
-            setSelectedConnectionId(null);
-            setDialogNodeId(workflow.nodes[0]?.id || null);
-            message.success("已创建漫剧生产流程");
-        }
-    }, [effectiveConfig, entitlements, getCanvasCenter, message]);
+        // 套餐系统已下线：不再限制角色资产数量
+        const workflow = createMangaWorkflow(getCanvasCenter(), effectiveConfig);
+        setNodes((prev) => [...prev, ...workflow.nodes]);
+        setConnections((prev) => [...prev, ...workflow.connections]);
+        setSelectedNodeIds(new Set([workflow.nodes[0]?.id].filter(Boolean)));
+        setSelectedConnectionId(null);
+        setDialogNodeId(workflow.nodes[0]?.id || null);
+        message.success("已创建漫剧生产流程");
+    }, [effectiveConfig, getCanvasCenter, message]);
 
     const deselectCanvas = useCallback(() => {
         cancelPendingConnectionCreate();
@@ -955,14 +910,9 @@ function InfiniteCanvasPage() {
 
     const createAndOpenProject = useCallback(() => {
         const projects = useCanvasStore.getState().projects;
-        const projectLimit = entitlements?.projects ?? 3;
-        if (isOverLimit(projects.length, projectLimit)) {
-            message.warning(`当前套餐最多创建 ${projectLimit} 个画布项目，请联系管理员申请开通套餐权益。`);
-            return;
-        }
         const id = createProject(`无限画布 ${projects.length + 1}`);
         router.push(`/canvas/${id}`);
-    }, [createProject, entitlements?.projects, message, router]);
+    }, [createProject, message, router]);
 
     const deleteCurrentProject = useCallback(() => {
         deleteProjects([projectId]);

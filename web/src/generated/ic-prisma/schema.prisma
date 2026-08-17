@@ -24,7 +24,6 @@ model User {
   banReason          String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
-  subscriptions      Subscription[]
   orders             Order[]
   usageRecords       UsageRecord[]
   generationJobs     GenerationJob[]
@@ -42,60 +41,6 @@ model UserConfig {
   config    Json     @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model Plan {
-  id            String         @id // free | creator | team | enterprise
-  name          String
-  description   String         @default("")
-  monthlyPrice  Int            @default(0) // cents
-  yearlyPrice   Int            @default(0) // cents
-  currency      String         @default("CNY")
-  sortOrder     Int            @default(0)
-  isActive      Boolean        @default(true)
-  isPopular     Boolean        @default(false)
-  entitlements  Entitlement[]
-  subscriptions Subscription[]
-  orders        Order[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-}
-
-model Entitlement {
-  id          String   @id @default(cuid())
-  planId      String
-  plan        Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
-  key         String
-  label       String
-  value       String
-  unit        String   @default("")
-  description String   @default("")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([planId, key])
-  @@index([key])
-}
-
-model Subscription {
-  id                 String    @id @default(cuid())
-  userId             String
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  planId             String    @default("free")
-  plan               Plan?     @relation(fields: [planId], references: [id])
-  status             String    @default("active") // active | cancelled | expired | past_due
-  billingCycle       String    @default("monthly") // monthly | yearly | manual
-  currentPeriodStart DateTime  @default(now())
-  currentPeriodEnd   DateTime?
-  cancelAtPeriodEnd  Boolean   @default(false)
-  autoRenew          Boolean   @default(false)
-  provider           String    @default("manual") // manual | wechat | alipay | stripe
-  providerSubId      String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-
-  @@index([userId, status])
-  @@index([planId])
 }
 
 model UsageRecord {
@@ -184,15 +129,13 @@ model Order {
   orderNo         String         @unique
   userId          String
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  planId          String?
-  plan            Plan?          @relation(fields: [planId], references: [id])
-  packageId       String? // 积分包订单时非空（套餐订单为空）
+  packageId       String? // 积分包订单
   package         CreditPackage? @relation(fields: [packageId], references: [id])
   amount          Int
   currency        String         @default("CNY")
   status          String         @default("pending") // pending | paid | cancelled | failed | refunded
   provider        String         @default("wechat") // wechat | alipay | stripe | manual
-  billingCycle    String         @default("monthly")
+  billingCycle    String         @default("manual")
   providerOrderNo String?
   paidAt          DateTime?
   metadata        Json?
@@ -201,7 +144,6 @@ model Order {
   updatedAt       DateTime       @updatedAt
 
   @@index([userId, status])
-  @@index([planId])
   @@index([provider])
 }
 

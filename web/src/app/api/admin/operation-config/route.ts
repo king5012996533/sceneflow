@@ -10,7 +10,6 @@ export const dynamic = "force-dynamic";
 const KNOWN_KEYS: Record<string, { description: string }> = {
     daily_credit_grant: { description: "免费用户每日赠送积分（0 = 不赠送）" },
     signup_credit_grant: { description: "新用户一次性赠送积分（0 = 不赠送）" },
-    sub_compensation_credits: { description: "存量付费订阅一次性折算补偿积分（0 = 不补偿）" },
 };
 
 export async function GET(req: NextRequest) {

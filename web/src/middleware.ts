@@ -12,7 +12,6 @@ const PUBLIC_PATHS = [
     "/api/auth/verify-code",
     "/api/auth/github",
     "/api/auth/github/callback",
-    "/api/billing/plans",
     "/api/payments/callback",
     "/api/prompts",
 ];

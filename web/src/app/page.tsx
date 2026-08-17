@@ -74,7 +74,7 @@ export default function Home() {
                                 进入生产画布 ↗
                             </Link>
                             <Link className="btn btn-ghost" href="/pricing">
-                                申请开通权益 ↗
+                                充值积分 ↗
                             </Link>
                         </div>
 
@@ -359,7 +359,7 @@ export default function Home() {
                                 进入生产画布 ↗
                             </Link>
                             <Link className="btn btn-ghost" href="/pricing">
-                                申请开通权益 ↗
+                                充值积分 ↗
                             </Link>
                         </div>
                     </div>

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { activateSubscription, type BillingCycle, type PaymentProvider } from "@/lib/billing";
 import { requireAdminUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 import { grantCredits } from "@/lib/credit-ledger";
@@ -17,7 +16,7 @@ export async function GET(req: NextRequest) {
 
         const orders = await prisma.order.findMany({
             where: status ? { status } : undefined,
-            include: { user: { select: { id: true, email: true, name: true } }, plan: true },
+            include: { user: { select: { id: true, email: true, name: true } }, package: true },
             orderBy: { createdAt: "desc" },
             take: 100,
         });
@@ -53,23 +52,14 @@ export async function PATCH(req: NextRequest) {
         const order = await prisma.order.update({
             where: { id: orderId },
             data: status === "paid" ? { status, paidAt: new Date() } : { status },
-            include: { user: { select: { id: true, email: true, name: true } }, plan: true, package: true },
+            include: { user: { select: { id: true, email: true, name: true } }, package: true },
         });
 
-        // 手动确认：订单置为「已开通」时按类型入账，与支付回调逻辑一致
-        // - 积分包订单 → 入账积分
-        // - 套餐订单 → 激活订阅
+        // 手动确认：订单置为「已支付」时入账积分（与支付回调逻辑一致，幂等由上面的 transitionToPaid 守卫保证）
         if (transitionToPaid) {
             if (order.packageId && order.package) {
                 const credits = order.package.credits + order.package.bonusCredits;
                 await grantCredits(prisma as never, order.userId, credits, "purchase", "order", orderId, `积分包「${order.package.name}」到账 ${credits} 积分`);
-            } else if (order.planId) {
-                await activateSubscription({
-                    userId: order.userId,
-                    planId: order.planId,
-                    cycle: order.billingCycle as BillingCycle,
-                    provider: (order.provider || "manual") as PaymentProvider,
-                });
             }
         }
 

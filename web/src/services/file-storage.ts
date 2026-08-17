@@ -2,7 +2,6 @@
 
 import { nanoid } from "nanoid";
 
-import { fetchClientEntitlements } from "@/lib/client-entitlements";
 import { createScopedLocalForageStore, scopedStorageKey } from "@/lib/user-data-scope";
 
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
@@ -31,18 +30,8 @@ function removeStorageUsage(bytes: number) {
     } catch {}
 }
 
-async function checkStorageAllowed(additionalBytes: number): Promise<boolean> {
-    const entitlements = await fetchClientEntitlements();
-    const limitBytes = entitlements.storageGb !== null ? entitlements.storageGb * 1024 * 1024 * 1024 : null;
-    if (limitBytes === null) return true;
-    return getStorageUsage() + additionalBytes <= limitBytes;
-}
-
 export async function uploadMediaFile(input: string | Blob, prefix = "file"): Promise<UploadedFile> {
     const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
-    if (!(await checkStorageAllowed(blob.size))) {
-        throw new Error("存储空间不足，请清理旧素材或升级套餐。");
-    }
     const storageKey = `${prefix}:${nanoid()}`;
     await getStore().setItem(storageKey, blob);
     addStorageUsage(blob.size);
@@ -68,9 +57,6 @@ export async function getMediaBlob(storageKey: string) {
 }
 
 export async function setMediaBlob(storageKey: string, blob: Blob) {
-    if (!(await checkStorageAllowed(blob.size))) {
-        throw new Error("存储空间不足，请清理旧素材或升级套餐。");
-    }
     const previous = await getStore().getItem<Blob>(storageKey);
     await getStore().setItem(storageKey, blob);
     if (previous) removeStorageUsage(previous.size);

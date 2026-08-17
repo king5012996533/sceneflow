@@ -10,9 +10,8 @@ export async function GET(req: NextRequest) {
         const admin = await requireAdminUser(req);
         if (!admin) return NextResponse.json({ error: "没有管理员权限" }, { status: 403 });
 
-        const [users, activeSubscriptions, paidOrders, pendingOrders, revenue, creditBalanceSum, creditsConsumed, creditsPurchased] = await Promise.all([
+        const [users, paidOrders, pendingOrders, revenue, creditBalanceSum, creditsConsumed, creditsPurchased] = await Promise.all([
             prisma.user.count(),
-            prisma.subscription.count({ where: { status: "active" } }),
             prisma.order.count({ where: { status: "paid" } }),
             prisma.order.count({ where: { status: "pending" } }),
             prisma.order.aggregate({ where: { status: "paid" }, _sum: { amount: true } }),
@@ -24,7 +23,6 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
             metrics: {
                 users,
-                activeSubscriptions,
                 paidOrders,
                 pendingOrders,
                 revenue: revenue._sum.amount || 0,
