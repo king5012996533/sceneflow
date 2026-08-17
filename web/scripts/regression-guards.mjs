@@ -146,6 +146,7 @@ assertIncludes("src/services/api/video.ts", "/api/external/v1/video/task/create"
 assertIncludes("src/services/api/video.ts", "Math.min(720", "aigccc 分辨率必须钳到 720p（网关实际最高只输出 720p）。");
 assertIncludes("src/services/api/video.ts", 'apiFormat === "aigccc"', "视频服务必须按 apiFormat=aigccc 分发（先于 seedance 启发式）。");
 assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", 'value: "aigccc"', "后台凭证表单必须提供 Aigccc 预设。");
+assertIncludes("src/app/(user)/admin/credential-capability-editor.tsx", "supportsCapability", "能力编辑器必须阻止未知模型名被默认标成图片能力（文本模型误开开关会跑到图片列表，画布 Agent 选不到）。");
 
 if (failures.length) {
     console.error("Regression guards failed:");

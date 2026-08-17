@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Switch } from "antd";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
-import { DEFAULT_IMAGE_CAPABILITY, defaultCapabilityForModel, type ModelCapabilitySpec } from "@/lib/model-capability-spec";
+import { defaultCapabilityForModel, type ModelCapabilitySpec } from "@/lib/model-capability-spec";
 import { ModelCapabilityFields } from "./model-capability-fields";
 
 /** 模型名 → 能力标定；undefined = 未启用（前端按内置默认） */
@@ -17,8 +17,9 @@ type CredentialCapabilityEditorProps = {
     onChange: (next: CredentialCapabilitiesMap) => void;
 };
 
-function initialSpecForModel(model: string): ModelCapabilitySpec {
-    return defaultCapabilityForModel(model) ?? { ...DEFAULT_IMAGE_CAPABILITY };
+/** 已知模型名的默认能力；未知模型名（文本/音频等无标定参数的类型）返回 undefined = 无需标定 */
+function initialSpecForModel(model: string): ModelCapabilitySpec | undefined {
+    return defaultCapabilityForModel(model) ?? undefined;
 }
 
 /**
@@ -39,7 +40,10 @@ export function CredentialCapabilityEditor({ models, value, onChange }: Credenti
                 const enabled = Boolean(spec);
                 const open = Boolean(expanded[model]);
                 const toggle = () => setExpanded((prev) => ({ ...prev, [model]: !prev[model] }));
+                // 文本/音频等模型没有可标定参数，禁止开启能力开关（此前误开成图片能力的，允许关闭恢复）
+                const supportsCapability = Boolean(defaultCapabilityForModel(model));
                 const setEnabled = (checked: boolean) => {
+                    if (checked && !supportsCapability) return;
                     onChange({ ...value, [model]: checked ? initialSpecForModel(model) : undefined });
                     if (checked) setExpanded((prev) => ({ ...prev, [model]: true }));
                 };
@@ -55,7 +59,9 @@ export function CredentialCapabilityEditor({ models, value, onChange }: Credenti
                         </div>
                         {open ? (
                             <div className="border-t border-stone-200 px-3 py-3">
-                                {enabled ? (
+                                {!supportsCapability ? (
+                                    <div className="text-xs leading-5 text-amber-600">该模型（文本/音频等）无需能力标定，使用内置默认。请保持开关关闭；若此前误开导致被当作图片模型，关闭后即恢复文本/音频分类。</div>
+                                ) : enabled ? (
                                     <ModelCapabilityFields model={model} spec={spec as ModelCapabilitySpec} onChange={(next) => onChange({ ...value, [model]: next })} />
                                 ) : (
                                     <div className="text-xs leading-5 text-stone-400">未启用：前端使用内置默认参数。打开开关后可按前端画质 / 分辨率 / 比例标定。</div>
