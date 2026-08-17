@@ -38,7 +38,7 @@ export function getGenerationCreditsCost(kind: GenerationKind, metadata?: Genera
             return 1;
         case "text":
         case "tool":
-            // 对话/工具类暂不计积分（沿用 agent-lab / 体验官的每日配额逻辑）
+            // 对话/工具类暂不计积分（沿用 agent-lab 的每日配额逻辑）
             return 0;
         default:
             return 2;

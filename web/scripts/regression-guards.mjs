@@ -85,9 +85,7 @@ assert(
 assertNotMatches("src/app/(user)/image/page.tsx", /请升级套餐继续使用/, "image quota copy should route users to manual opening, not nonexistent online upgrade.");
 assertNotMatches("src/app/(user)/video/page.tsx", /请升级套餐继续使用/, "video quota copy should route users to manual opening, not nonexistent online upgrade.");
 assertNotMatches("src/app/(user)/canvas/[id]/canvas-client-page.tsx", /请升级套餐继续使用|申请内测或升级套餐/, "canvas quota copy should avoid misleading upgrade/beta wording.");
-assertIncludes("src/components/layout/app-top-nav.tsx", "enrichExperienceApiDraft", "experience officer must complete model grouping after parsing API config.");
-assertIncludes("src/components/layout/app-top-nav.tsx", "recommendedModelsForProvider", "experience officer should recommend provider-specific models when users omit model names.");
-assertIncludes("src/components/layout/app-top-nav.tsx", "defaultVideoModel", "experience officer should show and apply default video model configuration.");
+assertNotMatches("src/components/layout/app-top-nav.tsx", /parseApiDraft|enrichExperienceApiDraft|体验官配置渠道|ExperienceOfficerModal/, "BYOK 下线：体验官「自行填 Key」助手已移除，不应残留自行配置 API Key 的入口。");
 
 if (failures.length) {
     console.error("Regression guards failed:");
