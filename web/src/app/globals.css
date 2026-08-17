@@ -128,30 +128,6 @@
     body {
         @apply bg-background text-foreground;
     }
-    .sceneflow-top-nav,
-    .sceneflow-top-nav a,
-    .sceneflow-top-nav button {
-        color: #1f2937 !important;
-    }
-    .sceneflow-top-nav button {
-        background: #ffffff !important;
-        border-color: #e6e8ec !important;
-        box-shadow: 0 6px 14px rgba(16, 24, 40, 0.06) !important;
-    }
-    .sceneflow-top-nav .sceneflow-nav-active {
-        color: #1722b8 !important;
-    }
-    .sceneflow-top-nav .sceneflow-register-action {
-        background: #4f6bff !important;
-        color: #ffffff !important;
-        box-shadow: 0 10px 24px rgba(79, 107, 255, 0.18) !important;
-    }
-    .sceneflow-top-nav button[aria-label*="切换"] {
-        display: none !important;
-    }
-    .sceneflow-top-nav svg {
-        stroke: currentColor;
-    }
     .sceneflow-experience-modal .ant-modal-content {
         background: #ffffff !important;
         border: 1px solid #e6e8ec;
