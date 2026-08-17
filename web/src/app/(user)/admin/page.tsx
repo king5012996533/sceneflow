@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { App, Button, Empty, Input, InputNumber, Select, Switch, Tabs, Tag, Tooltip } from "antd";
-import { Ban, Boxes, CreditCard, Database, FileText, History, Settings, Shield, Users } from "lucide-react";
+import { Ban, Boxes, Coins, CreditCard, Database, FileText, History, Settings, Shield, Users } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
 import { formatCny } from "@/lib/format";
 import { useUserStore } from "@/stores/use-user-store";
 import CredentialsTab from "./credentials-tab";
+import CreditsTab from "./credits-tab";
+import CostsTab from "./costs-tab";
+import OperationConfigTab from "./operation-config-tab";
 
 type Overview = {
     users: number;
@@ -17,6 +20,9 @@ type Overview = {
     paidOrders: number;
     pendingOrders: number;
     revenue: number;
+    creditBalanceSum: number;
+    creditsConsumed: number;
+    creditsPurchased: number;
 };
 
 type AdminUser = {
@@ -301,6 +307,11 @@ export default function AdminPage() {
                     <Metric icon={CreditCard} label="已开通记录" value={overview?.paidOrders ?? "-"} />
                     <Metric icon={CreditCard} label="开通申请" value={overview?.pendingOrders ?? "-"} />
                     <Metric icon={Database} label="参考金额" value={overview ? formatCny(overview.revenue) : "-"} />
+                </div>
+                <div className="mb-4 grid gap-3 md:grid-cols-5">
+                    <Metric icon={Coins} label="积分余额合计" value={overview ? overview.creditBalanceSum.toLocaleString("zh-CN") : "-"} />
+                    <Metric icon={Coins} label="已消耗积分" value={overview ? overview.creditsConsumed.toLocaleString("zh-CN") : "-"} />
+                    <Metric icon={Coins} label="已充值积分" value={overview ? overview.creditsPurchased.toLocaleString("zh-CN") : "-"} />
                 </div>
 
                 <Tabs
@@ -623,6 +634,21 @@ export default function AdminPage() {
                             key: "credentials",
                             label: "平台密钥",
                             children: <CredentialsTab />,
+                        },
+                        {
+                            key: "credits",
+                            label: "积分管理",
+                            children: <CreditsTab />,
+                        },
+                        {
+                            key: "costs",
+                            label: "对账",
+                            children: <CostsTab />,
+                        },
+                        {
+                            key: "operation-config",
+                            label: "运营配置",
+                            children: <OperationConfigTab />,
                         },
                     ]}
                 />

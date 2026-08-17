@@ -101,4 +101,28 @@ export async function ensureDailyCreditGrant(client: Db, userId: string, dailyAm
     return grantCredits(client, userId, dailyAmount, "grant", "daily_grant", refId, "每日赠送积分");
 }
 
+/**
+ * 管理员手动调整积分（充/扣，审计用 type=adjust）。
+ * amount 为正 → 充值；为负 → 扣减（余额不足时拒绝并返回 allowed:false，不写流水）。
+ */
+export async function adjustCredits(client: Db, userId: string, amount: number, note?: string): Promise<{ allowed: boolean; balance: number }> {
+    await ensureCreditBalance(client, userId);
+    if (amount < 0) {
+        const updated = await client.creditBalance.updateMany({
+            where: { userId, balance: { gte: -amount } },
+            data: { balance: { decrement: -amount } },
+        });
+        if (!updated.count) return { allowed: false, balance: await getCreditBalance(client, userId) };
+    } else if (amount > 0) {
+        await client.creditBalance.update({ where: { userId }, data: { balance: { increment: amount } } });
+    } else {
+        return { allowed: true, balance: await getCreditBalance(client, userId) };
+    }
+    const balance = await getCreditBalance(client, userId);
+    await client.creditTransaction.create({
+        data: { userId, type: "adjust", amount, balanceAfter: balance, refType: "manual", note },
+    });
+    return { allowed: true, balance };
+}
+
 export { dailyPeriodKey };

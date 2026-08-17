@@ -10,12 +10,15 @@ export async function GET(req: NextRequest) {
         const admin = await requireAdminUser(req);
         if (!admin) return NextResponse.json({ error: "没有管理员权限" }, { status: 403 });
 
-        const [users, activeSubscriptions, paidOrders, pendingOrders, revenue] = await Promise.all([
+        const [users, activeSubscriptions, paidOrders, pendingOrders, revenue, creditBalanceSum, creditsConsumed, creditsPurchased] = await Promise.all([
             prisma.user.count(),
             prisma.subscription.count({ where: { status: "active" } }),
             prisma.order.count({ where: { status: "paid" } }),
             prisma.order.count({ where: { status: "pending" } }),
             prisma.order.aggregate({ where: { status: "paid" }, _sum: { amount: true } }),
+            prisma.creditBalance.aggregate({ _sum: { balance: true } }),
+            prisma.creditTransaction.aggregate({ where: { type: "consume" }, _sum: { amount: true } }),
+            prisma.creditTransaction.aggregate({ where: { type: "purchase" }, _sum: { amount: true } }),
         ]);
 
         return NextResponse.json({
@@ -25,6 +28,9 @@ export async function GET(req: NextRequest) {
                 paidOrders,
                 pendingOrders,
                 revenue: revenue._sum.amount || 0,
+                creditBalanceSum: creditBalanceSum._sum.balance || 0,
+                creditsConsumed: Math.abs(creditsConsumed._sum.amount || 0),
+                creditsPurchased: creditsPurchased._sum.amount || 0,
             },
         });
     } catch (error) {
