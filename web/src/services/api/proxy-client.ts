@@ -44,6 +44,28 @@ export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Pro
     return data as T;
 }
 
+/**
+ * 流式代理请求：透传上游响应流（SSE / 文本流），返回原始 Response 由调用方读取 body。
+ * 平台 Key 化后所有上游 egress 都走代理，流式对话同样由服务端注入 Key。
+ */
+export async function proxyFetchStream(options: ProxyRequestOptions): Promise<Response> {
+    const payload = JSON.stringify({ ...options, stream: true });
+    if (payload.length > PROXY_WARNING_BYTES) {
+        throw new Error(`请求内容过大：本次代理请求约 ${formatProxyBytes(payload.length)}，超过 ${formatProxyBytes(PROXY_WARNING_BYTES)}。`);
+    }
+    const res = await fetch(PROXY_PATH, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        credentials: "include",
+    });
+    if (!res.ok && !res.body) {
+        const data = await res.json().catch(() => null);
+        throw new Error(proxyErrorMessage(data) || proxyStatusMessage(res.status));
+    }
+    return res;
+}
+
 function proxyStatusMessage(status: number) {
     if (status === 413) return `请求内容过大：代理请求超过 ${formatProxyBytes(PROXY_WARNING_BYTES)}。单张参考图也可能因原图体积或 base64 编码膨胀触发限制，请压缩图片、减少参考素材，或改用公网素材 URL。`;
     if (status === 401 || status === 403) return "鉴权失败，请检查 API Key、模型权限或套餐权限。";

@@ -200,6 +200,24 @@ model ModelConfig {
   @@index([type, enabled])
 }
 
+// 平台统一管理的上游 API 密钥（BYOK → 平台 Key 化）
+// keyEnc 为 AES-256-GCM 加密后的密文，密钥在服务端 env（PLATFORM_KEY_ENCRYPTION_SECRET），永不进客户端
+model ProviderCredential {
+  id          String   @id @default(cuid())
+  name        String                         // 展示名，如 "MiniMax 生产 Key"
+  provider    String                         // minimax | seedance | openai | replicate | gemini | deepseek ...
+  baseUrl     String                         // 渠道基址（不含 /v1 之类后缀，匹配时归一化）
+  keyEnc      String                         // AES-256-GCM：base64(iv:tag:cipher)
+  models      String[]  @default([])         // 绑定的模型；空数组 = 该 provider 全部模型
+  enabled     Boolean  @default(true)
+  priority    Int      @default(0)           // 同 provider 多 Key 时的优先级（越大越优先）
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([provider, enabled])
+}
+
 model OperationConfig {
   id          String   @id @default(cuid())
   key         String   @unique

@@ -296,8 +296,8 @@ export function AppConfigModal() {
                                                 <Form.Item label="Base URL" className="mb-0">
                                                     <Input value={channel.baseUrl} onChange={(event) => updateChannelBaseUrl(channel, event.target.value)} />
                                                 </Form.Item>
-                                                <Form.Item label="API Key" className="mb-0">
-                                                    <Input.Password value={channel.apiKey} onChange={(event) => updateChannel(channel.id, { apiKey: event.target.value })} />
+                                                <Form.Item label="API Key（可选）" className="mb-0" extra="平台 Key 化后可不填：未填写时由平台统一注入密钥。" tooltip="BYOK 过渡期仍支持自带 Key；平台已配置该地址的密钥时以平台 Key 为准。">
+                                                    <Input.Password value={channel.apiKey} onChange={(event) => updateChannel(channel.id, { apiKey: event.target.value })} placeholder="留空 = 使用平台密钥" />
                                                 </Form.Item>
                                                 <Form.Item label="模型列表" className="mb-0 md:col-span-2">
                                                     <Select mode="tags" showSearch allowClear maxTagCount="responsive" placeholder="输入模型名，或点击拉取模型" value={channel.models} onChange={(models) => updateChannel(channel.id, { models })} />

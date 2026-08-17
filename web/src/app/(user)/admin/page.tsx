@@ -9,6 +9,7 @@ import { Ban, Boxes, CreditCard, Database, FileText, History, Settings, Shield, 
 import { apiPath } from "@/lib/app-paths";
 import { formatCny } from "@/lib/format";
 import { useUserStore } from "@/stores/use-user-store";
+import CredentialsTab from "./credentials-tab";
 
 type Overview = {
     users: number;
@@ -617,6 +618,11 @@ export default function AdminPage() {
                                     </section>
                                 </div>
                             ),
+                        },
+                        {
+                            key: "credentials",
+                            label: "平台密钥",
+                            children: <CredentialsTab />,
                         },
                     ]}
                 />

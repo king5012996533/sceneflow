@@ -98,17 +98,32 @@ export async function storeGeneratedVideo(result: VideoGenerationResult): Promis
 }
 
 async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<VideoGenerationTask> {
-    const body = new FormData();
-    body.append("model", modelOptionName(model));
-    body.append("prompt", prompt);
-    body.append("seconds", normalizeVideoSeconds(config.videoSeconds));
-    if (normalizeVideoSize(config.size)) body.append("size", normalizeVideoSize(config.size)!);
-    body.append("resolution_name", normalizeVideoResolution(config.vquality));
-    body.append("preset", "normal");
+    const formData = new FormData();
+    formData.set("model", modelOptionName(model));
+    formData.set("prompt", prompt);
+    formData.set("seconds", normalizeVideoSeconds(config.videoSeconds));
+    if (normalizeVideoSize(config.size)) formData.set("size", normalizeVideoSize(config.size)!);
+    formData.set("resolution_name", normalizeVideoResolution(config.vquality));
+    formData.set("preset", "normal");
     const files = await Promise.all(references.slice(0, 7).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
-    files.forEach((file) => body.append("input_reference[]", file));
+    files.forEach((file) => formData.append("input_reference[]", file));
     try {
-        const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), body, { headers: aiHeaders(config), signal: options?.signal })).data);
+        // OpenAI 视频接口是 multipart/form-data，走 form-data 代理（平台 Key 由服务端注入）
+        formData.set("_proxy_url", aiApiUrl(config, "/videos"));
+        formData.set("_proxy_method", "POST");
+        formData.set("_proxy_headers", JSON.stringify(aiHeaders(config)));
+        const response = await fetch("/canvas/api/proxy/form-data", {
+            method: "POST",
+            body: formData,
+            credentials: "include",
+            signal: options?.signal,
+        });
+        const data = (await response.json().catch(() => null)) as ApiVideoResponse | null;
+        if (!response.ok) {
+            const payload = (data ?? {}) as { error?: { message?: string }; msg?: string };
+            throw new Error(normalizeUpstreamError(payload.msg || payload.error?.message || statusMessage(response.status, "视频任务创建失败")));
+        }
+        const created = unwrapVideoResponse(data ?? {});
         if (!created.id) throw new Error("视频接口没有返回任务 ID");
         return { id: created.id, provider: "openai", model };
     } catch (error) {
@@ -118,11 +133,11 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
 
 async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     try {
-        const video = unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${task.id}`), { headers: aiHeaders(config), signal: options?.signal })).data);
+        const video = unwrapVideoResponse(await proxyFetch<ApiVideoResponse>({ url: aiApiUrl(config, `/videos/${task.id}`), method: "GET", headers: aiHeaders(config) }));
         if (video.status === "completed") {
-            const content = await axios.get<Blob>(aiApiUrl(config, `/videos/${task.id}/content`), { headers: aiHeaders(config), responseType: "blob", signal: options?.signal });
-            await assertVideoBlob(content.data);
-            return { status: "completed", result: { blob: content.data } };
+            const blob = await proxyFetch<Blob>({ url: aiApiUrl(config, `/videos/${task.id}/content`), method: "GET", headers: aiHeaders(config), responseType: "blob" });
+            await assertVideoBlob(blob);
+            return { status: "completed", result: { blob } };
         }
         if (video.status === "failed" || video.status === "cancelled") return { status: "failed", error: video.error?.message || "视频生成失败" };
         return { status: "pending" };
@@ -647,7 +662,7 @@ async function videoResultFromUrl(url: string, options?: RequestOptions): Promis
 function assertVideoConfig(config: AiConfig, model: string) {
     if (!model) throw new Error("请先配置视频模型");
     if (!config.baseUrl.trim()) throw new Error("请先配置 Base URL");
-    if (!config.apiKey.trim()) throw new Error("请先配置 API Key");
+    // 平台 Key 化后不再要求客户端配置 API Key（Key 由服务端注入）
     if (config.apiFormat === "gemini") throw new Error("Gemini 调用格式暂不支持视频生成，请使用 OpenAI 格式渠道");
 }
 

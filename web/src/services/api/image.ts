@@ -6,7 +6,7 @@ import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
-import { proxyFetch } from "./proxy-client";
+import { proxyFetch, proxyFetchStream } from "./proxy-client";
 
 export type AiTextMessage = {
     role: "system" | "user" | "assistant";
@@ -563,11 +563,12 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
         }));
     }
 
-    const response = await fetch(aiApiUrl(config, "/chat/completions"), {
+    // 平台 Key 化后所有上游 egress 走代理：流式对话由代理透传 + 服务端注入 Key
+    const response = await proxyFetchStream({
+        url: aiApiUrl(config, "/chat/completions"),
         method: "POST",
         headers: { ...aiHeaders(config, "application/json"), Accept: "text/event-stream" },
-        body: JSON.stringify(chatBody),
-        signal: options?.signal,
+        body: chatBody,
     });
     if (!response.ok) throw new Error(await readFetchError(response, "请求失败"));
     if (!response.body) {
@@ -708,11 +709,11 @@ function toGeminiToolOptions(tools: ResponseFunctionTool[], toolChoice: ToolChoi
 }
 
 async function requestGeminiStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
-    const response = await fetch(`${geminiApiUrl(config, "streamGenerateContent")}?alt=sse`, {
+    const response = await proxyFetchStream({
+        url: `${geminiApiUrl(config, "streamGenerateContent")}?alt=sse`,
         method: "POST",
         headers: geminiHeaders(config),
-        body: JSON.stringify(body),
-        signal: options?.signal,
+        body,
     });
     if (!response.ok) throw new Error(await readFetchError(response, "请求失败"));
     if (!response.body) {
@@ -798,15 +799,16 @@ async function requestGeminiImagesOnce(config: AiConfig, prompt: string, referen
     for (const image of references) {
         parts.push(toGeminiImagePart(await imageToDataUrl(image)));
     }
-    const response = await axios.post<GeminiPayload>(
-        geminiApiUrl(config, "generateContent"),
-        {
+    const payload = await proxyFetch<GeminiPayload>({
+        url: geminiApiUrl(config, "generateContent"),
+        method: "POST",
+        headers: geminiHeaders(config),
+        body: {
             ...toGeminiBody(config, [{ role: "user", content: prompt }], { generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }),
             contents: [{ role: "user", parts }],
         },
-        { headers: geminiHeaders(config), signal: options?.signal },
-    );
-    return parseGeminiImagePayload(response.data);
+    });
+    return parseGeminiImagePayload(payload);
 }
 
 function parseGeminiImagePayload(payload: GeminiPayload) {
@@ -855,9 +857,11 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
         }
     }
     try {
-        const response = await axios.post<ImageApiResponse>(
-            aiApiUrl(requestConfig, "/images/generations"),
-            {
+        const payload = await proxyFetch<ImageApiResponse>({
+            url: aiApiUrl(requestConfig, "/images/generations"),
+            method: "POST",
+            headers: aiHeaders(requestConfig, "application/json"),
+            body: {
                 model: requestConfig.model,
                 prompt: withSystemPrompt(requestConfig, requestPrompt),
                 n,
@@ -866,13 +870,8 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 ...(isOpenAiApi(requestConfig) ? { response_format: "b64_json" } : {}),
                 ...(isOpenAiApi(requestConfig) ? { output_format: IMAGE_OUTPUT_FORMAT } : {}),
             },
-            {
-                headers: aiHeaders(requestConfig, "application/json"),
-                signal: options?.signal,
-            },
-        );
-        const images = parseImagePayload(response.data);
-        return images;
+        });
+        return parseImagePayload(payload);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
     }
@@ -991,9 +990,13 @@ export async function requestToolResponse(config: AiConfig, messages: ResponseIn
 export async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKey" | "apiFormat">) {
     try {
         if (config.apiFormat === "gemini") {
-            const response = await axios.get<GeminiPayload>(geminiApiUrl({ ...defaultGeminiConfig, ...config }), { headers: geminiHeaders({ ...defaultGeminiConfig, ...config }) });
-            validateGeminiPayload(response.data);
-            return (response.data.models || [])
+            const payload = await proxyFetch<GeminiPayload>({
+                url: geminiApiUrl({ ...defaultGeminiConfig, ...config }),
+                method: "GET",
+                headers: geminiHeaders({ ...defaultGeminiConfig, ...config }),
+            });
+            validateGeminiPayload(payload);
+            return (payload.models || [])
                 .map((model) => model.name?.replace(/^models\//, ""))
                 .filter((id): id is string => Boolean(id))
                 .sort((a, b) => a.localeCompare(b));

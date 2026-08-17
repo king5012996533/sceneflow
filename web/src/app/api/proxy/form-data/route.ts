@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
+import { resolvePlatformCredential } from "@/lib/credential-store.server";
+import { getOperationFlag } from "@/lib/operation-config";
 import FormData from "form-data";
 
 export const runtime = "nodejs";
@@ -9,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 const MAX_PROXY_REQUEST_BYTES = 16 * 1024 * 1024;
 const PROXY_TIMEOUT_MS = 120_000;
-const ALLOWED_HEADER_NAMES = new Set(["authorization", "accept", "x-api-key", "x-request-id"]);
+const ALLOWED_HEADER_NAMES = new Set(["authorization", "accept", "x-api-key", "x-request-id", "x-sf-provider", "x-sf-model"]);
 
 export async function POST(req: NextRequest) {
     const user = await requireCurrentUser(req);
@@ -24,21 +26,31 @@ export async function POST(req: NextRequest) {
         const method = sanitizeMethod(incoming.get("_proxy_method") || "POST");
         const safeHeaders = sanitizeHeaders(parseHeaders(incoming.get("_proxy_headers")));
 
-        // 优先从数据库读取用户的 API Key；数据库不可用或没存时回退到请求头自带的 Key
-        let apiKey = "";
-        try {
-            if (prisma) {
-                const config = await prisma.userConfig.findUnique({ where: { userId: user.id } });
-                if (config?.config && typeof config.config === "object") {
-                    const cfg = config.config as Record<string, unknown>;
-                    apiKey = String(cfg.apiKey || "");
+        // 平台凭证优先（按目标 host + 可选 provider/model 匹配）；无平台凭证且 BYOK 开关打开时，
+        // 回退用户 DB 默认 Key 或请求头自带的 Key（过渡期逻辑，最终移除）
+        const sfProvider = typeof safeHeaders["x-sf-provider"] === "string" ? safeHeaders["x-sf-provider"] : undefined;
+        const sfModel = typeof safeHeaders["x-sf-model"] === "string" ? safeHeaders["x-sf-model"] : undefined;
+        const platformCred = await resolvePlatformCredential({ targetUrl: target.toString(), provider: sfProvider, model: sfModel });
+
+        if (platformCred) {
+            safeHeaders["authorization"] = `Bearer ${platformCred.apiKey}`;
+            console.log(`[proxy/form-data] key-source=platform target=${target.hostname}`);
+        } else if (await getOperationFlag("byok_enabled", true)) {
+            let apiKey = "";
+            try {
+                if (prisma) {
+                    const config = await prisma.userConfig.findUnique({ where: { userId: user.id } });
+                    if (config?.config && typeof config.config === "object") {
+                        const cfg = config.config as Record<string, unknown>;
+                        apiKey = String(cfg.apiKey || "");
+                    }
                 }
+            } catch (dbErr) {
+                console.warn("[proxy/form-data] DB key 读取失败，回退请求头 Key:", (dbErr as Error)?.message);
             }
-        } catch (dbErr) {
-            console.warn("[proxy/form-data] DB key 读取失败，回退请求头 Key:", (dbErr as Error)?.message);
+            if (apiKey) safeHeaders["authorization"] = `Bearer ${apiKey}`;
+            // DB 无 key 时：保留请求头自带的 key，不再删掉导致 502
         }
-        if (apiKey) safeHeaders["authorization"] = `Bearer ${apiKey}`;
-        // DB 无 key 时：保留请求头自带的 key，不再删掉导致 502
 
         // 使用 form-data 包构建 multipart body
         const form = new FormData();

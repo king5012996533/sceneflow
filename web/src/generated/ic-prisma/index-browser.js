@@ -266,6 +266,20 @@ exports.Prisma.ModelConfigScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.ProviderCredentialScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  provider: 'provider',
+  baseUrl: 'baseUrl',
+  keyEnc: 'keyEnc',
+  models: 'models',
+  enabled: 'enabled',
+  priority: 'priority',
+  createdById: 'createdById',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.OperationConfigScalarFieldEnum = {
   id: 'id',
   key: 'key',
@@ -345,6 +359,7 @@ exports.Prisma.ModelName = {
   PaymentEvent: 'PaymentEvent',
   AdminAuditLog: 'AdminAuditLog',
   ModelConfig: 'ModelConfig',
+  ProviderCredential: 'ProviderCredential',
   OperationConfig: 'OperationConfig',
   VerificationCode: 'VerificationCode',
   CanvasBackup: 'CanvasBackup',

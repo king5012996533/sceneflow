@@ -69,6 +69,11 @@ export type AdminAuditLog = $Result.DefaultSelection<Prisma.$AdminAuditLogPayloa
  */
 export type ModelConfig = $Result.DefaultSelection<Prisma.$ModelConfigPayload>
 /**
+ * Model ProviderCredential
+ * 
+ */
+export type ProviderCredential = $Result.DefaultSelection<Prisma.$ProviderCredentialPayload>
+/**
  * Model OperationConfig
  * 
  */
@@ -319,6 +324,16 @@ export class PrismaClient<
     * ```
     */
   get modelConfig(): Prisma.ModelConfigDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.providerCredential`: Exposes CRUD operations for the **ProviderCredential** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ProviderCredentials
+    * const providerCredentials = await prisma.providerCredential.findMany()
+    * ```
+    */
+  get providerCredential(): Prisma.ProviderCredentialDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.operationConfig`: Exposes CRUD operations for the **OperationConfig** model.
@@ -804,6 +819,7 @@ export namespace Prisma {
     PaymentEvent: 'PaymentEvent',
     AdminAuditLog: 'AdminAuditLog',
     ModelConfig: 'ModelConfig',
+    ProviderCredential: 'ProviderCredential',
     OperationConfig: 'OperationConfig',
     VerificationCode: 'VerificationCode',
     CanvasBackup: 'CanvasBackup',
@@ -823,7 +839,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "userConfig" | "plan" | "entitlement" | "subscription" | "usageRecord" | "generationJob" | "order" | "paymentEvent" | "adminAuditLog" | "modelConfig" | "operationConfig" | "verificationCode" | "canvasBackup" | "rateLimitEntry"
+      modelProps: "user" | "userConfig" | "plan" | "entitlement" | "subscription" | "usageRecord" | "generationJob" | "order" | "paymentEvent" | "adminAuditLog" | "modelConfig" | "providerCredential" | "operationConfig" | "verificationCode" | "canvasBackup" | "rateLimitEntry"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1641,6 +1657,80 @@ export namespace Prisma {
           }
         }
       }
+      ProviderCredential: {
+        payload: Prisma.$ProviderCredentialPayload<ExtArgs>
+        fields: Prisma.ProviderCredentialFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ProviderCredentialFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ProviderCredentialFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload>
+          }
+          findFirst: {
+            args: Prisma.ProviderCredentialFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ProviderCredentialFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload>
+          }
+          findMany: {
+            args: Prisma.ProviderCredentialFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload>[]
+          }
+          create: {
+            args: Prisma.ProviderCredentialCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload>
+          }
+          createMany: {
+            args: Prisma.ProviderCredentialCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ProviderCredentialCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload>[]
+          }
+          delete: {
+            args: Prisma.ProviderCredentialDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload>
+          }
+          update: {
+            args: Prisma.ProviderCredentialUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload>
+          }
+          deleteMany: {
+            args: Prisma.ProviderCredentialDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ProviderCredentialUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ProviderCredentialUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload>[]
+          }
+          upsert: {
+            args: Prisma.ProviderCredentialUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ProviderCredentialPayload>
+          }
+          aggregate: {
+            args: Prisma.ProviderCredentialAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateProviderCredential>
+          }
+          groupBy: {
+            args: Prisma.ProviderCredentialGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ProviderCredentialGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ProviderCredentialCountArgs<ExtArgs>
+            result: $Utils.Optional<ProviderCredentialCountAggregateOutputType> | number
+          }
+        }
+      }
       OperationConfig: {
         payload: Prisma.$OperationConfigPayload<ExtArgs>
         fields: Prisma.OperationConfigFieldRefs
@@ -2056,6 +2146,7 @@ export namespace Prisma {
     paymentEvent?: PaymentEventOmit
     adminAuditLog?: AdminAuditLogOmit
     modelConfig?: ModelConfigOmit
+    providerCredential?: ProviderCredentialOmit
     operationConfig?: OperationConfigOmit
     verificationCode?: VerificationCodeOmit
     canvasBackup?: CanvasBackupOmit
@@ -15094,6 +15185,1114 @@ export namespace Prisma {
 
 
   /**
+   * Model ProviderCredential
+   */
+
+  export type AggregateProviderCredential = {
+    _count: ProviderCredentialCountAggregateOutputType | null
+    _avg: ProviderCredentialAvgAggregateOutputType | null
+    _sum: ProviderCredentialSumAggregateOutputType | null
+    _min: ProviderCredentialMinAggregateOutputType | null
+    _max: ProviderCredentialMaxAggregateOutputType | null
+  }
+
+  export type ProviderCredentialAvgAggregateOutputType = {
+    priority: number | null
+  }
+
+  export type ProviderCredentialSumAggregateOutputType = {
+    priority: number | null
+  }
+
+  export type ProviderCredentialMinAggregateOutputType = {
+    id: string | null
+    name: string | null
+    provider: string | null
+    baseUrl: string | null
+    keyEnc: string | null
+    enabled: boolean | null
+    priority: number | null
+    createdById: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ProviderCredentialMaxAggregateOutputType = {
+    id: string | null
+    name: string | null
+    provider: string | null
+    baseUrl: string | null
+    keyEnc: string | null
+    enabled: boolean | null
+    priority: number | null
+    createdById: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ProviderCredentialCountAggregateOutputType = {
+    id: number
+    name: number
+    provider: number
+    baseUrl: number
+    keyEnc: number
+    models: number
+    enabled: number
+    priority: number
+    createdById: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ProviderCredentialAvgAggregateInputType = {
+    priority?: true
+  }
+
+  export type ProviderCredentialSumAggregateInputType = {
+    priority?: true
+  }
+
+  export type ProviderCredentialMinAggregateInputType = {
+    id?: true
+    name?: true
+    provider?: true
+    baseUrl?: true
+    keyEnc?: true
+    enabled?: true
+    priority?: true
+    createdById?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ProviderCredentialMaxAggregateInputType = {
+    id?: true
+    name?: true
+    provider?: true
+    baseUrl?: true
+    keyEnc?: true
+    enabled?: true
+    priority?: true
+    createdById?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ProviderCredentialCountAggregateInputType = {
+    id?: true
+    name?: true
+    provider?: true
+    baseUrl?: true
+    keyEnc?: true
+    models?: true
+    enabled?: true
+    priority?: true
+    createdById?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ProviderCredentialAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ProviderCredential to aggregate.
+     */
+    where?: ProviderCredentialWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ProviderCredentials to fetch.
+     */
+    orderBy?: ProviderCredentialOrderByWithRelationInput | ProviderCredentialOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ProviderCredentialWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ProviderCredentials from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ProviderCredentials.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ProviderCredentials
+    **/
+    _count?: true | ProviderCredentialCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: ProviderCredentialAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: ProviderCredentialSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ProviderCredentialMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ProviderCredentialMaxAggregateInputType
+  }
+
+  export type GetProviderCredentialAggregateType<T extends ProviderCredentialAggregateArgs> = {
+        [P in keyof T & keyof AggregateProviderCredential]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateProviderCredential[P]>
+      : GetScalarType<T[P], AggregateProviderCredential[P]>
+  }
+
+
+
+
+  export type ProviderCredentialGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ProviderCredentialWhereInput
+    orderBy?: ProviderCredentialOrderByWithAggregationInput | ProviderCredentialOrderByWithAggregationInput[]
+    by: ProviderCredentialScalarFieldEnum[] | ProviderCredentialScalarFieldEnum
+    having?: ProviderCredentialScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ProviderCredentialCountAggregateInputType | true
+    _avg?: ProviderCredentialAvgAggregateInputType
+    _sum?: ProviderCredentialSumAggregateInputType
+    _min?: ProviderCredentialMinAggregateInputType
+    _max?: ProviderCredentialMaxAggregateInputType
+  }
+
+  export type ProviderCredentialGroupByOutputType = {
+    id: string
+    name: string
+    provider: string
+    baseUrl: string
+    keyEnc: string
+    models: string[]
+    enabled: boolean
+    priority: number
+    createdById: string | null
+    createdAt: Date
+    updatedAt: Date
+    _count: ProviderCredentialCountAggregateOutputType | null
+    _avg: ProviderCredentialAvgAggregateOutputType | null
+    _sum: ProviderCredentialSumAggregateOutputType | null
+    _min: ProviderCredentialMinAggregateOutputType | null
+    _max: ProviderCredentialMaxAggregateOutputType | null
+  }
+
+  type GetProviderCredentialGroupByPayload<T extends ProviderCredentialGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ProviderCredentialGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ProviderCredentialGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ProviderCredentialGroupByOutputType[P]>
+            : GetScalarType<T[P], ProviderCredentialGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ProviderCredentialSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    provider?: boolean
+    baseUrl?: boolean
+    keyEnc?: boolean
+    models?: boolean
+    enabled?: boolean
+    priority?: boolean
+    createdById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["providerCredential"]>
+
+  export type ProviderCredentialSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    provider?: boolean
+    baseUrl?: boolean
+    keyEnc?: boolean
+    models?: boolean
+    enabled?: boolean
+    priority?: boolean
+    createdById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["providerCredential"]>
+
+  export type ProviderCredentialSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    provider?: boolean
+    baseUrl?: boolean
+    keyEnc?: boolean
+    models?: boolean
+    enabled?: boolean
+    priority?: boolean
+    createdById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }, ExtArgs["result"]["providerCredential"]>
+
+  export type ProviderCredentialSelectScalar = {
+    id?: boolean
+    name?: boolean
+    provider?: boolean
+    baseUrl?: boolean
+    keyEnc?: boolean
+    models?: boolean
+    enabled?: boolean
+    priority?: boolean
+    createdById?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ProviderCredentialOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "provider" | "baseUrl" | "keyEnc" | "models" | "enabled" | "priority" | "createdById" | "createdAt" | "updatedAt", ExtArgs["result"]["providerCredential"]>
+
+  export type $ProviderCredentialPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ProviderCredential"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      name: string
+      provider: string
+      baseUrl: string
+      keyEnc: string
+      models: string[]
+      enabled: boolean
+      priority: number
+      createdById: string | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["providerCredential"]>
+    composites: {}
+  }
+
+  type ProviderCredentialGetPayload<S extends boolean | null | undefined | ProviderCredentialDefaultArgs> = $Result.GetResult<Prisma.$ProviderCredentialPayload, S>
+
+  type ProviderCredentialCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ProviderCredentialFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ProviderCredentialCountAggregateInputType | true
+    }
+
+  export interface ProviderCredentialDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ProviderCredential'], meta: { name: 'ProviderCredential' } }
+    /**
+     * Find zero or one ProviderCredential that matches the filter.
+     * @param {ProviderCredentialFindUniqueArgs} args - Arguments to find a ProviderCredential
+     * @example
+     * // Get one ProviderCredential
+     * const providerCredential = await prisma.providerCredential.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ProviderCredentialFindUniqueArgs>(args: SelectSubset<T, ProviderCredentialFindUniqueArgs<ExtArgs>>): Prisma__ProviderCredentialClient<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ProviderCredential that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ProviderCredentialFindUniqueOrThrowArgs} args - Arguments to find a ProviderCredential
+     * @example
+     * // Get one ProviderCredential
+     * const providerCredential = await prisma.providerCredential.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ProviderCredentialFindUniqueOrThrowArgs>(args: SelectSubset<T, ProviderCredentialFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ProviderCredentialClient<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ProviderCredential that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProviderCredentialFindFirstArgs} args - Arguments to find a ProviderCredential
+     * @example
+     * // Get one ProviderCredential
+     * const providerCredential = await prisma.providerCredential.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ProviderCredentialFindFirstArgs>(args?: SelectSubset<T, ProviderCredentialFindFirstArgs<ExtArgs>>): Prisma__ProviderCredentialClient<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ProviderCredential that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProviderCredentialFindFirstOrThrowArgs} args - Arguments to find a ProviderCredential
+     * @example
+     * // Get one ProviderCredential
+     * const providerCredential = await prisma.providerCredential.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ProviderCredentialFindFirstOrThrowArgs>(args?: SelectSubset<T, ProviderCredentialFindFirstOrThrowArgs<ExtArgs>>): Prisma__ProviderCredentialClient<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ProviderCredentials that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProviderCredentialFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ProviderCredentials
+     * const providerCredentials = await prisma.providerCredential.findMany()
+     * 
+     * // Get first 10 ProviderCredentials
+     * const providerCredentials = await prisma.providerCredential.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const providerCredentialWithIdOnly = await prisma.providerCredential.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ProviderCredentialFindManyArgs>(args?: SelectSubset<T, ProviderCredentialFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ProviderCredential.
+     * @param {ProviderCredentialCreateArgs} args - Arguments to create a ProviderCredential.
+     * @example
+     * // Create one ProviderCredential
+     * const ProviderCredential = await prisma.providerCredential.create({
+     *   data: {
+     *     // ... data to create a ProviderCredential
+     *   }
+     * })
+     * 
+     */
+    create<T extends ProviderCredentialCreateArgs>(args: SelectSubset<T, ProviderCredentialCreateArgs<ExtArgs>>): Prisma__ProviderCredentialClient<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ProviderCredentials.
+     * @param {ProviderCredentialCreateManyArgs} args - Arguments to create many ProviderCredentials.
+     * @example
+     * // Create many ProviderCredentials
+     * const providerCredential = await prisma.providerCredential.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ProviderCredentialCreateManyArgs>(args?: SelectSubset<T, ProviderCredentialCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ProviderCredentials and returns the data saved in the database.
+     * @param {ProviderCredentialCreateManyAndReturnArgs} args - Arguments to create many ProviderCredentials.
+     * @example
+     * // Create many ProviderCredentials
+     * const providerCredential = await prisma.providerCredential.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ProviderCredentials and only return the `id`
+     * const providerCredentialWithIdOnly = await prisma.providerCredential.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ProviderCredentialCreateManyAndReturnArgs>(args?: SelectSubset<T, ProviderCredentialCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ProviderCredential.
+     * @param {ProviderCredentialDeleteArgs} args - Arguments to delete one ProviderCredential.
+     * @example
+     * // Delete one ProviderCredential
+     * const ProviderCredential = await prisma.providerCredential.delete({
+     *   where: {
+     *     // ... filter to delete one ProviderCredential
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ProviderCredentialDeleteArgs>(args: SelectSubset<T, ProviderCredentialDeleteArgs<ExtArgs>>): Prisma__ProviderCredentialClient<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ProviderCredential.
+     * @param {ProviderCredentialUpdateArgs} args - Arguments to update one ProviderCredential.
+     * @example
+     * // Update one ProviderCredential
+     * const providerCredential = await prisma.providerCredential.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ProviderCredentialUpdateArgs>(args: SelectSubset<T, ProviderCredentialUpdateArgs<ExtArgs>>): Prisma__ProviderCredentialClient<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ProviderCredentials.
+     * @param {ProviderCredentialDeleteManyArgs} args - Arguments to filter ProviderCredentials to delete.
+     * @example
+     * // Delete a few ProviderCredentials
+     * const { count } = await prisma.providerCredential.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ProviderCredentialDeleteManyArgs>(args?: SelectSubset<T, ProviderCredentialDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ProviderCredentials.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProviderCredentialUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ProviderCredentials
+     * const providerCredential = await prisma.providerCredential.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ProviderCredentialUpdateManyArgs>(args: SelectSubset<T, ProviderCredentialUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ProviderCredentials and returns the data updated in the database.
+     * @param {ProviderCredentialUpdateManyAndReturnArgs} args - Arguments to update many ProviderCredentials.
+     * @example
+     * // Update many ProviderCredentials
+     * const providerCredential = await prisma.providerCredential.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ProviderCredentials and only return the `id`
+     * const providerCredentialWithIdOnly = await prisma.providerCredential.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ProviderCredentialUpdateManyAndReturnArgs>(args: SelectSubset<T, ProviderCredentialUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ProviderCredential.
+     * @param {ProviderCredentialUpsertArgs} args - Arguments to update or create a ProviderCredential.
+     * @example
+     * // Update or create a ProviderCredential
+     * const providerCredential = await prisma.providerCredential.upsert({
+     *   create: {
+     *     // ... data to create a ProviderCredential
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ProviderCredential we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ProviderCredentialUpsertArgs>(args: SelectSubset<T, ProviderCredentialUpsertArgs<ExtArgs>>): Prisma__ProviderCredentialClient<$Result.GetResult<Prisma.$ProviderCredentialPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ProviderCredentials.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProviderCredentialCountArgs} args - Arguments to filter ProviderCredentials to count.
+     * @example
+     * // Count the number of ProviderCredentials
+     * const count = await prisma.providerCredential.count({
+     *   where: {
+     *     // ... the filter for the ProviderCredentials we want to count
+     *   }
+     * })
+    **/
+    count<T extends ProviderCredentialCountArgs>(
+      args?: Subset<T, ProviderCredentialCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ProviderCredentialCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ProviderCredential.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProviderCredentialAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ProviderCredentialAggregateArgs>(args: Subset<T, ProviderCredentialAggregateArgs>): Prisma.PrismaPromise<GetProviderCredentialAggregateType<T>>
+
+    /**
+     * Group by ProviderCredential.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ProviderCredentialGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ProviderCredentialGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ProviderCredentialGroupByArgs['orderBy'] }
+        : { orderBy?: ProviderCredentialGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ProviderCredentialGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetProviderCredentialGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ProviderCredential model
+   */
+  readonly fields: ProviderCredentialFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ProviderCredential.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ProviderCredentialClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ProviderCredential model
+   */
+  interface ProviderCredentialFieldRefs {
+    readonly id: FieldRef<"ProviderCredential", 'String'>
+    readonly name: FieldRef<"ProviderCredential", 'String'>
+    readonly provider: FieldRef<"ProviderCredential", 'String'>
+    readonly baseUrl: FieldRef<"ProviderCredential", 'String'>
+    readonly keyEnc: FieldRef<"ProviderCredential", 'String'>
+    readonly models: FieldRef<"ProviderCredential", 'String[]'>
+    readonly enabled: FieldRef<"ProviderCredential", 'Boolean'>
+    readonly priority: FieldRef<"ProviderCredential", 'Int'>
+    readonly createdById: FieldRef<"ProviderCredential", 'String'>
+    readonly createdAt: FieldRef<"ProviderCredential", 'DateTime'>
+    readonly updatedAt: FieldRef<"ProviderCredential", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ProviderCredential findUnique
+   */
+  export type ProviderCredentialFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * Filter, which ProviderCredential to fetch.
+     */
+    where: ProviderCredentialWhereUniqueInput
+  }
+
+  /**
+   * ProviderCredential findUniqueOrThrow
+   */
+  export type ProviderCredentialFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * Filter, which ProviderCredential to fetch.
+     */
+    where: ProviderCredentialWhereUniqueInput
+  }
+
+  /**
+   * ProviderCredential findFirst
+   */
+  export type ProviderCredentialFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * Filter, which ProviderCredential to fetch.
+     */
+    where?: ProviderCredentialWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ProviderCredentials to fetch.
+     */
+    orderBy?: ProviderCredentialOrderByWithRelationInput | ProviderCredentialOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ProviderCredentials.
+     */
+    cursor?: ProviderCredentialWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ProviderCredentials from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ProviderCredentials.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ProviderCredentials.
+     */
+    distinct?: ProviderCredentialScalarFieldEnum | ProviderCredentialScalarFieldEnum[]
+  }
+
+  /**
+   * ProviderCredential findFirstOrThrow
+   */
+  export type ProviderCredentialFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * Filter, which ProviderCredential to fetch.
+     */
+    where?: ProviderCredentialWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ProviderCredentials to fetch.
+     */
+    orderBy?: ProviderCredentialOrderByWithRelationInput | ProviderCredentialOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ProviderCredentials.
+     */
+    cursor?: ProviderCredentialWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ProviderCredentials from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ProviderCredentials.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ProviderCredentials.
+     */
+    distinct?: ProviderCredentialScalarFieldEnum | ProviderCredentialScalarFieldEnum[]
+  }
+
+  /**
+   * ProviderCredential findMany
+   */
+  export type ProviderCredentialFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * Filter, which ProviderCredentials to fetch.
+     */
+    where?: ProviderCredentialWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ProviderCredentials to fetch.
+     */
+    orderBy?: ProviderCredentialOrderByWithRelationInput | ProviderCredentialOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ProviderCredentials.
+     */
+    cursor?: ProviderCredentialWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ProviderCredentials from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ProviderCredentials.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ProviderCredentials.
+     */
+    distinct?: ProviderCredentialScalarFieldEnum | ProviderCredentialScalarFieldEnum[]
+  }
+
+  /**
+   * ProviderCredential create
+   */
+  export type ProviderCredentialCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * The data needed to create a ProviderCredential.
+     */
+    data: XOR<ProviderCredentialCreateInput, ProviderCredentialUncheckedCreateInput>
+  }
+
+  /**
+   * ProviderCredential createMany
+   */
+  export type ProviderCredentialCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ProviderCredentials.
+     */
+    data: ProviderCredentialCreateManyInput | ProviderCredentialCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ProviderCredential createManyAndReturn
+   */
+  export type ProviderCredentialCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * The data used to create many ProviderCredentials.
+     */
+    data: ProviderCredentialCreateManyInput | ProviderCredentialCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ProviderCredential update
+   */
+  export type ProviderCredentialUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * The data needed to update a ProviderCredential.
+     */
+    data: XOR<ProviderCredentialUpdateInput, ProviderCredentialUncheckedUpdateInput>
+    /**
+     * Choose, which ProviderCredential to update.
+     */
+    where: ProviderCredentialWhereUniqueInput
+  }
+
+  /**
+   * ProviderCredential updateMany
+   */
+  export type ProviderCredentialUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ProviderCredentials.
+     */
+    data: XOR<ProviderCredentialUpdateManyMutationInput, ProviderCredentialUncheckedUpdateManyInput>
+    /**
+     * Filter which ProviderCredentials to update
+     */
+    where?: ProviderCredentialWhereInput
+    /**
+     * Limit how many ProviderCredentials to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ProviderCredential updateManyAndReturn
+   */
+  export type ProviderCredentialUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * The data used to update ProviderCredentials.
+     */
+    data: XOR<ProviderCredentialUpdateManyMutationInput, ProviderCredentialUncheckedUpdateManyInput>
+    /**
+     * Filter which ProviderCredentials to update
+     */
+    where?: ProviderCredentialWhereInput
+    /**
+     * Limit how many ProviderCredentials to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ProviderCredential upsert
+   */
+  export type ProviderCredentialUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * The filter to search for the ProviderCredential to update in case it exists.
+     */
+    where: ProviderCredentialWhereUniqueInput
+    /**
+     * In case the ProviderCredential found by the `where` argument doesn't exist, create a new ProviderCredential with this data.
+     */
+    create: XOR<ProviderCredentialCreateInput, ProviderCredentialUncheckedCreateInput>
+    /**
+     * In case the ProviderCredential was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ProviderCredentialUpdateInput, ProviderCredentialUncheckedUpdateInput>
+  }
+
+  /**
+   * ProviderCredential delete
+   */
+  export type ProviderCredentialDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+    /**
+     * Filter which ProviderCredential to delete.
+     */
+    where: ProviderCredentialWhereUniqueInput
+  }
+
+  /**
+   * ProviderCredential deleteMany
+   */
+  export type ProviderCredentialDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ProviderCredentials to delete
+     */
+    where?: ProviderCredentialWhereInput
+    /**
+     * Limit how many ProviderCredentials to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ProviderCredential without action
+   */
+  export type ProviderCredentialDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ProviderCredential
+     */
+    select?: ProviderCredentialSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ProviderCredential
+     */
+    omit?: ProviderCredentialOmit<ExtArgs> | null
+  }
+
+
+  /**
    * Model OperationConfig
    */
 
@@ -19398,6 +20597,23 @@ export namespace Prisma {
   export type ModelConfigScalarFieldEnum = (typeof ModelConfigScalarFieldEnum)[keyof typeof ModelConfigScalarFieldEnum]
 
 
+  export const ProviderCredentialScalarFieldEnum: {
+    id: 'id',
+    name: 'name',
+    provider: 'provider',
+    baseUrl: 'baseUrl',
+    keyEnc: 'keyEnc',
+    models: 'models',
+    enabled: 'enabled',
+    priority: 'priority',
+    createdById: 'createdById',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ProviderCredentialScalarFieldEnum = (typeof ProviderCredentialScalarFieldEnum)[keyof typeof ProviderCredentialScalarFieldEnum]
+
+
   export const OperationConfigScalarFieldEnum: {
     id: 'id',
     key: 'key',
@@ -20510,6 +21726,90 @@ export namespace Prisma {
     params?: JsonNullableWithAggregatesFilter<"ModelConfig">
     createdAt?: DateTimeWithAggregatesFilter<"ModelConfig"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"ModelConfig"> | Date | string
+  }
+
+  export type ProviderCredentialWhereInput = {
+    AND?: ProviderCredentialWhereInput | ProviderCredentialWhereInput[]
+    OR?: ProviderCredentialWhereInput[]
+    NOT?: ProviderCredentialWhereInput | ProviderCredentialWhereInput[]
+    id?: StringFilter<"ProviderCredential"> | string
+    name?: StringFilter<"ProviderCredential"> | string
+    provider?: StringFilter<"ProviderCredential"> | string
+    baseUrl?: StringFilter<"ProviderCredential"> | string
+    keyEnc?: StringFilter<"ProviderCredential"> | string
+    models?: StringNullableListFilter<"ProviderCredential">
+    enabled?: BoolFilter<"ProviderCredential"> | boolean
+    priority?: IntFilter<"ProviderCredential"> | number
+    createdById?: StringNullableFilter<"ProviderCredential"> | string | null
+    createdAt?: DateTimeFilter<"ProviderCredential"> | Date | string
+    updatedAt?: DateTimeFilter<"ProviderCredential"> | Date | string
+  }
+
+  export type ProviderCredentialOrderByWithRelationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    provider?: SortOrder
+    baseUrl?: SortOrder
+    keyEnc?: SortOrder
+    models?: SortOrder
+    enabled?: SortOrder
+    priority?: SortOrder
+    createdById?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ProviderCredentialWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: ProviderCredentialWhereInput | ProviderCredentialWhereInput[]
+    OR?: ProviderCredentialWhereInput[]
+    NOT?: ProviderCredentialWhereInput | ProviderCredentialWhereInput[]
+    name?: StringFilter<"ProviderCredential"> | string
+    provider?: StringFilter<"ProviderCredential"> | string
+    baseUrl?: StringFilter<"ProviderCredential"> | string
+    keyEnc?: StringFilter<"ProviderCredential"> | string
+    models?: StringNullableListFilter<"ProviderCredential">
+    enabled?: BoolFilter<"ProviderCredential"> | boolean
+    priority?: IntFilter<"ProviderCredential"> | number
+    createdById?: StringNullableFilter<"ProviderCredential"> | string | null
+    createdAt?: DateTimeFilter<"ProviderCredential"> | Date | string
+    updatedAt?: DateTimeFilter<"ProviderCredential"> | Date | string
+  }, "id">
+
+  export type ProviderCredentialOrderByWithAggregationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    provider?: SortOrder
+    baseUrl?: SortOrder
+    keyEnc?: SortOrder
+    models?: SortOrder
+    enabled?: SortOrder
+    priority?: SortOrder
+    createdById?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ProviderCredentialCountOrderByAggregateInput
+    _avg?: ProviderCredentialAvgOrderByAggregateInput
+    _max?: ProviderCredentialMaxOrderByAggregateInput
+    _min?: ProviderCredentialMinOrderByAggregateInput
+    _sum?: ProviderCredentialSumOrderByAggregateInput
+  }
+
+  export type ProviderCredentialScalarWhereWithAggregatesInput = {
+    AND?: ProviderCredentialScalarWhereWithAggregatesInput | ProviderCredentialScalarWhereWithAggregatesInput[]
+    OR?: ProviderCredentialScalarWhereWithAggregatesInput[]
+    NOT?: ProviderCredentialScalarWhereWithAggregatesInput | ProviderCredentialScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"ProviderCredential"> | string
+    name?: StringWithAggregatesFilter<"ProviderCredential"> | string
+    provider?: StringWithAggregatesFilter<"ProviderCredential"> | string
+    baseUrl?: StringWithAggregatesFilter<"ProviderCredential"> | string
+    keyEnc?: StringWithAggregatesFilter<"ProviderCredential"> | string
+    models?: StringNullableListFilter<"ProviderCredential">
+    enabled?: BoolWithAggregatesFilter<"ProviderCredential"> | boolean
+    priority?: IntWithAggregatesFilter<"ProviderCredential"> | number
+    createdById?: StringNullableWithAggregatesFilter<"ProviderCredential"> | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"ProviderCredential"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ProviderCredential"> | Date | string
   }
 
   export type OperationConfigWhereInput = {
@@ -21798,6 +23098,104 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type ProviderCredentialCreateInput = {
+    id?: string
+    name: string
+    provider: string
+    baseUrl: string
+    keyEnc: string
+    models?: ProviderCredentialCreatemodelsInput | string[]
+    enabled?: boolean
+    priority?: number
+    createdById?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProviderCredentialUncheckedCreateInput = {
+    id?: string
+    name: string
+    provider: string
+    baseUrl: string
+    keyEnc: string
+    models?: ProviderCredentialCreatemodelsInput | string[]
+    enabled?: boolean
+    priority?: number
+    createdById?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProviderCredentialUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    provider?: StringFieldUpdateOperationsInput | string
+    baseUrl?: StringFieldUpdateOperationsInput | string
+    keyEnc?: StringFieldUpdateOperationsInput | string
+    models?: ProviderCredentialUpdatemodelsInput | string[]
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    priority?: IntFieldUpdateOperationsInput | number
+    createdById?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProviderCredentialUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    provider?: StringFieldUpdateOperationsInput | string
+    baseUrl?: StringFieldUpdateOperationsInput | string
+    keyEnc?: StringFieldUpdateOperationsInput | string
+    models?: ProviderCredentialUpdatemodelsInput | string[]
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    priority?: IntFieldUpdateOperationsInput | number
+    createdById?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProviderCredentialCreateManyInput = {
+    id?: string
+    name: string
+    provider: string
+    baseUrl: string
+    keyEnc: string
+    models?: ProviderCredentialCreatemodelsInput | string[]
+    enabled?: boolean
+    priority?: number
+    createdById?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ProviderCredentialUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    provider?: StringFieldUpdateOperationsInput | string
+    baseUrl?: StringFieldUpdateOperationsInput | string
+    keyEnc?: StringFieldUpdateOperationsInput | string
+    models?: ProviderCredentialUpdatemodelsInput | string[]
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    priority?: IntFieldUpdateOperationsInput | number
+    createdById?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ProviderCredentialUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    provider?: StringFieldUpdateOperationsInput | string
+    baseUrl?: StringFieldUpdateOperationsInput | string
+    keyEnc?: StringFieldUpdateOperationsInput | string
+    models?: ProviderCredentialUpdatemodelsInput | string[]
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    priority?: IntFieldUpdateOperationsInput | number
+    createdById?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type OperationConfigCreateInput = {
     id?: string
     key: string
@@ -22917,6 +24315,62 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
+  export type StringNullableListFilter<$PrismaModel = never> = {
+    equals?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    has?: string | StringFieldRefInput<$PrismaModel> | null
+    hasEvery?: string[] | ListStringFieldRefInput<$PrismaModel>
+    hasSome?: string[] | ListStringFieldRefInput<$PrismaModel>
+    isEmpty?: boolean
+  }
+
+  export type ProviderCredentialCountOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    provider?: SortOrder
+    baseUrl?: SortOrder
+    keyEnc?: SortOrder
+    models?: SortOrder
+    enabled?: SortOrder
+    priority?: SortOrder
+    createdById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ProviderCredentialAvgOrderByAggregateInput = {
+    priority?: SortOrder
+  }
+
+  export type ProviderCredentialMaxOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    provider?: SortOrder
+    baseUrl?: SortOrder
+    keyEnc?: SortOrder
+    enabled?: SortOrder
+    priority?: SortOrder
+    createdById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ProviderCredentialMinOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    provider?: SortOrder
+    baseUrl?: SortOrder
+    keyEnc?: SortOrder
+    enabled?: SortOrder
+    priority?: SortOrder
+    createdById?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ProviderCredentialSumOrderByAggregateInput = {
+    priority?: SortOrder
+  }
+
   export type OperationConfigCountOrderByAggregateInput = {
     id?: SortOrder
     key?: SortOrder
@@ -23635,6 +25089,15 @@ export namespace Prisma {
     delete?: UserWhereInput | boolean
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutAuditLogsInput, UserUpdateWithoutAuditLogsInput>, UserUncheckedUpdateWithoutAuditLogsInput>
+  }
+
+  export type ProviderCredentialCreatemodelsInput = {
+    set: string[]
+  }
+
+  export type ProviderCredentialUpdatemodelsInput = {
+    set?: string[]
+    push?: string | string[]
   }
 
   export type NestedStringFilter<$PrismaModel = never> = {

@@ -233,7 +233,8 @@ function modelListKey(capability: ModelCapability) {
 
 function isAiConfigReady(config: AiConfig, model: string) {
     const channel = resolveModelChannel(config, model);
-    return Boolean(model.trim() && channel.baseUrl.trim() && channel.apiKey.trim());
+    // 平台 Key 化：API Key 不再必需（服务端注入平台 Key），只需模型 + Base URL 能路由到代理
+    return Boolean(model.trim() && channel.baseUrl.trim());
 }
 
 export const useConfigStore = create<ConfigStore>()(
