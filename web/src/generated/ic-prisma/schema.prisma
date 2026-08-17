@@ -248,7 +248,7 @@ model ModelConfig {
   @@index([type, enabled])
 }
 
-// 平台统一管理的上游 API 密钥（BYOK → 平台 Key 化）
+// 平台统一管理的上游 API 密钥
 // keyEnc 为 AES-256-GCM 加密后的密文，密钥在服务端 env（PLATFORM_KEY_ENCRYPTION_SECRET），永不进客户端
 model ProviderCredential {
   id           String   @id @default(cuid())

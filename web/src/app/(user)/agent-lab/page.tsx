@@ -61,7 +61,6 @@ const DEFAULT_MEMORY: AgentLabMemory = {
 
 type ProviderForm = {
     baseUrl: string;
-    apiKey: string;
     model: string;
 };
 
@@ -84,7 +83,7 @@ export default function AgentLabPage() {
     const [sessions, setSessions] = useState<AgentLabSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState("");
     const [messages, setMessages] = useState<AgentLabMessage[]>([DEFAULT_ASSISTANT_MESSAGE]);
-    const [provider, setProvider] = useState<ProviderForm>({ baseUrl: "https://api.deepseek.com", apiKey: "", model: "deepseek-chat" });
+    const [provider, setProvider] = useState<ProviderForm>({ baseUrl: "https://api.deepseek.com", model: "deepseek-chat" });
     const [draft, setDraft] = useState("");
     const [artifact, setArtifact] = useState<AgentLabArtifact | null>(null);
     const [personaId, setPersonaId] = useState(DEFAULT_PERSONA.id);
@@ -101,7 +100,6 @@ export default function AgentLabPage() {
             const data = JSON.parse(saved) as Partial<ProviderForm>;
             setProvider((current) => ({
                 baseUrl: typeof data.baseUrl === "string" ? data.baseUrl : current.baseUrl,
-                apiKey: typeof data.apiKey === "string" ? data.apiKey : current.apiKey,
                 model: typeof data.model === "string" ? data.model : current.model,
             }));
         } catch {
@@ -154,7 +152,7 @@ export default function AgentLabPage() {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }, [messages, sending]);
 
-    const modelLabel = useMemo(() => (provider.apiKey.trim() ? provider.model || "未填写模型" : "本地 fallback"), [provider.apiKey, provider.model]);
+    const modelLabel = provider.model || "未配置模型";
     const selectedPersona = useMemo(() => AGENT_PERSONAS.find((item) => item.id === personaId) || DEFAULT_PERSONA, [personaId]);
     const activeSession = useMemo(() => sessions.find((session) => session.id === activeSessionId) || sessions[0], [activeSessionId, sessions]);
 
@@ -194,7 +192,7 @@ export default function AgentLabPage() {
             }
         } catch (error) {
             const text = error instanceof Error ? error.message : "Agent 请求失败";
-            setMessages((current) => [...current, { role: "assistant", content: `这次请求没有成功：${text}\n\n你可以先清空 API Key，用本地 fallback 看交互，或者检查 Base URL、模型名和 Key。` }]);
+            setMessages((current) => [...current, { role: "assistant", content: `这次请求没有成功：${text}\n\n你可以检查 Base URL 和模型名是否正确，或稍后再试。` }]);
         } finally {
             setSending(false);
         }
@@ -285,7 +283,7 @@ export default function AgentLabPage() {
                         <div>
                             <div className="flex items-center gap-2 text-sm font-semibold">
                                 SceneFlow Agent Lab
-                                <Tag bordered={false} color={provider.apiKey.trim() ? "green" : "default"}>
+                                <Tag bordered={false} color="green">
                                     {modelLabel}
                                 </Tag>
                             </div>
@@ -322,7 +320,12 @@ export default function AgentLabPage() {
                                     {sessions.map((session) => {
                                         const active = session.id === activeSessionId;
                                         return (
-                                            <button key={session.id} type="button" className={`w-full rounded-2xl border px-3 py-2 text-left text-sm transition ${active ? "border-black bg-black text-white" : "border-black/10 bg-[#fffdfa] hover:border-black/20"}`} onClick={() => switchSession(session)}>
+                                            <button
+                                                key={session.id}
+                                                type="button"
+                                                className={`w-full rounded-2xl border px-3 py-2 text-left text-sm transition ${active ? "border-black bg-black text-white" : "border-black/10 bg-[#fffdfa] hover:border-black/20"}`}
+                                                onClick={() => switchSession(session)}
+                                            >
                                                 <div className="truncate font-medium">{session.title || "新会话"}</div>
                                                 <div className={`mt-1 text-xs ${active ? "text-white/55" : "text-black/40"}`}>{formatSessionTime(session.updatedAt)}</div>
                                             </button>
@@ -335,7 +338,6 @@ export default function AgentLabPage() {
                                 <div className="space-y-3">
                                     <div className="text-sm font-semibold">主模型</div>
                                     <Input value={provider.baseUrl} onChange={(event) => setProvider((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="Base URL，例如 https://api.deepseek.com" />
-                                    <Input.Password value={provider.apiKey} onChange={(event) => setProvider((current) => ({ ...current, apiKey: event.target.value }))} placeholder="API Key，留空使用本地 fallback" />
                                     <Input value={provider.model} onChange={(event) => setProvider((current) => ({ ...current, model: event.target.value }))} placeholder="模型名，例如 deepseek-chat" />
                                 </div>
                                 <div className="space-y-3">
@@ -516,7 +518,9 @@ function CompactArtifact({ artifact, onCopy, onConfirm, onReject }: { artifact: 
                             <div key={action.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black/10 bg-white/55 px-3 py-2">
                                 <div className="min-w-0">
                                     <div className="text-sm font-semibold">{action.title}</div>
-                                    <div className="mt-0.5 text-xs text-black/50">{formatToolActionType(action.type)} · {action.description || "等待确认后执行"}</div>
+                                    <div className="mt-0.5 text-xs text-black/50">
+                                        {formatToolActionType(action.type)} · {action.description || "等待确认后执行"}
+                                    </div>
                                 </div>
                                 <div className="flex shrink-0 gap-2">
                                     <Button size="small" onClick={() => onCopy(buildToolActionRecord(action), "已复制动作说明")}>

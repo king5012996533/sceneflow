@@ -4,11 +4,10 @@ import { requireAdminUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 import { invalidateOperationConfigCache } from "@/lib/operation-config";
 
-// 运营配置（OperationConfig）：读写 byok_enabled / daily_credit_grant 等
+// 运营配置（OperationConfig）：读写 daily_credit_grant 等
 export const dynamic = "force-dynamic";
 
 const KNOWN_KEYS: Record<string, { description: string }> = {
-    byok_enabled: { description: "是否允许用户自带 API Key（关闭后仅使用平台密钥）" },
     daily_credit_grant: { description: "免费用户每日赠送积分（0 = 不赠送）" },
     signup_credit_grant: { description: "新用户一次性赠送积分（0 = 不赠送）" },
     sub_compensation_credits: { description: "存量付费订阅一次性折算补偿积分（0 = 不补偿）" },

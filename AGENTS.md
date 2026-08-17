@@ -93,7 +93,7 @@
 ## 积分制 / 平台密钥（2026-08 起）
 
 - 平台统一管理上游 API Key（`ProviderCredential`，AES-256-GCM 加密存 `keyEnc`），客户端不再必须自带 Key。**平台密钥永不进客户端**，只能经 `/api/proxy`、`/api/proxy/form-data` 出网。
-- 代理取 Key 优先级：平台凭证 → BYOK（受 `byok_enabled` 运营配置控制，默认开）→ 无 Key。Gemini 用 `x-goog-api-key` 注入，其余用 `Authorization: Bearer`。
+- 代理取 Key：只使用平台凭证（`ProviderCredential`）。Gemini 用 `x-goog-api-key` 注入，其余用 `Authorization: Bearer`；无平台凭证则不注入 Key。
 - 积分账本（`credit-ledger.ts`）：扣减用 `updateMany({ balance: { gte: cost } })` 原子守卫，禁止读-改-写；退款按 `(refType, refId)` 幂等；余额与流水必须在同一事务（`$transaction` + `pg_advisory_xact_lock`）内变更。
 - 收费卡点在 `beginGenerationJob`（`generation-jobs.server.ts`）：先算 `creditsCost`（admin 为 0，不扣），事务内每日赠送（`daily_credit_grant`，幂等）→ 原子扣减 → 失败/取消/超时退款。余额不足返回 403，客户端弹「积分余额不足」弹窗（`components/credits/insufficient-credits-modal.tsx`）。
 - 积分定价表在 `web/src/lib/credit-pricing.ts`（草案），按 `GenerationJob.costCents` 实账校准；对账看 admin「对账」tab。

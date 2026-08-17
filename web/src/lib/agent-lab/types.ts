@@ -7,7 +7,6 @@ export type AgentLabMessage = {
 
 export type AgentLabProvider = {
     baseUrl?: string;
-    apiKey?: string;
     model?: string;
 };
 

@@ -12,8 +12,7 @@ export const dynamic = "force-dynamic";
 
 const TRUSTED_PROVIDER_HOSTS = new Set(["api.deepseek.com", "api.openai.com", "api.anthropic.com"]);
 
-// 服务器 Key 成本保护：只有当请求使用服务器的 API Key（用户未自带 Key）时才计配额。
-// 用户自带 Key 时费用由用户承担，不限制。
+// 服务器 Key 成本保护：所有请求都使用服务器 Key，统一计配额。
 const AGENT_LAB_DAILY_LIMIT = 60;
 const AGENT_LAB_RATE_LIMIT = { windowMs: 60_000, maxRequests: 10 } as const;
 
@@ -37,15 +36,13 @@ export async function POST(request: NextRequest) {
             return Response.json({ ...fallback, model: "fallback-local" } satisfies AgentLabResponse);
         }
 
-        // 使用服务器 Key 才计配额（用户自带 Key 不限制），防脚本无限调用烧钱
-        if (provider.usesServerKey) {
-            const quota = await reserveDailyUsage(user.id, "agent_chats", AGENT_LAB_DAILY_LIMIT);
-            if (!quota.allowed) {
-                return Response.json({ error: "今日 Agent Lab 免费调用次数已用完，请自带 API Key 或明天再试" }, { status: 429 });
-            }
-            if (!(await checkRateLimit(`agentlab:${user.id}`, AGENT_LAB_RATE_LIMIT))) {
-                return Response.json({ error: "操作太频繁，请稍后再试" }, { status: 429 });
-            }
+        // 所有请求都使用服务器 Key，统一计配额，防脚本无限调用烧钱
+        const quota = await reserveDailyUsage(user.id, "agent_chats", AGENT_LAB_DAILY_LIMIT);
+        if (!quota.allowed) {
+            return Response.json({ error: "今日 Agent Lab 免费调用次数已用完，请明天再试" }, { status: 429 });
+        }
+        if (!(await checkRateLimit(`agentlab:${user.id}`, AGENT_LAB_RATE_LIMIT))) {
+            return Response.json({ error: "操作太频繁，请稍后再试" }, { status: 429 });
         }
 
         const response = await fetchSafely(`${provider.baseUrl}/chat/completions`, {
@@ -87,20 +84,15 @@ async function resolveProvider(body: AgentLabRequest) {
     const baseUrl = target.origin;
 
     const isTrustedHost = TRUSTED_PROVIDER_HOSTS.has(target.hostname.toLowerCase());
-    const userProvidedKey = (body.provider?.apiKey || "").trim();
 
-    // 服务器 API Key 只在「可信提供商 + 用户未自带 key」时才使用，
+    // 服务器 API Key 只在「可信提供商 + 用户未自定义 baseUrl」时才使用，
     // 防止把服务器 key 发送到任意攻击者控制的地址。
-    let apiKey = userProvidedKey;
-    if (!apiKey) {
-        if (isTrustedHost) apiKey = (process.env.AGENT_LAB_API_KEY || process.env.DEEPSEEK_API_KEY || "").trim();
-        else if (!body.provider?.baseUrl) apiKey = (process.env.AGENT_LAB_API_KEY || process.env.DEEPSEEK_API_KEY || "").trim();
-    }
+    let apiKey = "";
+    if (isTrustedHost || !body.provider?.baseUrl) apiKey = (process.env.AGENT_LAB_API_KEY || process.env.DEEPSEEK_API_KEY || "").trim();
 
     return {
         baseUrl,
         apiKey,
-        usesServerKey: !userProvidedKey && !!apiKey,
         model: (body.provider?.model || process.env.AGENT_LAB_MODEL || process.env.DEEPSEEK_MODEL || "deepseek-chat").trim(),
     };
 }

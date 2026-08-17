@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
-import { prisma } from "@/lib/ic-prisma";
 import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
 import { resolvePlatformCredential } from "@/lib/credential-store.server";
-import { getOperationFlag } from "@/lib/operation-config";
 import FormData from "form-data";
 
 export const runtime = "nodejs";
@@ -26,8 +24,7 @@ export async function POST(req: NextRequest) {
         const method = sanitizeMethod(incoming.get("_proxy_method") || "POST");
         const safeHeaders = sanitizeHeaders(parseHeaders(incoming.get("_proxy_headers")));
 
-        // 平台凭证优先（按目标 host + 可选 provider/model 匹配）；无平台凭证且 BYOK 开关打开时，
-        // 回退用户 DB 默认 Key 或请求头自带的 Key（过渡期逻辑，最终移除）
+        // 平台凭证（按目标 host + 可选 provider/model 匹配）；无平台凭证 → 无 Key（BYOK 已彻底移除）
         const sfProvider = typeof safeHeaders["x-sf-provider"] === "string" ? safeHeaders["x-sf-provider"] : undefined;
         const sfModel = typeof safeHeaders["x-sf-model"] === "string" ? safeHeaders["x-sf-model"] : undefined;
         const platformCred = await resolvePlatformCredential({ targetUrl: target.toString(), provider: sfProvider, model: sfModel });
@@ -35,21 +32,6 @@ export async function POST(req: NextRequest) {
         if (platformCred) {
             safeHeaders["authorization"] = `Bearer ${platformCred.apiKey}`;
             console.log(`[proxy/form-data] key-source=platform target=${target.hostname}`);
-        } else if (await getOperationFlag("byok_enabled", false)) {
-            let apiKey = "";
-            try {
-                if (prisma) {
-                    const config = await prisma.userConfig.findUnique({ where: { userId: user.id } });
-                    if (config?.config && typeof config.config === "object") {
-                        const cfg = config.config as Record<string, unknown>;
-                        apiKey = String(cfg.apiKey || "");
-                    }
-                }
-            } catch (dbErr) {
-                console.warn("[proxy/form-data] DB key 读取失败，回退请求头 Key:", (dbErr as Error)?.message);
-            }
-            if (apiKey) safeHeaders["authorization"] = `Bearer ${apiKey}`;
-            // DB 无 key 时：保留请求头自带的 key，不再删掉导致 502
         }
 
         // 使用 form-data 包构建 multipart body

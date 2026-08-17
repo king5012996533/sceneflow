@@ -4,7 +4,7 @@ import { prisma } from "@/lib/ic-prisma";
 import type { CredentialCapabilities } from "@/lib/model-capability-spec";
 
 /**
- * 平台统一管理的上游 API 密钥库（BYOK → 平台 Key 化）。
+ * 平台统一管理的上游 API 密钥库。
  *
  * - 密钥以 AES-256-GCM 加密落库，加密密钥来自 env `PLATFORM_KEY_ENCRYPTION_SECRET`
  * - 本模块仅允许在服务端使用（.server.ts 后缀 + 不导出到客户端）

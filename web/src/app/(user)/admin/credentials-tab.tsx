@@ -108,7 +108,7 @@ export default function CredentialsTab() {
             setForm(EMPTY_FORM);
             await load();
         } catch (error) {
-            message.error(error instanceof Error ? error.message : (editing ? "更新平台密钥失败" : "新增平台密钥失败"));
+            message.error(error instanceof Error ? error.message : editing ? "更新平台密钥失败" : "新增平台密钥失败");
         } finally {
             setSaving(false);
         }
@@ -133,7 +133,7 @@ export default function CredentialsTab() {
     function remove(id: string, name: string) {
         Modal.confirm({
             title: `删除平台密钥「${name}」？`,
-            content: "删除后该地址的代理请求将回退到 BYOK 或失败。此操作不可撤销。",
+            content: "删除后该地址的代理请求将失败。此操作不可撤销。",
             okText: "删除",
             okButtonProps: { danger: true },
             cancelText: "取消",
@@ -230,7 +230,17 @@ export default function CredentialsTab() {
                 ]}
             />
 
-            <Modal title={editing ? `编辑平台密钥「${editing.name}」` : "添加平台密钥"} open={modalOpen} onCancel={() => setModalOpen(false)} onOk={() => void save()} confirmLoading={saving} okText={editing ? "保存" : "添加"} cancelText="取消" destroyOnHidden width={640}>
+            <Modal
+                title={editing ? `编辑平台密钥「${editing.name}」` : "添加平台密钥"}
+                open={modalOpen}
+                onCancel={() => setModalOpen(false)}
+                onOk={() => void save()}
+                confirmLoading={saving}
+                okText={editing ? "保存" : "添加"}
+                cancelText="取消"
+                destroyOnHidden
+                width={640}
+            >
                 <CredentialFormFields form={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} editMode={Boolean(editing)} />
             </Modal>
         </section>

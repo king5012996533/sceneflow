@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
-import { prisma } from "@/lib/ic-prisma";
 import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
 import { resolvePlatformCredential } from "@/lib/credential-store.server";
-import { getOperationFlag } from "@/lib/operation-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +13,7 @@ const MAX_PROXY_ENVELOPE_BYTES = 41 * 1024 * 1024;
 const PROXY_TIMEOUT_MS = 120_000;
 const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "prefer", "x-api-key", "x-request-id", "x-sf-provider", "x-sf-model"]);
 
-type KeySource = "platform" | "byok-header" | "byok-db-channel" | "byok-db-default" | "none";
+type KeySource = "platform" | "none";
 
 export async function POST(req: NextRequest) {
     const user = await requireCurrentUser(req);
@@ -32,11 +30,9 @@ export async function POST(req: NextRequest) {
         const target = await assertAllowedProxyUrl(String(url || ""));
         const safeHeaders = sanitizeHeaders(headers);
 
-        // —— API Key 解析优先级（平台 Key 化后反转） ——
-        // ① 平台统一配置的凭证（按目标 host + 可选 provider/model 匹配，admin 在后台管理）
-        // ② 过渡期 BYOK：默认关闭（BYOK 下线）；如应急需要可在后台「运营配置」临时打开
-        //    （请求头 Key > 用户 DB 渠道 Key > 用户 DB 默认 Key）
-        // ③ 都没有 → 402 拒绝（平台模式下不允许无 Key 调用）
+        // —— API Key 解析（平台 Key 化） ——
+        // 平台统一配置的凭证（按目标 host + 可选 provider/model 匹配，admin 在后台管理）；
+        // 无平台凭证 → 无 Key（BYOK 已彻底移除，不回落用户自带 Key）
         const sfProvider = typeof safeHeaders["x-sf-provider"] === "string" ? safeHeaders["x-sf-provider"] : undefined;
         const sfModel = typeof safeHeaders["x-sf-model"] === "string" ? safeHeaders["x-sf-model"] : undefined;
 
@@ -47,13 +43,6 @@ export async function POST(req: NextRequest) {
         if (platformCred) {
             finalToken = platformCred.apiKey;
             keySource = "platform";
-        } else {
-            const byokEnabled = await getOperationFlag("byok_enabled", false);
-            if (byokEnabled) {
-                const byok = await resolveByokKey(user.id, safeHeaders, target.toString());
-                finalToken = byok.token;
-                keySource = byok.source;
-            }
         }
 
         // 清掉原有的 Authorization（可能是 "Authorization" 或 "authorization"，避免同名字头重复），统一写小写
@@ -137,59 +126,10 @@ export async function POST(req: NextRequest) {
     }
 }
 
-/**
- * 过渡期 BYOK 解析：从请求头 Key → 用户 DB 渠道 Key → 用户 DB 默认 Key。
- * 平台 Key 化上线后此路径仅由 byok_enabled 开关控制，最终会移除。
- */
-async function resolveByokKey(userId: string, safeHeaders: Record<string, string>, targetUrl: string): Promise<{ token: string; source: KeySource }> {
-    const headerAuth = readHeaderAuthorization(safeHeaders);
-    const headerKey = headerAuth.replace(/^Bearer\s+/i, "").trim();
-    if (headerKey) return { token: headerKey, source: "byok-header" };
-
-    if (!prisma) return { token: "", source: "none" };
-    try {
-        const config = await prisma.userConfig.findUnique({ where: { userId } });
-        if (config?.config && typeof config.config === "object") {
-            const stored = config.config as { config?: Record<string, unknown> };
-            const cfg = (stored.config || stored) as Record<string, unknown>;
-            const defaultKey = String(cfg.apiKey || "");
-            try {
-                const targetHost = new URL(targetUrl).hostname;
-                const channels = Array.isArray(cfg.channels) ? (cfg.channels as Array<Record<string, unknown>>) : [];
-                const matched = channels.find((channel) => {
-                    try {
-                        const base = String(channel.baseUrl || "").trim();
-                        if (!base) return false;
-                        return new URL(base).hostname === targetHost;
-                    } catch {
-                        return false;
-                    }
-                });
-                if (matched && typeof matched.apiKey === "string" && matched.apiKey.trim()) {
-                    return { token: matched.apiKey, source: "byok-db-channel" };
-                }
-            } catch {
-                // 目标地址解析失败时回退默认 key
-            }
-            if (defaultKey) return { token: defaultKey, source: "byok-db-default" };
-        }
-    } catch (dbErr) {
-        console.warn("[proxy] DB key 读取失败，回退请求头 Key:", (dbErr as Error)?.message);
-    }
-    return { token: "", source: "none" };
-}
-
 function sanitizeMethod(method: unknown) {
     const normalized = String(method || "POST").toUpperCase();
     if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(normalized)) throw new Error("非法请求方法");
     return normalized;
-}
-
-function readHeaderAuthorization(headers: Record<string, string>): string {
-    for (const key of Object.keys(headers)) {
-        if (key.toLowerCase() === "authorization") return String(headers[key] ?? "");
-    }
-    return "";
 }
 
 function sanitizeHeaders(headers: unknown) {
