@@ -20,7 +20,7 @@ function dailyPeriodKey(date = new Date()): string {
     return `${y}-${m}-${d}`;
 }
 
-async function ensureCreditBalance(client: Db, userId: string): Promise<void> {
+export async function ensureCreditBalance(client: Db, userId: string): Promise<void> {
     await client.creditBalance.upsert({
         where: { userId },
         update: {},

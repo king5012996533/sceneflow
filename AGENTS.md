@@ -21,14 +21,11 @@
 
 ## 后端规范
 
-- 后端使用 Go + Gin + GORM。
-- `handler/` 只处理 HTTP 入参、调用 service、返回 `OK` / `Fail`。
-- `service/` 放业务逻辑、默认值、校验、时间、ID、鉴权等处理。
-- `repository/` 只做数据库访问和 GORM 查询。
-- `model/` 只定义数据结构、枚举和简单模型方法。
-- 列表接口优先沿用 `model.Query`、`Normalize`、分页和标签筛选方式。
-- 业务接口保持 `{ code, data, msg }` 的响应结构。
-- 新增数据表时同步更新 `docs/backend-database.md`。
+- 后端使用 Next.js API Routes（App Router）+ Prisma 7 + PostgreSQL。
+- API Route 只处理 HTTP 入参、鉴权、返回 JSON；业务逻辑放 `web/src/lib/`。
+- 新增数据表时同步生成 Prisma migration（离线生成：`prisma migrate diff --from-schema <旧schema备份> --to-schema prisma/schema.prisma --script`），并更新 `docs/content/docs/backend/backend-database.mdx`。
+- 写库操作保持幂等：退款按 `(refType, refId)` 查重、订单入账按状态迁移守卫，重复回调不得重复到账。
+- 金额一律以「分」存储（`*Cents` 字段），前端用 `formatCny` 展示；积分一律为整数。
 
 ## 前端规范
 
@@ -52,6 +49,7 @@
 - 样式优先由组件自己管理；组件私有样式优先使用 Tailwind className 或少量内联 style，不要为单个组件新增大量全局 CSS。
 - 全局 CSS 只放基础变量、全局重置、跨页面通用样式和少量第三方组件必要覆盖；不要在 `globals.css` 堆页面私有样式。
 - 代码尽量短小直接，少拆不必要组件，少做多层 props 传递，避免为了抽象堆出更多代码。
+- **大文件拆分红线**：单个文件避免超过约 350 行。新增页面/后台 tab 时拆成独立组件文件（如 `admin/credits-tab.tsx`、`components/credits/*`）；存量超千行大文件（`canvas-client-page.tsx`、`image.ts`、`video.ts` 等）只做小改动，新增 UI 一律独立成组件再 import，绝不继续往里堆逻辑。
 - 前端业务数据需要浏览器本地持久化时，默认使用 `localforage`；`localStorage` 只用于极小的简单配置，不要用来保存业务列表、生成记录、图片、base64 或大 JSON。
 
 ## 画布 UI 规范
@@ -91,3 +89,14 @@
 - 当前画布项目和“我的素材”主要保存在浏览器本地，不要在文档中误写成已支持云同步。
 - 当前 AI API Key 存在浏览器本地，并由前端直接请求 OpenAI 兼容接口；涉及安全说明时要写清楚。
 - Docker 静态资源路径目前仍是待办项，文档中不要过度承诺生产部署已经完全验证。
+
+## 积分制 / 平台密钥（2026-08 起）
+
+- 平台统一管理上游 API Key（`ProviderCredential`，AES-256-GCM 加密存 `keyEnc`），客户端不再必须自带 Key。**平台密钥永不进客户端**，只能经 `/api/proxy`、`/api/proxy/form-data` 出网。
+- 代理取 Key 优先级：平台凭证 → BYOK（受 `byok_enabled` 运营配置控制，默认开）→ 无 Key。Gemini 用 `x-goog-api-key` 注入，其余用 `Authorization: Bearer`。
+- 积分账本（`credit-ledger.ts`）：扣减用 `updateMany({ balance: { gte: cost } })` 原子守卫，禁止读-改-写；退款按 `(refType, refId)` 幂等；余额与流水必须在同一事务（`$transaction` + `pg_advisory_xact_lock`）内变更。
+- 收费卡点在 `beginGenerationJob`（`generation-jobs.server.ts`）：先算 `creditsCost`（admin 为 0，不扣），事务内每日赠送（`daily_credit_grant`，幂等）→ 原子扣减 → 失败/取消/超时退款。余额不足返回 403，客户端弹「积分余额不足」弹窗（`components/credits/insufficient-credits-modal.tsx`）。
+- 积分定价表在 `web/src/lib/credit-pricing.ts`（草案），按 `GenerationJob.costCents` 实账校准；对账看 admin「对账」tab。
+- 前端余额唯一来源是 `useCreditBalance` hook（读 `/api/billing/credits`），充值/生成后调 `refresh()`。
+- 运营配置（`OperationConfig`）走 `lib/operation-config.ts` 读取（30s 进程内缓存），admin 后台「运营配置」tab 编辑后自动失效缓存。
+- 存量迁移（`lib/credit-migration.ts`）：登录时幂等补建积分账户、新用户赠送、存量付费订阅折算补偿。

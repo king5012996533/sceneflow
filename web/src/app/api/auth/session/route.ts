@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/ic-prisma";
 import { applyPrivateNoStore, AUTH_COOKIE_NAME, clearAuthCookie, verifyToken } from "@/lib/auth";
+import { ensureLoginCreditMigration } from "@/lib/credit-migration";
 
 function sessionResponse(body: unknown, clearCookie = false) {
   const response = NextResponse.json(body);
@@ -30,6 +31,11 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return sessionResponse({ user: null }, true);
     }
+
+    // 存量迁移（Phase 6）：积分账户 + 新手赠送 + 付费订阅折算补偿（幂等，失败不影响会话）
+    await ensureLoginCreditMigration(prisma, user.id).catch((err: unknown) => {
+      console.warn("[auth/session] credit migration failed:", err instanceof Error ? err.message : err);
+    });
 
     return sessionResponse({ user });
   } catch {

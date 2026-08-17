@@ -80,69 +80,6 @@ export function nextDayStart(date = new Date()) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 }
 
-/**
- * @deprecated 积分制上线后此路径废弃（全仓库无客户端调用）。
- * 真实配额卡点已改为 beginGenerationJob 内的积分扣减（见 credit-ledger.ts）。
- * Phase 6 收尾时删除本函数及 /api/billing/usage/generation。
- */
-export async function reserveGenerationUsage(userId: string, count: number) {
-    if (!prisma) throw new Error("Database unavailable");
-    const safeCount = Math.max(1, Math.min(50, Math.floor(count || 1)));
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-    if (user?.role === "admin") {
-        return { allowed: true, used: 0, reserved: safeCount, remaining: -1, limit: null };
-    }
-
-    const entitlements = await getServerEntitlements(userId);
-    const generationLimit = entitlements.dailyGenerations;
-
-    if (generationLimit === null) {
-        return { allowed: true, used: 0, reserved: safeCount, remaining: -1, limit: null };
-    }
-
-    const period = dailyPeriod();
-    const metric = "generations";
-
-    const current = await prisma.usageRecord.upsert({
-        where: { userId_metric_period: { userId, metric, period } },
-        update: {},
-        create: {
-            userId,
-            metric,
-            period,
-            used: 0,
-            limit: generationLimit,
-            resetAt: nextDayStart(),
-        },
-    });
-
-    const updatedCount = await prisma.usageRecord.updateMany({
-        where: { id: current.id, used: { lte: generationLimit - safeCount } },
-        data: { used: { increment: safeCount }, limit: generationLimit, resetAt: nextDayStart() },
-    });
-
-    if (!updatedCount.count) {
-        const latest = await prisma.usageRecord.findUnique({ where: { id: current.id } });
-        return {
-            allowed: false,
-            used: latest?.used ?? current.used,
-            reserved: 0,
-            remaining: Math.max(0, generationLimit - (latest?.used ?? current.used)),
-            limit: generationLimit,
-        };
-    }
-
-    const updated = await prisma.usageRecord.findUniqueOrThrow({ where: { id: current.id } });
-
-    return {
-        allowed: true,
-        used: updated.used,
-        reserved: safeCount,
-        remaining: Math.max(0, generationLimit - updated.used),
-        limit: generationLimit,
-    };
-}
-
 // 通用每日配额（非生成类消耗，如 Agent Lab / 体验官聊天）。
 // 数据库不可用时保守拒绝（fail-closed）——宁可暂时不可用，也不能无限制消耗服务器 API Key。
 export async function reserveDailyUsage(userId: string, metric: string, limit: number): Promise<{ allowed: boolean; remaining: number; limit: number | null }> {

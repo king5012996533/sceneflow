@@ -33,15 +33,28 @@ npm install
 
 ### 3. 配置环境变量
 
-复制 `.env.example` 为 `.env`，并填入你的 API Key 和数据库连接字符串：
+复制 `.env.example` 为 `.env`，并填入数据库连接与平台密钥加密口令：
 
 ```bash
-# 必填：AI 服务接口 (支持 OpenAI/DeepSeek 等兼容接口)
-OPENAI_API_KEY=sk-xxxxx
-OPENAI_BASE_URL=https://api.xxxx.com
-
 # 必填：数据库连接
 DATABASE_URL="postgresql://user:password@localhost:5432/sceneflow"
+
+# 必填：平台密钥加密口令（AES-256-GCM 派生密钥，用于加密 ProviderCredential）
+# 生成方式：openssl rand -hex 32
+PLATFORM_KEY_ENCRYPTION_SECRET=xxxxxxxxxxxxxxxx
+
+# 可选：模型渠道直连地址（未在后台配置 ProviderCredential 前的兜底）
+OPENAI_API_KEY=sk-xxxxx
+OPENAI_BASE_URL=https://api.xxxx.com
+```
+
+> 自 2026-08 起项目采用「平台统一 Key + 积分制」：上游模型 Key 由管理员在后台「平台密钥」统一配置（加密入库，永不下发客户端），用户充值积分按次扣费。用户自带 Key（BYOK）仍可在后台「运营配置」灰度开启。
+
+### 4. 迁移数据库
+
+```bash
+cd web
+npx prisma migrate deploy   # 应用 migrations/ 下的离线迁移
 ```
 
 ### 4. 启动开发服务器

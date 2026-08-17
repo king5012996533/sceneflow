@@ -12,6 +12,22 @@ type OperationConfigItem = {
     description: string;
 };
 
+type EditorSpec = {
+    key: string;
+    label: string;
+    description: string;
+    kind: "switch" | "number";
+    /** 未配置时的展示默认值（与 server 端 getOperation* 的 fallback 保持一致） */
+    defaultValue: boolean | number;
+};
+
+const EDITORS: EditorSpec[] = [
+    { key: "byok_enabled", label: "允许用户自带 API Key（BYOK）", description: "关闭后仅使用平台密钥（灰度关闭 BYOK 的开关）", kind: "switch", defaultValue: true },
+    { key: "daily_credit_grant", label: "免费用户每日赠送积分", description: "每次生成前自动赠送，按自然日幂等（0 = 不赠送）", kind: "number", defaultValue: 3 },
+    { key: "signup_credit_grant", label: "新用户一次性赠送积分", description: "登录时自动发放一次（0 = 不赠送）", kind: "number", defaultValue: 50 },
+    { key: "sub_compensation_credits", label: "存量付费订阅折算补偿", description: "对存量 active 付费订阅一次性补偿积分（0 = 不补偿）", kind: "number", defaultValue: 500 },
+];
+
 /** 运营配置（byok_enabled / daily_credit_grant 等），保存后 ≤30s 生效（进程内缓存 TTL） */
 export default function OperationConfigTab() {
     const { message } = App.useApp();
@@ -39,14 +55,22 @@ export default function OperationConfigTab() {
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || "保存失败");
-            setConfigs((prev) => prev.map((item) => (item.key === key ? { ...item, value } : item)));
+            setConfigs((prev) => {
+                const next = prev.filter((item) => item.key !== key);
+                return [...next, { key, value, description: "" }];
+            });
             message.success(`已更新 ${key}，约 30 秒内生效`);
         } catch (error) {
             message.error(error instanceof Error ? error.message : "保存运营配置失败");
         }
     }
 
-    const find = (key: string) => configs.find((item) => item.key === key);
+    function currentValue(spec: EditorSpec): boolean | number {
+        const found = configs.find((item) => item.key === spec.key);
+        if (!found) return spec.defaultValue;
+        if (spec.kind === "switch") return found.value === true || found.value === "true" || found.value === "1";
+        return typeof found.value === "number" ? found.value : Number(found.value) || 0;
+    }
 
     return (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -55,30 +79,25 @@ export default function OperationConfigTab() {
                     <SlidersHorizontal className="size-5" />
                     灰度与计费开关
                 </div>
+                <p className="mb-4 text-xs leading-5 text-stone-400">修改保存后约 30 秒生效（进程内缓存 TTL）。未配置项使用系统默认值。</p>
                 {loading ? (
                     <div className="text-sm text-stone-400">加载中…</div>
                 ) : (
                     <div className="space-y-4">
-                        <div className="flex items-start justify-between gap-4 rounded-md border border-stone-200 p-4">
-                            <div>
-                                <div className="text-sm font-medium">允许用户自带 API Key（BYOK）</div>
-                                <div className="mt-1 text-xs leading-5 text-stone-500">{find("byok_enabled")?.description || "是否允许用户自带 API Key（关闭后仅使用平台密钥）"}</div>
+                        {EDITORS.map((spec) => (
+                            <div key={spec.key} className="flex items-start justify-between gap-4 rounded-md border border-stone-200 p-4">
+                                <div>
+                                    <div className="text-sm font-medium">{spec.label}</div>
+                                    <div className="mt-1 text-xs leading-5 text-stone-500">{spec.description}</div>
+                                    <div className="mt-1 font-mono text-[11px] text-stone-400">{spec.key}</div>
+                                </div>
+                                {spec.kind === "switch" ? (
+                                    <Switch checked={currentValue(spec) === true} onChange={(checked) => void update(spec.key, checked)} />
+                                ) : (
+                                    <InputNumber min={0} max={1000000} value={currentValue(spec) as number} onChange={(value) => void update(spec.key, value ?? 0)} className="w-32" />
+                                )}
                             </div>
-                            <Switch checked={find("byok_enabled")?.value === true} loading={loading} onChange={(checked) => void update("byok_enabled", checked)} />
-                        </div>
-                        <div className="flex items-start justify-between gap-4 rounded-md border border-stone-200 p-4">
-                            <div>
-                                <div className="text-sm font-medium">免费用户每日赠送积分</div>
-                                <div className="mt-1 text-xs leading-5 text-stone-500">{find("daily_credit_grant")?.description || "免费用户每日赠送积分（0 = 不赠送）"}</div>
-                            </div>
-                            <InputNumber
-                                min={0}
-                                max={100000}
-                                value={typeof find("daily_credit_grant")?.value === "number" ? (find("daily_credit_grant")?.value as number) : undefined}
-                                onChange={(value) => void update("daily_credit_grant", value ?? 0)}
-                                className="w-32"
-                            />
-                        </div>
+                        ))}
                     </div>
                 )}
             </section>
