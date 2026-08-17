@@ -11,6 +11,7 @@ export const PROVIDER_PRESETS = [
     { label: "OpenAI", value: "openai" },
     { label: "MiniMax", value: "minimax" },
     { label: "Seedance / 火山", value: "seedance" },
+    { label: "Aigccc / Seedance 2.0 网关", value: "aigccc" },
     { label: "Replicate", value: "replicate" },
     { label: "Gemini", value: "gemini" },
     { label: "DeepSeek", value: "deepseek" },

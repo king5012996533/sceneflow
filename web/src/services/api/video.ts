@@ -34,7 +34,7 @@ const REPLICATE_VIDEO_IMAGE_MAX_BYTES = 900 * 1024;
 const REPLICATE_VIDEO_IMAGE_MAX_SIDE = 1280;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
-export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate" | "minimax"; model: string; result?: VideoGenerationResult };
+export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate" | "minimax" | "aigccc"; model: string; result?: VideoGenerationResult };
 export type VideoGenerationTaskState = { status: "pending" } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
 function aiApiUrl(config: AiConfig, path: string) {
@@ -61,7 +61,7 @@ function proxyHintHeaders(config: Pick<AiConfig, "apiFormat" | "baseUrl" | "mode
 export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationResult> {
     const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options);
     if (task.result) return task.result;
-    const delayMs = task.provider === "seedance" ? 5000 : task.provider === "replicate" ? 1500 : task.provider === "minimax" ? 10000 : 2500;
+    const delayMs = task.provider === "aigccc" ? 5000 : task.provider === "seedance" ? 5000 : task.provider === "replicate" ? 1500 : task.provider === "minimax" ? 10000 : 2500;
     for (let attempt = 0; attempt < 120; attempt += 1) {
         if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const state = await pollVideoGenerationTask(config, task, options);
@@ -77,6 +77,10 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     const selectedModel = (config.videoModel || config.model).trim();
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
     assertVideoConfig(requestConfig, requestConfig.model);
+    if (requestConfig.apiFormat === "aigccc") {
+        // Aigccc（Seedance 2.0 第三方网关）必须优先于 isSeedanceVideoConfig 判断（模型能力标定为 seedance-video 时会命中 seedance 分支）
+        return createAigcccVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
+    }
     if (isSeedanceVideoConfig(requestConfig)) {
         return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
@@ -95,6 +99,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
 export async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     const requestConfig = resolveModelRequestConfig(config, task.model);
     assertVideoConfig(requestConfig, requestConfig.model);
+    if (task.provider === "aigccc") return pollAigcccVideoTask(requestConfig, task, options);
     if (task.provider === "seedance") return pollSeedanceTask(requestConfig, task, options);
     if (task.provider === "replicate") return pollReplicateVideoTask(requestConfig, task, options);
     if (task.provider === "minimax") return pollMiniMaxVideoTask(requestConfig, task, options);
@@ -330,6 +335,164 @@ async function pollMiniMaxVideoTask(config: AiConfig, task: VideoGenerationTask,
     } catch (error) {
         throw new Error(readAxiosError(error, "MiniMax 任务查询失败"));
     }
+}
+
+// ---------- Aigccc（Seedance 2.0 第三方网关，自有 REST 接口：/api/external/v1/...）----------
+
+type AigcccEnvelope<T> = { code?: number; message?: string; data?: T | null; trace_id?: string };
+
+const AIGCCC_UPLOAD_MAX_BYTES = 8 * 1024 * 1024;
+const AIGCCC_UPLOAD_MAX_SIDE = 2048;
+
+function aigcccApiUrl(config: AiConfig, path: string) {
+    // 网关路径是根路径下的绝对路径（/api/external/v1/...），不能套用 buildApiUrl 的 /v1 拼接规则
+    const base = config.baseUrl.trim().replace(/\/+$/, "");
+    return `${base}${path}`;
+}
+
+function aigcccHeaders(config: Pick<AiConfig, "apiFormat" | "baseUrl" | "model">) {
+    return { ...proxyHintHeaders(config), "Content-Type": "application/json" };
+}
+
+function aigcccRatio(value: string) {
+    if (!value || value === "auto" || value === "adaptive") return "16:9";
+    const match = value.match(/^(\d+)[:x](\d+)$/i);
+    if (match) {
+        const w = Number(match[1]);
+        const h = Number(match[2]);
+        if (w && h) {
+            const divisor = gcd(w, h);
+            const ratio = `${w / divisor}:${h / divisor}`;
+            if (["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"].includes(ratio)) return ratio;
+        }
+    }
+    return "16:9";
+}
+
+function aigcccDuration(value: string) {
+    const seconds = Math.round(Number(value) || 5);
+    if (!Number.isFinite(seconds) || seconds <= 0) return 5;
+    return Math.min(15, Math.max(4, seconds));
+}
+
+function aigcccResolution(value: string) {
+    if (value === "low") return "480p";
+    if (value === "high") return "1080p";
+    if (value === "auto" || value === "medium") return "720p";
+    const resolution = Math.floor(Number(value.replace(/p$/i, "")) || 720);
+    return `${Math.min(1080, Math.max(480, resolution))}p`;
+}
+
+function unwrapAigccc<T>(payload: AigcccEnvelope<T>): T {
+    if (!payload || typeof payload !== "object") throw new Error("Aigccc 接口没有返回数据");
+    if (payload.code !== 0 || !payload.data) {
+        const trace = payload.trace_id ? ` Trace id: ${payload.trace_id}` : "";
+        throw new Error(`${payload.message || `Aigccc 错误 ${payload.code}`}${trace}`);
+    }
+    return payload.data;
+}
+
+async function createAigcccVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+    if (!prompt.trim() && !references.length && !videoReferences.length && !audioReferences.length) {
+        throw new Error("请输入视频提示词，或连接参考图片/视频/音频");
+    }
+    assertSeedanceVideoReferences(videoReferences);
+    assertSeedanceAudioReferences(audioReferences);
+    const payload: Record<string, unknown> = {
+        prompt: prompt.trim(),
+        mode: "pro",
+        resolution: aigcccResolution(config.vquality),
+        ratio: aigcccRatio(config.size),
+        duration: aigcccDuration(config.videoSeconds),
+    };
+    const images = references.slice(0, 9);
+    if (images.length) {
+        payload.images = (await uploadAigcccImages(config, images, options?.signal)).map((url) => ({ url }));
+    }
+    if (videoReferences.length) {
+        payload.videos = videoReferences.slice(0, 3).map((video) => ({ url: aigcccReferenceUrl(video.url, "参考视频必须是公网 URL 或已上传的素材链接") }));
+    }
+    if (audioReferences.length) {
+        payload.audios = audioReferences.slice(0, 3).map((audio) => ({ url: aigcccReferenceUrl(audio.url, "参考音频必须是公网 URL 或已上传的素材链接") }));
+    }
+    try {
+        const data = await proxyFetch<AigcccEnvelope<{ task_id?: string; estimated_credits?: number }>>({
+            url: aigcccApiUrl(config, "/api/external/v1/video/task/create"),
+            method: "POST",
+            headers: aigcccHeaders(config),
+            body: payload,
+        });
+        const created = unwrapAigccc(data);
+        if (!created.task_id) throw new Error("Aigccc 接口没有返回任务 ID");
+        return { id: created.task_id, provider: "aigccc", model };
+    } catch (error) {
+        throw new Error(readAxiosError(error, "Aigccc 任务创建失败"));
+    }
+}
+
+async function pollAigcccVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
+    try {
+        const state = unwrapAigccc(
+            await proxyFetch<AigcccEnvelope<{ status?: string; video_url?: string; duration?: number; error?: string }>>({
+                url: aigcccApiUrl(config, "/api/external/v1/video/task/status"),
+                method: "POST",
+                headers: aigcccHeaders(config),
+                body: { task_id: task.id },
+            }),
+        );
+        if (state.status === "succeeded") {
+            if (!state.video_url) return { status: "failed", error: "Aigccc 任务成功但没有返回视频 URL" };
+            return { status: "completed", result: await videoResultFromUrl(state.video_url, options) };
+        }
+        if (state.status === "failed") return { status: "failed", error: state.error || "Aigccc 视频生成失败" };
+        return { status: "pending" };
+    } catch (error) {
+        throw new Error(readAxiosError(error, "Aigccc 任务查询失败"));
+    }
+}
+
+// 本地参考图压缩后上传到网关临时存储（每次一图，规避网关按 key 的并发上传限流）
+async function uploadAigcccImages(config: AiConfig, images: ReferenceImage[], signal?: AbortSignal) {
+    const urls: string[] = [];
+    for (const image of images) {
+        const directUrl = image.url || image.dataUrl;
+        if (isPublicMediaUrl(directUrl)) {
+            urls.push(directUrl);
+            continue;
+        }
+        const dataUrl = await imageToDataUrl(image);
+        if (!dataUrl) throw new Error("参考图读取失败，请换一张图片或重新上传");
+        const compressed = await compressImageDataUrl(dataUrl, AIGCCC_UPLOAD_MAX_BYTES, AIGCCC_UPLOAD_MAX_SIDE);
+        const file = await dataUrlToFile({ ...image, dataUrl: compressed });
+        urls.push(await uploadAigcccImage(config, file, signal));
+    }
+    return urls;
+}
+
+async function uploadAigcccImage(config: AiConfig, file: File, signal?: AbortSignal) {
+    const formData = new FormData();
+    formData.append("files", file, file.name || "reference.jpg");
+    formData.set("_proxy_url", aigcccApiUrl(config, "/api/external/v1/image/upload/batch"));
+    formData.set("_proxy_method", "POST");
+    formData.set("_proxy_headers", JSON.stringify(proxyHintHeaders(config)));
+    const response = await fetch("/canvas/api/proxy/form-data", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+        signal,
+    });
+    const data = (await response.json().catch(() => null)) as { success?: boolean; message?: string; data?: Array<{ url?: string }> } | null;
+    if (!response.ok || !data?.success) {
+        throw new Error(data?.message || statusMessage(response.status, "参考图上传失败"));
+    }
+    const uploaded = data.data?.[0];
+    if (!uploaded?.url) throw new Error("参考图上传失败，请换一张图片或重新上传");
+    return uploaded.url;
+}
+
+function aigcccReferenceUrl(url: string, message: string) {
+    if (!isPublicMediaUrl(url)) throw new Error(message);
+    return url;
 }
 
 async function createReplicateVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {

@@ -56,6 +56,12 @@ export async function POST(req: NextRequest) {
                     if (key.toLowerCase() === "x-goog-api-key") delete safeHeaders[key];
                 }
                 safeHeaders["x-goog-api-key"] = finalToken;
+            } else if (platformCred?.provider === "aigccc") {
+                // aigccc 网关用 ApiKey 头（非 Bearer）
+                for (const key of Object.keys(safeHeaders)) {
+                    if (key.toLowerCase() === "apikey") delete safeHeaders[key];
+                }
+                safeHeaders["apikey"] = finalToken;
             } else {
                 safeHeaders["authorization"] = `Bearer ${finalToken}`;
             }

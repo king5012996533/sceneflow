@@ -30,7 +30,12 @@ export async function POST(req: NextRequest) {
         const platformCred = await resolvePlatformCredential({ targetUrl: target.toString(), provider: sfProvider, model: sfModel });
 
         if (platformCred) {
-            safeHeaders["authorization"] = `Bearer ${platformCred.apiKey}`;
+            if (platformCred.provider === "aigccc") {
+                // aigccc 网关用 ApiKey 头（非 Bearer）
+                safeHeaders["apikey"] = platformCred.apiKey;
+            } else {
+                safeHeaders["authorization"] = `Bearer ${platformCred.apiKey}`;
+            }
             console.log(`[proxy/form-data] key-source=platform target=${target.hostname}`);
         }
 

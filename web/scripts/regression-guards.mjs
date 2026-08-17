@@ -135,6 +135,17 @@ assertIncludes("src/stores/platform-catalog-store.ts", "getPlatformPricing", "�
 assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "videoCreditsPerSecond", "后台必须提供逐模型定价编辑器。");
 assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", "pickPricing", "后台表单必须提供 pickPricing。");
 
+// —— Aigccc / Seedance 2.0 网关接入 ——
+assertIncludes("src/stores/use-config-store.ts", '"aigccc"', "ApiCallFormat 必须支持 aigccc。");
+assertIncludes("src/stores/use-config-store.ts", 'value.includes("aigccc666.com")', "config store 必须按 aigccc666.com 识别网关 Base URL。");
+assertIncludes("src/app/api/proxy/route.ts", 'platformCred?.provider === "aigccc"', "proxy 必须为 aigccc 注入 ApiKey 头（非 Bearer）。");
+assertIncludes("src/app/api/proxy/form-data/route.ts", 'platformCred.provider === "aigccc"', "form-data proxy 必须为 aigccc 注入 ApiKey 头（非 Bearer）。");
+assertIncludes("src/services/api/video.ts", "createAigcccVideoTask", "视频服务必须提供 aigccc 任务创建分支。");
+assertIncludes("src/services/api/video.ts", "pollAigcccVideoTask", "视频服务必须提供 aigccc 任务轮询分支。");
+assertIncludes("src/services/api/video.ts", "/api/external/v1/video/task/create", "aigccc 创建任务必须走网关 /api/external/v1 路径。");
+assertIncludes("src/services/api/video.ts", 'apiFormat === "aigccc"', "视频服务必须按 apiFormat=aigccc 分发（先于 seedance 启发式）。");
+assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", 'value: "aigccc"', "后台凭证表单必须提供 Aigccc 预设。");
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

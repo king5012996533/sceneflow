@@ -7,7 +7,7 @@ import { nanoid } from "nanoid";
 import { scopedStorageKey } from "@/lib/user-data-scope";
 import type { PlatformCatalogModel } from "@/stores/platform-catalog-store";
 
-export type ApiCallFormat = "openai" | "gemini" | "replicate" | "minimax";
+export type ApiCallFormat = "openai" | "gemini" | "replicate" | "minimax" | "aigccc";
 
 export type ModelChannel = {
     id: string;
@@ -514,7 +514,7 @@ export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
 }
 
 function normalizeApiFormat(apiFormat: unknown): ApiCallFormat {
-    if (apiFormat === "gemini" || apiFormat === "replicate" || apiFormat === "minimax") return apiFormat;
+    if (apiFormat === "gemini" || apiFormat === "replicate" || apiFormat === "minimax" || apiFormat === "aigccc") return apiFormat;
     return "openai";
 }
 
@@ -523,6 +523,7 @@ export function inferApiFormatFromBaseUrl(baseUrl: string): ApiCallFormat | null
     if (value.includes("api.replicate.com") || value.includes("replicate.com/v1")) return "replicate";
     if (value.includes("generativelanguage.googleapis.com")) return "gemini";
     if (value.includes("api.minimaxi.com")) return "minimax";
+    if (value.includes("aigccc666.com")) return "aigccc";
     return null;
 }
 
@@ -534,6 +535,7 @@ export function inferProviderHint(apiFormat: ApiCallFormat, baseUrl: string): st
     if (apiFormat === "gemini") return "gemini";
     if (apiFormat === "replicate") return "replicate";
     if (apiFormat === "minimax") return "minimax";
+    if (apiFormat === "aigccc") return "aigccc";
     const value = baseUrl.trim().toLowerCase();
     if (value.includes("ark.cn-beijing.volces.com") || value.includes("/api/plan/v3")) return "seedance";
     if (value.includes("api.deepseek.com")) return "deepseek";
