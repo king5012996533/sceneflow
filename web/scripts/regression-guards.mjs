@@ -143,6 +143,7 @@ assertIncludes("src/app/api/proxy/form-data/route.ts", 'platformCred.provider ==
 assertIncludes("src/services/api/video.ts", "createAigcccVideoTask", "视频服务必须提供 aigccc 任务创建分支。");
 assertIncludes("src/services/api/video.ts", "pollAigcccVideoTask", "视频服务必须提供 aigccc 任务轮询分支。");
 assertIncludes("src/services/api/video.ts", "/api/external/v1/video/task/create", "aigccc 创建任务必须走网关 /api/external/v1 路径。");
+assertIncludes("src/services/api/video.ts", "Math.min(720", "aigccc 分辨率必须钳到 720p（网关实际最高只输出 720p）。");
 assertIncludes("src/services/api/video.ts", 'apiFormat === "aigccc"', "视频服务必须按 apiFormat=aigccc 分发（先于 seedance 启发式）。");
 assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", 'value: "aigccc"', "后台凭证表单必须提供 Aigccc 预设。");
 

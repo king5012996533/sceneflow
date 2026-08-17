@@ -376,11 +376,11 @@ function aigcccDuration(value: string) {
 }
 
 function aigcccResolution(value: string) {
+    // 网关实际输出最高 720p（1080p/更高会被静默降级），创建前直接钳制，避免「选了 1080p 实际出 720p」
     if (value === "low") return "480p";
-    if (value === "high") return "1080p";
-    if (value === "auto" || value === "medium") return "720p";
+    if (value === "high" || value === "auto" || value === "medium") return "720p";
     const resolution = Math.floor(Number(value.replace(/p$/i, "")) || 720);
-    return `${Math.min(1080, Math.max(480, resolution))}p`;
+    return `${Math.min(720, Math.max(480, resolution))}p`;
 }
 
 function unwrapAigccc<T>(payload: AigcccEnvelope<T>): T {
