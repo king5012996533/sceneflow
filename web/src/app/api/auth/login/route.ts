@@ -23,6 +23,15 @@ export async function POST(req: NextRequest) {
         const allowed = await checkRateLimit(`auth:login:${ip}`, { windowMs: 60_000, maxRequests: 5 });
         if (!allowed) return withNoStore(NextResponse.json({ error: "登录太频繁，请稍后再试" }, { status: 429 }));
 
+        // M4：按账号限流（防止攻击者换 IP 爆破单一账号）
+        const account = String(phone || email || "")
+            .trim()
+            .toLowerCase();
+        if (account) {
+            const accountAllowed = await checkRateLimit(`auth:login:account:${account}`, { windowMs: 60_000, maxRequests: 5 });
+            if (!accountAllowed) return withNoStore(NextResponse.json({ error: "该账号登录尝试过于频繁，请稍后再试" }, { status: 429 }));
+        }
+
         if (phone && code) {
             if (!PHONE_REGEX.test(phone)) return withNoStore(NextResponse.json({ error: "手机号格式不正确" }, { status: 400 }));
 
@@ -71,10 +80,7 @@ export async function POST(req: NextRequest) {
     } catch (err: any) {
         console.error("Login error:", err?.message, err?.code);
         const dbErrorCode = typeof err?.code === "string" && /^P10\d{2}$/.test(err.code);
-        const dbErrorMessage =
-            /connection (terminated|reset|refused|closed|timeout)|can't reach database|database server timeout|timed?\s*out/i.test(
-                String(err?.message || ""),
-            );
+        const dbErrorMessage = /connection (terminated|reset|refused|closed|timeout)|can't reach database|database server timeout|timed?\s*out/i.test(String(err?.message || ""));
         if (dbErrorCode || dbErrorMessage) {
             return withNoStore(NextResponse.json({ error: "数据库连接超时，请稍后再试" }, { status: 503 }));
         }

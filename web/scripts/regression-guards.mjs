@@ -154,6 +154,11 @@ assertIncludes("src/app/api/payments/callback/route.ts", "prisma.$transaction", 
 assertIncludes("src/app/api/payments/callback/route.ts", "order.amount", "支付回调必须核对订单金额（H-4）。");
 assertIncludes("src/lib/generation/generation-jobs.server.ts", "normalizeGenerationMetadata", "扣费必须基于服务端规范化的 metadata（H-6）。");
 assertIncludes("src/lib/generation/generation-config.ts", "normalizeGenerationMetadata", "服务端必须提供 metadata 规范化函数（H-6）。");
+
+// —— M4/M5 限流 ——
+assertIncludes("src/app/api/auth/send-code/route.ts", "auth:sendcode:target:daily", "验证码必须按目标每日上限（M5）。");
+assertIncludes("src/app/api/auth/send-code/route.ts", "auth:sendcode:ip:daily", "验证码必须按 IP 每日上限（M5）。");
+assertIncludes("src/app/api/auth/login/route.ts", "auth:login:account:", "登录必须按账号限流（M4）。");
 assertIncludes("src/services/api/video.ts", "createAigcccVideoTask", "视频服务必须提供 aigccc 任务创建分支。");
 assertIncludes("src/services/api/video.ts", "pollAigcccVideoTask", "视频服务必须提供 aigccc 任务轮询分支。");
 assertIncludes("src/services/api/video.ts", "/api/external/v1/video/task/create", "aigccc 创建任务必须走网关 /api/external/v1 路径。");

@@ -21,6 +21,12 @@ export async function POST(req: NextRequest) {
         const ipAllowed = await checkRateLimit(`auth:ip:${ip}`, { windowMs: 60_000, maxRequests: 1 });
         if (!ipAllowed) return NextResponse.json({ error: "发送太频繁，请稍后再试" }, { status: 429 });
 
+        // M5：每日上限（按 IP 与按目标各设一道，防短信轰炸/撞库）
+        const ipDailyAllowed = await checkRateLimit(`auth:sendcode:ip:daily:${ip}`, { windowMs: 24 * 3600_000, maxRequests: 20 });
+        if (!ipDailyAllowed) return NextResponse.json({ error: "今日发送次数已达上限" }, { status: 429 });
+        const targetDailyAllowed = await checkRateLimit(`auth:sendcode:target:daily:${target}`, { windowMs: 24 * 3600_000, maxRequests: 10 });
+        if (!targetDailyAllowed) return NextResponse.json({ error: "该手机号/邮箱今日验证码次数已达上限" }, { status: 429 });
+
         const targetAllowed = await checkRateLimit(`auth:target:${target}`, { windowMs: 300_000, maxRequests: 1 });
         if (!targetAllowed) return NextResponse.json({ error: "验证码已发送，请查收", retryAfter: 300 }, { status: 429 });
 
