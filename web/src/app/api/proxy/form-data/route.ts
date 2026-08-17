@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         if (platformCred) {
             safeHeaders["authorization"] = `Bearer ${platformCred.apiKey}`;
             console.log(`[proxy/form-data] key-source=platform target=${target.hostname}`);
-        } else if (await getOperationFlag("byok_enabled", true)) {
+        } else if (await getOperationFlag("byok_enabled", false)) {
             let apiKey = "";
             try {
                 if (prisma) {

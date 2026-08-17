@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
         // —— API Key 解析优先级（平台 Key 化后反转） ——
         // ① 平台统一配置的凭证（按目标 host + 可选 provider/model 匹配，admin 在后台管理）
-        // ② 过渡期 BYOK：仅当 byok_enabled 开关打开时才读用户自带 Key
+        // ② 过渡期 BYOK：默认关闭（BYOK 下线）；如应急需要可在后台「运营配置」临时打开
         //    （请求头 Key > 用户 DB 渠道 Key > 用户 DB 默认 Key）
         // ③ 都没有 → 402 拒绝（平台模式下不允许无 Key 调用）
         const sfProvider = typeof safeHeaders["x-sf-provider"] === "string" ? safeHeaders["x-sf-provider"] : undefined;
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
             finalToken = platformCred.apiKey;
             keySource = "platform";
         } else {
-            const byokEnabled = await getOperationFlag("byok_enabled", true);
+            const byokEnabled = await getOperationFlag("byok_enabled", false);
             if (byokEnabled) {
                 const byok = await resolveByokKey(user.id, safeHeaders, target.toString());
                 finalToken = byok.token;
