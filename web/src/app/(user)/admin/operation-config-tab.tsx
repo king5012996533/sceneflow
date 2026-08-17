@@ -72,22 +72,22 @@ export default function OperationConfigTab() {
 
     return (
         <div className="grid gap-4 lg:grid-cols-2">
-            <section className="rounded-lg border border-stone-200 bg-white p-5">
-                <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                    <SlidersHorizontal className="size-5" />
+            <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+                <div className="sf-serif mb-4 flex items-center gap-2 text-[17px] font-semibold">
+                    <SlidersHorizontal className="size-4 text-[#9b5b32]" />
                     灰度与计费开关
                 </div>
-                <p className="mb-4 text-xs leading-5 text-stone-400">修改保存后约 30 秒生效（进程内缓存 TTL）。未配置项使用系统默认值。</p>
+                <p className="mb-4 text-xs leading-5 text-[#7a6d63]">修改保存后约 30 秒生效（进程内缓存 TTL）。未配置项使用系统默认值。</p>
                 {loading ? (
-                    <div className="text-sm text-stone-400">加载中…</div>
+                    <div className="text-sm text-[#7a6d63]">加载中…</div>
                 ) : (
                     <div className="space-y-4">
                         {EDITORS.map((spec) => (
-                            <div key={spec.key} className="flex items-start justify-between gap-4 rounded-md border border-stone-200 p-4">
+                            <div key={spec.key} className="flex items-start justify-between gap-4 rounded-md border border-[#ded2c3] bg-[#fffdf8] p-4">
                                 <div>
                                     <div className="text-sm font-medium">{spec.label}</div>
-                                    <div className="mt-1 text-xs leading-5 text-stone-500">{spec.description}</div>
-                                    <div className="mt-1 font-mono text-[11px] text-stone-400">{spec.key}</div>
+                                    <div className="mt-1 text-xs leading-5 text-[#7a6d63]">{spec.description}</div>
+                                    <div className="mt-1 font-mono text-[11px] text-[#b7a99b]">{spec.key}</div>
                                 </div>
                                 {spec.kind === "switch" ? (
                                     <Switch checked={currentValue(spec) === true} onChange={(checked) => void update(spec.key, checked)} />

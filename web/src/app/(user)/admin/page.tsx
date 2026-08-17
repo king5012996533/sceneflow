@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { App, Button, Empty, Input, Select, Tabs, Tag } from "antd";
-import { Ban, Coins, CreditCard, Database, FileText, History, Settings, Shield, Users } from "lucide-react";
+import { App, Button, ConfigProvider, Empty, Input, Select, Tabs, Tag } from "antd";
+import { Ban, Coins, CreditCard, FileText, History, Shield, TrendingUp, Users } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
 import { formatCny } from "@/lib/format";
 import { useUserStore } from "@/stores/use-user-store";
+import { adminTheme } from "./admin-theme";
 import CredentialsTab from "./credentials-tab";
 import CreditsTab from "./credits-tab";
 import CostsTab from "./costs-tab";
@@ -44,11 +45,6 @@ type AdminOrder = {
     createdAt: string;
     user: { email: string; name: string };
     package: { name: string } | null;
-};
-
-type AdminConfig = {
-    modelConfigs: Array<{ id: string; provider: string; model: string; displayName: string; type: string; enabled: boolean; isDefault: boolean }>;
-    operationConfigs: Array<{ id: string; key: string; value: unknown; description: string }>;
 };
 
 type AuditLog = {
@@ -100,7 +96,6 @@ export default function AdminPage() {
     const [overview, setOverview] = useState<Overview | null>(null);
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [orders, setOrders] = useState<AdminOrder[]>([]);
-    const [config, setConfig] = useState<AdminConfig | null>(null);
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
     const [generationJobs, setGenerationJobs] = useState<GenerationJob[]>([]);
     const [query, setQuery] = useState("");
@@ -117,18 +112,16 @@ export default function AdminPage() {
     async function loadAll() {
         setLoading(true);
         try {
-            const [overviewData, usersData, ordersData, configData, auditData, jobsData] = await Promise.all([
+            const [overviewData, usersData, ordersData, auditData, jobsData] = await Promise.all([
                 requestJson<{ metrics: Overview }>(apiPath("/api/admin/overview")),
                 requestJson<{ users: AdminUser[] }>(apiPath(`/api/admin/users${query ? `?q=${encodeURIComponent(query)}` : ""}`)),
                 requestJson<{ orders: AdminOrder[] }>(apiPath("/api/admin/orders")),
-                requestJson<AdminConfig>(apiPath("/api/admin/configs")),
                 requestJson<{ logs: AuditLog[] }>(apiPath("/api/admin/audit-log?take=50")),
                 requestJson<{ jobs: GenerationJob[] }>(apiPath("/api/admin/generation-jobs?take=50")),
             ]);
             setOverview(overviewData.metrics);
             setUsers(usersData.users);
             setOrders(ordersData.orders);
-            setConfig(configData);
             setAuditLogs(auditData.logs);
             setGenerationJobs(jobsData.jobs);
         } catch (error) {
@@ -192,305 +185,293 @@ export default function AdminPage() {
 
     if (checkingAccess || user?.role !== "admin") {
         return (
-            <main className="grid h-full place-items-center bg-[#f5f5f2] px-6 text-stone-950">
-                <div className="rounded-lg border border-stone-200 bg-white p-6 text-sm text-stone-500 shadow-sm">正在校验管理员权限...</div>
+            <main className="grid h-full place-items-center bg-[#f6efe4] px-6">
+                <div className="rounded-xl border border-[#ded2c3] bg-[#fffdf8] p-6 text-sm text-[#7a6d63] shadow-sm">正在校验管理员权限...</div>
             </main>
         );
     }
 
+    const pendingOrders = overview?.pendingOrders ?? 0;
+
     return (
-        <main className="h-full overflow-y-auto bg-[#f5f5f2] px-6 py-8 text-stone-950">
-            <div className="mx-auto max-w-7xl">
-                <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                        <div className="mb-3 inline-flex items-center gap-2 text-xs font-medium tracking-[0.18em] text-stone-400">
-                            <Shield className="size-4" />
-                            ADMIN
+        <ConfigProvider theme={adminTheme}>
+            <main className="h-full overflow-y-auto bg-[#f6efe4] px-6 py-8 text-[#201914]">
+                <div className="mx-auto max-w-[1180px]">
+                    <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+                        <div>
+                            <div className="mb-2.5 inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.24em] text-[#9b5b32]">
+                                <Shield className="size-3.5" />
+                                ADMIN · 控制台
+                            </div>
+                            <h1 className="sf-serif text-[30px] font-semibold tracking-[0.01em] text-[#201914]">管理后台</h1>
+                            <p className="mt-2 max-w-[520px] text-[13px] leading-relaxed text-[#7a6d63]">内测期间订单由管理员人工确认后入账，待处理订单会以红点标注。</p>
                         </div>
-                        <h1 className="text-2xl font-semibold tracking-tight">管理后台</h1>
-                        <p className="mt-2 text-sm text-stone-500">内测阶段暂不接入在线收银台，管理员确认积分包订单后人工入账。</p>
+                        <Button loading={loading} onClick={() => void loadAll()} className="!border-[#ded2c3] !bg-[#fffdf8] !text-[#201914]">
+                            刷新数据
+                        </Button>
                     </div>
-                    <Button loading={loading} onClick={() => void loadAll()}>
-                        刷新数据
-                    </Button>
-                </div>
 
-                <div className="mb-4 grid gap-3 md:grid-cols-4">
-                    <Metric icon={Users} label="用户" value={overview?.users ?? "-"} />
-                    <Metric icon={CreditCard} label="已支付订单" value={overview?.paidOrders ?? "-"} />
-                    <Metric icon={CreditCard} label="待处理订单" value={overview?.pendingOrders ?? "-"} />
-                    <Metric icon={Database} label="参考金额" value={overview ? formatCny(overview.revenue) : "-"} />
-                </div>
-                <div className="mb-4 grid gap-3 md:grid-cols-5">
-                    <Metric icon={Coins} label="积分余额合计" value={overview ? overview.creditBalanceSum.toLocaleString("zh-CN") : "-"} />
-                    <Metric icon={Coins} label="已消耗积分" value={overview ? overview.creditsConsumed.toLocaleString("zh-CN") : "-"} />
-                    <Metric icon={Coins} label="已充值积分" value={overview ? overview.creditsPurchased.toLocaleString("zh-CN") : "-"} />
-                </div>
+                    <div className="mb-6 grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+                        <Metric icon={Users} label="用户总数" value={overview?.users?.toLocaleString("zh-CN") ?? "-"} caption="注册用户累计" />
+                        <Metric icon={CreditCard} label="待处理订单" value={overview?.pendingOrders ?? "-"} caption="需人工确认入账" />
+                        <Metric icon={TrendingUp} label="累计收入 · 参考" value={overview ? formatCny(overview.revenue) : "-"} caption="按订单金额估算" />
+                        <Metric icon={Coins} label="积分余额合计" value={overview ? overview.creditBalanceSum.toLocaleString("zh-CN") : "-"} caption="全体用户累计" />
+                    </div>
 
-                <Tabs
-                    items={[
-                        {
-                            key: "users",
-                            label: "用户管理",
-                            children: (
-                                <section className="rounded-lg border border-stone-200 bg-white p-5">
-                                    <div className="mb-4 flex flex-wrap gap-3">
-                                        <Input.Search value={query} onChange={(event) => setQuery(event.target.value)} onSearch={() => void loadAll()} placeholder="搜索邮箱、昵称、手机号" className="max-w-md" />
-                                    </div>
-                                    <DataTable empty={!users.length}>
-                                        <thead className="border-b border-stone-200 text-stone-500">
-                                            <tr>
-                                                <th className="py-3 font-medium">用户</th>
-                                                <th className="py-3 font-medium">注册时间</th>
-                                                <th className="py-3 font-medium">角色</th>
-                                                <th className="py-3 font-medium">状态</th>
-                                                <th className="py-3 font-medium">操作</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {users.map((user) => (
-                                                <tr key={user.id} className="border-b border-stone-100 align-top">
-                                                    <td className="py-3">
-                                                        <div className="font-medium">{user.name || user.email}</div>
-                                                        <div className="text-xs text-stone-500">{user.email}</div>
-                                                        {user.phone ? <div className="text-xs text-stone-400">{user.phone}</div> : null}
-                                                    </td>
-                                                    <td className="py-3 text-sm text-stone-600">
-                                                        <div>{formatDateTime(user.createdAt)}</div>
-                                                        <div className="text-xs text-stone-400">{formatRelativeTime(user.createdAt)}</div>
-                                                    </td>
-                                                    <td className="py-3">
-                                                        <Select
-                                                            value={user.role}
-                                                            options={[
-                                                                { label: "user", value: "user" },
-                                                                { label: "admin", value: "admin" },
-                                                            ]}
-                                                            onChange={(role) => void updateUser(user.id, "role", { role })}
-                                                            className="w-28"
-                                                        />
-                                                    </td>
-                                                    <td className="py-3">{user.bannedAt ? <Tag color="red">已封禁</Tag> : <Tag color="green">正常</Tag>}</td>
-                                                    <td className="py-3">
-                                                        <Button size="small" icon={<Ban className="size-3.5" />} onClick={() => void updateUser(user.id, user.bannedAt ? "unban" : "ban")}>
-                                                            {user.bannedAt ? "解封" : "封禁"}
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </DataTable>
-                                </section>
-                            ),
-                        },
-                        {
-                            key: "orders",
-                            label: "订单管理",
-                            children: (
-                                <section className="rounded-lg border border-stone-200 bg-white p-5">
-                                    <DataTable empty={!orders.length}>
-                                        <thead className="border-b border-stone-200 text-stone-500">
-                                            <tr>
-                                                <th className="py-3 font-medium">记录号</th>
-                                                <th className="py-3 font-medium">用户</th>
-                                                <th className="py-3 font-medium">积分包</th>
-                                                <th className="py-3 font-medium">参考金额</th>
-                                                <th className="py-3 font-medium">来源</th>
-                                                <th className="py-3 font-medium">时间</th>
-                                                <th className="py-3 font-medium">状态</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {orders.map((order) => (
-                                                <tr key={order.id} className="border-b border-stone-100">
-                                                    <td className="py-3 font-mono text-xs">{order.orderNo}</td>
-                                                    <td className="py-3">{order.user.email}</td>
-                                                    <td className="py-3">{order.package?.name || "—"}</td>
-                                                    <td className="py-3">{formatCny(order.amount)}</td>
-                                                    <td className="py-3">{order.provider === "manual" ? "人工确认" : order.provider}</td>
-                                                    <td className="py-3 text-sm text-stone-600">
-                                                        <div>{formatDateTime(order.createdAt)}</div>
-                                                        <div className="text-xs text-stone-400">{formatRelativeTime(order.createdAt)}</div>
-                                                    </td>
-                                                    <td className="py-3">
-                                                        <Select
-                                                            value={order.status}
-                                                            options={[
-                                                                { label: "待处理", value: "pending" },
-                                                                { label: "已开通", value: "paid" },
-                                                                { label: "已取消", value: "cancelled" },
-                                                                { label: "失败", value: "failed" },
-                                                                { label: "已退款", value: "refunded" },
-                                                            ]}
-                                                            onChange={(status) => void updateOrder(order.id, status)}
-                                                            className="w-32"
-                                                        />
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </DataTable>
-                                </section>
-                            ),
-                        },
-                        {
-                            key: "projects",
-                            label: "项目管理",
-                            children: (
-                                <section className="rounded-lg border border-stone-200 bg-white p-6">
-                                    <Empty description="当前画布项目主要存储在前端/本地持久化，后续接入服务端 Project、CanvasSnapshot、AssetReference 后再做全局检索和异常排查。" />
-                                </section>
-                            ),
-                        },
-                        {
-                            key: "audit",
-                            label: "审计日志",
-                            children: (
-                                <section className="rounded-lg border border-stone-200 bg-white p-5">
-                                    <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                                        <History className="size-5" />
-                                        管理员操作记录
-                                    </div>
-                                    <DataTable empty={!auditLogs.length}>
-                                        <thead className="border-b border-stone-200 text-stone-500">
-                                            <tr>
-                                                <th className="py-3 font-medium">时间</th>
-                                                <th className="py-3 font-medium">操作人</th>
-                                                <th className="py-3 font-medium">操作</th>
-                                                <th className="py-3 font-medium">目标</th>
-                                                <th className="py-3 font-medium">目标ID</th>
-                                                <th className="py-3 font-medium">详情</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {auditLogs.map((log) => (
-                                                <tr key={log.id} className="border-b border-stone-100">
-                                                    <td className="py-3 text-sm text-stone-600">{formatDateTime(log.createdAt)}</td>
-                                                    <td className="py-3 text-sm">{log.actor?.email || "-"}</td>
-                                                    <td className="py-3">
-                                                        <Tag>{log.action}</Tag>
-                                                    </td>
-                                                    <td className="py-3 text-sm">{log.target}</td>
-                                                    <td className="py-3 font-mono text-xs text-stone-500">{log.targetId.slice(0, 12)}...</td>
-                                                    <td className="py-3 text-xs text-stone-400 max-w-[200px] truncate">{JSON.stringify(log.metadata)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </DataTable>
-                                </section>
-                            ),
-                        },
-                        {
-                            key: "jobs",
-                            label: "生成记录",
-                            children: (
-                                <section className="rounded-lg border border-stone-200 bg-white p-5">
-                                    <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                                        <FileText className="size-5" />
-                                        AI 生成任务
-                                    </div>
-                                    <DataTable empty={!generationJobs.length}>
-                                        <thead className="border-b border-stone-200 text-stone-500">
-                                            <tr>
-                                                <th className="py-3 font-medium">时间</th>
-                                                <th className="py-3 font-medium">用户</th>
-                                                <th className="py-3 font-medium">类型</th>
-                                                <th className="py-3 font-medium">模型</th>
-                                                <th className="py-3 font-medium">状态</th>
-                                                <th className="py-3 font-medium">预览</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {generationJobs.map((job) => (
-                                                <tr key={job.id} className="border-b border-stone-100">
-                                                    <td className="py-3 text-sm text-stone-600">{formatDateTime(job.createdAt)}</td>
-                                                    <td className="py-3 text-sm">{job.user?.email || "-"}</td>
-                                                    <td className="py-3">
-                                                        <Tag>{job.kind}</Tag>
-                                                    </td>
-                                                    <td className="py-3 text-sm">{String(job.metadata?.model || job.metadata?.imageModel || job.metadata?.videoModel || "-")}</td>
-                                                    <td className="py-3">
-                                                        <Tag color={job.status === "succeeded" ? "green" : job.status === "failed" ? "red" : "blue"}>{job.status}</Tag>
-                                                    </td>
-                                                    <td className="py-3">
-                                                        {job.resultUrl ? (
-                                                            <a href={job.resultUrl} target="_blank" rel="noopener noreferrer">
-                                                                <img src={job.resultUrl} alt="生成结果" className="h-12 w-12 rounded object-cover border border-stone-200" />
-                                                            </a>
-                                                        ) : (
-                                                            <span className="text-xs text-stone-400">-</span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </DataTable>
-                                </section>
-                            ),
-                        },
-                        {
-                            key: "configs",
-                            label: "模型/运营配置",
-                            children: (
-                                <div className="grid gap-4 lg:grid-cols-2">
-                                    <section className="rounded-lg border border-stone-200 bg-white p-5">
-                                        <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                                            <Settings className="size-5" />
-                                            模型与运营配置
-                                        </div>
-                                        {config?.modelConfigs.length ? (
-                                            <div className="space-y-3">
-                                                {config.modelConfigs.map((item) => (
-                                                    <div key={item.id} className="rounded-md border border-stone-200 p-4 text-sm">
-                                                        <div className="font-medium">{item.displayName}</div>
-                                                        <div className="mt-1 text-stone-500">
-                                                            {item.provider} / {item.model} / {item.type}
-                                                        </div>
-                                                    </div>
-                                                ))}
+                    <Tabs
+                        defaultActiveKey="users"
+                        items={[
+                            {
+                                key: "users",
+                                label: "用户管理",
+                                children: (
+                                    <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+                                        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                                            <div className="sf-serif flex items-center gap-2 text-[17px] font-semibold">
+                                                <Users className="size-4 text-[#9b5b32]" />
+                                                用户列表
                                             </div>
-                                        ) : (
-                                            <Empty description="暂无模型配置，可通过 /api/admin/configs 写入。" />
-                                        )}
+                                            <Input.Search value={query} onChange={(event) => setQuery(event.target.value)} onSearch={() => void loadAll()} placeholder="搜索邮箱、昵称、手机号" className="max-w-md" />
+                                        </div>
+                                        <DataTable empty={!users.length}>
+                                            <thead>
+                                                <tr>
+                                                    <th className="py-3">用户</th>
+                                                    <th className="py-3">注册时间</th>
+                                                    <th className="py-3">角色</th>
+                                                    <th className="py-3">状态</th>
+                                                    <th className="py-3">操作</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {users.map((item) => (
+                                                    <tr key={item.id}>
+                                                        <td className="py-3">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="sf-serif flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[#9b5b32] text-[14px] font-semibold text-[#fffaf2]">
+                                                                    {(item.name || item.email || "U").slice(0, 1).toUpperCase()}
+                                                                </span>
+                                                                <div className="min-w-0">
+                                                                    <div className="font-medium text-[#201914]">{item.name || item.email}</div>
+                                                                    <div className="text-xs text-[#7a6d63]">{item.email}</div>
+                                                                    {item.phone ? <div className="text-[11px] text-[#b7a99b]">{item.phone}</div> : null}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-3 text-sm text-[#5a4f47]">
+                                                            <div>{formatDateTime(item.createdAt)}</div>
+                                                            <div className="text-xs text-[#b7a99b]">{formatRelativeTime(item.createdAt)}</div>
+                                                        </td>
+                                                        <td className="py-3">
+                                                            <Select
+                                                                value={item.role}
+                                                                options={[
+                                                                    { label: "user", value: "user" },
+                                                                    { label: "admin", value: "admin" },
+                                                                ]}
+                                                                onChange={(role) => void updateUser(item.id, "role", { role })}
+                                                                className="w-28"
+                                                            />
+                                                        </td>
+                                                        <td className="py-3">{item.bannedAt ? <Tag color="red">已封禁</Tag> : <Tag color="green">正常</Tag>}</td>
+                                                        <td className="py-3">
+                                                            <Button size="small" icon={<Ban className="size-3.5" />} onClick={() => void updateUser(item.id, item.bannedAt ? "unban" : "ban")}>
+                                                                {item.bannedAt ? "解封" : "封禁"}
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </DataTable>
                                     </section>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: "credentials",
-                            label: "平台密钥",
-                            children: <CredentialsTab />,
-                        },
-                        {
-                            key: "credits",
-                            label: "积分管理",
-                            children: <CreditsTab />,
-                        },
-                        {
-                            key: "costs",
-                            label: "对账",
-                            children: <CostsTab />,
-                        },
-                        {
-                            key: "operation-config",
-                            label: "运营配置",
-                            children: <OperationConfigTab />,
-                        },
-                    ]}
-                />
-            </div>
-        </main>
+                                ),
+                            },
+                            {
+                                key: "orders",
+                                label: (
+                                    <span className="inline-flex items-center gap-1.5">
+                                        {pendingOrders > 0 ? <span aria-hidden="true" className="size-1.5 rounded-full bg-[#c2412e]" /> : null}
+                                        订单管理
+                                    </span>
+                                ),
+                                children: (
+                                    <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+                                        <div className="sf-serif mb-4 flex items-center gap-2 text-[17px] font-semibold">
+                                            <CreditCard className="size-4 text-[#9b5b32]" />
+                                            订单列表
+                                            {pendingOrders > 0 ? <Tag color="red">{pendingOrders} 笔待处理</Tag> : null}
+                                        </div>
+                                        <DataTable empty={!orders.length}>
+                                            <thead>
+                                                <tr>
+                                                    <th className="py-3">记录号</th>
+                                                    <th className="py-3">用户</th>
+                                                    <th className="py-3">积分包</th>
+                                                    <th className="py-3">金额</th>
+                                                    <th className="py-3">来源</th>
+                                                    <th className="py-3">时间</th>
+                                                    <th className="py-3">状态</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {orders.map((order) => (
+                                                    <tr key={order.id}>
+                                                        <td className="py-3 font-mono text-xs">{order.orderNo}</td>
+                                                        <td className="py-3">
+                                                            <div className="font-medium">{order.user.name || order.user.email}</div>
+                                                            <div className="text-xs text-[#7a6d63]">{order.user.email}</div>
+                                                        </td>
+                                                        <td className="py-3">{order.package?.name || "—"}</td>
+                                                        <td className="py-3">{formatCny(order.amount)}</td>
+                                                        <td className="py-3">{order.provider === "manual" ? "人工确认" : order.provider}</td>
+                                                        <td className="py-3 text-sm text-[#5a4f47]">
+                                                            <div>{formatDateTime(order.createdAt)}</div>
+                                                            <div className="text-xs text-[#b7a99b]">{formatRelativeTime(order.createdAt)}</div>
+                                                        </td>
+                                                        <td className="py-3">
+                                                            <Select
+                                                                value={order.status}
+                                                                options={[
+                                                                    { label: "待处理", value: "pending" },
+                                                                    { label: "已开通", value: "paid" },
+                                                                    { label: "已取消", value: "cancelled" },
+                                                                    { label: "失败", value: "failed" },
+                                                                    { label: "已退款", value: "refunded" },
+                                                                ]}
+                                                                onChange={(status) => void updateOrder(order.id, status)}
+                                                                className="w-32"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </DataTable>
+                                    </section>
+                                ),
+                            },
+                            {
+                                key: "credits",
+                                label: "积分管理",
+                                children: <CreditsTab />,
+                            },
+                            {
+                                key: "jobs",
+                                label: "生成记录",
+                                children: (
+                                    <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+                                        <div className="sf-serif mb-4 flex items-center gap-2 text-[17px] font-semibold">
+                                            <FileText className="size-4 text-[#9b5b32]" />
+                                            AI 生成任务
+                                        </div>
+                                        <DataTable empty={!generationJobs.length}>
+                                            <thead>
+                                                <tr>
+                                                    <th className="py-3">时间</th>
+                                                    <th className="py-3">用户</th>
+                                                    <th className="py-3">类型</th>
+                                                    <th className="py-3">模型</th>
+                                                    <th className="py-3">状态</th>
+                                                    <th className="py-3">预览</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {generationJobs.map((job) => (
+                                                    <tr key={job.id}>
+                                                        <td className="py-3 text-sm text-[#5a4f47]">{formatDateTime(job.createdAt)}</td>
+                                                        <td className="py-3 text-sm">{job.user?.email || "-"}</td>
+                                                        <td className="py-3">
+                                                            <Tag>{job.kind}</Tag>
+                                                        </td>
+                                                        <td className="py-3 text-sm">{String(job.metadata?.model || job.metadata?.imageModel || job.metadata?.videoModel || "-")}</td>
+                                                        <td className="py-3">
+                                                            <Tag color={job.status === "succeeded" ? "green" : job.status === "failed" ? "red" : "blue"}>{job.status}</Tag>
+                                                        </td>
+                                                        <td className="py-3">
+                                                            {job.resultUrl ? (
+                                                                <a href={job.resultUrl} target="_blank" rel="noopener noreferrer">
+                                                                    <img src={job.resultUrl} alt="生成结果" className="h-12 w-12 rounded border border-[#ded2c3] object-cover" />
+                                                                </a>
+                                                            ) : (
+                                                                <span className="text-xs text-[#b7a99b]">-</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </DataTable>
+                                    </section>
+                                ),
+                            },
+                            {
+                                key: "audit",
+                                label: "审计日志",
+                                children: (
+                                    <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+                                        <div className="sf-serif mb-4 flex items-center gap-2 text-[17px] font-semibold">
+                                            <History className="size-4 text-[#9b5b32]" />
+                                            管理员操作记录
+                                        </div>
+                                        <DataTable empty={!auditLogs.length}>
+                                            <thead>
+                                                <tr>
+                                                    <th className="py-3">时间</th>
+                                                    <th className="py-3">操作人</th>
+                                                    <th className="py-3">操作</th>
+                                                    <th className="py-3">目标</th>
+                                                    <th className="py-3">目标ID</th>
+                                                    <th className="py-3">详情</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {auditLogs.map((log) => (
+                                                    <tr key={log.id}>
+                                                        <td className="py-3 text-sm text-[#5a4f47]">{formatDateTime(log.createdAt)}</td>
+                                                        <td className="py-3 text-sm">{log.actor?.email || "-"}</td>
+                                                        <td className="py-3">
+                                                            <Tag>{log.action}</Tag>
+                                                        </td>
+                                                        <td className="py-3 text-sm">{log.target}</td>
+                                                        <td className="py-3 font-mono text-xs text-[#7a6d63]">{log.targetId.slice(0, 12)}...</td>
+                                                        <td className="max-w-[200px] truncate py-3 text-xs text-[#b7a99b]">{JSON.stringify(log.metadata)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </DataTable>
+                                    </section>
+                                ),
+                            },
+                            {
+                                key: "credentials",
+                                label: "平台密钥",
+                                children: <CredentialsTab />,
+                            },
+                            {
+                                key: "operation-config",
+                                label: "运营配置",
+                                children: <OperationConfigTab />,
+                            },
+                            {
+                                key: "costs",
+                                label: "对账",
+                                children: <CostsTab />,
+                            },
+                        ]}
+                    />
+                </div>
+            </main>
+        </ConfigProvider>
     );
 }
 
-function Metric({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: string | number }) {
+function Metric({ icon: Icon, label, value, caption }: { icon: typeof Users; label: string; value: string | number; caption: string }) {
     return (
-        <div className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2 text-sm text-stone-500">
-                <Icon className="size-4" />
+        <div className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-4 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+            <div className="mb-2.5 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a6d63]">
+                <Icon className="size-3.5 text-[#9b5b32]" />
                 {label}
             </div>
-            <div className="text-2xl font-semibold tracking-tight">{value}</div>
+            <div className="sf-serif text-[26px] font-semibold tracking-[0.01em] text-[#201914]">{value}</div>
+            <div className="mt-1 text-[11px] text-[#b7a99b]">{caption}</div>
         </div>
     );
 }
@@ -499,7 +480,7 @@ function DataTable({ children, empty }: { children: ReactNode; empty: boolean })
     if (empty) return <Empty description="暂无数据" />;
     return (
         <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">{children}</table>
+            <table className="admin-tbl w-full min-w-[980px] text-left text-sm">{children}</table>
         </div>
     );
 }

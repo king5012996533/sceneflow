@@ -151,19 +151,19 @@ export default function CreditsTab() {
             title: "备注",
             dataIndex: "note",
             ellipsis: true,
-            render: (value: string | null) => (value ? <span className="text-stone-500">{value}</span> : "—"),
+            render: (value: string | null) => (value ? <span className="text-[#7a6d63]">{value}</span> : "—"),
         },
     ];
 
     return (
         <div className="space-y-4">
-            <section className="rounded-lg border border-stone-200 bg-white p-5">
+            <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                 <div className="mb-4 flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2 text-lg font-semibold">
-                        <Wallet className="size-5" />
+                    <div className="sf-serif flex items-center gap-2 text-[17px] font-semibold">
+                        <Wallet className="size-4 text-[#9b5b32]" />
                         手动充 / 扣
                     </div>
-                    <span className="text-xs text-stone-400">所有调整写入 adjust 流水，可在下方审计</span>
+                    <span className="text-xs text-[#7a6d63]">所有调整写入 adjust 流水，可在下方审计</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     <Select
@@ -191,15 +191,15 @@ export default function CreditsTab() {
                 </div>
             </section>
 
-            <section className="rounded-lg border border-stone-200 bg-white p-5">
+            <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-lg font-semibold">
-                        <Coins className="size-5" />
+                    <div className="sf-serif flex items-center gap-2 text-[17px] font-semibold">
+                        <Coins className="size-4 text-[#9b5b32]" />
                         积分流水
                     </div>
                     <div className="flex items-center gap-3 text-sm">
-                        <span className="text-stone-500">
-                            全体用户余额合计：<span className="font-semibold text-stone-800">{totalBalance.toLocaleString("zh-CN")} 积分</span>
+                        <span className="text-[#7a6d63]">
+                            全体用户余额合计：<span className="font-semibold text-[#201914]">{totalBalance.toLocaleString("zh-CN")} 积分</span>
                         </span>
                         <Select
                             value={typeFilter}

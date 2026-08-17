@@ -2834,3 +2834,34 @@ html,
     border-radius: 26px;
     background: #fffdf8;
 }
+
+/* ============================================================
+ * 管理后台：暖色编辑风表格（.admin-tbl 手写表格）
+ * 2026-08-18
+ * ============================================================ */
+.admin-tbl thead th {
+    padding: 9px 16px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #7a6d63;
+    border-top: 1px solid #ded2c3;
+    border-bottom: 1px solid #ded2c3;
+    white-space: nowrap;
+}
+.admin-tbl tbody td {
+    padding: 13px 16px;
+    border-bottom: 1px solid #eee4d5;
+    vertical-align: top;
+}
+.admin-tbl tbody tr:last-child td {
+    border-bottom: none;
+}
+.admin-tbl tbody tr {
+    transition: background 0.12s;
+}
+.admin-tbl tbody tr:hover {
+    background: #faf4ea;
+}

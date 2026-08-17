@@ -66,35 +66,35 @@ export function CredentialFormFields({ form, onChange, editMode }: CredentialFor
     return (
         <div className="space-y-3 py-2">
             <div>
-                <div className="mb-1 text-sm text-stone-600">名称</div>
+                <div className="mb-1 text-sm text-[#201914]">名称</div>
                 <Input value={form.name} maxLength={40} placeholder="如：MiniMax 生产 Key" onChange={(event) => set({ name: event.target.value })} />
             </div>
             <div>
-                <div className="mb-1 text-sm text-stone-600">供应商</div>
+                <div className="mb-1 text-sm text-[#201914]">供应商</div>
                 <Select className="w-full" value={form.provider} options={PROVIDER_PRESETS} onChange={(value) => set({ provider: value })} showSearch />
             </div>
             <div>
-                <div className="mb-1 text-sm text-stone-600">Base URL</div>
+                <div className="mb-1 text-sm text-[#201914]">Base URL</div>
                 <Input value={form.baseUrl} placeholder="如：https://api.minimax.chat/v1" onChange={(event) => set({ baseUrl: event.target.value })} />
             </div>
             <div>
-                <div className="mb-1 text-sm text-stone-600">API Key</div>
+                <div className="mb-1 text-sm text-[#201914]">API Key</div>
                 <Input.Password value={form.apiKey} placeholder={editMode ? "留空则不更换（当前已加密存储）" : "上游 API Key（加密存储）"} onChange={(event) => set({ apiKey: event.target.value })} />
             </div>
             <div>
-                <div className="mb-1 text-sm text-stone-600">绑定模型（逗号分隔；留空 = 全部）</div>
+                <div className="mb-1 text-sm text-[#201914]">绑定模型（逗号分隔；留空 = 全部）</div>
                 <Input value={form.models} placeholder="如：MiniMax-H3, gpt-image-2" onChange={(event) => set({ models: event.target.value })} />
             </div>
             <div>
-                <div className="mb-1 text-sm text-stone-600">优先级（越大越优先，同供应商多 Key 时生效）</div>
+                <div className="mb-1 text-sm text-[#201914]">优先级（越大越优先，同供应商多 Key 时生效）</div>
                 <InputNumber className="w-full" min={0} value={form.priority} onChange={(value) => set({ priority: Number(value) || 0 })} />
             </div>
             <div>
-                <div className="mb-1 text-sm text-stone-600">逐模型能力标定（与前端画质 / 分辨率 / 比例 / 时长等一一对应）</div>
+                <div className="mb-1 text-sm text-[#201914]">逐模型能力标定（与前端画质 / 分辨率 / 比例 / 时长等一一对应）</div>
                 <CredentialCapabilityEditor models={models} value={form.capabilities} onChange={(capabilities) => set({ capabilities })} />
             </div>
             <div>
-                <div className="mb-1 text-sm text-stone-600">逐模型积分定价（图片每张 / 视频每秒 / 音频每次 / 文本每次；未配置 = 内置草案）</div>
+                <div className="mb-1 text-sm text-[#201914]">逐模型积分定价（图片每张 / 视频每秒 / 音频每次 / 文本每次；未配置 = 内置草案）</div>
                 <CredentialPricingEditor models={models} value={form.pricing} onChange={(pricing) => set({ pricing })} />
             </div>
         </div>

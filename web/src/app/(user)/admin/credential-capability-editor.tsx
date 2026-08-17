@@ -30,7 +30,7 @@ export function CredentialCapabilityEditor({ models, value, onChange }: Credenti
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
     if (!models.length) {
-        return <div className="rounded-lg border border-dashed border-stone-300 px-3 py-4 text-center text-xs text-stone-400">先在「绑定模型」里填写模型名（逗号分隔），即可逐模型标定画质 / 分辨率 / 比例等参数。</div>;
+        return <div className="rounded-lg border border-dashed border-[#ded2c3] px-3 py-4 text-center text-xs text-[#7a6d63]">先在「绑定模型」里填写模型名（逗号分隔），即可逐模型标定画质 / 分辨率 / 比例等参数。</div>;
     }
 
     return (
@@ -48,23 +48,23 @@ export function CredentialCapabilityEditor({ models, value, onChange }: Credenti
                     if (checked) setExpanded((prev) => ({ ...prev, [model]: true }));
                 };
                 return (
-                    <div key={model} className="rounded-lg border border-stone-200 bg-stone-50/60">
+                    <div key={model} className="rounded-lg border border-[#ded2c3] bg-[#faf4ea]">
                         <div className="flex items-center justify-between gap-2 px-3 py-2">
                             <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left" onClick={toggle}>
-                                {open ? <ChevronDown className="size-4 shrink-0 text-stone-400" /> : <ChevronRight className="size-4 shrink-0 text-stone-400" />}
+                                {open ? <ChevronDown className="size-4 shrink-0 text-[#7a6d63]" /> : <ChevronRight className="size-4 shrink-0 text-[#7a6d63]" />}
                                 <span className="truncate font-mono text-sm">{model}</span>
-                                {enabled ? <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-600">已标定</span> : <span className="shrink-0 text-[11px] text-stone-400">内置默认</span>}
+                                {enabled ? <span className="shrink-0 rounded bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-600">已标定</span> : <span className="shrink-0 text-[11px] text-[#7a6d63]">内置默认</span>}
                             </button>
                             <Switch size="small" checked={enabled} onChange={setEnabled} />
                         </div>
                         {open ? (
-                            <div className="border-t border-stone-200 px-3 py-3">
+                            <div className="border-t border-[#ded2c3] px-3 py-3">
                                 {!supportsCapability ? (
                                     <div className="text-xs leading-5 text-amber-600">该模型（文本/音频等）无需能力标定，使用内置默认。请保持开关关闭；若此前误开导致被当作图片模型，关闭后即恢复文本/音频分类。</div>
                                 ) : enabled ? (
                                     <ModelCapabilityFields model={model} spec={spec as ModelCapabilitySpec} onChange={(next) => onChange({ ...value, [model]: next })} />
                                 ) : (
-                                    <div className="text-xs leading-5 text-stone-400">未启用：前端使用内置默认参数。打开开关后可按前端画质 / 分辨率 / 比例标定。</div>
+                                    <div className="text-xs leading-5 text-[#7a6d63]">未启用：前端使用内置默认参数。打开开关后可按前端画质 / 分辨率 / 比例标定。</div>
                                 )}
                             </div>
                         ) : null}
