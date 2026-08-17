@@ -93,7 +93,7 @@
 ## 积分制 / 平台密钥（2026-08 起）
 
 - 平台统一管理上游 API Key（`ProviderCredential`，AES-256-GCM 加密存 `keyEnc`），客户端不再必须自带 Key。**平台密钥永不进客户端**，只能经 `/api/proxy`、`/api/proxy/form-data` 出网。
-- 代理取 Key：只使用平台凭证（`ProviderCredential`）。Gemini 用 `x-goog-api-key` 注入，Aigccc 网关（provider=aigccc）用 `ApiKey` 头注入，其余用 `Authorization: Bearer`；无平台凭证则不注入 Key。
+- 代理取 Key：只使用平台凭证（`ProviderCredential`）。Gemini 用 `x-goog-api-key` 注入，Aigccc 网关（provider=aigccc 或目标 host 为 aigccc666.com）用 `ApiKey` 头注入，其余用 `Authorization: Bearer`；无平台凭证则不注入 Key。
 - Aigccc / Seedance 2.0 第三方网关（`https://www.aigccc666.com`，请求头 `ApiKey`）：`apiFormat="aigccc"`（按 Base URL 识别），视频链路在 `web/src/services/api/video.ts`（`createAigcccVideoTask` / `pollAigcccVideoTask`，分发先于 seedance 启发式）。接口：创建 `POST /api/external/v1/video/task/create`（body：`prompt / mode（仅 pro|fast，默认 pro）/ images / videos / audios / resolution / ratio / duration`；本地参考图先 `POST /api/external/v1/image/upload/batch` multipart 上传到网关临时存储，顺序单张上传规避按 key 并发限流；视频/音频参考仅支持公网 URL；分辨率输出最高 720p（1080p 会被网关静默降级，代码先钳到 720p））；轮询 `POST /api/external/v1/video/task/status`（`code=0` + `data.status`，≥5s 间隔）。后台「平台密钥」选 provider=aigccc 预设，模型能力标定为 `seedance-video`（复用 Seedance 设置面板）。
 - 积分账本（`credit-ledger.ts`）：扣减用 `updateMany({ balance: { gte: cost } })` 原子守卫，禁止读-改-写；退款按 `(refType, refId)` 幂等；余额与流水必须在同一事务（`$transaction` + `pg_advisory_xact_lock`）内变更。
 - 收费卡点在 `beginGenerationJob`（`generation-jobs.server.ts`）：先算 `creditsCost`（admin 为 0，不扣），事务内每日赠送（`daily_credit_grant`，幂等）→ 原子扣减 → 失败/取消/超时退款。余额不足返回 403，客户端弹「积分余额不足」弹窗（`components/credits/insufficient-credits-modal.tsx`）。

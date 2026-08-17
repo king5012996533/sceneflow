@@ -56,8 +56,8 @@ export async function POST(req: NextRequest) {
                     if (key.toLowerCase() === "x-goog-api-key") delete safeHeaders[key];
                 }
                 safeHeaders["x-goog-api-key"] = finalToken;
-            } else if (platformCred?.provider === "aigccc") {
-                // aigccc 网关用 ApiKey 头（非 Bearer）
+            } else if (platformCred?.provider === "aigccc" || target.hostname.toLowerCase().includes("aigccc666.com")) {
+                // aigccc 网关用 ApiKey 头（非 Bearer）：按目标 host 判断，避免供应商标签漏配时误发 Bearer 导致 7002 Token 无效
                 for (const key of Object.keys(safeHeaders)) {
                     if (key.toLowerCase() === "apikey") delete safeHeaders[key];
                 }
