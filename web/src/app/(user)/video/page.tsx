@@ -18,15 +18,16 @@ import { deleteStoredMedia, resolveMediaUrl, uploadMediaFile } from "@/services/
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { createGeneratedVideoTask, persistGeneratedVideo, pollGeneratedVideoTask, type VideoGenerationTask } from "@/lib/generation/generation-request";
 import { useAssetStore } from "@/stores/use-asset-store";
-import { checkGenerationQuota } from "@/lib/generation-quota";
 import { fetchClientEntitlements, type ClientEntitlements } from "@/lib/client-entitlements";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
-import { QuotaExceededModal, type QuotaExceededModalHandle } from "@/components/quota-exceeded-modal";
-import { QuotaExceededError } from "@/lib/generation/generation-guard";
+import { InsufficientCreditsModal, type InsufficientCreditsModalHandle } from "@/components/credits/insufficient-credits-modal";
+import { InsufficientCreditsError } from "@/lib/generation/generation-guard";
+import { getGenerationCreditsCost } from "@/lib/credit-pricing";
+import { useCreditBalance } from "@/hooks/use-credit-balance";
 import { createScopedLocalForageStore } from "@/lib/user-data-scope";
 
 type GeneratedVideo = {
@@ -129,7 +130,8 @@ export default function VideoPage() {
     const [selectedLogIds, setSelectedLogIds] = useState<string[]>([]);
     const [previewLog, setPreviewLog] = useState<GenerationLog | null>(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-    const quotaModalRef = useRef<QuotaExceededModalHandle>(null);
+    const quotaModalRef = useRef<InsufficientCreditsModalHandle>(null);
+    const { balance: creditBalance } = useCreditBalance();
 
     const model = effectiveConfig.videoModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
@@ -208,14 +210,11 @@ export default function VideoPage() {
             message.info("正在加载套餐权益，请稍候…");
             return;
         }
-        // 配额检查
-        const { allowed, remaining, limit } = checkGenerationQuota(entitlements, 1, user?.role);
-        if (!allowed) {
-            quotaModalRef.current?.open(remaining, limit);
+        // 积分预检（服务端为最终裁决，这里只做体验拦截）
+        const required = getGenerationCreditsCost("video", { model, videoModel: model });
+        if (user?.role !== "admin" && creditBalance !== null && creditBalance < required) {
+            quotaModalRef.current?.open({ balance: creditBalance, required });
             return;
-        }
-        if (remaining > 0 && remaining <= 1) {
-            message.info(`免费套餐今日还剩 ${remaining} 次生成机会`);
         }
         setElapsedMs(0);
         setRunning(true);
@@ -229,8 +228,8 @@ export default function VideoPage() {
             await saveLog(log);
             void pollGenerationLog(log, snapshot.config);
         } catch (error) {
-            if (error instanceof QuotaExceededError) {
-                quotaModalRef.current?.open(0, null);
+            if (error instanceof InsufficientCreditsError) {
+                quotaModalRef.current?.open({ message: error.message });
                 setRunning(false);
                 return;
             }
@@ -626,7 +625,7 @@ export default function VideoPage() {
             <Modal title="删除生成记录" open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText="删除" okButtonProps={{ danger: true }} cancelText="取消">
                 确定删除选中的 {selectedLogIds.length} 条生成记录吗？
             </Modal>
-            <QuotaExceededModal ref={quotaModalRef} />
+            <InsufficientCreditsModal ref={quotaModalRef} />
         </div>
     );
 }

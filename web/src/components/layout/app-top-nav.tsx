@@ -10,6 +10,7 @@ import { getVisibleNavigationTools, navigationTools, type NavigationToolSlug } f
 import { AppConfigModal } from "@/components/layout/app-config-modal";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
+import { CreditBalanceBadge } from "@/components/credits/credit-balance-badge";
 import { publicPath } from "@/lib/app-paths";
 import { cn } from "@/lib/utils";
 import {
@@ -151,6 +152,7 @@ export function AppTopNav() {
                         </div>
 
                         <div className="my-auto ml-auto flex h-9 min-w-0 shrink-0 items-center justify-end gap-1.5 border-l border-[#e6e8ec] pl-3 whitespace-nowrap">
+                            <CreditBalanceBadge />
                             <UserStatusActions variant={useDarkHome ? "home" : "default"} showThemeToggle={false} />
                         </div>
                     </div>

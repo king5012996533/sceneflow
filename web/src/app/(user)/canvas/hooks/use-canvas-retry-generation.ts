@@ -2,7 +2,6 @@
 
 import { useCallback } from "react";
 import { requestGeneratedText, requestGeneratedVideo, persistGeneratedVideo, requestGeneratedAudio, persistGeneratedAudio, requestGeneratedImages } from "@/lib/generation/generation-request";
-import { QuotaExceededError } from "@/lib/generation/generation-guard";
 import { uploadImage } from "@/services/image-storage";
 import type { AiConfig } from "@/stores/use-config-store";
 import { NODE_DEFAULT_SIZE } from "../constants";
@@ -43,7 +42,6 @@ type UseCanvasRetryGenerationOptions = {
     setNodes: React.Dispatch<React.SetStateAction<CanvasNodeData[]>>;
     setRunningNodeId: React.Dispatch<React.SetStateAction<string | null>>;
     message: { info: (msg: string) => void; success: (msg: string) => void; error: (msg: string) => void; warning: (msg: string) => void };
-    quotaModalRef: React.MutableRefObject<{ open: (remaining: number, limit: number | null) => void } | null>;
 };
 
 export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOptions) {
@@ -64,7 +62,6 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
         setNodes,
         setRunningNodeId,
         message,
-        quotaModalRef,
     } = options;
 
     const retryNode = useCallback(
@@ -117,8 +114,7 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
             try {
                 await reserveCanvasGenerationQuota(1);
             } catch (error) {
-                if (error instanceof QuotaExceededError) quotaModalRef.current?.open(0, null);
-                else if (error instanceof Error) message.warning(error.message);
+                if (error instanceof Error) message.warning(error.message);
                 return;
             }
 
@@ -188,7 +184,6 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
             isGenerationCanceled,
             message,
             openConfigDialog,
-            quotaModalRef,
             reserveCanvasGenerationQuota,
             retrySourceNode,
             startGenerationRequest,

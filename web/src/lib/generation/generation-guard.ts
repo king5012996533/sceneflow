@@ -1,10 +1,10 @@
 import { apiPath } from "@/lib/app-paths";
-import { recordGeneration } from "@/lib/generation-quota";
 
-export class QuotaExceededError extends Error {
+/** 积分不足（服务端 403）：由 /api/generation/jobs 返回"积分不足…"时抛出 */
+export class InsufficientCreditsError extends Error {
     constructor(message: string) {
         super(message);
-        this.name = "QuotaExceededError";
+        this.name = "InsufficientCreditsError";
     }
 }
 
@@ -27,7 +27,7 @@ export async function beginClientGeneration(kind: ClientGenerationKind, count = 
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
         const msg = readError(payload, "生成权限检查失败");
-        if (response.status === 403 || msg.includes("已用完")) throw new QuotaExceededError(msg);
+        if (response.status === 403 || msg.includes("已用完")) throw new InsufficientCreditsError(msg);
         throw new Error(msg);
     }
     return payload?.job as GenerationJob;
@@ -58,7 +58,6 @@ export async function runGuardedGeneration<T>(
         const result = await run(job);
         const resultUrl = extractResultUrl(result);
         await finishClientGeneration(job.id, "succeeded", undefined, resultUrl);
-        recordGeneration(count);
         return result;
     } catch (error) {
         const status = error instanceof DOMException && error.name === "AbortError" ? "cancelled" : "failed";

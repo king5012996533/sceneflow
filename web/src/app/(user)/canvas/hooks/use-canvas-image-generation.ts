@@ -3,7 +3,8 @@
 import { useCallback } from "react";
 import { nanoid } from "nanoid";
 import { requestGeneratedImages } from "@/lib/generation/generation-request";
-import { QuotaExceededError } from "@/lib/generation/generation-guard";
+import { InsufficientCreditsError } from "@/lib/generation/generation-guard";
+import type { InsufficientCreditsModalHandle } from "@/components/credits/insufficient-credits-modal";
 import { uploadImage } from "@/services/image-storage";
 import type { AiConfig } from "@/stores/use-config-store";
 import { canvasGenerationErrorToast, formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
@@ -28,7 +29,7 @@ type UseCanvasImageGenerationOptions = {
     setSelectedConnectionId: React.Dispatch<React.SetStateAction<string | null>>;
     setDialogNodeId: React.Dispatch<React.SetStateAction<string | null>>;
     message: { info: (msg: string) => void; success: (msg: string) => void; error: (msg: string) => void; warning: (msg: string) => void };
-    quotaModalRef: React.MutableRefObject<{ open: (remaining: number, limit: number | null) => void } | null>;
+    quotaModalRef: React.MutableRefObject<InsufficientCreditsModalHandle | null>;
 };
 
 type GenerateImageParams = {
@@ -64,8 +65,7 @@ export function useCanvasImageGeneration(options: UseCanvasImageGenerationOption
             try {
                 await reserveCanvasGenerationQuota(count);
             } catch (error) {
-                if (error instanceof QuotaExceededError) quotaModalRef.current?.open(0, null);
-                else if (error instanceof Error) message.warning(error.message);
+                if (error instanceof Error) message.warning(error.message);
                 return;
             }
 
@@ -189,6 +189,7 @@ export function useCanvasImageGeneration(options: UseCanvasImageGenerationOption
                         return true;
                     } catch (error) {
                         if (isGenerationCanceled(error)) return false;
+                        if (error instanceof InsufficientCreditsError) quotaModalRef.current?.open({ message: error.message });
                         const errorDetails = formatCanvasGenerationErrorDetails(error);
                         hasFailure = true;
                         setNodes((prev) => prev.map((node) => (node.id === targetId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_ERROR, errorDetails } } : node)));

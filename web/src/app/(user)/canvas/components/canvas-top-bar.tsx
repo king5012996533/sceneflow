@@ -7,6 +7,7 @@ import { Button, Dropdown, Modal } from "antd";
 import { DOCS_URL } from "@/constant/env";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
+import { CreditBalanceBadge } from "@/components/credits/credit-balance-badge";
 import { useThemeStore } from "@/stores/use-theme-store";
 
 function MenuLabel({ text, shortcut }: { text: string; shortcut: string }) {
@@ -180,6 +181,7 @@ export function CanvasTopBar({
 
                 <div className="pointer-events-auto flex items-center gap-1.5">
                     {compactAgentStatus ? <CompactAgentStatus status={compactAgentStatus} onClick={onToggleAgent} /> : null}
+                    <CreditBalanceBadge variant="canvas" style={{ color: theme.node.text }} />
                     <UserStatusActions variant="canvas" onOpenShortcuts={() => setShortcutsOpen(true)} />
                     <span className="h-6 w-px" style={{ background: theme.toolbar.border }} />
                     <Button

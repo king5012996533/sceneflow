@@ -3,7 +3,6 @@
 import { useCallback, useMemo } from "react";
 import { nanoid } from "nanoid";
 import { requestGeneratedImages } from "@/lib/generation/generation-request";
-import { QuotaExceededError } from "@/lib/generation/generation-guard";
 import { defaultConfig, type AiConfig } from "@/stores/use-config-store";
 import { uploadImage } from "@/services/image-storage";
 import { cropDataUrl, splitDataUrl } from "../utils/canvas-image-data";
@@ -54,7 +53,6 @@ type UseCanvasImageEditDialogsOptions = {
     openConfigDialog: (show: boolean) => void;
     buildGenCfg: (node: CanvasNodeData | undefined, mode: "image" | "video" | "audio" | "text") => AiConfig;
     message: { info: (msg: string) => void; success: (msg: string) => void; error: (msg: string) => void; warning: (msg: string) => void };
-    quotaModalRef: React.MutableRefObject<{ open: (remaining: number, limit: number | null) => void } | null>;
 };
 
 export function useCanvasImageEditDialogs(options: UseCanvasImageEditDialogsOptions) {
@@ -90,7 +88,6 @@ export function useCanvasImageEditDialogs(options: UseCanvasImageEditDialogsOpti
         openConfigDialog,
         buildGenCfg,
         message,
-        quotaModalRef,
     } = options;
 
     // Derived nodes
@@ -191,8 +188,7 @@ export function useCanvasImageEditDialogs(options: UseCanvasImageEditDialogsOpti
             try {
                 await reserveCanvasGenerationQuota(1);
             } catch (error) {
-                if (error instanceof QuotaExceededError) quotaModalRef.current?.open(0, null);
-                else if (error instanceof Error) message.warning(error.message);
+                if (error instanceof Error) message.warning(error.message);
                 return;
             }
             const childId = nanoid();
@@ -246,7 +242,6 @@ export function useCanvasImageEditDialogs(options: UseCanvasImageEditDialogsOpti
             isGenerationCanceled,
             message,
             openConfigDialog,
-            quotaModalRef,
             reserveCanvasGenerationQuota,
             setConnections,
             setDialogNodeId,

@@ -3,10 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { App, Button, Empty, Progress, Tag } from "antd";
-import { ArrowRight, CreditCard, Gauge, PackageCheck } from "lucide-react";
+import { ArrowRight, Coins, CreditCard, Gauge, PackageCheck } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
 import { formatCny } from "@/lib/format";
+import { CreditBalanceCard } from "@/components/credits/credit-balance-card";
+import { CreditTransactionsTable } from "@/components/credits/credit-transactions-table";
+import { CreditPackagesSection } from "@/components/credits/credit-packages-section";
+import { useCreditBalance } from "@/hooks/use-credit-balance";
 
 type BillingState = {
     subscription?: {
@@ -37,6 +41,7 @@ export default function BillingPage() {
     const { message } = App.useApp();
     const [data, setData] = useState<BillingState | null>(null);
     const [loading, setLoading] = useState(false);
+    const { balance, loading: balanceLoading, refresh } = useCreditBalance();
 
     async function loadBilling() {
         setLoading(true);
@@ -88,6 +93,17 @@ export default function BillingPage() {
                         <ArrowRight className="size-4" />
                     </Link>
                 </div>
+
+                <section className="rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
+                    <div className="mb-5 flex items-center gap-2 text-sm font-medium">
+                        <Coins className="size-5" />
+                        积分余额与流水
+                    </div>
+                    <div className="space-y-4">
+                        <CreditBalanceCard balance={balance} loading={balanceLoading} onRefresh={() => void refresh()} actionHref="/pricing" actionLabel="去充值" />
+                        <CreditTransactionsTable limit={20} />
+                    </div>
+                </section>
 
                 <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
                     <section className="rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
@@ -193,6 +209,10 @@ export default function BillingPage() {
                         <Empty description="暂无开通申请" />
                     )}
                 </section>
+
+                <div className="mt-4">
+                    <CreditPackagesSection />
+                </div>
             </div>
         </main>
     );

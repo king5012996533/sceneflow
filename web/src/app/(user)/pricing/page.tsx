@@ -8,6 +8,9 @@ import { ArrowRight, Check, Crown, Sparkles, Users, Zap } from "lucide-react";
 import { apiPath, publicPath } from "@/lib/app-paths";
 import { formatCny } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { CreditBalanceCard } from "@/components/credits/credit-balance-card";
+import { CreditPackagesSection } from "@/components/credits/credit-packages-section";
+import { useCreditBalance } from "@/hooks/use-credit-balance";
 
 type Plan = {
     id: string;
@@ -89,6 +92,7 @@ export default function PricingPage() {
     const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
     const paymentQrSrc = publicPath("/wechat-payment-qr.jpg");
+    const { balance, loading: balanceLoading, refresh } = useCreditBalance();
 
     useEffect(() => {
         void fetch(apiPath("/api/billing/plans"))
@@ -179,6 +183,8 @@ export default function PricingPage() {
                     />
                 </div>
 
+                <CreditBalanceCard balance={balance} loading={balanceLoading} onRefresh={() => void refresh()} />
+
                 <div className="grid gap-5 lg:grid-cols-4">
                     {sortedPlans.map((plan) => {
                         const Icon = planIcons[plan.id as keyof typeof planIcons] || Sparkles;
@@ -233,6 +239,8 @@ export default function PricingPage() {
                         );
                     })}
                 </div>
+
+                <CreditPackagesSection />
 
                 <div className="rounded-3xl border border-[#e6e8ec] bg-white p-6 text-sm leading-7 text-[#667085]">
                     <p>{copy.footer}</p>

@@ -6,8 +6,8 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { BookOpen, Bot, Home, ImageIcon, Images, List, Menu, Music2, Plus, Redo2, Settings2, Trash2, Undo2, Upload, Video } from "lucide-react";
 
 import { requestGeneratedImages } from "@/lib/generation/generation-request";
-import { QuotaExceededError } from "@/lib/generation/generation-guard";
-import { QuotaExceededModal } from "@/components/quota-exceeded-modal";
+import { InsufficientCreditsError } from "@/lib/generation/generation-guard";
+import { InsufficientCreditsModal, type InsufficientCreditsModalHandle } from "@/components/credits/insufficient-credits-modal";
 
 import { defaultConfig, type AiConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { uploadImage } from "@/services/image-storage";
@@ -16,7 +16,6 @@ import { nanoid } from "nanoid";
 import { readImageMeta } from "@/lib/image-utils";
 import { canvasThemes, type CanvasBackgroundMode } from "@/lib/canvas-theme";
 import { fetchClientEntitlements, isOverLimit, type ClientEntitlements } from "@/lib/client-entitlements";
-import { checkGenerationQuota } from "@/lib/generation-quota";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -195,7 +194,7 @@ function InfiniteCanvasPage() {
     const [superResolveNodeId, setSuperResolveNodeId] = useState<string | null>(null);
     const [angleNodeId, setAngleNodeId] = useState<string | null>(null);
     const [previewNodeId, setPreviewNodeId] = useState<string | null>(null);
-    const quotaModalRef = useRef<{ open: (remaining: number, limit: number | null) => void }>(null);
+    const quotaModalRef = useRef<InsufficientCreditsModalHandle>(null);
     const [assistantCollapsed, setAssistantCollapsed] = useState(true);
     const [assistantMounted, setAssistantMounted] = useState(false);
     const [assistantClosing, setAssistantClosing] = useState(false);
@@ -307,23 +306,14 @@ function InfiniteCanvasPage() {
     });
 
     const reserveCanvasGenerationQuota = useCallback(
-        async (count = 1) => {
-            const safeCount = Math.max(1, Math.min(50, Math.floor(Number(count) || 1)));
+        async () => {
             const concurrentLimit = entitlements ? entitlements.concurrentJobs : null;
             const activeRunningTasks = new Set(Array.from(generationRequestsRef.current.values()).map((request) => request.runningNodeId)).size;
             if (concurrentLimit !== null && activeRunningTasks + 1 > concurrentLimit) {
                 throw new Error(`当前套餐最多同时运行 ${concurrentLimit} 个生成任务，请等待已有任务完成或升级套餐。`);
             }
-            const quota = checkGenerationQuota(entitlements, safeCount, user?.role);
-            if (!quota.allowed) {
-                quotaModalRef.current?.open(quota.remaining, quota.limit);
-                throw new QuotaExceededError(`今日免费生成次数已用完（${quota.limit} 次/天）`);
-            }
-            if (quota.remaining > 0 && quota.remaining <= safeCount) {
-                message.info(`免费套餐今日还剩 ${quota.remaining} 次生成机会`);
-            }
         },
-        [entitlements, message, user?.role],
+        [entitlements],
     );
 
     useEffect(() => {
@@ -702,7 +692,6 @@ function InfiniteCanvasPage() {
         openConfigDialog,
         buildGenCfg,
         message,
-        quotaModalRef,
     });
 
     const { generateText } = useCanvasTextGeneration({
@@ -736,7 +725,6 @@ function InfiniteCanvasPage() {
         setNodes,
         setRunningNodeId,
         message,
-        quotaModalRef,
     });
 
     const { runPipeline } = useCanvasPipelineRunner({
@@ -763,7 +751,6 @@ function InfiniteCanvasPage() {
         openConfigDialog,
         buildGenCfg,
         message,
-        quotaModalRef,
     });
 
     const visibleNodes = useMemo(() => {
@@ -1469,10 +1456,9 @@ function InfiniteCanvasPage() {
 
             const plannedGenerationCount = mode === "image" ? resolveGenerationCount(generationConfig.count) : mode === "text" && sourceNode?.type === CanvasNodeType.Config ? resolveGenerationCount(generationConfig.count) : 1;
             try {
-                await reserveCanvasGenerationQuota(plannedGenerationCount);
+                await reserveCanvasGenerationQuota();
             } catch (error) {
-                if (error instanceof QuotaExceededError) quotaModalRef.current?.open(0, null);
-                else if (error instanceof Error) message.warning(error.message);
+                if (error instanceof Error) message.warning(error.message);
                 return;
             }
 
@@ -1954,7 +1940,7 @@ function InfiniteCanvasPage() {
                     onCollapse={closeAgent}
                 />
             ) : null}
-            <QuotaExceededModal ref={quotaModalRef} />
+            <InsufficientCreditsModal ref={quotaModalRef} />
         </main>
     );
 }
