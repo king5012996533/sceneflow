@@ -2843,3 +2843,18 @@ html,
         transform: none;
     }
 }
+
+/* ============================================================
+ * 计费 / 套餐页：编辑衬线标题 + 等宽眉标（与登录页同语言）
+ * 2026-08-18
+ * ============================================================ */
+.sf-serif {
+    font-family: Georgia, "Noto Serif SC", "Songti SC", "STSong", serif;
+}
+.sf-mono {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+.sf-pay-modal .ant-modal-content {
+    border-radius: 26px;
+    background: #fffdf8;
+}
