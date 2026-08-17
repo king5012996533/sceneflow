@@ -49,6 +49,11 @@ export type UsageRecord = $Result.DefaultSelection<Prisma.$UsageRecordPayload>
  */
 export type GenerationJob = $Result.DefaultSelection<Prisma.$GenerationJobPayload>
 /**
+ * Model CreditPackage
+ * 
+ */
+export type CreditPackage = $Result.DefaultSelection<Prisma.$CreditPackagePayload>
+/**
  * Model CreditBalance
  * 
  */
@@ -294,6 +299,16 @@ export class PrismaClient<
     * ```
     */
   get generationJob(): Prisma.GenerationJobDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.creditPackage`: Exposes CRUD operations for the **CreditPackage** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CreditPackages
+    * const creditPackages = await prisma.creditPackage.findMany()
+    * ```
+    */
+  get creditPackage(): Prisma.CreditPackageDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.creditBalance`: Exposes CRUD operations for the **CreditBalance** model.
@@ -845,6 +860,7 @@ export namespace Prisma {
     Subscription: 'Subscription',
     UsageRecord: 'UsageRecord',
     GenerationJob: 'GenerationJob',
+    CreditPackage: 'CreditPackage',
     CreditBalance: 'CreditBalance',
     CreditTransaction: 'CreditTransaction',
     Order: 'Order',
@@ -871,7 +887,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "userConfig" | "plan" | "entitlement" | "subscription" | "usageRecord" | "generationJob" | "creditBalance" | "creditTransaction" | "order" | "paymentEvent" | "adminAuditLog" | "modelConfig" | "providerCredential" | "operationConfig" | "verificationCode" | "canvasBackup" | "rateLimitEntry"
+      modelProps: "user" | "userConfig" | "plan" | "entitlement" | "subscription" | "usageRecord" | "generationJob" | "creditPackage" | "creditBalance" | "creditTransaction" | "order" | "paymentEvent" | "adminAuditLog" | "modelConfig" | "providerCredential" | "operationConfig" | "verificationCode" | "canvasBackup" | "rateLimitEntry"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1390,6 +1406,80 @@ export namespace Prisma {
           count: {
             args: Prisma.GenerationJobCountArgs<ExtArgs>
             result: $Utils.Optional<GenerationJobCountAggregateOutputType> | number
+          }
+        }
+      }
+      CreditPackage: {
+        payload: Prisma.$CreditPackagePayload<ExtArgs>
+        fields: Prisma.CreditPackageFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CreditPackageFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CreditPackageFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload>
+          }
+          findFirst: {
+            args: Prisma.CreditPackageFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CreditPackageFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload>
+          }
+          findMany: {
+            args: Prisma.CreditPackageFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload>[]
+          }
+          create: {
+            args: Prisma.CreditPackageCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload>
+          }
+          createMany: {
+            args: Prisma.CreditPackageCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CreditPackageCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload>[]
+          }
+          delete: {
+            args: Prisma.CreditPackageDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload>
+          }
+          update: {
+            args: Prisma.CreditPackageUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload>
+          }
+          deleteMany: {
+            args: Prisma.CreditPackageDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CreditPackageUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CreditPackageUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload>[]
+          }
+          upsert: {
+            args: Prisma.CreditPackageUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CreditPackagePayload>
+          }
+          aggregate: {
+            args: Prisma.CreditPackageAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCreditPackage>
+          }
+          groupBy: {
+            args: Prisma.CreditPackageGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CreditPackageGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CreditPackageCountArgs<ExtArgs>
+            result: $Utils.Optional<CreditPackageCountAggregateOutputType> | number
           }
         }
       }
@@ -2322,6 +2412,7 @@ export namespace Prisma {
     subscription?: SubscriptionOmit
     usageRecord?: UsageRecordOmit
     generationJob?: GenerationJobOmit
+    creditPackage?: CreditPackageOmit
     creditBalance?: CreditBalanceOmit
     creditTransaction?: CreditTransactionOmit
     order?: OrderOmit
@@ -2529,6 +2620,37 @@ export namespace Prisma {
    * PlanCountOutputType without action
    */
   export type PlanCountOutputTypeCountOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: OrderWhereInput
+  }
+
+
+  /**
+   * Count Type CreditPackageCountOutputType
+   */
+
+  export type CreditPackageCountOutputType = {
+    orders: number
+  }
+
+  export type CreditPackageCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    orders?: boolean | CreditPackageCountOutputTypeCountOrdersArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * CreditPackageCountOutputType without action
+   */
+  export type CreditPackageCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackageCountOutputType
+     */
+    select?: CreditPackageCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * CreditPackageCountOutputType without action
+   */
+  export type CreditPackageCountOutputTypeCountOrdersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: OrderWhereInput
   }
 
@@ -10963,6 +11085,1179 @@ export namespace Prisma {
 
 
   /**
+   * Model CreditPackage
+   */
+
+  export type AggregateCreditPackage = {
+    _count: CreditPackageCountAggregateOutputType | null
+    _avg: CreditPackageAvgAggregateOutputType | null
+    _sum: CreditPackageSumAggregateOutputType | null
+    _min: CreditPackageMinAggregateOutputType | null
+    _max: CreditPackageMaxAggregateOutputType | null
+  }
+
+  export type CreditPackageAvgAggregateOutputType = {
+    credits: number | null
+    priceCents: number | null
+    bonusCredits: number | null
+    sortOrder: number | null
+  }
+
+  export type CreditPackageSumAggregateOutputType = {
+    credits: number | null
+    priceCents: number | null
+    bonusCredits: number | null
+    sortOrder: number | null
+  }
+
+  export type CreditPackageMinAggregateOutputType = {
+    id: string | null
+    name: string | null
+    credits: number | null
+    priceCents: number | null
+    currency: string | null
+    bonusCredits: number | null
+    isActive: boolean | null
+    sortOrder: number | null
+    createdAt: Date | null
+  }
+
+  export type CreditPackageMaxAggregateOutputType = {
+    id: string | null
+    name: string | null
+    credits: number | null
+    priceCents: number | null
+    currency: string | null
+    bonusCredits: number | null
+    isActive: boolean | null
+    sortOrder: number | null
+    createdAt: Date | null
+  }
+
+  export type CreditPackageCountAggregateOutputType = {
+    id: number
+    name: number
+    credits: number
+    priceCents: number
+    currency: number
+    bonusCredits: number
+    isActive: number
+    sortOrder: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type CreditPackageAvgAggregateInputType = {
+    credits?: true
+    priceCents?: true
+    bonusCredits?: true
+    sortOrder?: true
+  }
+
+  export type CreditPackageSumAggregateInputType = {
+    credits?: true
+    priceCents?: true
+    bonusCredits?: true
+    sortOrder?: true
+  }
+
+  export type CreditPackageMinAggregateInputType = {
+    id?: true
+    name?: true
+    credits?: true
+    priceCents?: true
+    currency?: true
+    bonusCredits?: true
+    isActive?: true
+    sortOrder?: true
+    createdAt?: true
+  }
+
+  export type CreditPackageMaxAggregateInputType = {
+    id?: true
+    name?: true
+    credits?: true
+    priceCents?: true
+    currency?: true
+    bonusCredits?: true
+    isActive?: true
+    sortOrder?: true
+    createdAt?: true
+  }
+
+  export type CreditPackageCountAggregateInputType = {
+    id?: true
+    name?: true
+    credits?: true
+    priceCents?: true
+    currency?: true
+    bonusCredits?: true
+    isActive?: true
+    sortOrder?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type CreditPackageAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CreditPackage to aggregate.
+     */
+    where?: CreditPackageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CreditPackages to fetch.
+     */
+    orderBy?: CreditPackageOrderByWithRelationInput | CreditPackageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CreditPackageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CreditPackages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CreditPackages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CreditPackages
+    **/
+    _count?: true | CreditPackageCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: CreditPackageAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: CreditPackageSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CreditPackageMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CreditPackageMaxAggregateInputType
+  }
+
+  export type GetCreditPackageAggregateType<T extends CreditPackageAggregateArgs> = {
+        [P in keyof T & keyof AggregateCreditPackage]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCreditPackage[P]>
+      : GetScalarType<T[P], AggregateCreditPackage[P]>
+  }
+
+
+
+
+  export type CreditPackageGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CreditPackageWhereInput
+    orderBy?: CreditPackageOrderByWithAggregationInput | CreditPackageOrderByWithAggregationInput[]
+    by: CreditPackageScalarFieldEnum[] | CreditPackageScalarFieldEnum
+    having?: CreditPackageScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CreditPackageCountAggregateInputType | true
+    _avg?: CreditPackageAvgAggregateInputType
+    _sum?: CreditPackageSumAggregateInputType
+    _min?: CreditPackageMinAggregateInputType
+    _max?: CreditPackageMaxAggregateInputType
+  }
+
+  export type CreditPackageGroupByOutputType = {
+    id: string
+    name: string
+    credits: number
+    priceCents: number
+    currency: string
+    bonusCredits: number
+    isActive: boolean
+    sortOrder: number
+    createdAt: Date
+    _count: CreditPackageCountAggregateOutputType | null
+    _avg: CreditPackageAvgAggregateOutputType | null
+    _sum: CreditPackageSumAggregateOutputType | null
+    _min: CreditPackageMinAggregateOutputType | null
+    _max: CreditPackageMaxAggregateOutputType | null
+  }
+
+  type GetCreditPackageGroupByPayload<T extends CreditPackageGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CreditPackageGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CreditPackageGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CreditPackageGroupByOutputType[P]>
+            : GetScalarType<T[P], CreditPackageGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CreditPackageSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    credits?: boolean
+    priceCents?: boolean
+    currency?: boolean
+    bonusCredits?: boolean
+    isActive?: boolean
+    sortOrder?: boolean
+    createdAt?: boolean
+    orders?: boolean | CreditPackage$ordersArgs<ExtArgs>
+    _count?: boolean | CreditPackageCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["creditPackage"]>
+
+  export type CreditPackageSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    credits?: boolean
+    priceCents?: boolean
+    currency?: boolean
+    bonusCredits?: boolean
+    isActive?: boolean
+    sortOrder?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["creditPackage"]>
+
+  export type CreditPackageSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    name?: boolean
+    credits?: boolean
+    priceCents?: boolean
+    currency?: boolean
+    bonusCredits?: boolean
+    isActive?: boolean
+    sortOrder?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["creditPackage"]>
+
+  export type CreditPackageSelectScalar = {
+    id?: boolean
+    name?: boolean
+    credits?: boolean
+    priceCents?: boolean
+    currency?: boolean
+    bonusCredits?: boolean
+    isActive?: boolean
+    sortOrder?: boolean
+    createdAt?: boolean
+  }
+
+  export type CreditPackageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "credits" | "priceCents" | "currency" | "bonusCredits" | "isActive" | "sortOrder" | "createdAt", ExtArgs["result"]["creditPackage"]>
+  export type CreditPackageInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    orders?: boolean | CreditPackage$ordersArgs<ExtArgs>
+    _count?: boolean | CreditPackageCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type CreditPackageIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type CreditPackageIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+
+  export type $CreditPackagePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CreditPackage"
+    objects: {
+      orders: Prisma.$OrderPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      name: string
+      credits: number
+      priceCents: number
+      currency: string
+      bonusCredits: number
+      isActive: boolean
+      sortOrder: number
+      createdAt: Date
+    }, ExtArgs["result"]["creditPackage"]>
+    composites: {}
+  }
+
+  type CreditPackageGetPayload<S extends boolean | null | undefined | CreditPackageDefaultArgs> = $Result.GetResult<Prisma.$CreditPackagePayload, S>
+
+  type CreditPackageCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CreditPackageFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CreditPackageCountAggregateInputType | true
+    }
+
+  export interface CreditPackageDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CreditPackage'], meta: { name: 'CreditPackage' } }
+    /**
+     * Find zero or one CreditPackage that matches the filter.
+     * @param {CreditPackageFindUniqueArgs} args - Arguments to find a CreditPackage
+     * @example
+     * // Get one CreditPackage
+     * const creditPackage = await prisma.creditPackage.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CreditPackageFindUniqueArgs>(args: SelectSubset<T, CreditPackageFindUniqueArgs<ExtArgs>>): Prisma__CreditPackageClient<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CreditPackage that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CreditPackageFindUniqueOrThrowArgs} args - Arguments to find a CreditPackage
+     * @example
+     * // Get one CreditPackage
+     * const creditPackage = await prisma.creditPackage.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CreditPackageFindUniqueOrThrowArgs>(args: SelectSubset<T, CreditPackageFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CreditPackageClient<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CreditPackage that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreditPackageFindFirstArgs} args - Arguments to find a CreditPackage
+     * @example
+     * // Get one CreditPackage
+     * const creditPackage = await prisma.creditPackage.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CreditPackageFindFirstArgs>(args?: SelectSubset<T, CreditPackageFindFirstArgs<ExtArgs>>): Prisma__CreditPackageClient<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CreditPackage that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreditPackageFindFirstOrThrowArgs} args - Arguments to find a CreditPackage
+     * @example
+     * // Get one CreditPackage
+     * const creditPackage = await prisma.creditPackage.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CreditPackageFindFirstOrThrowArgs>(args?: SelectSubset<T, CreditPackageFindFirstOrThrowArgs<ExtArgs>>): Prisma__CreditPackageClient<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CreditPackages that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreditPackageFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CreditPackages
+     * const creditPackages = await prisma.creditPackage.findMany()
+     * 
+     * // Get first 10 CreditPackages
+     * const creditPackages = await prisma.creditPackage.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const creditPackageWithIdOnly = await prisma.creditPackage.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends CreditPackageFindManyArgs>(args?: SelectSubset<T, CreditPackageFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CreditPackage.
+     * @param {CreditPackageCreateArgs} args - Arguments to create a CreditPackage.
+     * @example
+     * // Create one CreditPackage
+     * const CreditPackage = await prisma.creditPackage.create({
+     *   data: {
+     *     // ... data to create a CreditPackage
+     *   }
+     * })
+     * 
+     */
+    create<T extends CreditPackageCreateArgs>(args: SelectSubset<T, CreditPackageCreateArgs<ExtArgs>>): Prisma__CreditPackageClient<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CreditPackages.
+     * @param {CreditPackageCreateManyArgs} args - Arguments to create many CreditPackages.
+     * @example
+     * // Create many CreditPackages
+     * const creditPackage = await prisma.creditPackage.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CreditPackageCreateManyArgs>(args?: SelectSubset<T, CreditPackageCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CreditPackages and returns the data saved in the database.
+     * @param {CreditPackageCreateManyAndReturnArgs} args - Arguments to create many CreditPackages.
+     * @example
+     * // Create many CreditPackages
+     * const creditPackage = await prisma.creditPackage.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CreditPackages and only return the `id`
+     * const creditPackageWithIdOnly = await prisma.creditPackage.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CreditPackageCreateManyAndReturnArgs>(args?: SelectSubset<T, CreditPackageCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CreditPackage.
+     * @param {CreditPackageDeleteArgs} args - Arguments to delete one CreditPackage.
+     * @example
+     * // Delete one CreditPackage
+     * const CreditPackage = await prisma.creditPackage.delete({
+     *   where: {
+     *     // ... filter to delete one CreditPackage
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CreditPackageDeleteArgs>(args: SelectSubset<T, CreditPackageDeleteArgs<ExtArgs>>): Prisma__CreditPackageClient<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CreditPackage.
+     * @param {CreditPackageUpdateArgs} args - Arguments to update one CreditPackage.
+     * @example
+     * // Update one CreditPackage
+     * const creditPackage = await prisma.creditPackage.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CreditPackageUpdateArgs>(args: SelectSubset<T, CreditPackageUpdateArgs<ExtArgs>>): Prisma__CreditPackageClient<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CreditPackages.
+     * @param {CreditPackageDeleteManyArgs} args - Arguments to filter CreditPackages to delete.
+     * @example
+     * // Delete a few CreditPackages
+     * const { count } = await prisma.creditPackage.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CreditPackageDeleteManyArgs>(args?: SelectSubset<T, CreditPackageDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CreditPackages.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreditPackageUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CreditPackages
+     * const creditPackage = await prisma.creditPackage.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CreditPackageUpdateManyArgs>(args: SelectSubset<T, CreditPackageUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CreditPackages and returns the data updated in the database.
+     * @param {CreditPackageUpdateManyAndReturnArgs} args - Arguments to update many CreditPackages.
+     * @example
+     * // Update many CreditPackages
+     * const creditPackage = await prisma.creditPackage.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CreditPackages and only return the `id`
+     * const creditPackageWithIdOnly = await prisma.creditPackage.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CreditPackageUpdateManyAndReturnArgs>(args: SelectSubset<T, CreditPackageUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CreditPackage.
+     * @param {CreditPackageUpsertArgs} args - Arguments to update or create a CreditPackage.
+     * @example
+     * // Update or create a CreditPackage
+     * const creditPackage = await prisma.creditPackage.upsert({
+     *   create: {
+     *     // ... data to create a CreditPackage
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CreditPackage we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CreditPackageUpsertArgs>(args: SelectSubset<T, CreditPackageUpsertArgs<ExtArgs>>): Prisma__CreditPackageClient<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CreditPackages.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreditPackageCountArgs} args - Arguments to filter CreditPackages to count.
+     * @example
+     * // Count the number of CreditPackages
+     * const count = await prisma.creditPackage.count({
+     *   where: {
+     *     // ... the filter for the CreditPackages we want to count
+     *   }
+     * })
+    **/
+    count<T extends CreditPackageCountArgs>(
+      args?: Subset<T, CreditPackageCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CreditPackageCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CreditPackage.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreditPackageAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CreditPackageAggregateArgs>(args: Subset<T, CreditPackageAggregateArgs>): Prisma.PrismaPromise<GetCreditPackageAggregateType<T>>
+
+    /**
+     * Group by CreditPackage.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CreditPackageGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CreditPackageGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CreditPackageGroupByArgs['orderBy'] }
+        : { orderBy?: CreditPackageGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CreditPackageGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCreditPackageGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CreditPackage model
+   */
+  readonly fields: CreditPackageFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CreditPackage.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CreditPackageClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    orders<T extends CreditPackage$ordersArgs<ExtArgs> = {}>(args?: Subset<T, CreditPackage$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CreditPackage model
+   */
+  interface CreditPackageFieldRefs {
+    readonly id: FieldRef<"CreditPackage", 'String'>
+    readonly name: FieldRef<"CreditPackage", 'String'>
+    readonly credits: FieldRef<"CreditPackage", 'Int'>
+    readonly priceCents: FieldRef<"CreditPackage", 'Int'>
+    readonly currency: FieldRef<"CreditPackage", 'String'>
+    readonly bonusCredits: FieldRef<"CreditPackage", 'Int'>
+    readonly isActive: FieldRef<"CreditPackage", 'Boolean'>
+    readonly sortOrder: FieldRef<"CreditPackage", 'Int'>
+    readonly createdAt: FieldRef<"CreditPackage", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CreditPackage findUnique
+   */
+  export type CreditPackageFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+    /**
+     * Filter, which CreditPackage to fetch.
+     */
+    where: CreditPackageWhereUniqueInput
+  }
+
+  /**
+   * CreditPackage findUniqueOrThrow
+   */
+  export type CreditPackageFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+    /**
+     * Filter, which CreditPackage to fetch.
+     */
+    where: CreditPackageWhereUniqueInput
+  }
+
+  /**
+   * CreditPackage findFirst
+   */
+  export type CreditPackageFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+    /**
+     * Filter, which CreditPackage to fetch.
+     */
+    where?: CreditPackageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CreditPackages to fetch.
+     */
+    orderBy?: CreditPackageOrderByWithRelationInput | CreditPackageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CreditPackages.
+     */
+    cursor?: CreditPackageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CreditPackages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CreditPackages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CreditPackages.
+     */
+    distinct?: CreditPackageScalarFieldEnum | CreditPackageScalarFieldEnum[]
+  }
+
+  /**
+   * CreditPackage findFirstOrThrow
+   */
+  export type CreditPackageFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+    /**
+     * Filter, which CreditPackage to fetch.
+     */
+    where?: CreditPackageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CreditPackages to fetch.
+     */
+    orderBy?: CreditPackageOrderByWithRelationInput | CreditPackageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CreditPackages.
+     */
+    cursor?: CreditPackageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CreditPackages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CreditPackages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CreditPackages.
+     */
+    distinct?: CreditPackageScalarFieldEnum | CreditPackageScalarFieldEnum[]
+  }
+
+  /**
+   * CreditPackage findMany
+   */
+  export type CreditPackageFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+    /**
+     * Filter, which CreditPackages to fetch.
+     */
+    where?: CreditPackageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CreditPackages to fetch.
+     */
+    orderBy?: CreditPackageOrderByWithRelationInput | CreditPackageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CreditPackages.
+     */
+    cursor?: CreditPackageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CreditPackages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CreditPackages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CreditPackages.
+     */
+    distinct?: CreditPackageScalarFieldEnum | CreditPackageScalarFieldEnum[]
+  }
+
+  /**
+   * CreditPackage create
+   */
+  export type CreditPackageCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+    /**
+     * The data needed to create a CreditPackage.
+     */
+    data: XOR<CreditPackageCreateInput, CreditPackageUncheckedCreateInput>
+  }
+
+  /**
+   * CreditPackage createMany
+   */
+  export type CreditPackageCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CreditPackages.
+     */
+    data: CreditPackageCreateManyInput | CreditPackageCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CreditPackage createManyAndReturn
+   */
+  export type CreditPackageCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * The data used to create many CreditPackages.
+     */
+    data: CreditPackageCreateManyInput | CreditPackageCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CreditPackage update
+   */
+  export type CreditPackageUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+    /**
+     * The data needed to update a CreditPackage.
+     */
+    data: XOR<CreditPackageUpdateInput, CreditPackageUncheckedUpdateInput>
+    /**
+     * Choose, which CreditPackage to update.
+     */
+    where: CreditPackageWhereUniqueInput
+  }
+
+  /**
+   * CreditPackage updateMany
+   */
+  export type CreditPackageUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CreditPackages.
+     */
+    data: XOR<CreditPackageUpdateManyMutationInput, CreditPackageUncheckedUpdateManyInput>
+    /**
+     * Filter which CreditPackages to update
+     */
+    where?: CreditPackageWhereInput
+    /**
+     * Limit how many CreditPackages to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CreditPackage updateManyAndReturn
+   */
+  export type CreditPackageUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * The data used to update CreditPackages.
+     */
+    data: XOR<CreditPackageUpdateManyMutationInput, CreditPackageUncheckedUpdateManyInput>
+    /**
+     * Filter which CreditPackages to update
+     */
+    where?: CreditPackageWhereInput
+    /**
+     * Limit how many CreditPackages to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CreditPackage upsert
+   */
+  export type CreditPackageUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+    /**
+     * The filter to search for the CreditPackage to update in case it exists.
+     */
+    where: CreditPackageWhereUniqueInput
+    /**
+     * In case the CreditPackage found by the `where` argument doesn't exist, create a new CreditPackage with this data.
+     */
+    create: XOR<CreditPackageCreateInput, CreditPackageUncheckedCreateInput>
+    /**
+     * In case the CreditPackage was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CreditPackageUpdateInput, CreditPackageUncheckedUpdateInput>
+  }
+
+  /**
+   * CreditPackage delete
+   */
+  export type CreditPackageDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+    /**
+     * Filter which CreditPackage to delete.
+     */
+    where: CreditPackageWhereUniqueInput
+  }
+
+  /**
+   * CreditPackage deleteMany
+   */
+  export type CreditPackageDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CreditPackages to delete
+     */
+    where?: CreditPackageWhereInput
+    /**
+     * Limit how many CreditPackages to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CreditPackage.orders
+   */
+  export type CreditPackage$ordersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Order
+     */
+    select?: OrderSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Order
+     */
+    omit?: OrderOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: OrderInclude<ExtArgs> | null
+    where?: OrderWhereInput
+    orderBy?: OrderOrderByWithRelationInput | OrderOrderByWithRelationInput[]
+    cursor?: OrderWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: OrderScalarFieldEnum | OrderScalarFieldEnum[]
+  }
+
+  /**
+   * CreditPackage without action
+   */
+  export type CreditPackageDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Model CreditBalance
    */
 
@@ -13224,6 +14519,7 @@ export namespace Prisma {
     orderNo: string | null
     userId: string | null
     planId: string | null
+    packageId: string | null
     amount: number | null
     currency: string | null
     status: string | null
@@ -13240,6 +14536,7 @@ export namespace Prisma {
     orderNo: string | null
     userId: string | null
     planId: string | null
+    packageId: string | null
     amount: number | null
     currency: string | null
     status: string | null
@@ -13256,6 +14553,7 @@ export namespace Prisma {
     orderNo: number
     userId: number
     planId: number
+    packageId: number
     amount: number
     currency: number
     status: number
@@ -13283,6 +14581,7 @@ export namespace Prisma {
     orderNo?: true
     userId?: true
     planId?: true
+    packageId?: true
     amount?: true
     currency?: true
     status?: true
@@ -13299,6 +14598,7 @@ export namespace Prisma {
     orderNo?: true
     userId?: true
     planId?: true
+    packageId?: true
     amount?: true
     currency?: true
     status?: true
@@ -13315,6 +14615,7 @@ export namespace Prisma {
     orderNo?: true
     userId?: true
     planId?: true
+    packageId?: true
     amount?: true
     currency?: true
     status?: true
@@ -13418,7 +14719,8 @@ export namespace Prisma {
     id: string
     orderNo: string
     userId: string
-    planId: string
+    planId: string | null
+    packageId: string | null
     amount: number
     currency: string
     status: string
@@ -13455,6 +14757,7 @@ export namespace Prisma {
     orderNo?: boolean
     userId?: boolean
     planId?: boolean
+    packageId?: boolean
     amount?: boolean
     currency?: boolean
     status?: boolean
@@ -13466,7 +14769,8 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
-    plan?: boolean | PlanDefaultArgs<ExtArgs>
+    plan?: boolean | Order$planArgs<ExtArgs>
+    package?: boolean | Order$packageArgs<ExtArgs>
     paymentEvents?: boolean | Order$paymentEventsArgs<ExtArgs>
     _count?: boolean | OrderCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["order"]>
@@ -13476,6 +14780,7 @@ export namespace Prisma {
     orderNo?: boolean
     userId?: boolean
     planId?: boolean
+    packageId?: boolean
     amount?: boolean
     currency?: boolean
     status?: boolean
@@ -13487,7 +14792,8 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
-    plan?: boolean | PlanDefaultArgs<ExtArgs>
+    plan?: boolean | Order$planArgs<ExtArgs>
+    package?: boolean | Order$packageArgs<ExtArgs>
   }, ExtArgs["result"]["order"]>
 
   export type OrderSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -13495,6 +14801,7 @@ export namespace Prisma {
     orderNo?: boolean
     userId?: boolean
     planId?: boolean
+    packageId?: boolean
     amount?: boolean
     currency?: boolean
     status?: boolean
@@ -13506,7 +14813,8 @@ export namespace Prisma {
     createdAt?: boolean
     updatedAt?: boolean
     user?: boolean | UserDefaultArgs<ExtArgs>
-    plan?: boolean | PlanDefaultArgs<ExtArgs>
+    plan?: boolean | Order$planArgs<ExtArgs>
+    package?: boolean | Order$packageArgs<ExtArgs>
   }, ExtArgs["result"]["order"]>
 
   export type OrderSelectScalar = {
@@ -13514,6 +14822,7 @@ export namespace Prisma {
     orderNo?: boolean
     userId?: boolean
     planId?: boolean
+    packageId?: boolean
     amount?: boolean
     currency?: boolean
     status?: boolean
@@ -13526,34 +14835,39 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type OrderOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "orderNo" | "userId" | "planId" | "amount" | "currency" | "status" | "provider" | "billingCycle" | "providerOrderNo" | "paidAt" | "metadata" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
+  export type OrderOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "orderNo" | "userId" | "planId" | "packageId" | "amount" | "currency" | "status" | "provider" | "billingCycle" | "providerOrderNo" | "paidAt" | "metadata" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
   export type OrderInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
-    plan?: boolean | PlanDefaultArgs<ExtArgs>
+    plan?: boolean | Order$planArgs<ExtArgs>
+    package?: boolean | Order$packageArgs<ExtArgs>
     paymentEvents?: boolean | Order$paymentEventsArgs<ExtArgs>
     _count?: boolean | OrderCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type OrderIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
-    plan?: boolean | PlanDefaultArgs<ExtArgs>
+    plan?: boolean | Order$planArgs<ExtArgs>
+    package?: boolean | Order$packageArgs<ExtArgs>
   }
   export type OrderIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
-    plan?: boolean | PlanDefaultArgs<ExtArgs>
+    plan?: boolean | Order$planArgs<ExtArgs>
+    package?: boolean | Order$packageArgs<ExtArgs>
   }
 
   export type $OrderPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Order"
     objects: {
       user: Prisma.$UserPayload<ExtArgs>
-      plan: Prisma.$PlanPayload<ExtArgs>
+      plan: Prisma.$PlanPayload<ExtArgs> | null
+      package: Prisma.$CreditPackagePayload<ExtArgs> | null
       paymentEvents: Prisma.$PaymentEventPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
       orderNo: string
       userId: string
-      planId: string
+      planId: string | null
+      packageId: string | null
       amount: number
       currency: string
       status: string
@@ -13959,7 +15273,8 @@ export namespace Prisma {
   export interface Prisma__OrderClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-    plan<T extends PlanDefaultArgs<ExtArgs> = {}>(args?: Subset<T, PlanDefaultArgs<ExtArgs>>): Prisma__PlanClient<$Result.GetResult<Prisma.$PlanPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    plan<T extends Order$planArgs<ExtArgs> = {}>(args?: Subset<T, Order$planArgs<ExtArgs>>): Prisma__PlanClient<$Result.GetResult<Prisma.$PlanPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    package<T extends Order$packageArgs<ExtArgs> = {}>(args?: Subset<T, Order$packageArgs<ExtArgs>>): Prisma__CreditPackageClient<$Result.GetResult<Prisma.$CreditPackagePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     paymentEvents<T extends Order$paymentEventsArgs<ExtArgs> = {}>(args?: Subset<T, Order$paymentEventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PaymentEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -13994,6 +15309,7 @@ export namespace Prisma {
     readonly orderNo: FieldRef<"Order", 'String'>
     readonly userId: FieldRef<"Order", 'String'>
     readonly planId: FieldRef<"Order", 'String'>
+    readonly packageId: FieldRef<"Order", 'String'>
     readonly amount: FieldRef<"Order", 'Int'>
     readonly currency: FieldRef<"Order", 'String'>
     readonly status: FieldRef<"Order", 'String'>
@@ -14402,6 +15718,44 @@ export namespace Prisma {
      * Limit how many Orders to delete.
      */
     limit?: number
+  }
+
+  /**
+   * Order.plan
+   */
+  export type Order$planArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Plan
+     */
+    select?: PlanSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Plan
+     */
+    omit?: PlanOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: PlanInclude<ExtArgs> | null
+    where?: PlanWhereInput
+  }
+
+  /**
+   * Order.package
+   */
+  export type Order$packageArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CreditPackage
+     */
+    select?: CreditPackageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CreditPackage
+     */
+    omit?: CreditPackageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: CreditPackageInclude<ExtArgs> | null
+    where?: CreditPackageWhereInput
   }
 
   /**
@@ -23050,6 +24404,21 @@ export namespace Prisma {
   export type GenerationJobScalarFieldEnum = (typeof GenerationJobScalarFieldEnum)[keyof typeof GenerationJobScalarFieldEnum]
 
 
+  export const CreditPackageScalarFieldEnum: {
+    id: 'id',
+    name: 'name',
+    credits: 'credits',
+    priceCents: 'priceCents',
+    currency: 'currency',
+    bonusCredits: 'bonusCredits',
+    isActive: 'isActive',
+    sortOrder: 'sortOrder',
+    createdAt: 'createdAt'
+  };
+
+  export type CreditPackageScalarFieldEnum = (typeof CreditPackageScalarFieldEnum)[keyof typeof CreditPackageScalarFieldEnum]
+
+
   export const CreditBalanceScalarFieldEnum: {
     id: 'id',
     userId: 'userId',
@@ -23080,6 +24449,7 @@ export namespace Prisma {
     orderNo: 'orderNo',
     userId: 'userId',
     planId: 'planId',
+    packageId: 'packageId',
     amount: 'amount',
     currency: 'currency',
     status: 'status',
@@ -23968,6 +25338,83 @@ export namespace Prisma {
     updatedAt?: DateTimeWithAggregatesFilter<"GenerationJob"> | Date | string
   }
 
+  export type CreditPackageWhereInput = {
+    AND?: CreditPackageWhereInput | CreditPackageWhereInput[]
+    OR?: CreditPackageWhereInput[]
+    NOT?: CreditPackageWhereInput | CreditPackageWhereInput[]
+    id?: StringFilter<"CreditPackage"> | string
+    name?: StringFilter<"CreditPackage"> | string
+    credits?: IntFilter<"CreditPackage"> | number
+    priceCents?: IntFilter<"CreditPackage"> | number
+    currency?: StringFilter<"CreditPackage"> | string
+    bonusCredits?: IntFilter<"CreditPackage"> | number
+    isActive?: BoolFilter<"CreditPackage"> | boolean
+    sortOrder?: IntFilter<"CreditPackage"> | number
+    createdAt?: DateTimeFilter<"CreditPackage"> | Date | string
+    orders?: OrderListRelationFilter
+  }
+
+  export type CreditPackageOrderByWithRelationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    credits?: SortOrder
+    priceCents?: SortOrder
+    currency?: SortOrder
+    bonusCredits?: SortOrder
+    isActive?: SortOrder
+    sortOrder?: SortOrder
+    createdAt?: SortOrder
+    orders?: OrderOrderByRelationAggregateInput
+  }
+
+  export type CreditPackageWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: CreditPackageWhereInput | CreditPackageWhereInput[]
+    OR?: CreditPackageWhereInput[]
+    NOT?: CreditPackageWhereInput | CreditPackageWhereInput[]
+    name?: StringFilter<"CreditPackage"> | string
+    credits?: IntFilter<"CreditPackage"> | number
+    priceCents?: IntFilter<"CreditPackage"> | number
+    currency?: StringFilter<"CreditPackage"> | string
+    bonusCredits?: IntFilter<"CreditPackage"> | number
+    isActive?: BoolFilter<"CreditPackage"> | boolean
+    sortOrder?: IntFilter<"CreditPackage"> | number
+    createdAt?: DateTimeFilter<"CreditPackage"> | Date | string
+    orders?: OrderListRelationFilter
+  }, "id">
+
+  export type CreditPackageOrderByWithAggregationInput = {
+    id?: SortOrder
+    name?: SortOrder
+    credits?: SortOrder
+    priceCents?: SortOrder
+    currency?: SortOrder
+    bonusCredits?: SortOrder
+    isActive?: SortOrder
+    sortOrder?: SortOrder
+    createdAt?: SortOrder
+    _count?: CreditPackageCountOrderByAggregateInput
+    _avg?: CreditPackageAvgOrderByAggregateInput
+    _max?: CreditPackageMaxOrderByAggregateInput
+    _min?: CreditPackageMinOrderByAggregateInput
+    _sum?: CreditPackageSumOrderByAggregateInput
+  }
+
+  export type CreditPackageScalarWhereWithAggregatesInput = {
+    AND?: CreditPackageScalarWhereWithAggregatesInput | CreditPackageScalarWhereWithAggregatesInput[]
+    OR?: CreditPackageScalarWhereWithAggregatesInput[]
+    NOT?: CreditPackageScalarWhereWithAggregatesInput | CreditPackageScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"CreditPackage"> | string
+    name?: StringWithAggregatesFilter<"CreditPackage"> | string
+    credits?: IntWithAggregatesFilter<"CreditPackage"> | number
+    priceCents?: IntWithAggregatesFilter<"CreditPackage"> | number
+    currency?: StringWithAggregatesFilter<"CreditPackage"> | string
+    bonusCredits?: IntWithAggregatesFilter<"CreditPackage"> | number
+    isActive?: BoolWithAggregatesFilter<"CreditPackage"> | boolean
+    sortOrder?: IntWithAggregatesFilter<"CreditPackage"> | number
+    createdAt?: DateTimeWithAggregatesFilter<"CreditPackage"> | Date | string
+  }
+
   export type CreditBalanceWhereInput = {
     AND?: CreditBalanceWhereInput | CreditBalanceWhereInput[]
     OR?: CreditBalanceWhereInput[]
@@ -24104,7 +25551,8 @@ export namespace Prisma {
     id?: StringFilter<"Order"> | string
     orderNo?: StringFilter<"Order"> | string
     userId?: StringFilter<"Order"> | string
-    planId?: StringFilter<"Order"> | string
+    planId?: StringNullableFilter<"Order"> | string | null
+    packageId?: StringNullableFilter<"Order"> | string | null
     amount?: IntFilter<"Order"> | number
     currency?: StringFilter<"Order"> | string
     status?: StringFilter<"Order"> | string
@@ -24116,7 +25564,8 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
-    plan?: XOR<PlanScalarRelationFilter, PlanWhereInput>
+    plan?: XOR<PlanNullableScalarRelationFilter, PlanWhereInput> | null
+    package?: XOR<CreditPackageNullableScalarRelationFilter, CreditPackageWhereInput> | null
     paymentEvents?: PaymentEventListRelationFilter
   }
 
@@ -24124,7 +25573,8 @@ export namespace Prisma {
     id?: SortOrder
     orderNo?: SortOrder
     userId?: SortOrder
-    planId?: SortOrder
+    planId?: SortOrderInput | SortOrder
+    packageId?: SortOrderInput | SortOrder
     amount?: SortOrder
     currency?: SortOrder
     status?: SortOrder
@@ -24137,6 +25587,7 @@ export namespace Prisma {
     updatedAt?: SortOrder
     user?: UserOrderByWithRelationInput
     plan?: PlanOrderByWithRelationInput
+    package?: CreditPackageOrderByWithRelationInput
     paymentEvents?: PaymentEventOrderByRelationAggregateInput
   }
 
@@ -24147,7 +25598,8 @@ export namespace Prisma {
     OR?: OrderWhereInput[]
     NOT?: OrderWhereInput | OrderWhereInput[]
     userId?: StringFilter<"Order"> | string
-    planId?: StringFilter<"Order"> | string
+    planId?: StringNullableFilter<"Order"> | string | null
+    packageId?: StringNullableFilter<"Order"> | string | null
     amount?: IntFilter<"Order"> | number
     currency?: StringFilter<"Order"> | string
     status?: StringFilter<"Order"> | string
@@ -24159,7 +25611,8 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"Order"> | Date | string
     updatedAt?: DateTimeFilter<"Order"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
-    plan?: XOR<PlanScalarRelationFilter, PlanWhereInput>
+    plan?: XOR<PlanNullableScalarRelationFilter, PlanWhereInput> | null
+    package?: XOR<CreditPackageNullableScalarRelationFilter, CreditPackageWhereInput> | null
     paymentEvents?: PaymentEventListRelationFilter
   }, "id" | "orderNo">
 
@@ -24167,7 +25620,8 @@ export namespace Prisma {
     id?: SortOrder
     orderNo?: SortOrder
     userId?: SortOrder
-    planId?: SortOrder
+    planId?: SortOrderInput | SortOrder
+    packageId?: SortOrderInput | SortOrder
     amount?: SortOrder
     currency?: SortOrder
     status?: SortOrder
@@ -24192,7 +25646,8 @@ export namespace Prisma {
     id?: StringWithAggregatesFilter<"Order"> | string
     orderNo?: StringWithAggregatesFilter<"Order"> | string
     userId?: StringWithAggregatesFilter<"Order"> | string
-    planId?: StringWithAggregatesFilter<"Order"> | string
+    planId?: StringNullableWithAggregatesFilter<"Order"> | string | null
+    packageId?: StringNullableWithAggregatesFilter<"Order"> | string | null
     amount?: IntWithAggregatesFilter<"Order"> | number
     currency?: StringWithAggregatesFilter<"Order"> | string
     status?: StringWithAggregatesFilter<"Order"> | string
@@ -25455,6 +26910,94 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type CreditPackageCreateInput = {
+    id?: string
+    name: string
+    credits: number
+    priceCents: number
+    currency?: string
+    bonusCredits?: number
+    isActive?: boolean
+    sortOrder?: number
+    createdAt?: Date | string
+    orders?: OrderCreateNestedManyWithoutPackageInput
+  }
+
+  export type CreditPackageUncheckedCreateInput = {
+    id?: string
+    name: string
+    credits: number
+    priceCents: number
+    currency?: string
+    bonusCredits?: number
+    isActive?: boolean
+    sortOrder?: number
+    createdAt?: Date | string
+    orders?: OrderUncheckedCreateNestedManyWithoutPackageInput
+  }
+
+  export type CreditPackageUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    credits?: IntFieldUpdateOperationsInput | number
+    priceCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    bonusCredits?: IntFieldUpdateOperationsInput | number
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    sortOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    orders?: OrderUpdateManyWithoutPackageNestedInput
+  }
+
+  export type CreditPackageUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    credits?: IntFieldUpdateOperationsInput | number
+    priceCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    bonusCredits?: IntFieldUpdateOperationsInput | number
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    sortOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    orders?: OrderUncheckedUpdateManyWithoutPackageNestedInput
+  }
+
+  export type CreditPackageCreateManyInput = {
+    id?: string
+    name: string
+    credits: number
+    priceCents: number
+    currency?: string
+    bonusCredits?: number
+    isActive?: boolean
+    sortOrder?: number
+    createdAt?: Date | string
+  }
+
+  export type CreditPackageUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    credits?: IntFieldUpdateOperationsInput | number
+    priceCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    bonusCredits?: IntFieldUpdateOperationsInput | number
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    sortOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CreditPackageUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    credits?: IntFieldUpdateOperationsInput | number
+    priceCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    bonusCredits?: IntFieldUpdateOperationsInput | number
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    sortOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type CreditBalanceCreateInput = {
     id?: string
     balance?: number
@@ -25600,7 +27143,8 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutOrdersInput
-    plan: PlanCreateNestedOneWithoutOrdersInput
+    plan?: PlanCreateNestedOneWithoutOrdersInput
+    package?: CreditPackageCreateNestedOneWithoutOrdersInput
     paymentEvents?: PaymentEventCreateNestedManyWithoutOrderInput
   }
 
@@ -25608,7 +27152,8 @@ export namespace Prisma {
     id?: string
     orderNo: string
     userId: string
-    planId: string
+    planId?: string | null
+    packageId?: string | null
     amount: number
     currency?: string
     status?: string
@@ -25636,7 +27181,8 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutOrdersNestedInput
-    plan?: PlanUpdateOneRequiredWithoutOrdersNestedInput
+    plan?: PlanUpdateOneWithoutOrdersNestedInput
+    package?: CreditPackageUpdateOneWithoutOrdersNestedInput
     paymentEvents?: PaymentEventUpdateManyWithoutOrderNestedInput
   }
 
@@ -25644,7 +27190,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     orderNo?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
-    planId?: StringFieldUpdateOperationsInput | string
+    planId?: NullableStringFieldUpdateOperationsInput | string | null
+    packageId?: NullableStringFieldUpdateOperationsInput | string | null
     amount?: IntFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
     status?: StringFieldUpdateOperationsInput | string
@@ -25662,7 +27209,8 @@ export namespace Prisma {
     id?: string
     orderNo: string
     userId: string
-    planId: string
+    planId?: string | null
+    packageId?: string | null
     amount: number
     currency?: string
     status?: string
@@ -25694,7 +27242,8 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     orderNo?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
-    planId?: StringFieldUpdateOperationsInput | string
+    planId?: NullableStringFieldUpdateOperationsInput | string | null
+    packageId?: NullableStringFieldUpdateOperationsInput | string | null
     amount?: IntFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
     status?: StringFieldUpdateOperationsInput | string
@@ -27002,6 +28551,56 @@ export namespace Prisma {
     _max?: NestedJsonNullableFilter<$PrismaModel>
   }
 
+  export type CreditPackageCountOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    credits?: SortOrder
+    priceCents?: SortOrder
+    currency?: SortOrder
+    bonusCredits?: SortOrder
+    isActive?: SortOrder
+    sortOrder?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CreditPackageAvgOrderByAggregateInput = {
+    credits?: SortOrder
+    priceCents?: SortOrder
+    bonusCredits?: SortOrder
+    sortOrder?: SortOrder
+  }
+
+  export type CreditPackageMaxOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    credits?: SortOrder
+    priceCents?: SortOrder
+    currency?: SortOrder
+    bonusCredits?: SortOrder
+    isActive?: SortOrder
+    sortOrder?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CreditPackageMinOrderByAggregateInput = {
+    id?: SortOrder
+    name?: SortOrder
+    credits?: SortOrder
+    priceCents?: SortOrder
+    currency?: SortOrder
+    bonusCredits?: SortOrder
+    isActive?: SortOrder
+    sortOrder?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CreditPackageSumOrderByAggregateInput = {
+    credits?: SortOrder
+    priceCents?: SortOrder
+    bonusCredits?: SortOrder
+    sortOrder?: SortOrder
+  }
+
   export type CreditBalanceCountOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
@@ -27077,6 +28676,11 @@ export namespace Prisma {
     balanceAfter?: SortOrder
   }
 
+  export type CreditPackageNullableScalarRelationFilter = {
+    is?: CreditPackageWhereInput | null
+    isNot?: CreditPackageWhereInput | null
+  }
+
   export type PaymentEventListRelationFilter = {
     every?: PaymentEventWhereInput
     some?: PaymentEventWhereInput
@@ -27092,6 +28696,7 @@ export namespace Prisma {
     orderNo?: SortOrder
     userId?: SortOrder
     planId?: SortOrder
+    packageId?: SortOrder
     amount?: SortOrder
     currency?: SortOrder
     status?: SortOrder
@@ -27113,6 +28718,7 @@ export namespace Prisma {
     orderNo?: SortOrder
     userId?: SortOrder
     planId?: SortOrder
+    packageId?: SortOrder
     amount?: SortOrder
     currency?: SortOrder
     status?: SortOrder
@@ -27129,6 +28735,7 @@ export namespace Prisma {
     orderNo?: SortOrder
     userId?: SortOrder
     planId?: SortOrder
+    packageId?: SortOrder
     amount?: SortOrder
     currency?: SortOrder
     status?: SortOrder
@@ -28003,6 +29610,48 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutGenerationJobsInput, UserUpdateWithoutGenerationJobsInput>, UserUncheckedUpdateWithoutGenerationJobsInput>
   }
 
+  export type OrderCreateNestedManyWithoutPackageInput = {
+    create?: XOR<OrderCreateWithoutPackageInput, OrderUncheckedCreateWithoutPackageInput> | OrderCreateWithoutPackageInput[] | OrderUncheckedCreateWithoutPackageInput[]
+    connectOrCreate?: OrderCreateOrConnectWithoutPackageInput | OrderCreateOrConnectWithoutPackageInput[]
+    createMany?: OrderCreateManyPackageInputEnvelope
+    connect?: OrderWhereUniqueInput | OrderWhereUniqueInput[]
+  }
+
+  export type OrderUncheckedCreateNestedManyWithoutPackageInput = {
+    create?: XOR<OrderCreateWithoutPackageInput, OrderUncheckedCreateWithoutPackageInput> | OrderCreateWithoutPackageInput[] | OrderUncheckedCreateWithoutPackageInput[]
+    connectOrCreate?: OrderCreateOrConnectWithoutPackageInput | OrderCreateOrConnectWithoutPackageInput[]
+    createMany?: OrderCreateManyPackageInputEnvelope
+    connect?: OrderWhereUniqueInput | OrderWhereUniqueInput[]
+  }
+
+  export type OrderUpdateManyWithoutPackageNestedInput = {
+    create?: XOR<OrderCreateWithoutPackageInput, OrderUncheckedCreateWithoutPackageInput> | OrderCreateWithoutPackageInput[] | OrderUncheckedCreateWithoutPackageInput[]
+    connectOrCreate?: OrderCreateOrConnectWithoutPackageInput | OrderCreateOrConnectWithoutPackageInput[]
+    upsert?: OrderUpsertWithWhereUniqueWithoutPackageInput | OrderUpsertWithWhereUniqueWithoutPackageInput[]
+    createMany?: OrderCreateManyPackageInputEnvelope
+    set?: OrderWhereUniqueInput | OrderWhereUniqueInput[]
+    disconnect?: OrderWhereUniqueInput | OrderWhereUniqueInput[]
+    delete?: OrderWhereUniqueInput | OrderWhereUniqueInput[]
+    connect?: OrderWhereUniqueInput | OrderWhereUniqueInput[]
+    update?: OrderUpdateWithWhereUniqueWithoutPackageInput | OrderUpdateWithWhereUniqueWithoutPackageInput[]
+    updateMany?: OrderUpdateManyWithWhereWithoutPackageInput | OrderUpdateManyWithWhereWithoutPackageInput[]
+    deleteMany?: OrderScalarWhereInput | OrderScalarWhereInput[]
+  }
+
+  export type OrderUncheckedUpdateManyWithoutPackageNestedInput = {
+    create?: XOR<OrderCreateWithoutPackageInput, OrderUncheckedCreateWithoutPackageInput> | OrderCreateWithoutPackageInput[] | OrderUncheckedCreateWithoutPackageInput[]
+    connectOrCreate?: OrderCreateOrConnectWithoutPackageInput | OrderCreateOrConnectWithoutPackageInput[]
+    upsert?: OrderUpsertWithWhereUniqueWithoutPackageInput | OrderUpsertWithWhereUniqueWithoutPackageInput[]
+    createMany?: OrderCreateManyPackageInputEnvelope
+    set?: OrderWhereUniqueInput | OrderWhereUniqueInput[]
+    disconnect?: OrderWhereUniqueInput | OrderWhereUniqueInput[]
+    delete?: OrderWhereUniqueInput | OrderWhereUniqueInput[]
+    connect?: OrderWhereUniqueInput | OrderWhereUniqueInput[]
+    update?: OrderUpdateWithWhereUniqueWithoutPackageInput | OrderUpdateWithWhereUniqueWithoutPackageInput[]
+    updateMany?: OrderUpdateManyWithWhereWithoutPackageInput | OrderUpdateManyWithWhereWithoutPackageInput[]
+    deleteMany?: OrderScalarWhereInput | OrderScalarWhereInput[]
+  }
+
   export type UserCreateNestedOneWithoutCreditBalanceInput = {
     create?: XOR<UserCreateWithoutCreditBalanceInput, UserUncheckedCreateWithoutCreditBalanceInput>
     connectOrCreate?: UserCreateOrConnectWithoutCreditBalanceInput
@@ -28043,6 +29692,12 @@ export namespace Prisma {
     connect?: PlanWhereUniqueInput
   }
 
+  export type CreditPackageCreateNestedOneWithoutOrdersInput = {
+    create?: XOR<CreditPackageCreateWithoutOrdersInput, CreditPackageUncheckedCreateWithoutOrdersInput>
+    connectOrCreate?: CreditPackageCreateOrConnectWithoutOrdersInput
+    connect?: CreditPackageWhereUniqueInput
+  }
+
   export type PaymentEventCreateNestedManyWithoutOrderInput = {
     create?: XOR<PaymentEventCreateWithoutOrderInput, PaymentEventUncheckedCreateWithoutOrderInput> | PaymentEventCreateWithoutOrderInput[] | PaymentEventUncheckedCreateWithoutOrderInput[]
     connectOrCreate?: PaymentEventCreateOrConnectWithoutOrderInput | PaymentEventCreateOrConnectWithoutOrderInput[]
@@ -28065,12 +29720,24 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutOrdersInput, UserUpdateWithoutOrdersInput>, UserUncheckedUpdateWithoutOrdersInput>
   }
 
-  export type PlanUpdateOneRequiredWithoutOrdersNestedInput = {
+  export type PlanUpdateOneWithoutOrdersNestedInput = {
     create?: XOR<PlanCreateWithoutOrdersInput, PlanUncheckedCreateWithoutOrdersInput>
     connectOrCreate?: PlanCreateOrConnectWithoutOrdersInput
     upsert?: PlanUpsertWithoutOrdersInput
+    disconnect?: PlanWhereInput | boolean
+    delete?: PlanWhereInput | boolean
     connect?: PlanWhereUniqueInput
     update?: XOR<XOR<PlanUpdateToOneWithWhereWithoutOrdersInput, PlanUpdateWithoutOrdersInput>, PlanUncheckedUpdateWithoutOrdersInput>
+  }
+
+  export type CreditPackageUpdateOneWithoutOrdersNestedInput = {
+    create?: XOR<CreditPackageCreateWithoutOrdersInput, CreditPackageUncheckedCreateWithoutOrdersInput>
+    connectOrCreate?: CreditPackageCreateOrConnectWithoutOrdersInput
+    upsert?: CreditPackageUpsertWithoutOrdersInput
+    disconnect?: CreditPackageWhereInput | boolean
+    delete?: CreditPackageWhereInput | boolean
+    connect?: CreditPackageWhereUniqueInput
+    update?: XOR<XOR<CreditPackageUpdateToOneWithWhereWithoutOrdersInput, CreditPackageUpdateWithoutOrdersInput>, CreditPackageUncheckedUpdateWithoutOrdersInput>
   }
 
   export type PaymentEventUpdateManyWithoutOrderNestedInput = {
@@ -28440,14 +30107,16 @@ export namespace Prisma {
     metadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: Date | string
     updatedAt?: Date | string
-    plan: PlanCreateNestedOneWithoutOrdersInput
+    plan?: PlanCreateNestedOneWithoutOrdersInput
+    package?: CreditPackageCreateNestedOneWithoutOrdersInput
     paymentEvents?: PaymentEventCreateNestedManyWithoutOrderInput
   }
 
   export type OrderUncheckedCreateWithoutUserInput = {
     id?: string
     orderNo: string
-    planId: string
+    planId?: string | null
+    packageId?: string | null
     amount: number
     currency?: string
     status?: string
@@ -28703,7 +30372,8 @@ export namespace Prisma {
     id?: StringFilter<"Order"> | string
     orderNo?: StringFilter<"Order"> | string
     userId?: StringFilter<"Order"> | string
-    planId?: StringFilter<"Order"> | string
+    planId?: StringNullableFilter<"Order"> | string | null
+    packageId?: StringNullableFilter<"Order"> | string | null
     amount?: IntFilter<"Order"> | number
     currency?: StringFilter<"Order"> | string
     status?: StringFilter<"Order"> | string
@@ -29091,6 +30761,7 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutOrdersInput
+    package?: CreditPackageCreateNestedOneWithoutOrdersInput
     paymentEvents?: PaymentEventCreateNestedManyWithoutOrderInput
   }
 
@@ -29098,6 +30769,7 @@ export namespace Prisma {
     id?: string
     orderNo: string
     userId: string
+    packageId?: string | null
     amount: number
     currency?: string
     status?: string
@@ -29680,6 +31352,68 @@ export namespace Prisma {
     creditTransactions?: CreditTransactionUncheckedUpdateManyWithoutUserNestedInput
   }
 
+  export type OrderCreateWithoutPackageInput = {
+    id?: string
+    orderNo: string
+    amount: number
+    currency?: string
+    status?: string
+    provider?: string
+    billingCycle?: string
+    providerOrderNo?: string | null
+    paidAt?: Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutOrdersInput
+    plan?: PlanCreateNestedOneWithoutOrdersInput
+    paymentEvents?: PaymentEventCreateNestedManyWithoutOrderInput
+  }
+
+  export type OrderUncheckedCreateWithoutPackageInput = {
+    id?: string
+    orderNo: string
+    userId: string
+    planId?: string | null
+    amount: number
+    currency?: string
+    status?: string
+    provider?: string
+    billingCycle?: string
+    providerOrderNo?: string | null
+    paidAt?: Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    paymentEvents?: PaymentEventUncheckedCreateNestedManyWithoutOrderInput
+  }
+
+  export type OrderCreateOrConnectWithoutPackageInput = {
+    where: OrderWhereUniqueInput
+    create: XOR<OrderCreateWithoutPackageInput, OrderUncheckedCreateWithoutPackageInput>
+  }
+
+  export type OrderCreateManyPackageInputEnvelope = {
+    data: OrderCreateManyPackageInput | OrderCreateManyPackageInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type OrderUpsertWithWhereUniqueWithoutPackageInput = {
+    where: OrderWhereUniqueInput
+    update: XOR<OrderUpdateWithoutPackageInput, OrderUncheckedUpdateWithoutPackageInput>
+    create: XOR<OrderCreateWithoutPackageInput, OrderUncheckedCreateWithoutPackageInput>
+  }
+
+  export type OrderUpdateWithWhereUniqueWithoutPackageInput = {
+    where: OrderWhereUniqueInput
+    data: XOR<OrderUpdateWithoutPackageInput, OrderUncheckedUpdateWithoutPackageInput>
+  }
+
+  export type OrderUpdateManyWithWhereWithoutPackageInput = {
+    where: OrderScalarWhereInput
+    data: XOR<OrderUpdateManyMutationInput, OrderUncheckedUpdateManyWithoutPackageInput>
+  }
+
   export type UserCreateWithoutCreditBalanceInput = {
     id?: string
     email: string
@@ -29994,6 +31728,35 @@ export namespace Prisma {
     create: XOR<PlanCreateWithoutOrdersInput, PlanUncheckedCreateWithoutOrdersInput>
   }
 
+  export type CreditPackageCreateWithoutOrdersInput = {
+    id?: string
+    name: string
+    credits: number
+    priceCents: number
+    currency?: string
+    bonusCredits?: number
+    isActive?: boolean
+    sortOrder?: number
+    createdAt?: Date | string
+  }
+
+  export type CreditPackageUncheckedCreateWithoutOrdersInput = {
+    id?: string
+    name: string
+    credits: number
+    priceCents: number
+    currency?: string
+    bonusCredits?: number
+    isActive?: boolean
+    sortOrder?: number
+    createdAt?: Date | string
+  }
+
+  export type CreditPackageCreateOrConnectWithoutOrdersInput = {
+    where: CreditPackageWhereUniqueInput
+    create: XOR<CreditPackageCreateWithoutOrdersInput, CreditPackageUncheckedCreateWithoutOrdersInput>
+  }
+
   export type PaymentEventCreateWithoutOrderInput = {
     id?: string
     provider: string
@@ -30124,6 +31887,41 @@ export namespace Prisma {
     subscriptions?: SubscriptionUncheckedUpdateManyWithoutPlanNestedInput
   }
 
+  export type CreditPackageUpsertWithoutOrdersInput = {
+    update: XOR<CreditPackageUpdateWithoutOrdersInput, CreditPackageUncheckedUpdateWithoutOrdersInput>
+    create: XOR<CreditPackageCreateWithoutOrdersInput, CreditPackageUncheckedCreateWithoutOrdersInput>
+    where?: CreditPackageWhereInput
+  }
+
+  export type CreditPackageUpdateToOneWithWhereWithoutOrdersInput = {
+    where?: CreditPackageWhereInput
+    data: XOR<CreditPackageUpdateWithoutOrdersInput, CreditPackageUncheckedUpdateWithoutOrdersInput>
+  }
+
+  export type CreditPackageUpdateWithoutOrdersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    credits?: IntFieldUpdateOperationsInput | number
+    priceCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    bonusCredits?: IntFieldUpdateOperationsInput | number
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    sortOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CreditPackageUncheckedUpdateWithoutOrdersInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    credits?: IntFieldUpdateOperationsInput | number
+    priceCents?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    bonusCredits?: IntFieldUpdateOperationsInput | number
+    isActive?: BoolFieldUpdateOperationsInput | boolean
+    sortOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type PaymentEventUpsertWithWhereUniqueWithoutOrderInput = {
     where: PaymentEventWhereUniqueInput
     update: XOR<PaymentEventUpdateWithoutOrderInput, PaymentEventUncheckedUpdateWithoutOrderInput>
@@ -30167,14 +31965,16 @@ export namespace Prisma {
     createdAt?: Date | string
     updatedAt?: Date | string
     user: UserCreateNestedOneWithoutOrdersInput
-    plan: PlanCreateNestedOneWithoutOrdersInput
+    plan?: PlanCreateNestedOneWithoutOrdersInput
+    package?: CreditPackageCreateNestedOneWithoutOrdersInput
   }
 
   export type OrderUncheckedCreateWithoutPaymentEventsInput = {
     id?: string
     orderNo: string
     userId: string
-    planId: string
+    planId?: string | null
+    packageId?: string | null
     amount: number
     currency?: string
     status?: string
@@ -30217,14 +32017,16 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutOrdersNestedInput
-    plan?: PlanUpdateOneRequiredWithoutOrdersNestedInput
+    plan?: PlanUpdateOneWithoutOrdersNestedInput
+    package?: CreditPackageUpdateOneWithoutOrdersNestedInput
   }
 
   export type OrderUncheckedUpdateWithoutPaymentEventsInput = {
     id?: StringFieldUpdateOperationsInput | string
     orderNo?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
-    planId?: StringFieldUpdateOperationsInput | string
+    planId?: NullableStringFieldUpdateOperationsInput | string | null
+    packageId?: NullableStringFieldUpdateOperationsInput | string | null
     amount?: IntFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
     status?: StringFieldUpdateOperationsInput | string
@@ -30367,7 +32169,8 @@ export namespace Prisma {
   export type OrderCreateManyUserInput = {
     id?: string
     orderNo: string
-    planId: string
+    planId?: string | null
+    packageId?: string | null
     amount: number
     currency?: string
     status?: string
@@ -30487,14 +32290,16 @@ export namespace Prisma {
     metadata?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
-    plan?: PlanUpdateOneRequiredWithoutOrdersNestedInput
+    plan?: PlanUpdateOneWithoutOrdersNestedInput
+    package?: CreditPackageUpdateOneWithoutOrdersNestedInput
     paymentEvents?: PaymentEventUpdateManyWithoutOrderNestedInput
   }
 
   export type OrderUncheckedUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     orderNo?: StringFieldUpdateOperationsInput | string
-    planId?: StringFieldUpdateOperationsInput | string
+    planId?: NullableStringFieldUpdateOperationsInput | string | null
+    packageId?: NullableStringFieldUpdateOperationsInput | string | null
     amount?: IntFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
     status?: StringFieldUpdateOperationsInput | string
@@ -30511,7 +32316,8 @@ export namespace Prisma {
   export type OrderUncheckedUpdateManyWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     orderNo?: StringFieldUpdateOperationsInput | string
-    planId?: StringFieldUpdateOperationsInput | string
+    planId?: NullableStringFieldUpdateOperationsInput | string | null
+    packageId?: NullableStringFieldUpdateOperationsInput | string | null
     amount?: IntFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
     status?: StringFieldUpdateOperationsInput | string
@@ -30701,6 +32507,7 @@ export namespace Prisma {
     id?: string
     orderNo: string
     userId: string
+    packageId?: string | null
     amount: number
     currency?: string
     status?: string
@@ -30805,6 +32612,7 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     user?: UserUpdateOneRequiredWithoutOrdersNestedInput
+    package?: CreditPackageUpdateOneWithoutOrdersNestedInput
     paymentEvents?: PaymentEventUpdateManyWithoutOrderNestedInput
   }
 
@@ -30812,6 +32620,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     orderNo?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
+    packageId?: NullableStringFieldUpdateOperationsInput | string | null
     amount?: IntFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
     status?: StringFieldUpdateOperationsInput | string
@@ -30829,6 +32638,77 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     orderNo?: StringFieldUpdateOperationsInput | string
     userId?: StringFieldUpdateOperationsInput | string
+    packageId?: NullableStringFieldUpdateOperationsInput | string | null
+    amount?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    provider?: StringFieldUpdateOperationsInput | string
+    billingCycle?: StringFieldUpdateOperationsInput | string
+    providerOrderNo?: NullableStringFieldUpdateOperationsInput | string | null
+    paidAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type OrderCreateManyPackageInput = {
+    id?: string
+    orderNo: string
+    userId: string
+    planId?: string | null
+    amount: number
+    currency?: string
+    status?: string
+    provider?: string
+    billingCycle?: string
+    providerOrderNo?: string | null
+    paidAt?: Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type OrderUpdateWithoutPackageInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderNo?: StringFieldUpdateOperationsInput | string
+    amount?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    provider?: StringFieldUpdateOperationsInput | string
+    billingCycle?: StringFieldUpdateOperationsInput | string
+    providerOrderNo?: NullableStringFieldUpdateOperationsInput | string | null
+    paidAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutOrdersNestedInput
+    plan?: PlanUpdateOneWithoutOrdersNestedInput
+    paymentEvents?: PaymentEventUpdateManyWithoutOrderNestedInput
+  }
+
+  export type OrderUncheckedUpdateWithoutPackageInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderNo?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    planId?: NullableStringFieldUpdateOperationsInput | string | null
+    amount?: IntFieldUpdateOperationsInput | number
+    currency?: StringFieldUpdateOperationsInput | string
+    status?: StringFieldUpdateOperationsInput | string
+    provider?: StringFieldUpdateOperationsInput | string
+    billingCycle?: StringFieldUpdateOperationsInput | string
+    providerOrderNo?: NullableStringFieldUpdateOperationsInput | string | null
+    paidAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    metadata?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    paymentEvents?: PaymentEventUncheckedUpdateManyWithoutOrderNestedInput
+  }
+
+  export type OrderUncheckedUpdateManyWithoutPackageInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    orderNo?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    planId?: NullableStringFieldUpdateOperationsInput | string | null
     amount?: IntFieldUpdateOperationsInput | number
     currency?: StringFieldUpdateOperationsInput | string
     status?: StringFieldUpdateOperationsInput | string

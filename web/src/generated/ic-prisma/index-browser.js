@@ -218,6 +218,18 @@ exports.Prisma.GenerationJobScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.CreditPackageScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  credits: 'credits',
+  priceCents: 'priceCents',
+  currency: 'currency',
+  bonusCredits: 'bonusCredits',
+  isActive: 'isActive',
+  sortOrder: 'sortOrder',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.CreditBalanceScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -242,6 +254,7 @@ exports.Prisma.OrderScalarFieldEnum = {
   orderNo: 'orderNo',
   userId: 'userId',
   planId: 'planId',
+  packageId: 'packageId',
   amount: 'amount',
   currency: 'currency',
   status: 'status',
@@ -376,6 +389,7 @@ exports.Prisma.ModelName = {
   Subscription: 'Subscription',
   UsageRecord: 'UsageRecord',
   GenerationJob: 'GenerationJob',
+  CreditPackage: 'CreditPackage',
   CreditBalance: 'CreditBalance',
   CreditTransaction: 'CreditTransaction',
   Order: 'Order',

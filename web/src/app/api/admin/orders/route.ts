@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { activateSubscription, type BillingCycle, type PaymentProvider } from "@/lib/billing";
 import { requireAdminUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
+import { grantCredits } from "@/lib/credit-ledger";
 
 export async function GET(req: NextRequest) {
     try {
@@ -44,21 +45,32 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json({ error: "订单状态无效" }, { status: 400 });
         }
 
+        // 幂等守卫：仅当订单从「非 paid」迁移到「paid」时执行入账，重复确认不会重复到账
+        const existing = await prisma.order.findUnique({ where: { id: orderId } });
+        if (!existing) return NextResponse.json({ error: "订单不存在" }, { status: 404 });
+        const transitionToPaid = status === "paid" && existing.status !== "paid";
+
         const order = await prisma.order.update({
             where: { id: orderId },
             data: status === "paid" ? { status, paidAt: new Date() } : { status },
-            include: { user: { select: { id: true, email: true, name: true } }, plan: true },
+            include: { user: { select: { id: true, email: true, name: true } }, plan: true, package: true },
         });
 
-        // 手动开通：订单置为「已开通」时同步激活订阅，与支付回调逻辑一致
-        // （此前只改订单状态不建订阅，导致后台开通权限不生效）
-        if (status === "paid") {
-            await activateSubscription({
-                userId: order.userId,
-                planId: order.planId,
-                cycle: order.billingCycle as BillingCycle,
-                provider: (order.provider || "manual") as PaymentProvider,
-            });
+        // 手动确认：订单置为「已开通」时按类型入账，与支付回调逻辑一致
+        // - 积分包订单 → 入账积分
+        // - 套餐订单 → 激活订阅
+        if (transitionToPaid) {
+            if (order.packageId && order.package) {
+                const credits = order.package.credits + order.package.bonusCredits;
+                await grantCredits(prisma as never, order.userId, credits, "purchase", "order", orderId, `积分包「${order.package.name}」到账 ${credits} 积分`);
+            } else if (order.planId) {
+                await activateSubscription({
+                    userId: order.userId,
+                    planId: order.planId,
+                    cycle: order.billingCycle as BillingCycle,
+                    provider: (order.provider || "manual") as PaymentProvider,
+                });
+            }
         }
 
         await prisma.adminAuditLog.create({

@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { activateSubscription, type BillingCycle, type PaymentProvider } from "@/lib/billing";
 import { prisma } from "@/lib/ic-prisma";
+import { grantCredits } from "@/lib/credit-ledger";
 
 export async function POST(req: NextRequest) {
     try {
@@ -63,9 +64,18 @@ export async function POST(req: NextRequest) {
 
         const updatedOrder = await prisma.order.findUniqueOrThrow({ where: { id: order.id } });
 
+        if (updatedOrder.packageId) {
+            // 积分包订单：入账积分（幂等由上面的 updateMany 领取保证，不会重复到账）
+            const pkg = updatedOrder.packageId ? await prisma.creditPackage.findUnique({ where: { id: updatedOrder.packageId } }) : null;
+            if (!pkg) return NextResponse.json({ error: "积分包不存在" }, { status: 404 });
+            const credits = pkg.credits + pkg.bonusCredits;
+            const balance = await grantCredits(prisma as never, order.userId, credits, "purchase", "order", order.id, `积分包「${pkg.name}」到账 ${credits} 积分`);
+            return NextResponse.json({ order: updatedOrder, credits, balance });
+        }
+
         const subscription = await activateSubscription({
             userId: order.userId,
-            planId: order.planId,
+            planId: order.planId as string,
             cycle: order.billingCycle as BillingCycle,
             provider,
         });

@@ -137,6 +137,22 @@ model GenerationJob {
   @@index([userId, createdAt])
 }
 
+// 积分包（充值商品；平台统一 Key + 积分制）
+model CreditPackage {
+  id           String   @id @default(cuid())
+  name         String
+  credits      Int
+  priceCents   Int
+  currency     String   @default("CNY")
+  bonusCredits Int      @default(0) // 赠送积分
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  orders       Order[]
+
+  @@index([isActive, sortOrder])
+}
+
 // 积分余额（一用户一行；平台统一 Key + 积分制）
 model CreditBalance {
   id        String   @id @default(cuid())
@@ -168,8 +184,10 @@ model Order {
   orderNo         String         @unique
   userId          String
   user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  planId          String
-  plan            Plan           @relation(fields: [planId], references: [id])
+  planId          String?
+  plan            Plan?          @relation(fields: [planId], references: [id])
+  packageId       String? // 积分包订单时非空（套餐订单为空）
+  package         CreditPackage? @relation(fields: [packageId], references: [id])
   amount          Int
   currency        String         @default("CNY")
   status          String         @default("pending") // pending | paid | cancelled | failed | refunded
