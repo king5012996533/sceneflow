@@ -138,8 +138,22 @@ assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", "pickPricing",
 // —— Aigccc / Seedance 2.0 网关接入 ——
 assertIncludes("src/stores/use-config-store.ts", '"aigccc"', "ApiCallFormat 必须支持 aigccc。");
 assertIncludes("src/stores/use-config-store.ts", 'value.includes("aigccc666.com")', "config store 必须按 aigccc666.com 识别网关 Base URL。");
-assertIncludes("src/app/api/proxy/route.ts", 'includes("aigccc666.com")', "proxy 必须为 aigccc 注入 ApiKey 头（按 host 或 provider 判断，非 Bearer）。");
-assertIncludes("src/app/api/proxy/form-data/route.ts", 'includes("aigccc666.com")', "form-data proxy 必须为 aigccc 注入 ApiKey 头（按 host 或 provider 判断，非 Bearer）。");
+assertIncludes("src/app/api/proxy/route.ts", 'isHostOrSubdomain(target.hostname, "aigccc666.com")', "proxy 必须用域名边界匹配为 aigccc 注入 ApiKey（禁止 includes 子串，防 Key 外泄 H-1）。");
+assertIncludes("src/app/api/proxy/form-data/route.ts", 'isHostOrSubdomain(target.hostname, "aigccc666.com")', "form-data proxy 必须用域名边界匹配为 aigccc 注入 ApiKey（禁止 includes 子串）。");
+assertNotMatches("src/app/api/proxy/route.ts", /includes\("aigccc666\.com"\)/, "proxy 不得再用 includes 子串匹配 aigccc 域名（H-1 平台 Key 外泄）。");
+assertNotMatches("src/app/api/proxy/form-data/route.ts", /includes\("aigccc666\.com"\)/, "form-data proxy 不得再用 includes 子串匹配 aigccc 域名（H-1）。");
+
+// —— 安全加固（2026-08-18 审计）——
+assertIncludes("src/lib/url-safety.ts", "embeddedIpv4", "SSRF 校验必须识别内嵌 IPv4（mapped/NAT64/6to4/IPv4-compatible，H-2）。");
+assertIncludes("src/lib/url-safety.ts", "resolvePinnedTarget", "SSRF 必须 DNS 固定解析（防重绑定，H-3）。");
+assertIncludes("src/lib/url-safety.ts", "servername", "DNS 固定解析后 TLS SNI 必须仍用原始域名（证书校验）。");
+assertIncludes("src/lib/credential-store.server.ts", "isHostOrSubdomain(targetHost, credHost)", "凭证 host 匹配必须边界匹配（禁止反向后缀，H-1）。");
+assertNotMatches("src/lib/credential-store.server.ts", /endsWith\(`\.\$\{targetHost\}`\)/, "凭证匹配不得允许反向后缀（H-1）。");
+assertIncludes("src/app/api/payments/callback/route.ts", "createHmac", "支付回调必须做 HMAC 签名验证（H-4）。");
+assertIncludes("src/app/api/payments/callback/route.ts", "prisma.$transaction", "支付回调必须事务内原子入账（H-5）。");
+assertIncludes("src/app/api/payments/callback/route.ts", "order.amount", "支付回调必须核对订单金额（H-4）。");
+assertIncludes("src/lib/generation/generation-jobs.server.ts", "normalizeGenerationMetadata", "扣费必须基于服务端规范化的 metadata（H-6）。");
+assertIncludes("src/lib/generation/generation-config.ts", "normalizeGenerationMetadata", "服务端必须提供 metadata 规范化函数（H-6）。");
 assertIncludes("src/services/api/video.ts", "createAigcccVideoTask", "视频服务必须提供 aigccc 任务创建分支。");
 assertIncludes("src/services/api/video.ts", "pollAigcccVideoTask", "视频服务必须提供 aigccc 任务轮询分支。");
 assertIncludes("src/services/api/video.ts", "/api/external/v1/video/task/create", "aigccc 创建任务必须走网关 /api/external/v1 路径。");

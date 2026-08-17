@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 import { prisma } from "@/lib/ic-prisma";
+import { isHostOrSubdomain } from "@/lib/url-safety";
 import type { CredentialCapabilities } from "@/lib/model-capability-spec";
 import type { CredentialPricing, ModelPricing } from "@/lib/credit-pricing";
 
@@ -82,7 +83,9 @@ function hostMatches(credentialBaseUrl: string, targetUrl: string): boolean {
     const credHost = extractHost(credentialBaseUrl);
     const targetHost = extractHost(targetUrl);
     if (!credHost || !targetHost) return false;
-    return credHost === targetHost || targetHost.endsWith(`.${credHost}`) || credHost.endsWith(`.${targetHost}`);
+    // 只允许「同域或目标域是凭证域的子域」；禁止反向后缀匹配（凭证域是目标域的子域），
+    // 防止攻击者用父域/更短后缀骗取平台 Key（H-1）。
+    return isHostOrSubdomain(targetHost, credHost);
 }
 
 function modelMatches(models: string[], model?: string): boolean {

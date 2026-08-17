@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
-import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
+import { assertAllowedProxyUrl, fetchSafely, isHostOrSubdomain } from "@/lib/url-safety";
 import { resolvePlatformCredential } from "@/lib/credential-store.server";
 import FormData from "form-data";
 
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
         const platformCred = await resolvePlatformCredential({ targetUrl: target.toString(), provider: sfProvider, model: sfModel });
 
         if (platformCred) {
-            if (platformCred.provider === "aigccc" || target.hostname.toLowerCase().includes("aigccc666.com")) {
+            if (platformCred.provider === "aigccc" || isHostOrSubdomain(target.hostname, "aigccc666.com")) {
                 // aigccc 网关用 ApiKey 头（非 Bearer）：按目标 host 判断，避免供应商标签漏配时误发 Bearer
                 safeHeaders["apikey"] = platformCred.apiKey;
             } else {

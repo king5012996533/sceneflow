@@ -75,3 +75,24 @@ export function normalizeVideoResolution(value: string) {
     if (value === "720p" || value === "auto" || value === "high" || value === "medium") return "720";
     return String(value || "").replace(/p$/i, "") || "720";
 }
+
+/**
+ * 服务端确权（H-6）：扣费前把客户端传入的生成 metadata 按服务端口径规范化。
+ * - 视频时长 clamp 到 1–20 秒（-1 自动时长保留），与上游实际生成的时长范围一致；
+ * - 模型名去除首尾空白；
+ * 规范化结果同时用于计费与落库，客户端无法通过篡改时长/模型名影响扣费口径。
+ */
+export function normalizeGenerationMetadata(metadata: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+    if (!metadata) return undefined;
+    const out: Record<string, unknown> = { ...metadata };
+    if (out.videoSeconds !== undefined && out.videoSeconds !== null) {
+        out.videoSeconds = normalizeVideoSeconds(String(out.videoSeconds));
+    }
+    for (const key of ["model", "imageModel", "videoModel", "textModel"] as const) {
+        if (typeof out[key] === "string") {
+            const trimmed = out[key].trim();
+            out[key] = trimmed.length ? trimmed : undefined;
+        }
+    }
+    return out;
+}
