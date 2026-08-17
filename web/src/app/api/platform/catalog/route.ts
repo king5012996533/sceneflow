@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 import type { CredentialCapabilities, ModelCapabilitySpec } from "@/lib/model-capability-spec";
+import type { ModelPricing } from "@/lib/credit-pricing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,13 +24,14 @@ export async function GET(req: NextRequest) {
         const credentials = await prisma.providerCredential.findMany({
             where: { enabled: true },
             orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
-            select: { provider: true, baseUrl: true, models: true, capabilities: true },
+            select: { provider: true, baseUrl: true, models: true, capabilities: true, pricing: true },
         });
 
         const seen = new Set<string>();
-        const models: Array<{ model: string; provider: string; baseUrl: string; capabilities: ModelCapabilitySpec | null }> = [];
+        const models: Array<{ model: string; provider: string; baseUrl: string; capabilities: ModelCapabilitySpec | null; pricing: ModelPricing | null }> = [];
         for (const credential of credentials) {
             const caps = (credential.capabilities ?? {}) as CredentialCapabilities;
+            const pricingByModel = (credential.pricing ?? {}) as Record<string, ModelPricing>;
             for (const rawModel of credential.models ?? []) {
                 const model = String(rawModel).trim();
                 if (!model || seen.has(model)) continue;
@@ -39,6 +41,7 @@ export async function GET(req: NextRequest) {
                     provider: credential.provider,
                     baseUrl: credential.baseUrl,
                     capabilities: caps[model] ?? null,
+                    pricing: pricingByModel[model] ?? null,
                 });
             }
         }

@@ -96,11 +96,12 @@
 - 代理取 Key：只使用平台凭证（`ProviderCredential`）。Gemini 用 `x-goog-api-key` 注入，其余用 `Authorization: Bearer`；无平台凭证则不注入 Key。
 - 积分账本（`credit-ledger.ts`）：扣减用 `updateMany({ balance: { gte: cost } })` 原子守卫，禁止读-改-写；退款按 `(refType, refId)` 幂等；余额与流水必须在同一事务（`$transaction` + `pg_advisory_xact_lock`）内变更。
 - 收费卡点在 `beginGenerationJob`（`generation-jobs.server.ts`）：先算 `creditsCost`（admin 为 0，不扣），事务内每日赠送（`daily_credit_grant`，幂等）→ 原子扣减 → 失败/取消/超时退款。余额不足返回 403，客户端弹「积分余额不足」弹窗（`components/credits/insufficient-credits-modal.tsx`）。
-- 积分定价表在 `web/src/lib/credit-pricing.ts`（草案），按 `GenerationJob.costCents` 实账校准；对账看 admin「对账」tab。
+- 积分定价：内置草案在 `web/src/lib/credit-pricing.ts`（`getGenerationCreditsCost`，客户端预检/成本展示/服务端扣费共用同一纯函数）。后台可在「平台密钥 → 逐模型定价」按模型覆盖（`ProviderCredential.pricing`，Json，key=模型名）：图片每张 `imageCredits`、视频每秒 `videoCreditsPerSecond`（实际扣费 = 每秒 × 计费时长，向上取整；时长 `-1`/非法/缺失按 6 秒计）、音频每次 `audioCredits`、文本/工具每次 `textCredits`；未配置的模型退回内置草案。匹配取绑定该模型且启用的最高优先级凭证（priority desc, createdAt asc，与代理解析一致）。按 `GenerationJob.costCents` 实账校准；对账看 admin「对账」tab。
 - 前端余额唯一来源是 `useCreditBalance` hook（读 `/api/billing/credits`），充值/生成后调 `refresh()`。
 - 运营配置（`OperationConfig`）走 `lib/operation-config.ts` 读取（30s 进程内缓存），admin 后台「运营配置」tab 编辑后自动失效缓存。
 - 存量迁移（`lib/credit-migration.ts`）：登录时幂等补建积分账户、新用户赠送积分。
 - 平台模型「能力标定」（`ProviderCredential.capabilities`，Json，key=模型名）：后台逐模型配置与前端设置面板一一对应（图片：画质/宽高比/张数；Seedance：分辨率/比例/时长/声音/水印；通用视频：清晰度/尺寸/秒数）。词汇表与默认值在 `lib/model-capability-spec.ts`（服务端清洗 `sanitizeCapabilities` 与客户端共用）；admin 编辑入口在「平台密钥」tab（`credential-form-fields.tsx` / `credential-capability-editor.tsx` / `model-capability-fields.tsx`）。
+- 逐模型积分定价（`ProviderCredential.pricing`，Json，key=模型名）：admin 在「平台密钥」表单内配置（`credential-pricing-editor.tsx`），落库前 `sanitizePricing`（只保留 ≥0 整数）；`/api/platform/catalog` 附带每模型 `pricing`，前端余额预检（image/video 页）与画布成本角标与实际扣费一致（目录 60s 缓存，改价约 1 分钟内生效）。
 - 能力下发：`GET /api/platform/catalog`（登录即可访问，不含 Key）→ `stores/platform-catalog-store.ts`（60s TTL）→ 图片/视频设置面板按能力过滤选项，未配置退回内置默认。代理路由提示头 `x-sf-provider` / `x-sf-model` 由 `image.ts` / `video.ts` / `audio.ts` 的 `proxyHintHeaders` 统一发出，让「模型绑定」真正参与取 Key。
 - 前端模型选项唯一来源 = 平台目录：`ClientRootInit` 启动拉目录 → `useConfigStore.reconcilePlatformModels` 重建各能力模型列表并归一化选中项（分类优先 `capabilities.kind`，text/audio 退回名称启发式）；`resolveModelChannel` 对原始模型名查目录返回平台合成渠道（`baseUrl` 取目录、无 Key）。后台改模型约 60s 内生效。
 - 用户侧「配置」入口已彻底删除：无自行填 Base URL / 模型 / Key 的界面；WebDAV 备份配置代码（`services/app-sync.ts`、`services/webdav-sync.ts`、`/api/webdav-proxy`）无 UI 入口，保持休眠不删。

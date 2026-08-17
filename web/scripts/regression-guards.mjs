@@ -123,6 +123,18 @@ assertIncludes("src/components/layout/client-root-init.tsx", "reconcilePlatformM
 assertIncludes("src/components/model-picker.tsx", "暂无可用模型，请联系管理员在后台配置平台模型", "模型空态文案应引导联系管理员配置平台模型。");
 assertNotMatches("src/stores/use-config-store.ts", /grok-imagine-video/, "config store 不得保留占位模型默认值。");
 
+// —— 后台可配置积分定价（图片每张 / 视频每秒）——
+assertIncludes("prisma/schema.prisma", "pricing", "ProviderCredential 必须支持逐模型积分定价（pricing Json）。");
+assertIncludes("src/lib/credit-pricing.ts", "videoCreditsPerSecond", "定价表必须支持视频每秒扣积分。");
+assertIncludes("src/lib/credit-pricing.ts", "effectiveVideoSeconds", "视频计费必须按实际时长换算（-1/自动按 6 秒）。");
+assertIncludes("src/lib/credential-store.server.ts", "resolveConfiguredPricing", "服务端必须能按模型解析后台逐模型定价。");
+assertIncludes("src/lib/generation/generation-jobs.server.ts", "resolveConfiguredPricing", "扣费必须接入后台逐模型定价（未配置退回内置草案）。");
+assertIncludes("src/app/api/admin/credentials/route.ts", "sanitizePricing", "后台定价落库前必须清洗。");
+assertIncludes("src/app/api/platform/catalog/route.ts", "pricing", "平台目录必须下发逐模型定价（供前端预检/成本展示）。");
+assertIncludes("src/stores/platform-catalog-store.ts", "getPlatformPricing", "客户端必须能按模型取后台定价。");
+assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "videoCreditsPerSecond", "后台必须提供逐模型定价编辑器。");
+assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", "pickPricing", "后台表单必须提供 pickPricing。");
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

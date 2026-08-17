@@ -19,6 +19,7 @@ import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { createGeneratedVideoTask, persistGeneratedVideo, pollGeneratedVideoTask, type VideoGenerationTask } from "@/lib/generation/generation-request";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { getPlatformPricing } from "@/stores/platform-catalog-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
@@ -176,8 +177,8 @@ export default function VideoPage() {
     const generate = async () => {
         const snapshot = buildRequestSnapshot();
         if (!snapshot) return;
-        // 积分预检（服务端为最终裁决，这里只做体验拦截）
-        const required = getGenerationCreditsCost("video", { model, videoModel: model });
+        // 积分预检（服务端为最终裁决，这里只做体验拦截；定价优先取后台逐模型配置，视频按每秒×时长）
+        const required = getGenerationCreditsCost("video", { model, videoModel: model, videoSeconds: effectiveConfig.videoSeconds }, getPlatformPricing(model));
         if (user?.role !== "admin" && creditBalance !== null && creditBalance < required) {
             quotaModalRef.current?.open({ balance: creditBalance, required });
             return;

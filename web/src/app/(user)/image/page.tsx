@@ -12,6 +12,7 @@ import { AssetPickerModal, type InsertAssetPayload } from "@/app/(user)/canvas/c
 import { canvasThemes } from "@/lib/canvas-theme";
 import { imageReferenceLabel } from "@/lib/image-reference-prompt";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { getPlatformPricing } from "@/stores/platform-catalog-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
@@ -149,8 +150,8 @@ export default function ImagePage() {
             message.error("请输入生图提示词");
             return;
         }
-        // 积分预检（服务端为最终裁决，这里只做体验拦截）
-        const required = getGenerationCreditsCost("image", { model, imageModel: model }) * generationCount;
+        // 积分预检（服务端为最终裁决，这里只做体验拦截；定价优先取后台逐模型配置）
+        const required = getGenerationCreditsCost("image", { model, imageModel: model }, getPlatformPricing(model)) * generationCount;
         if (user?.role !== "admin" && creditBalance !== null && creditBalance < required) {
             quotaModalRef.current?.open({ balance: creditBalance, required });
             return;

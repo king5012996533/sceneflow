@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/ic-prisma";
 import { Prisma } from "@/generated/ic-prisma/client";
 import { deductCredits, ensureDailyCreditGrant, refundCredits } from "@/lib/credit-ledger";
-import { estimateGenerationCostCents, getGenerationCreditsCost, type GenerationKind } from "@/lib/credit-pricing";
+import { estimateGenerationCostCents, generationModel, getGenerationCreditsCost, type GenerationKind } from "@/lib/credit-pricing";
+import { resolveConfiguredPricing } from "@/lib/credential-store.server";
 import { getOperationNumber } from "@/lib/operation-config";
 
 const STALE_JOB_MS = 30 * 60 * 1000;
@@ -28,8 +29,9 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     const isAdmin = user?.role === "admin";
-    // 积分制：非 admin 按「模型 × 类型 × 档位」扣积分；免费用户每日自动赠送积分（后台可配）
-    const creditsCost = !isAdmin ? getGenerationCreditsCost(input.kind, input.metadata) : 0;
+    // 积分制：非 admin 按「模型 × 类型」扣积分；定价优先取后台逐模型配置（图片每张 / 视频每秒），未配置退回内置草案
+    const configuredPricing = !isAdmin ? await resolveConfiguredPricing(generationModel(input.metadata)) : null;
+    const creditsCost = !isAdmin ? getGenerationCreditsCost(input.kind, input.metadata, configuredPricing ?? undefined) : 0;
     const costCents = estimateGenerationCostCents(input.kind, input.metadata);
     // 每日赠送积分在事务外读取（操作配置走进程内缓存，避免在事务内发起独立连接）
     const dailyGrant = !isAdmin ? await getOperationNumber("daily_credit_grant", 3) : 0;

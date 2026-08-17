@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 
 import { prisma } from "@/lib/ic-prisma";
 import type { CredentialCapabilities } from "@/lib/model-capability-spec";
+import type { CredentialPricing, ModelPricing } from "@/lib/credit-pricing";
 
 /**
  * 平台统一管理的上游 API 密钥库。
@@ -19,6 +20,7 @@ type CredentialRow = {
     keyEnc: string;
     models: string[];
     capabilities: CredentialCapabilities | null;
+    pricing: CredentialPricing | null;
     enabled: boolean;
     priority: number;
     createdAt: Date;
@@ -89,6 +91,26 @@ function modelMatches(models: string[], model?: string): boolean {
 }
 
 /**
+ * 按模型取后台配置的积分定价。
+ * 匹配与代理解析一致（enabled 凭证，priority desc → createdAt asc），返回最高优先级凭证中该模型的定价；
+ * 未配置返回 null（调用方退回内置草案）。
+ */
+export async function resolveConfiguredPricing(model: string): Promise<ModelPricing | null> {
+    if (!prisma || !model) return null;
+    const credentials = (await prisma.providerCredential.findMany({
+        where: { enabled: true },
+        orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    })) as unknown as CredentialRow[];
+    for (const credential of credentials) {
+        if (modelMatches(credential.models, model)) {
+            const pricing = (credential.pricing ?? {}) as CredentialPricing;
+            return pricing[model] ?? null;
+        }
+    }
+    return null;
+}
+
+/**
  * 按目标地址匹配平台凭证。
  * 匹配策略：先按 host 匹配；多个候选时用 provider 提示消歧，再用 model 过滤；
  * 都不满足时回退到 host 匹配的最高优先级凭证。找不到返回 null。
@@ -141,6 +163,8 @@ export type CredentialInput = {
     models?: string[];
     /** 逐模型能力标定；空对象 = 该凭证所有模型都不做能力限制（前端退回内置默认） */
     capabilities?: CredentialCapabilities;
+    /** 逐模型积分定价（图片每张 / 视频每秒 / 音频每次 / 文本每次）；缺省 = 内置草案 */
+    pricing?: CredentialPricing;
     enabled?: boolean;
     priority?: number;
 };
@@ -173,6 +197,7 @@ export async function createPlatformCredential(input: CredentialInput) {
             keyEnc: encryptCredentialKey(input.apiKey.trim()),
             models: input.models ?? [],
             capabilities: input.capabilities ?? {},
+            pricing: input.pricing ?? {},
             enabled: input.enabled ?? true,
             priority: input.priority ?? 0,
         },
@@ -187,6 +212,7 @@ export async function updatePlatformCredential(id: string, patch: Partial<Omit<C
     if (patch.baseUrl !== undefined) data.baseUrl = patch.baseUrl.trim();
     if (patch.models !== undefined) data.models = patch.models;
     if (patch.capabilities !== undefined) data.capabilities = patch.capabilities ?? {};
+    if (patch.pricing !== undefined) data.pricing = patch.pricing ?? {};
     if (patch.enabled !== undefined) data.enabled = patch.enabled;
     if (patch.priority !== undefined) data.priority = patch.priority;
     if (patch.apiKey !== undefined && patch.apiKey.trim()) data.keyEnc = encryptCredentialKey(patch.apiKey.trim());

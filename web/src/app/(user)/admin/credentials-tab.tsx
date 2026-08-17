@@ -6,7 +6,8 @@ import { KeyRound, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
 import type { ModelCapabilitySpec } from "@/lib/model-capability-spec";
-import { CredentialFormFields, parseModelList, pickCapabilities, type CredentialFormState } from "./credential-form-fields";
+import type { ModelPricing } from "@/lib/credit-pricing";
+import { CredentialFormFields, parseModelList, pickCapabilities, pickPricing, type CredentialFormState } from "./credential-form-fields";
 
 type Credential = {
     id: string;
@@ -16,6 +17,7 @@ type Credential = {
     apiKeyMasked: string;
     models: string[];
     capabilities?: Record<string, ModelCapabilitySpec>;
+    pricing?: Record<string, ModelPricing>;
     enabled: boolean;
     priority: number;
     createdAt: string;
@@ -30,6 +32,7 @@ const EMPTY_FORM: CredentialFormState = {
     models: "",
     priority: 0,
     capabilities: {},
+    pricing: {},
 };
 
 export default function CredentialsTab() {
@@ -75,6 +78,7 @@ export default function CredentialsTab() {
             models: (row.models || []).join(", "),
             priority: row.priority || 0,
             capabilities: { ...(row.capabilities || {}) },
+            pricing: { ...(row.pricing || {}) },
         });
         setModalOpen(true);
     }
@@ -92,6 +96,7 @@ export default function CredentialsTab() {
                 baseUrl: form.baseUrl,
                 models: parseModelList(form.models),
                 capabilities: pickCapabilities(form.models, form.capabilities),
+                pricing: pickPricing(form.models, form.pricing),
                 priority: Number(form.priority) || 0,
                 ...(form.apiKey.trim() ? { apiKey: form.apiKey } : {}),
             };
@@ -188,6 +193,7 @@ export default function CredentialsTab() {
                         dataIndex: "models",
                         render: (value: string[], row) => {
                             const capCount = row.capabilities ? Object.keys(row.capabilities).length : 0;
+                            const pricingCount = row.pricing ? Object.keys(row.pricing).length : 0;
                             return (
                                 <Space size={2} wrap>
                                     {value.length ? (
@@ -201,6 +207,7 @@ export default function CredentialsTab() {
                                     )}
                                     {value.length > 4 ? <Tag>+{value.length - 4}</Tag> : null}
                                     {capCount ? <Tag color="blue">能力标定 {capCount}</Tag> : null}
+                                    {pricingCount ? <Tag color="amber">定价 {pricingCount} 项</Tag> : null}
                                 </Space>
                             );
                         },

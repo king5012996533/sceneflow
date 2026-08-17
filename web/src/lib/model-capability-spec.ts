@@ -11,6 +11,8 @@
 //
 // 本模块不依赖任何业务库，可同时在服务端（admin 清洗）与客户端（面板过滤）使用。
 
+import type { CredentialPricing, ModelPricing } from "@/lib/credit-pricing";
+
 // ---------- 图片 ----------
 export type ImageQuality = "auto" | "high" | "medium" | "low";
 export type ImageAspect = "1:1" | "3:2" | "2:3" | "4:3" | "3:4" | "16:9" | "9:16" | "1:1-2k" | "16:9-2k" | "9:16-2k" | "16:9-4k" | "9:16-4k" | "auto";
@@ -253,4 +255,33 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
         sizes: pickStrings(value.sizes, VIDEO_SIZE_VALUES),
         seconds: pickNumbers(value.seconds, VIDEO_SECONDS_VALUES),
     };
+}
+// ---------- 逐模型积分定价清洗（admin API 落库前调用，只保留 ≥0 整数） ----------
+
+function toPricingNumber(value: unknown): number | undefined {
+    const num = Math.floor(Number(value));
+    if (!Number.isFinite(num) || num < 0) return undefined;
+    return num;
+}
+
+export function sanitizePricing(input: unknown): CredentialPricing | undefined {
+    if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+    const result: CredentialPricing = {};
+    for (const [model, raw] of Object.entries(input as Record<string, unknown>)) {
+        const name = model.trim();
+        if (!name) continue;
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+        const value = raw as Record<string, unknown>;
+        const pricing: ModelPricing = {};
+        const imageCredits = toPricingNumber(value.imageCredits);
+        if (imageCredits !== undefined) pricing.imageCredits = imageCredits;
+        const videoCreditsPerSecond = toPricingNumber(value.videoCreditsPerSecond);
+        if (videoCreditsPerSecond !== undefined) pricing.videoCreditsPerSecond = videoCreditsPerSecond;
+        const audioCredits = toPricingNumber(value.audioCredits);
+        if (audioCredits !== undefined) pricing.audioCredits = audioCredits;
+        const textCredits = toPricingNumber(value.textCredits);
+        if (textCredits !== undefined) pricing.textCredits = textCredits;
+        if (Object.keys(pricing).length) result[name] = pricing;
+    }
+    return Object.keys(result).length ? result : undefined;
 }

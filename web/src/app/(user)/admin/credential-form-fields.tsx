@@ -3,7 +3,9 @@
 import { Input, InputNumber, Select } from "antd";
 
 import type { ModelCapabilitySpec } from "@/lib/model-capability-spec";
+import type { ModelPricing } from "@/lib/credit-pricing";
 import { CredentialCapabilityEditor, type CredentialCapabilitiesMap } from "./credential-capability-editor";
+import { CredentialPricingEditor, type CredentialPricingMap } from "./credential-pricing-editor";
 
 export const PROVIDER_PRESETS = [
     { label: "OpenAI", value: "openai" },
@@ -22,6 +24,7 @@ export type CredentialFormState = {
     models: string;
     priority: number;
     capabilities: CredentialCapabilitiesMap;
+    pricing: CredentialPricingMap;
 };
 
 type CredentialFormFieldsProps = {
@@ -41,6 +44,16 @@ export function pickCapabilities(modelsText: string, map: CredentialCapabilities
     for (const model of parseModelList(modelsText)) {
         const spec = map[model];
         if (spec) result[model] = spec;
+    }
+    return result;
+}
+
+/** 落库前只保留「仍在绑定列表里」且「非空定价」的模型（全空 = 未启用，不走 sanitize 也会被清洗掉） */
+export function pickPricing(modelsText: string, map: CredentialPricingMap): Record<string, ModelPricing> {
+    const result: Record<string, ModelPricing> = {};
+    for (const model of parseModelList(modelsText)) {
+        const pricing = map[model];
+        if (pricing && Object.keys(pricing).length) result[model] = pricing;
     }
     return result;
 }
@@ -78,6 +91,10 @@ export function CredentialFormFields({ form, onChange, editMode }: CredentialFor
             <div>
                 <div className="mb-1 text-sm text-stone-600">逐模型能力标定（与前端画质 / 分辨率 / 比例 / 时长等一一对应）</div>
                 <CredentialCapabilityEditor models={models} value={form.capabilities} onChange={(capabilities) => set({ capabilities })} />
+            </div>
+            <div>
+                <div className="mb-1 text-sm text-stone-600">逐模型积分定价（图片每张 / 视频每秒 / 音频每次 / 文本每次；未配置 = 内置草案）</div>
+                <CredentialPricingEditor models={models} value={form.pricing} onChange={(pricing) => set({ pricing })} />
             </div>
         </div>
     );
