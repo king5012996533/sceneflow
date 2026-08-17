@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/current-user";
 import { createPlatformCredential, deletePlatformCredential, listPlatformCredentials, updatePlatformCredential } from "@/lib/credential-store.server";
+import { sanitizeCapabilities } from "@/lib/model-capability-spec";
 
 // admin 平台密钥管理（ProviderCredential）
 // GET  → 列表（Key 脱敏）
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
         const baseUrl = String(body.baseUrl || "").trim();
         const apiKey = String(body.apiKey || "").trim();
         const models = Array.isArray(body.models) ? body.models.map((m: unknown) => String(m).trim()).filter(Boolean) : [];
+        const capabilities = sanitizeCapabilities(body.capabilities) ?? {};
         const enabled = body.enabled !== false;
         const priority = Number.isFinite(Number(body.priority)) ? Math.max(0, Math.floor(Number(body.priority))) : 0;
 
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Base URL 不是合法 URL" }, { status: 400 });
         }
 
-        const credential = await createPlatformCredential({ name, provider, baseUrl, apiKey, models, enabled, priority });
+        const credential = await createPlatformCredential({ name, provider, baseUrl, apiKey, models, capabilities, enabled, priority });
         return NextResponse.json({ credential: { ...credential, keyEnc: undefined } });
     } catch (error) {
         console.error("[admin/credentials:post]", error);
@@ -68,6 +70,7 @@ export async function PATCH(req: NextRequest) {
         if (body.baseUrl !== undefined) patch.baseUrl = String(body.baseUrl);
         if (body.apiKey !== undefined) patch.apiKey = String(body.apiKey);
         if (body.models !== undefined) patch.models = Array.isArray(body.models) ? body.models.map((m: unknown) => String(m).trim()).filter(Boolean) : [];
+        if (body.capabilities !== undefined) patch.capabilities = sanitizeCapabilities(body.capabilities) ?? {};
         if (body.enabled !== undefined) patch.enabled = body.enabled !== false;
         if (body.priority !== undefined) patch.priority = Math.max(0, Math.floor(Number(body.priority)));
 

@@ -461,6 +461,20 @@ export function inferApiFormatFromBaseUrl(baseUrl: string): ApiCallFormat | null
     return null;
 }
 
+/**
+ * 代理请求的 x-sf-provider 提示（与后台凭证的 provider 标签对齐，用于同 host 多凭证消歧）。
+ * Seedance/DeepSeek 走 OpenAI 兼容接口，需按 Base URL 特征识别。
+ */
+export function inferProviderHint(apiFormat: ApiCallFormat, baseUrl: string): string {
+    if (apiFormat === "gemini") return "gemini";
+    if (apiFormat === "replicate") return "replicate";
+    if (apiFormat === "minimax") return "minimax";
+    const value = baseUrl.trim().toLowerCase();
+    if (value.includes("ark.cn-beijing.volces.com") || value.includes("/api/plan/v3")) return "seedance";
+    if (value.includes("api.deepseek.com")) return "deepseek";
+    return "openai";
+}
+
 function uniqueRawModels(models: string[]) {
     return Array.from(new Set((models || []).map((model) => modelOptionName(model).trim()).filter(Boolean)));
 }

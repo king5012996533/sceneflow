@@ -5,7 +5,7 @@ import { dataUrlToFile, getDataUrlByteSize } from "@/lib/image-utils";
 import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
 import { boolConfig, buildSeedancePromptText, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceVideoReferenceError, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
-import { buildApiUrl, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
+import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
@@ -44,7 +44,17 @@ function aiApiUrl(config: AiConfig, path: string) {
 function aiHeaders(config: AiConfig, contentType?: string) {
     return {
         Authorization: `Bearer ${config.apiKey}`,
+        ...proxyHintHeaders(config),
         ...(contentType ? { "Content-Type": contentType } : {}),
+    };
+}
+
+/** 平台路由提示：x-sf-provider / x-sf-model 让代理按凭证「模型绑定」精确取 Key（与后台能力标定配套） */
+function proxyHintHeaders(config: Pick<AiConfig, "apiFormat" | "baseUrl" | "model">) {
+    const provider = inferProviderHint(config.apiFormat, config.baseUrl);
+    return {
+        ...(provider ? { "x-sf-provider": provider } : {}),
+        ...(config.model ? { "x-sf-model": modelOptionName(config.model) } : {}),
     };
 }
 
@@ -346,7 +356,7 @@ async function pollReplicateVideoTask(config: AiConfig, task: VideoGenerationTas
         const state = await proxyFetch<ReplicatePrediction>({
             url: replicatePredictionUrl(config, task),
             method: "GET",
-            headers: { Authorization: `Bearer ${config.apiKey}` },
+            headers: { Authorization: `Bearer ${config.apiKey}`, ...proxyHintHeaders(config) },
         });
         if (state.status === "succeeded") return { status: "completed", result: await videoResultFromUrl(parseReplicateVideoUrl(state), options) };
         if (state.status === "failed" || state.status === "canceled") return { status: "failed", error: readReplicateError(state.error) };
@@ -442,6 +452,7 @@ async function uploadReplicateFile(config: AiConfig, blob: Blob) {
         method: "POST",
         headers: {
             Authorization: `Bearer ${config.apiKey}`,
+            ...proxyHintHeaders(config),
             "Content-Type": blob.type || "application/octet-stream",
         },
         bodyBase64: base64,
@@ -472,9 +483,10 @@ function replicatePredictionUrl(config: Pick<AiConfig, "baseUrl">, task: VideoGe
     return `${baseUrl}/predictions/${encodeURIComponent(task.id)}`;
 }
 
-function replicateHeaders(config: Pick<AiConfig, "apiKey">) {
+function replicateHeaders(config: Pick<AiConfig, "apiKey" | "apiFormat" | "baseUrl" | "model">) {
     return {
         Authorization: `Bearer ${config.apiKey}`,
+        ...proxyHintHeaders(config),
         "Content-Type": "application/json",
     };
 }

@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 
 import { prisma } from "@/lib/ic-prisma";
+import type { CredentialCapabilities } from "@/lib/model-capability-spec";
 
 /**
  * 平台统一管理的上游 API 密钥库（BYOK → 平台 Key 化）。
@@ -17,6 +18,7 @@ type CredentialRow = {
     baseUrl: string;
     keyEnc: string;
     models: string[];
+    capabilities: CredentialCapabilities | null;
     enabled: boolean;
     priority: number;
     createdAt: Date;
@@ -137,6 +139,8 @@ export type CredentialInput = {
     baseUrl: string;
     apiKey: string;
     models?: string[];
+    /** 逐模型能力标定；空对象 = 该凭证所有模型都不做能力限制（前端退回内置默认） */
+    capabilities?: CredentialCapabilities;
     enabled?: boolean;
     priority?: number;
 };
@@ -168,6 +172,7 @@ export async function createPlatformCredential(input: CredentialInput) {
             baseUrl: input.baseUrl.trim(),
             keyEnc: encryptCredentialKey(input.apiKey.trim()),
             models: input.models ?? [],
+            capabilities: input.capabilities ?? {},
             enabled: input.enabled ?? true,
             priority: input.priority ?? 0,
         },
@@ -181,6 +186,7 @@ export async function updatePlatformCredential(id: string, patch: Partial<Omit<C
     if (patch.provider !== undefined) data.provider = patch.provider.trim();
     if (patch.baseUrl !== undefined) data.baseUrl = patch.baseUrl.trim();
     if (patch.models !== undefined) data.models = patch.models;
+    if (patch.capabilities !== undefined) data.capabilities = patch.capabilities ?? {};
     if (patch.enabled !== undefined) data.enabled = patch.enabled;
     if (patch.priority !== undefined) data.priority = patch.priority;
     if (patch.apiKey !== undefined && patch.apiKey.trim()) data.keyEnc = encryptCredentialKey(patch.apiKey.trim());

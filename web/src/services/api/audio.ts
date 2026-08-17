@@ -2,7 +2,7 @@ import axios from "axios";
 
 import { audioMimeType, normalizeAudioFormatValue, normalizeAudioSpeedValue, normalizeAudioVoiceValue } from "@/lib/audio-generation";
 import { uploadMediaFile, type UploadedFile } from "@/services/file-storage";
-import { buildApiUrl, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
+import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import { proxyFetch } from "./proxy-client";
 
 type RequestOptions = { signal?: AbortSignal };
@@ -11,9 +11,19 @@ function aiApiUrl(config: AiConfig, path: string) {
     return buildApiUrl(config.baseUrl, path);
 }
 
+/** 平台路由提示：x-sf-provider / x-sf-model 让代理按凭证「模型绑定」精确取 Key */
+function proxyHintHeaders(config: Pick<AiConfig, "apiFormat" | "baseUrl" | "model">) {
+    const provider = inferProviderHint(config.apiFormat, config.baseUrl);
+    return {
+        ...(provider ? { "x-sf-provider": provider } : {}),
+        ...(config.model ? { "x-sf-model": modelOptionName(config.model) } : {}),
+    };
+}
+
 function aiHeaders(config: AiConfig) {
     return {
         Authorization: `Bearer ${config.apiKey}`,
+        ...proxyHintHeaders(config),
         "Content-Type": "application/json",
     };
 }

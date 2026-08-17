@@ -19104,6 +19104,7 @@ export namespace Prisma {
     baseUrl: number
     keyEnc: number
     models: number
+    capabilities: number
     enabled: number
     priority: number
     createdById: number
@@ -19154,6 +19155,7 @@ export namespace Prisma {
     baseUrl?: true
     keyEnc?: true
     models?: true
+    capabilities?: true
     enabled?: true
     priority?: true
     createdById?: true
@@ -19255,6 +19257,7 @@ export namespace Prisma {
     baseUrl: string
     keyEnc: string
     models: string[]
+    capabilities: JsonValue | null
     enabled: boolean
     priority: number
     createdById: string | null
@@ -19288,6 +19291,7 @@ export namespace Prisma {
     baseUrl?: boolean
     keyEnc?: boolean
     models?: boolean
+    capabilities?: boolean
     enabled?: boolean
     priority?: boolean
     createdById?: boolean
@@ -19302,6 +19306,7 @@ export namespace Prisma {
     baseUrl?: boolean
     keyEnc?: boolean
     models?: boolean
+    capabilities?: boolean
     enabled?: boolean
     priority?: boolean
     createdById?: boolean
@@ -19316,6 +19321,7 @@ export namespace Prisma {
     baseUrl?: boolean
     keyEnc?: boolean
     models?: boolean
+    capabilities?: boolean
     enabled?: boolean
     priority?: boolean
     createdById?: boolean
@@ -19330,6 +19336,7 @@ export namespace Prisma {
     baseUrl?: boolean
     keyEnc?: boolean
     models?: boolean
+    capabilities?: boolean
     enabled?: boolean
     priority?: boolean
     createdById?: boolean
@@ -19337,7 +19344,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type ProviderCredentialOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "provider" | "baseUrl" | "keyEnc" | "models" | "enabled" | "priority" | "createdById" | "createdAt" | "updatedAt", ExtArgs["result"]["providerCredential"]>
+  export type ProviderCredentialOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "provider" | "baseUrl" | "keyEnc" | "models" | "capabilities" | "enabled" | "priority" | "createdById" | "createdAt" | "updatedAt", ExtArgs["result"]["providerCredential"]>
 
   export type $ProviderCredentialPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "ProviderCredential"
@@ -19349,6 +19356,7 @@ export namespace Prisma {
       baseUrl: string
       keyEnc: string
       models: string[]
+      capabilities: Prisma.JsonValue | null
       enabled: boolean
       priority: number
       createdById: string | null
@@ -19783,6 +19791,7 @@ export namespace Prisma {
     readonly baseUrl: FieldRef<"ProviderCredential", 'String'>
     readonly keyEnc: FieldRef<"ProviderCredential", 'String'>
     readonly models: FieldRef<"ProviderCredential", 'String[]'>
+    readonly capabilities: FieldRef<"ProviderCredential", 'Json'>
     readonly enabled: FieldRef<"ProviderCredential", 'Boolean'>
     readonly priority: FieldRef<"ProviderCredential", 'Int'>
     readonly createdById: FieldRef<"ProviderCredential", 'String'>
@@ -24514,6 +24523,7 @@ export namespace Prisma {
     baseUrl: 'baseUrl',
     keyEnc: 'keyEnc',
     models: 'models',
+    capabilities: 'capabilities',
     enabled: 'enabled',
     priority: 'priority',
     createdById: 'createdById',
@@ -25878,6 +25888,7 @@ export namespace Prisma {
     baseUrl?: StringFilter<"ProviderCredential"> | string
     keyEnc?: StringFilter<"ProviderCredential"> | string
     models?: StringNullableListFilter<"ProviderCredential">
+    capabilities?: JsonNullableFilter<"ProviderCredential">
     enabled?: BoolFilter<"ProviderCredential"> | boolean
     priority?: IntFilter<"ProviderCredential"> | number
     createdById?: StringNullableFilter<"ProviderCredential"> | string | null
@@ -25892,6 +25903,7 @@ export namespace Prisma {
     baseUrl?: SortOrder
     keyEnc?: SortOrder
     models?: SortOrder
+    capabilities?: SortOrderInput | SortOrder
     enabled?: SortOrder
     priority?: SortOrder
     createdById?: SortOrderInput | SortOrder
@@ -25909,6 +25921,7 @@ export namespace Prisma {
     baseUrl?: StringFilter<"ProviderCredential"> | string
     keyEnc?: StringFilter<"ProviderCredential"> | string
     models?: StringNullableListFilter<"ProviderCredential">
+    capabilities?: JsonNullableFilter<"ProviderCredential">
     enabled?: BoolFilter<"ProviderCredential"> | boolean
     priority?: IntFilter<"ProviderCredential"> | number
     createdById?: StringNullableFilter<"ProviderCredential"> | string | null
@@ -25923,6 +25936,7 @@ export namespace Prisma {
     baseUrl?: SortOrder
     keyEnc?: SortOrder
     models?: SortOrder
+    capabilities?: SortOrderInput | SortOrder
     enabled?: SortOrder
     priority?: SortOrder
     createdById?: SortOrderInput | SortOrder
@@ -25945,6 +25959,7 @@ export namespace Prisma {
     baseUrl?: StringWithAggregatesFilter<"ProviderCredential"> | string
     keyEnc?: StringWithAggregatesFilter<"ProviderCredential"> | string
     models?: StringNullableListFilter<"ProviderCredential">
+    capabilities?: JsonNullableWithAggregatesFilter<"ProviderCredential">
     enabled?: BoolWithAggregatesFilter<"ProviderCredential"> | boolean
     priority?: IntWithAggregatesFilter<"ProviderCredential"> | number
     createdById?: StringNullableWithAggregatesFilter<"ProviderCredential"> | string | null
@@ -27492,6 +27507,7 @@ export namespace Prisma {
     baseUrl: string
     keyEnc: string
     models?: ProviderCredentialCreatemodelsInput | string[]
+    capabilities?: NullableJsonNullValueInput | InputJsonValue
     enabled?: boolean
     priority?: number
     createdById?: string | null
@@ -27506,6 +27522,7 @@ export namespace Prisma {
     baseUrl: string
     keyEnc: string
     models?: ProviderCredentialCreatemodelsInput | string[]
+    capabilities?: NullableJsonNullValueInput | InputJsonValue
     enabled?: boolean
     priority?: number
     createdById?: string | null
@@ -27520,6 +27537,7 @@ export namespace Prisma {
     baseUrl?: StringFieldUpdateOperationsInput | string
     keyEnc?: StringFieldUpdateOperationsInput | string
     models?: ProviderCredentialUpdatemodelsInput | string[]
+    capabilities?: NullableJsonNullValueInput | InputJsonValue
     enabled?: BoolFieldUpdateOperationsInput | boolean
     priority?: IntFieldUpdateOperationsInput | number
     createdById?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27534,6 +27552,7 @@ export namespace Prisma {
     baseUrl?: StringFieldUpdateOperationsInput | string
     keyEnc?: StringFieldUpdateOperationsInput | string
     models?: ProviderCredentialUpdatemodelsInput | string[]
+    capabilities?: NullableJsonNullValueInput | InputJsonValue
     enabled?: BoolFieldUpdateOperationsInput | boolean
     priority?: IntFieldUpdateOperationsInput | number
     createdById?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27548,6 +27567,7 @@ export namespace Prisma {
     baseUrl: string
     keyEnc: string
     models?: ProviderCredentialCreatemodelsInput | string[]
+    capabilities?: NullableJsonNullValueInput | InputJsonValue
     enabled?: boolean
     priority?: number
     createdById?: string | null
@@ -27562,6 +27582,7 @@ export namespace Prisma {
     baseUrl?: StringFieldUpdateOperationsInput | string
     keyEnc?: StringFieldUpdateOperationsInput | string
     models?: ProviderCredentialUpdatemodelsInput | string[]
+    capabilities?: NullableJsonNullValueInput | InputJsonValue
     enabled?: BoolFieldUpdateOperationsInput | boolean
     priority?: IntFieldUpdateOperationsInput | number
     createdById?: NullableStringFieldUpdateOperationsInput | string | null
@@ -27576,6 +27597,7 @@ export namespace Prisma {
     baseUrl?: StringFieldUpdateOperationsInput | string
     keyEnc?: StringFieldUpdateOperationsInput | string
     models?: ProviderCredentialUpdatemodelsInput | string[]
+    capabilities?: NullableJsonNullValueInput | InputJsonValue
     enabled?: BoolFieldUpdateOperationsInput | boolean
     priority?: IntFieldUpdateOperationsInput | number
     createdById?: NullableStringFieldUpdateOperationsInput | string | null
@@ -28875,6 +28897,7 @@ export namespace Prisma {
     baseUrl?: SortOrder
     keyEnc?: SortOrder
     models?: SortOrder
+    capabilities?: SortOrder
     enabled?: SortOrder
     priority?: SortOrder
     createdById?: SortOrder

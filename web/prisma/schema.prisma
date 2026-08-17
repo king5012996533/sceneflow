@@ -257,6 +257,7 @@ model ProviderCredential {
   baseUrl     String                         // 渠道基址（不含 /v1 之类后缀，匹配时归一化）
   keyEnc      String                         // AES-256-GCM：base64(iv:tag:cipher)
   models      String[]  @default([])         // 绑定的模型；空数组 = 该 provider 全部模型
+  capabilities Json?                        // 逐模型能力标定（与前端设置面板一一对应），key=模型名
   enabled     Boolean  @default(true)
   priority    Int      @default(0)           // 同 provider 多 Key 时的优先级（越大越优先）
   createdById String?

@@ -100,3 +100,5 @@
 - 前端余额唯一来源是 `useCreditBalance` hook（读 `/api/billing/credits`），充值/生成后调 `refresh()`。
 - 运营配置（`OperationConfig`）走 `lib/operation-config.ts` 读取（30s 进程内缓存），admin 后台「运营配置」tab 编辑后自动失效缓存。
 - 存量迁移（`lib/credit-migration.ts`）：登录时幂等补建积分账户、新用户赠送、存量付费订阅折算补偿。
+- 平台模型「能力标定」（`ProviderCredential.capabilities`，Json，key=模型名）：后台逐模型配置与前端设置面板一一对应（图片：画质/宽高比/张数；Seedance：分辨率/比例/时长/声音/水印；通用视频：清晰度/尺寸/秒数）。词汇表与默认值在 `lib/model-capability-spec.ts`（服务端清洗 `sanitizeCapabilities` 与客户端共用）；admin 编辑入口在「平台密钥」tab（`credential-form-fields.tsx` / `credential-capability-editor.tsx` / `model-capability-fields.tsx`）。
+- 能力下发：`GET /api/platform/catalog`（登录即可访问，不含 Key）→ `stores/platform-catalog-store.ts`（60s TTL）→ 图片/视频设置面板按能力过滤选项，未配置退回内置默认。代理路由提示头 `x-sf-provider` / `x-sf-model` 由 `image.ts` / `video.ts` / `audio.ts` 的 `proxyHintHeaders` 统一发出，让「模型绑定」真正参与取 Key。

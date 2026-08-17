@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { Switch } from "antd";
 
 import { ImageSettingsTheme } from "@/components/image-settings-panel";
@@ -17,6 +17,7 @@ import {
     seedanceResolutionOptions,
 } from "@/lib/seedance-video";
 import { type CanvasTheme } from "@/lib/canvas-theme";
+import { usePlatformCapability } from "@/stores/platform-catalog-store";
 import { modelOptionName, type AiConfig } from "@/stores/use-config-store";
 
 const resolutionOptions = [
@@ -53,9 +54,33 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
     const dimensions = readSizeDimensions(size);
     const resolution = normalizeVideoResolutionValue(config.vquality);
     const model = modelOptionName(config.model || config.videoModel);
+    const spec = usePlatformCapability(model);
+    // 平台能力标定：有标定则按标定过滤选项；无标定（或标定为空）退回内置默认
+    const clarityOptionsShown = spec?.kind === "video" && (spec.clarity as string[]).length ? resolutionOptions.filter((item) => (spec.clarity as string[]).includes(item.value)) : resolutionOptions;
+    const sizeOptionsShown = spec?.kind === "video" && (spec.sizes as string[]).length ? sizeOptions.filter((item) => (spec.sizes as string[]).includes(item.value)) : sizeOptions;
+    const secondsOptionsShown = spec?.kind === "video" && (spec.seconds as number[]).length ? secondOptions.filter((value) => (spec.seconds as number[]).includes(value)) : secondOptions;
     // prunaai/p-video 支持草稿模式：开启更快更省但画质较低，关闭走完整推理
     const isPrunaVideo = model.toLowerCase().includes("prunaai/p-video");
     const draftMode = boolConfig(config.videoDraft, true);
+    // 收敛：当前值不在平台标定范围内时自动切到第一个允许值（避免把不允许的参数发往上游）
+    useEffect(() => {
+        if (spec?.kind !== "video") return;
+        const allowed = spec.clarity as string[];
+        if (!allowed.length || allowed.includes(resolution)) return;
+        onConfigChange("vquality", allowed[0] || "720");
+    }, [spec, resolution]);
+    useEffect(() => {
+        if (spec?.kind !== "video") return;
+        const allowed = spec.sizes as string[];
+        if (!allowed.length || allowed.includes(size)) return;
+        onConfigChange("size", allowed[0] || "1280x720");
+    }, [spec, size]);
+    useEffect(() => {
+        if (spec?.kind !== "video") return;
+        const allowed = spec.seconds as number[];
+        if (!allowed.length || allowed.includes(Number(seconds))) return;
+        onConfigChange("videoSeconds", String(allowed[0] ?? 6));
+    }, [spec, seconds]);
     const updateDimension = (key: "width" | "height", value: number | null) => {
         const next = Math.max(1, Math.floor(value || dimensions[key] || 720));
         onConfigChange("size", `${key === "width" ? next : dimensions.width}x${key === "height" ? next : dimensions.height}`);
@@ -67,7 +92,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
                 {showTitle ? <div className="text-sm font-medium">视频设置</div> : null}
                 <SettingGroup title="清晰度" color={theme.node.muted}>
                     <div className="grid grid-cols-3 gap-2.5">
-                        {resolutionOptions.map((item) => (
+                        {clarityOptionsShown.map((item) => (
                             <OptionPill key={item.value} selected={resolution === item.value} theme={theme} onClick={() => onConfigChange("vquality", item.value)}>
                                 {item.label}
                             </OptionPill>
@@ -82,7 +107,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
                         <DimensionInput prefix="H" value={dimensions.height} disabled={size === "auto"} theme={theme} onChange={(value) => updateDimension("height", value)} />
                     </div>
                     <div className="grid grid-cols-3 gap-2.5">
-                        {sizeOptions.map((item) => (
+                        {sizeOptionsShown.map((item) => (
                             <button
                                 key={item.value}
                                 type="button"
@@ -100,7 +125,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
                 </SettingGroup>
                 <SettingGroup title="秒数" color={theme.node.muted}>
                     <div className="grid grid-cols-3 gap-2.5">
-                        {secondOptions.map((value) => (
+                        {secondsOptionsShown.map((value) => (
                             <OptionPill key={value} selected={seconds === String(value)} theme={theme} onClick={() => onConfigChange("videoSeconds", String(value))}>
                                 {value}s
                             </OptionPill>
@@ -122,11 +147,42 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
 
 function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, className }: VideoSettingsPanelProps) {
     const model = modelOptionName(config.model || config.videoModel);
+    const spec = usePlatformCapability(model);
     const resolution = normalizeSeedanceResolution(config.vquality, model);
     const ratio = normalizeSeedanceRatio(config.size);
     const duration = normalizeSeedanceDuration(config.videoSeconds);
     const generateAudio = boolConfig(config.videoGenerateAudio, true);
     const watermark = boolConfig(config.videoWatermark, false);
+    // 平台能力标定：有标定则按标定过滤选项；无标定（或标定为空）退回内置默认
+    const resolutionOptionsShown = spec?.kind === "seedance-video" && (spec.resolutions as string[]).length ? seedanceResolutionOptions.filter((item) => (spec.resolutions as string[]).includes(item.value)) : seedanceResolutionOptions;
+    const ratioOptionsShown = spec?.kind === "seedance-video" && (spec.ratios as string[]).length ? seedanceRatioOptions.filter((item) => (spec.ratios as string[]).includes(item.value)) : seedanceRatioOptions;
+    const durationOptionsShown = spec?.kind === "seedance-video" && (spec.durations as number[]).length ? seedanceDurationOptions.filter((value) => (spec.durations as number[]).includes(value)) : seedanceDurationOptions;
+    const audioEnabled = spec?.kind !== "seedance-video" || spec.audio;
+    const watermarkEnabled = spec?.kind !== "seedance-video" || spec.watermark;
+    // 收敛：当前值不在平台标定范围内时自动切到第一个允许值；不允许的声音/水印强制关闭
+    useEffect(() => {
+        if (spec?.kind !== "seedance-video") return;
+        const allowed = spec.resolutions as string[];
+        if (!allowed.length || allowed.includes(resolution)) return;
+        onConfigChange("vquality", allowed[0] || "720p");
+    }, [spec, resolution]);
+    useEffect(() => {
+        if (spec?.kind !== "seedance-video") return;
+        const allowed = spec.ratios as string[];
+        if (!allowed.length || allowed.includes(ratio)) return;
+        onConfigChange("size", allowed[0] || "16:9");
+    }, [spec, ratio]);
+    useEffect(() => {
+        if (spec?.kind !== "seedance-video") return;
+        const allowed = spec.durations as number[];
+        if (!allowed.length || allowed.includes(duration)) return;
+        onConfigChange("videoSeconds", String(allowed[0] ?? -1));
+    }, [spec, duration]);
+    useEffect(() => {
+        if (spec?.kind !== "seedance-video") return;
+        if (!spec.audio && generateAudio) onConfigChange("videoGenerateAudio", "false");
+        if (!spec.watermark && watermark) onConfigChange("videoWatermark", "false");
+    }, [spec, generateAudio, watermark]);
 
     return (
         <ImageSettingsTheme theme={theme}>
@@ -134,7 +190,7 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
                 {showTitle ? <div className="text-sm font-medium">视频设置</div> : null}
                 <SettingGroup title="分辨率" color={theme.node.muted}>
                     <div className="grid grid-cols-3 gap-2.5">
-                        {seedanceResolutionOptions.map((item) => {
+                        {resolutionOptionsShown.map((item) => {
                             const disabled = item.value === "1080p" && isSeedanceFastModel(model);
                             return (
                                 <OptionPill key={item.value} selected={resolution === item.value} disabled={disabled} theme={theme} onClick={() => onConfigChange("vquality", item.value)}>
@@ -147,7 +203,7 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
                 </SettingGroup>
                 <SettingGroup title="比例" color={theme.node.muted}>
                     <div className="grid grid-cols-3 gap-2.5">
-                        {seedanceRatioOptions.map((item) => (
+                        {ratioOptionsShown.map((item) => (
                             <button
                                 key={item.value}
                                 type="button"
@@ -165,7 +221,7 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
                 </SettingGroup>
                 <SettingGroup title="时长" color={theme.node.muted}>
                     <div className="grid grid-cols-4 gap-2.5">
-                        {seedanceDurationOptions.map((value) => (
+                        {durationOptionsShown.map((value) => (
                             <OptionPill key={value} selected={duration === value} theme={theme} onClick={() => onConfigChange("videoSeconds", String(value))}>
                                 {value === -1 ? "智能" : `${value}s`}
                             </OptionPill>
@@ -175,8 +231,8 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
                 </SettingGroup>
                 <SettingGroup title="输出" color={theme.node.muted}>
                     <div className="grid gap-2 rounded-xl border p-2.5" style={{ borderColor: theme.node.stroke }}>
-                        <SwitchRow label="生成声音" checked={generateAudio} theme={theme} onChange={(checked) => onConfigChange("videoGenerateAudio", String(checked))} />
-                        <SwitchRow label="添加水印" checked={watermark} theme={theme} onChange={(checked) => onConfigChange("videoWatermark", String(checked))} />
+                        {audioEnabled ? <SwitchRow label="生成声音" checked={generateAudio} theme={theme} onChange={(checked) => onConfigChange("videoGenerateAudio", String(checked))} /> : null}
+                        {watermarkEnabled ? <SwitchRow label="添加水印" checked={watermark} theme={theme} onChange={(checked) => onConfigChange("videoWatermark", String(checked))} /> : null}
                     </div>
                 </SettingGroup>
             </div>

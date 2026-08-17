@@ -1,6 +1,6 @@
 import axios from "axios";
 
-import { buildApiUrl, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
+import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
@@ -278,9 +278,19 @@ function isOpenAiApi(config: Pick<AiConfig, "baseUrl">): boolean {
     return config.baseUrl.toLowerCase().includes("openai.com");
 }
 
+/** 平台路由提示：x-sf-provider / x-sf-model 让代理按凭证「模型绑定」精确取 Key（与后台能力标定配套） */
+function proxyHintHeaders(config: { apiFormat: AiConfig["apiFormat"]; baseUrl: string; model?: string }) {
+    const provider = inferProviderHint(config.apiFormat, config.baseUrl);
+    return {
+        ...(provider ? { "x-sf-provider": provider } : {}),
+        ...(config.model ? { "x-sf-model": modelOptionName(config.model) } : {}),
+    };
+}
+
 function aiHeaders(config: AiConfig, contentType?: string) {
     return {
         Authorization: `Bearer ${config.apiKey}`,
+        ...proxyHintHeaders(config),
         ...(contentType ? { "Content-Type": contentType } : {}),
     };
 }
@@ -301,9 +311,10 @@ function geminiApiUrl(config: Pick<AiConfig, "baseUrl" | "model">, action?: "gen
     return `${baseUrl}/models/${encodeURIComponent(geminiModelName(config.model))}:${action}`;
 }
 
-function geminiHeaders(config: Pick<AiConfig, "apiKey">) {
+function geminiHeaders(config: Pick<AiConfig, "apiKey" | "apiFormat" | "baseUrl" | "model">) {
     return {
         "x-goog-api-key": config.apiKey,
+        ...proxyHintHeaders(config),
         "Content-Type": "application/json",
     };
 }
@@ -316,9 +327,10 @@ function replicateApiUrl(config: Pick<AiConfig, "baseUrl" | "model">) {
     return `${baseUrl}/models/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/predictions`;
 }
 
-function replicateHeaders(config: Pick<AiConfig, "apiKey">) {
+function replicateHeaders(config: Pick<AiConfig, "apiKey" | "apiFormat" | "baseUrl" | "model">) {
     return {
         Authorization: `Bearer ${config.apiKey}`,
+        ...proxyHintHeaders(config),
         "Content-Type": "application/json",
         Prefer: "wait=60",
     };
@@ -335,7 +347,7 @@ async function requestReplicateImages(config: AiConfig, input: Record<string, un
     return parseReplicateImagePayload(completed);
 }
 
-async function waitForReplicatePrediction(prediction: ReplicatePrediction, config: Pick<AiConfig, "apiKey">, options?: RequestOptions) {
+async function waitForReplicatePrediction(prediction: ReplicatePrediction, config: Pick<AiConfig, "apiKey" | "apiFormat" | "baseUrl" | "model">, options?: RequestOptions) {
     let current = prediction;
     for (let attempt = 0; attempt < 80; attempt += 1) {
         if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
@@ -345,7 +357,7 @@ async function waitForReplicatePrediction(prediction: ReplicatePrediction, confi
         current = await proxyFetch<ReplicatePrediction>({
             url: current.urls.get,
             method: "GET",
-            headers: { Authorization: `Bearer ${config.apiKey}` },
+            headers: { Authorization: `Bearer ${config.apiKey}`, ...proxyHintHeaders(config) },
         });
     }
     throw new Error("Replicate 生成超时，请稍后在任务记录中查看结果");
@@ -1004,7 +1016,7 @@ export async function fetchImageModels(config: Pick<AiConfig, "baseUrl" | "apiKe
         const response = await proxyFetch<{ data?: Array<{ id?: string }>; error?: { message?: string } }>({
             url: buildApiUrl(config.baseUrl, "/models"),
             method: "GET",
-            headers: { Authorization: `Bearer ${config.apiKey}` },
+            headers: { Authorization: `Bearer ${config.apiKey}`, ...proxyHintHeaders({ apiFormat: config.apiFormat, baseUrl: config.baseUrl }) },
         });
         return (response.data || [])
             .map((model) => model.id)

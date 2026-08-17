@@ -307,6 +307,7 @@ exports.Prisma.ProviderCredentialScalarFieldEnum = {
   baseUrl: 'baseUrl',
   keyEnc: 'keyEnc',
   models: 'models',
+  capabilities: 'capabilities',
   enabled: 'enabled',
   priority: 'priority',
   createdById: 'createdById',

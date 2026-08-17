@@ -1,4 +1,5 @@
 import { modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
+import { getPlatformCapability } from "@/stores/platform-catalog-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
@@ -58,7 +59,12 @@ const seedancePixels = {
 
 export function isSeedanceVideoConfig(config: AiConfig | Pick<AiConfig, "model" | "videoModel" | "baseUrl">) {
     const requestConfig = "channels" in config ? resolveModelRequestConfig(config, config.videoModel || config.model) : config;
-    return isSeedanceVideoModel(modelOptionName(requestConfig.model || requestConfig.videoModel)) || isArkPlanBaseUrl(requestConfig.baseUrl);
+    const model = modelOptionName(requestConfig.model || requestConfig.videoModel);
+    // 平台能力标定优先：后台显式标定 kind 时以标定为准（覆盖按模型名的启发式路由）
+    const spec = getPlatformCapability(model);
+    if (spec?.kind === "seedance-video") return true;
+    if (spec?.kind === "video") return false;
+    return isSeedanceVideoModel(model) || isArkPlanBaseUrl(requestConfig.baseUrl);
 }
 
 export function isSeedanceVideoModel(model: string) {
