@@ -50,7 +50,6 @@ type UseCanvasImageEditDialogsOptions = {
     finishGenerationRequest: (targetNodeId: string, controller: AbortController) => void;
     reserveCanvasGenerationQuota: (count?: number) => Promise<void>;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
-    openConfigDialog: (show: boolean) => void;
     buildGenCfg: (node: CanvasNodeData | undefined, mode: "image" | "video" | "audio" | "text") => AiConfig;
     message: { info: (msg: string) => void; success: (msg: string) => void; error: (msg: string) => void; warning: (msg: string) => void };
 };
@@ -85,7 +84,6 @@ export function useCanvasImageEditDialogs(options: UseCanvasImageEditDialogsOpti
         finishGenerationRequest,
         reserveCanvasGenerationQuota,
         isAiConfigReady,
-        openConfigDialog,
         buildGenCfg,
         message,
     } = options;
@@ -180,7 +178,7 @@ export function useCanvasImageEditDialogs(options: UseCanvasImageEditDialogsOpti
             if (!node.metadata?.content) return;
             const generationConfig = { ...buildGenCfg(node, "image"), count: "1", size: node.metadata?.size || effectiveConfig.size || defaultConfig.size } as AiConfig;
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
+                message.warning("暂无可用模型，请联系管理员在后台配置平台模型");
                 return;
             }
             const userPrompt = payload.prompt.trim();
@@ -241,7 +239,6 @@ export function useCanvasImageEditDialogs(options: UseCanvasImageEditDialogsOpti
             isAiConfigReady,
             isGenerationCanceled,
             message,
-            openConfigDialog,
             reserveCanvasGenerationQuota,
             setConnections,
             setDialogNodeId,

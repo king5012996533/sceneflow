@@ -1,43 +1,23 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
-import { App } from "antd";
+import { useEffect } from "react";
 
-import { createModelChannel, useConfigStore } from "@/stores/use-config-store";
+import { usePlatformCatalogStore } from "@/stores/platform-catalog-store";
+import { useConfigStore } from "@/stores/use-config-store";
 
 export function ClientRootInit({ children }: { children: ReactNode }) {
-    const { message } = App.useApp();
-    const handledConfigParams = useRef(false);
-    const updateConfig = useConfigStore((state) => state.updateConfig);
-    const config = useConfigStore((state) => state.config);
-
     useEffect(() => {
-        if (handledConfigParams.current) return;
-        const searchParams = new URLSearchParams(window.location.search);
-        const baseUrl = searchParams.get("baseUrl") || searchParams.get("baseurl");
-        if (!baseUrl) return;
-        handledConfigParams.current = true;
-        searchParams.delete("baseUrl");
-        searchParams.delete("baseurl");
-        window.history.replaceState(null, "", `${window.location.pathname}${searchParams.size ? `?${searchParams}` : ""}${window.location.hash}`);
-        const firstChannel = config.channels[0];
-        updateConfig(
-            "channels",
-            firstChannel
-                ? config.channels.map((channel, index) =>
-                      index === 0
-                          ? {
-                                ...channel,
-                                ...(baseUrl ? { baseUrl } : {}),
-                            }
-                          : channel,
-                  )
-                : [createModelChannel({ id: "default", name: "默认渠道", baseUrl: baseUrl || undefined })],
-        );
-        if (baseUrl) updateConfig("baseUrl", baseUrl);
-        message.success("已导入渠道 Base URL");
-    }, [config.channels, message, updateConfig]);
+        // 平台托管模型：启动即拉取平台模型目录（/api/platform/catalog），
+        // 目录就绪后重建前端模型列表（管理员后台配置的模型是前端唯一模型来源）。
+        void usePlatformCatalogStore.getState().load();
+        const unsubscribe = usePlatformCatalogStore.subscribe((state, prevState) => {
+            if (state.models !== prevState.models || state.loadedAt !== prevState.loadedAt) {
+                useConfigStore.getState().reconcilePlatformModels(state.models);
+            }
+        });
+        return unsubscribe;
+    }, []);
 
     return <>{children}</>;
 }

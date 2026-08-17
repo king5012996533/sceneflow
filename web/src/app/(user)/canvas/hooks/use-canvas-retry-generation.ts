@@ -36,7 +36,6 @@ type UseCanvasRetryGenerationOptions = {
     resolveReferences: (metadata: CanvasNodeMetadata) => Promise<ReferenceImage[] | null>;
     sourceReferenceImages: (node: CanvasNodeData | null) => ReferenceImage[];
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
-    openConfigDialog: (show: boolean) => void;
     nodesRef: React.MutableRefObject<CanvasNodeData[]>;
     effectiveConfig: AiConfig;
     setNodes: React.Dispatch<React.SetStateAction<CanvasNodeData[]>>;
@@ -56,7 +55,6 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
         resolveReferences,
         sourceReferenceImages,
         isAiConfigReady,
-        openConfigDialog,
         nodesRef,
         effectiveConfig,
         setNodes,
@@ -83,7 +81,7 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
                     : ({ ...buildGenCfg(sourceNode, node.type === CanvasNodeType.Text ? "text" : node.type === CanvasNodeType.Video ? "video" : node.type === CanvasNodeType.Audio ? "audio" : "image"), count: "1" } as AiConfig);
 
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
+                message.warning("暂无可用模型，请联系管理员在后台配置平台模型");
                 return;
             }
 
@@ -183,7 +181,6 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
             isAiConfigReady,
             isGenerationCanceled,
             message,
-            openConfigDialog,
             reserveCanvasGenerationQuota,
             retrySourceNode,
             startGenerationRequest,

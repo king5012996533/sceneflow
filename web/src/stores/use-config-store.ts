@@ -5,6 +5,7 @@ import { createJSONStorage, persist, type StateStorage } from "zustand/middlewar
 import { nanoid } from "nanoid";
 
 import { scopedStorageKey } from "@/lib/user-data-scope";
+import type { PlatformCatalogModel } from "@/stores/platform-catalog-store";
 
 export type ApiCallFormat = "openai" | "gemini" | "replicate" | "minimax";
 
@@ -66,25 +67,18 @@ const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
 const REPLICATE_BASE_URL = "https://api.replicate.com/v1";
 
 export const defaultConfig: AiConfig = {
-    channelMode: "local",
-    baseUrl: OPENAI_BASE_URL,
+    // 平台托管模式：渠道/模型列表由管理员后台的 ProviderCredential 决定，前端启动时经
+    // reconcilePlatformModels 用 /api/platform/catalog 重建；此处不再保留任何占位渠道/模型。
+    channelMode: "remote",
+    baseUrl: "",
     apiKey: "",
     apiFormat: "openai",
-    channels: [
-        {
-            id: "default",
-            name: "默认渠道",
-            baseUrl: OPENAI_BASE_URL,
-            apiKey: "",
-            apiFormat: "openai",
-            models: ["gpt-image-2", "grok-imagine-video", "gpt-5.5", "gpt-4o-mini-tts"],
-        },
-    ],
-    model: "default::gpt-image-2",
-    imageModel: "default::gpt-image-2",
-    videoModel: "default::grok-imagine-video",
-    textModel: "default::gpt-5.5",
-    audioModel: "default::gpt-4o-mini-tts",
+    channels: [],
+    model: "",
+    imageModel: "",
+    videoModel: "",
+    textModel: "",
+    audioModel: "",
     audioVoice: "alloy",
     audioFormat: "mp3",
     audioSpeed: "1",
@@ -95,11 +89,11 @@ export const defaultConfig: AiConfig = {
     videoWatermark: "false",
     videoDraft: "true",
     systemPrompt: "",
-    models: ["default::gpt-image-2", "default::grok-imagine-video", "default::gpt-5.5", "default::gpt-4o-mini-tts"],
-    imageModels: ["default::gpt-image-2"],
-    videoModels: ["default::grok-imagine-video"],
-    textModels: ["default::gpt-5.5"],
-    audioModels: ["default::gpt-4o-mini-tts"],
+    models: [],
+    imageModels: [],
+    videoModels: [],
+    textModels: [],
+    audioModels: [],
     quality: "auto",
     size: "1:1",
     count: "1",
@@ -166,15 +160,14 @@ function sanitizePersistedConfigStorageValue(value: string | null) {
 type ConfigStore = {
     config: AiConfig;
     webdav: WebdavSyncConfig;
-    isConfigOpen: boolean;
-    shouldPromptContinue: boolean;
+    /** 平台模型目录快照（reconcilePlatformModels 写入，不持久化；resolveModelChannel 依赖它做平台路由） */
+    platformCatalog: PlatformCatalogModel[];
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
     updateWebdavConfig: <K extends keyof WebdavSyncConfig>(key: K, value: WebdavSyncConfig[K]) => void;
     resetWebdavConfig: () => void;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
-    openConfigDialog: (shouldPromptContinue?: boolean) => void;
-    setConfigDialogOpen: (isOpen: boolean) => void;
-    clearPromptContinue: () => void;
+    /** 用平台模型目录重建模型列表/选中项（管理员后台配置的模型是前端唯一模型来源） */
+    reconcilePlatformModels: (catalogModels: PlatformCatalogModel[]) => void;
     hydrateFromServer: () => Promise<void>;
 };
 
@@ -222,6 +215,21 @@ export function filterModelsByCapability(models: string[], capability?: ModelCap
     return capability ? models.filter((model) => modelMatchesCapability(model, capability)) : models;
 }
 
+/**
+ * 平台模型能力分类：优先使用管理员在后台逐模型标定的 capabilities.kind
+ * （image / seedance-video / video）；text / audio 无标定，退回名称启发式。
+ */
+export function classifyCatalogModel(item: PlatformCatalogModel): ModelCapability {
+    const kind = item.capabilities?.kind;
+    if (kind === "image") return "image";
+    if (kind === "seedance-video" || kind === "video") return "video";
+    const name = modelOptionName(item.model);
+    if (isVideoModelName(name)) return "video";
+    if (isImageModelName(name)) return "image";
+    if (isAudioModelName(name)) return "audio";
+    return "text";
+}
+
 export function selectableModelsByCapability(config: AiConfig, capability?: ModelCapability) {
     if (!capability) return config.models;
     return config[modelListKey(capability)];
@@ -231,7 +239,7 @@ function modelListKey(capability: ModelCapability) {
     return `${capability}Models` as "imageModels" | "videoModels" | "textModels" | "audioModels";
 }
 
-function isAiConfigReady(config: AiConfig, model: string) {
+function isAiConfigReady(config: AiConfig, model: string): boolean {
     const channel = resolveModelChannel(config, model);
     // 平台 Key 化：API Key 不再必需（服务端注入平台 Key），只需模型 + Base URL 能路由到代理
     return Boolean(model.trim() && channel.baseUrl.trim());
@@ -242,8 +250,7 @@ export const useConfigStore = create<ConfigStore>()(
         (set, get) => ({
             config: defaultConfig,
             webdav: defaultWebdavSyncConfig,
-            isConfigOpen: false,
-            shouldPromptContinue: false,
+            platformCatalog: [],
             updateConfig: (key, value) => {
                 set((state) => {
                     const newConfig = { ...state.config, [key]: value };
@@ -261,9 +268,46 @@ export const useConfigStore = create<ConfigStore>()(
             },
             resetWebdavConfig: () => set({ webdav: defaultWebdavSyncConfig }),
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
-            openConfigDialog: (shouldPromptContinue = false) => set({ isConfigOpen: true, shouldPromptContinue }),
-            setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
-            clearPromptContinue: () => set({ shouldPromptContinue: false }),
+            reconcilePlatformModels: (catalogModels) => {
+                const imageModels: string[] = [];
+                const videoModels: string[] = [];
+                const textModels: string[] = [];
+                const audioModels: string[] = [];
+                const pushUnique = (bucket: string[], name: string) => {
+                    if (name && !bucket.includes(name)) bucket.push(name);
+                };
+                for (const item of catalogModels) {
+                    const name = modelOptionName(item.model);
+                    const capability = classifyCatalogModel(item);
+                    if (capability === "image") pushUnique(imageModels, name);
+                    else if (capability === "video") pushUnique(videoModels, name);
+                    else if (capability === "audio") pushUnique(audioModels, name);
+                    else pushUnique(textModels, name);
+                }
+                const models = [...imageModels, ...videoModels, ...textModels, ...audioModels];
+                set((state) => {
+                    const current = state.config;
+                    const pick = (selected: string, list: string[]) => (selected && list.includes(selected) ? selected : list[0] || "");
+                    const nextConfig: AiConfig = {
+                        ...current,
+                        // 平台托管：渠道由管理员后台统一配置，前端不再维护任何用户渠道
+                        channelMode: "remote",
+                        channels: [],
+                        models,
+                        imageModels,
+                        videoModels,
+                        textModels,
+                        audioModels,
+                        model: pick(current.model, models),
+                        imageModel: pick(current.imageModel, imageModels),
+                        videoModel: pick(current.videoModel, videoModels),
+                        textModel: pick(current.textModel, textModels),
+                        audioModel: pick(current.audioModel, audioModels),
+                    };
+                    syncConfigToServer(nextConfig, state.webdav);
+                    return { config: nextConfig, platformCatalog: catalogModels };
+                });
+            },
             hydrateFromServer: async () => {
                 const serverData = await loadConfigFromServer();
                 if (!serverData?.config) return;
@@ -286,6 +330,10 @@ export const useConfigStore = create<ConfigStore>()(
                         webdav: sanitizeHydratedWebdavConfig(serverWebdav),
                     };
                 });
+                // 竞态防护：服务器回填可能晚于目录加载并覆盖平台模型列表 →
+                // 目录已就绪时立即用目录重建，保证旧持久化列表永远打不过平台目录。
+                const catalogModels = useConfigStore.getState().platformCatalog;
+                if (catalogModels.length) useConfigStore.getState().reconcilePlatformModels(catalogModels);
             },
         }),
         {
@@ -310,7 +358,7 @@ export const useConfigStore = create<ConfigStore>()(
                         channels,
                         models,
                         imageModel: normalizeModelOptionValue(config.imageModel || config.model, channels),
-                        videoModel: normalizeModelOptionValue(config.videoModel || "grok-imagine-video", channels),
+                        videoModel: normalizeModelOptionValue(config.videoModel, channels),
                         textModel: normalizeModelOptionValue(config.textModel || config.model, channels),
                         audioModel: normalizeModelOptionValue(config.audioModel || defaultConfig.audioModel, channels),
                         audioVoice: config.audioVoice || defaultConfig.audioVoice,
@@ -375,9 +423,13 @@ export function modelOptionName(value: string) {
     return decodeChannelModel(value)?.model || value;
 }
 
-export function modelOptionLabel(config: AiConfig, value: string) {
+export function modelOptionLabel(config: AiConfig, value: string): string {
     const decoded = decodeChannelModel(value);
-    if (!decoded) return value;
+    if (!decoded) {
+        // 平台模型（无渠道前缀）：命中平台目录时标注「平台」，否则原样返回
+        const channel = resolveModelChannel(config, value);
+        return channel.id === "platform" ? `${modelOptionName(value)}（平台）` : value;
+    }
     const channel = config.channels.find((item) => item.id === decoded.channelId);
     return channel ? `${decoded.model}（${channel.name}）` : decoded.model;
 }
@@ -398,14 +450,27 @@ export function normalizeModelOptionValue(value: string | undefined, channels: M
     return channel && channel.models.includes(model) ? encodeChannelModel(channel.id, model) : model;
 }
 
-export function resolveModelChannel(config: AiConfig, value: string) {
+export function resolveModelChannel(config: AiConfig, value: string): ModelChannel {
     const decoded = decodeChannelModel(value);
     const model = decoded?.model || value;
+    // 平台模型优先：管理员后台配置的模型统一走平台合成渠道（无用户 Key，由服务端代理注入平台 Key）
+    if (!decoded) {
+        const catalogItem = useConfigStore.getState().platformCatalog.find((item) => modelOptionName(item.model) === modelOptionName(model));
+        if (catalogItem) {
+            return createModelChannel({
+                id: "platform",
+                name: "平台",
+                baseUrl: catalogItem.baseUrl,
+                apiFormat: inferApiFormatFromBaseUrl(catalogItem.baseUrl) || "openai",
+                models: [model],
+            });
+        }
+    }
     const matched = decoded ? config.channels.find((channel) => channel.id === decoded.channelId) : config.channels.find((channel) => channel.models.includes(model));
     return matched || config.channels[0] || createModelChannel({ id: "default", name: "默认渠道", baseUrl: config.baseUrl, apiKey: config.apiKey, apiFormat: config.apiFormat, models: config.models.map(modelOptionName) });
 }
 
-export function resolveModelRequestConfig(config: AiConfig, value: string) {
+export function resolveModelRequestConfig(config: AiConfig, value: string): AiConfig {
     const channel = resolveModelChannel(config, value);
     const apiFormat = inferApiFormatFromBaseUrl(channel.baseUrl) || channel.apiFormat;
     return {

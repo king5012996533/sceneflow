@@ -154,7 +154,6 @@ function InfiniteCanvasPage() {
     const config = useConfigStore((state) => state.config);
     const effectiveConfig = useEffectiveConfig();
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
-    const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const user = useUserStore((state) => state.user);
     const addAsset = useAssetStore((state) => state.addAsset);
     const cleanupAssetImages = useAssetStore((state) => state.cleanupImages);
@@ -661,7 +660,6 @@ function InfiniteCanvasPage() {
         finishGenerationRequest,
         reserveCanvasGenerationQuota,
         isAiConfigReady,
-        openConfigDialog,
         buildGenCfg,
         message,
     });
@@ -691,7 +689,6 @@ function InfiniteCanvasPage() {
         resolveReferences,
         sourceReferenceImages,
         isAiConfigReady,
-        openConfigDialog,
         nodesRef,
         effectiveConfig,
         setNodes,
@@ -720,7 +717,6 @@ function InfiniteCanvasPage() {
         finishGenerationRequest,
         reserveCanvasGenerationQuota,
         isAiConfigReady,
-        openConfigDialog,
         buildGenCfg,
         message,
     });
@@ -1400,7 +1396,7 @@ function InfiniteCanvasPage() {
             const nodePrompt = sourceNode?.type === CanvasNodeType.Config ? sourceNode.metadata?.composerContent || prompt || sourceNode.metadata?.prompt || "" : prompt || sourceNode?.metadata?.prompt || "";
             const generationConfig = buildGenCfg(sourceNode, mode);
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
+                message.warning("暂无可用模型，请联系管理员在后台配置平台模型");
                 return;
             }
 
@@ -1491,7 +1487,7 @@ function InfiniteCanvasPage() {
                 setRunningNodeId(null);
             }
         },
-        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, openConfigDialog, reserveCanvasGenerationQuota, startGenerationRequest],
+        [effectiveConfig, finishGenerationRequest, isAiConfigReady, message, reserveCanvasGenerationQuota, startGenerationRequest],
     );
     useEffect(() => {
         generateNodeRef.current = handleGenerateNode;

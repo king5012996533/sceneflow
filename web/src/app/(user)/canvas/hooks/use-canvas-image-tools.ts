@@ -42,7 +42,6 @@ type UseCanvasImageToolsOptions = {
     finishGenerationRequest: (targetNodeId: string, controller: AbortController) => void;
     reserveCanvasGenerationQuota: (count?: number) => Promise<void>;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
-    openConfigDialog: (show: boolean) => void;
     buildGenCfg: (node: CanvasNodeData | undefined, mode: "image" | "video" | "audio" | "text") => AiConfig;
     message: { info: (msg: string) => void; success: (msg: string) => void; error: (msg: string) => void; warning: (msg: string) => void };
 };
@@ -61,7 +60,6 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions) {
         finishGenerationRequest,
         reserveCanvasGenerationQuota,
         isAiConfigReady,
-        openConfigDialog,
         buildGenCfg,
         message,
     } = options;
@@ -83,11 +81,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions) {
             const configSpec = NODE_DEFAULT_SIZE[CanvasNodeType.Config];
             const centerY = node.position.y + node.height / 2;
             const textNode = {
-                ...createCanvasNode(
-                    CanvasNodeType.Text,
-                    { x: node.position.x + node.width + gap + textSpec.width / 2, y: centerY },
-                    { content: IMAGE_PROMPT_REVERSE_PRESET, prompt: IMAGE_PROMPT_REVERSE_PRESET, status: NODE_STATUS_SUCCESS, fontSize: 14 },
-                ),
+                ...createCanvasNode(CanvasNodeType.Text, { x: node.position.x + node.width + gap + textSpec.width / 2, y: centerY }, { content: IMAGE_PROMPT_REVERSE_PRESET, prompt: IMAGE_PROMPT_REVERSE_PRESET, status: NODE_STATUS_SUCCESS, fontSize: 14 }),
                 title: "反推提示词",
             };
             const configNode = {
@@ -106,11 +100,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions) {
             };
 
             setNodes((prev) => [...prev, textNode, configNode]);
-            setConnections((prev) => [
-                ...prev,
-                { id: nanoid(), fromNodeId: node.id, toNodeId: configNode.id },
-                { id: nanoid(), fromNodeId: textNode.id, toNodeId: configNode.id },
-            ]);
+            setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: node.id, toNodeId: configNode.id }, { id: nanoid(), fromNodeId: textNode.id, toNodeId: configNode.id }]);
             setSelectedNodeIds(new Set([configNode.id]));
             setSelectedConnectionId(null);
             setDialogNodeId(configNode.id);
@@ -150,7 +140,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions) {
             if (!node.metadata?.content) return;
             const generationConfig = { ...buildGenCfg(node, "image"), count: "1" } as AiConfig;
             if (!isAiConfigReady(generationConfig, generationConfig.model)) {
-                openConfigDialog(true);
+                message.warning("暂无可用模型，请联系管理员在后台配置平台模型");
                 return;
             }
             const childId = nanoid();
@@ -188,9 +178,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions) {
                 const image = await requestGeneratedImages({
                     config: generationConfig,
                     prompt,
-                    references: [
-                        { id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey },
-                    ],
+                    references: [{ id: node.id, name: `${node.title || node.id}.png`, type: node.metadata.mimeType || "image/png", dataUrl: node.metadata.content, storageKey: node.metadata.storageKey }],
                     options: { signal: controller.signal },
                 }).then((items) => items[0]);
                 const uploaded = await uploadImage(image.dataUrl);
@@ -205,22 +193,7 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions) {
                 setRunningNodeId(null);
             }
         },
-        [
-            buildGenCfg,
-            finishGenerationRequest,
-            isAiConfigReady,
-            isGenerationCanceled,
-            message,
-            openConfigDialog,
-            reserveCanvasGenerationQuota,
-            setAngleNodeId,
-            setConnections,
-            setDialogNodeId,
-            setNodes,
-            setRunningNodeId,
-            setSelectedNodeIds,
-            startGenerationRequest,
-        ],
+        [buildGenCfg, finishGenerationRequest, isAiConfigReady, isGenerationCanceled, message, reserveCanvasGenerationQuota, setAngleNodeId, setConnections, setDialogNodeId, setNodes, setRunningNodeId, setSelectedNodeIds, startGenerationRequest],
     );
 
     return {

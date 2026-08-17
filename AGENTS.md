@@ -87,7 +87,7 @@
 ## 项目注意事项
 
 - 当前画布项目和“我的素材”主要保存在浏览器本地，不要在文档中误写成已支持云同步。
-- 当前 AI API Key 存在浏览器本地，并由前端直接请求 OpenAI 兼容接口；涉及安全说明时要写清楚。
+- 上游 API Key 由平台统一管理（ProviderCredential），客户端不保存任何 Key；涉及安全说明时按平台密钥架构写。
 - Docker 静态资源路径目前仍是待办项，文档中不要过度承诺生产部署已经完全验证。
 
 ## 积分制 / 平台密钥（2026-08 起）
@@ -102,3 +102,5 @@
 - 存量迁移（`lib/credit-migration.ts`）：登录时幂等补建积分账户、新用户赠送积分。
 - 平台模型「能力标定」（`ProviderCredential.capabilities`，Json，key=模型名）：后台逐模型配置与前端设置面板一一对应（图片：画质/宽高比/张数；Seedance：分辨率/比例/时长/声音/水印；通用视频：清晰度/尺寸/秒数）。词汇表与默认值在 `lib/model-capability-spec.ts`（服务端清洗 `sanitizeCapabilities` 与客户端共用）；admin 编辑入口在「平台密钥」tab（`credential-form-fields.tsx` / `credential-capability-editor.tsx` / `model-capability-fields.tsx`）。
 - 能力下发：`GET /api/platform/catalog`（登录即可访问，不含 Key）→ `stores/platform-catalog-store.ts`（60s TTL）→ 图片/视频设置面板按能力过滤选项，未配置退回内置默认。代理路由提示头 `x-sf-provider` / `x-sf-model` 由 `image.ts` / `video.ts` / `audio.ts` 的 `proxyHintHeaders` 统一发出，让「模型绑定」真正参与取 Key。
+- 前端模型选项唯一来源 = 平台目录：`ClientRootInit` 启动拉目录 → `useConfigStore.reconcilePlatformModels` 重建各能力模型列表并归一化选中项（分类优先 `capabilities.kind`，text/audio 退回名称启发式）；`resolveModelChannel` 对原始模型名查目录返回平台合成渠道（`baseUrl` 取目录、无 Key）。后台改模型约 60s 内生效。
+- 用户侧「配置」入口已彻底删除：无自行填 Base URL / 模型 / Key 的界面；WebDAV 备份配置代码（`services/app-sync.ts`、`services/webdav-sync.ts`、`/api/webdav-proxy`）无 UI 入口，保持休眠不删。

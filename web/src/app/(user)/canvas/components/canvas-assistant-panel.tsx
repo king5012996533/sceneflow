@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bot, Cpu, History, PanelRightClose, Plus, Settings2, Trash2, X } from "lucide-react";
-import { Button, Modal, Switch, Tooltip } from "antd";
+import { App, Button, Modal, Switch, Tooltip } from "antd";
 import { motion } from "motion/react";
 
 import { modelOptionName, resolveModelChannel, selectableModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
@@ -53,11 +53,11 @@ type CanvasAssistantPanelProps = {
 
 export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, sessions, activeSessionId, onSelectNodeIds, onSessionsChange, onApplyOps, canUndoOps, onUndoOps, onPasteImage, agentMode, onAgentModeChange, autoConnectLocal, closing, onCollapse }: CanvasAssistantPanelProps) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const { message } = App.useApp();
     const user = useUserStore((state) => state.user);
     const effectiveConfig = useEffectiveConfig();
     const cleanupImages = useAssetStore((state) => state.cleanupImages);
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
-    const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const confirmTools = useCanvasAgentStore((state) => state.confirmTools);
     const setAgentState = useCanvasAgentStore((state) => state.setAgentState);
@@ -179,7 +179,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
     const sendMessage = async (text: string, savedReferences?: CanvasAssistantReference[]) => {
         const requestConfig = { ...effectiveConfig, model: effectiveConfig.textModel || effectiveConfig.model };
         if (!isAiConfigReady(requestConfig, requestConfig.model)) {
-            openConfigDialog(true);
+            message.warning("暂无可用模型，请联系管理员在后台配置平台模型");
             return;
         }
 
@@ -317,15 +317,12 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                                 }}
                             />
                         </Tooltip>
-                        <Tooltip title="配置">
-                            <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<Settings2 className="size-4" />} onClick={() => openConfigDialog(false)} />
-                        </Tooltip>
                     </>
                 }
             />
 
             {view === "setup" ? (
-                <OnlineAgentSetupView theme={theme} activeModel={activeModel} onOpenConfig={() => openConfigDialog(true)} />
+                <OnlineAgentSetupView theme={theme} activeModel={activeModel} />
             ) : (
                 <div ref={view === "chat" ? chatScrollRef : undefined} className="thin-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
                     {view === "history" ? (
@@ -586,14 +583,14 @@ function AssistantHistory({
     );
 }
 
-function OnlineAgentSetupView({ theme, activeModel, onOpenConfig }: { theme: (typeof canvasThemes)[keyof typeof canvasThemes]; activeModel: string; onOpenConfig: () => void }) {
+function OnlineAgentSetupView({ theme, activeModel }: { theme: (typeof canvasThemes)[keyof typeof canvasThemes]; activeModel: string }) {
     return (
         <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
             <div className="space-y-4">
                 <div>
                     <div className="text-base font-semibold leading-6">连接配置</div>
                     <div className="mt-1 text-xs leading-5" style={{ color: theme.node.muted }}>
-                        网站 Agent 直接使用当前网页配置的文本模型和 API。
+                        网站 Agent 直接使用管理员在后台配置的平台文本模型。
                     </div>
                 </div>
                 <div className="rounded-lg border p-3" style={{ borderColor: theme.node.stroke }}>
@@ -604,9 +601,6 @@ function OnlineAgentSetupView({ theme, activeModel, onOpenConfig }: { theme: (ty
                                 {activeModel || "未配置模型"}
                             </div>
                         </div>
-                        <Button className="!h-8 !px-3" type="primary" icon={<Settings2 className="size-4" />} onClick={onOpenConfig}>
-                            配置
-                        </Button>
                     </div>
                 </div>
             </div>

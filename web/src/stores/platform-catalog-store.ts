@@ -23,6 +23,8 @@ export type PlatformCatalogModel = {
 };
 
 type PlatformCatalogStore = {
+    /** 平台模型目录完整列表（admin 后台启用的 ProviderCredential 模型），模型选项的唯一来源 */
+    models: PlatformCatalogModel[];
     byModel: Record<string, ModelCapabilitySpec | undefined>;
     loadedAt: number;
     lastAttemptAt: number;
@@ -32,6 +34,7 @@ type PlatformCatalogStore = {
 const CATALOG_TTL_MS = 60_000;
 
 export const usePlatformCatalogStore = create<PlatformCatalogStore>((set, get) => ({
+    models: [],
     byModel: {},
     loadedAt: 0,
     lastAttemptAt: 0,
@@ -43,11 +46,12 @@ export const usePlatformCatalogStore = create<PlatformCatalogStore>((set, get) =
             const res = await fetch(apiPath("/api/platform/catalog"), { credentials: "include" });
             if (!res.ok) return;
             const data = (await res.json()) as { models?: PlatformCatalogModel[] };
+            const catalogModels = data.models ?? [];
             const byModel: Record<string, ModelCapabilitySpec | undefined> = {};
-            for (const item of data.models ?? []) {
+            for (const item of catalogModels) {
                 if (item.capabilities) byModel[item.model] = item.capabilities;
             }
-            set({ byModel, loadedAt: Date.now() });
+            set({ models: catalogModels, byModel, loadedAt: Date.now() });
         } catch {
             // 静默失败：目录拿不到时前端退回内置默认
         }

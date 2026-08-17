@@ -6,13 +6,11 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { getVisibleNavigationTools, navigationTools, type NavigationToolSlug } from "@/constant/navigation-tools";
-import { AppConfigModal } from "@/components/layout/app-config-modal";
 import { MobileNavDrawer } from "@/components/layout/mobile-nav-drawer";
 import { UserStatusActions } from "@/components/layout/user-status-actions";
 import { CreditBalanceBadge } from "@/components/credits/credit-balance-badge";
 import { publicPath } from "@/lib/app-paths";
 import { cn } from "@/lib/utils";
-import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 export function AppTopNav() {
@@ -88,7 +86,6 @@ export function AppTopNav() {
             ) : null}
 
             <MobileNavDrawer open={mobileNavOpen} activeToolSlug={activeToolSlug} onClose={() => setMobileNavOpen(false)} />
-            <AppConfigModal />
         </>
     );
 }

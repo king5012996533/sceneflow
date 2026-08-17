@@ -96,6 +96,33 @@ assertNotMatches("src/lib/credit-migration.ts", /sub_compensation/, "套餐已�
 assertNotMatches("src/app/api/billing/orders/route.ts", /planId|getPlanAmount/, "套餐已下线：订单接口只保留积分包下单。");
 assertNotMatches("src/middleware.ts", /\/api\/billing\/plans/, "套餐已下线：middleware 不得放行 /api/billing/plans。");
 
+// —— 平台模型驱动前端 + 彻底删除配置入口 ——
+assertNotExists("src/components/layout/app-config-modal.tsx", "配置入口已删除：app-config-modal 组件必须删除。");
+assertNotMatches("src/stores/use-config-store.ts", /openConfigDialog|setConfigDialogOpen|isConfigOpen|shouldPromptContinue|clearPromptContinue/, "配置弹窗已删除：config store 不得保留 openConfigDialog 家族成员。");
+assertNotMatches("src/app/(user)/image/page.tsx", /openConfigDialog|onMissingConfig|请先完成配置/, "image 页不得保留配置弹窗调用。");
+assertNotMatches("src/app/(user)/video/page.tsx", /openConfigDialog|onMissingConfig|请先完成配置/, "video 页不得保留配置弹窗调用。");
+const canvasConfigEntryFiles = [
+    "src/app/(user)/canvas/[id]/canvas-client-page.tsx",
+    "src/app/(user)/canvas/hooks/use-canvas-image-edit-dialogs.ts",
+    "src/app/(user)/canvas/hooks/use-canvas-image-tools.ts",
+    "src/app/(user)/canvas/hooks/use-canvas-retry-generation.ts",
+    "src/app/(user)/canvas/components/canvas-config-node-panel.tsx",
+    "src/app/(user)/canvas/components/canvas-node-prompt-panel.tsx",
+    "src/app/(user)/canvas/components/canvas-image-settings-popover.tsx",
+    "src/app/(user)/canvas/components/canvas-assistant-panel.tsx",
+];
+for (const file of canvasConfigEntryFiles) {
+    assertNotMatches(file, /openConfigDialog|onMissingConfig/, `${file} 不得保留配置弹窗调用。`);
+}
+assertNotMatches("src/components/layout/user-status-actions.tsx", /Settings2|showConfig/, "导航栏不得保留自行配置齿轮入口。");
+assertNotMatches("src/components/layout/app-top-nav.tsx", /AppConfigModal/, "顶部导航不得渲染配置弹窗。");
+// 前端模型选项唯一来源 = 平台模型目录（管理员后台 ProviderCredential）
+assertIncludes("src/stores/platform-catalog-store.ts", "models", "平台目录 store 必须保存完整模型列表（models）。");
+assertIncludes("src/stores/use-config-store.ts", "reconcilePlatformModels", "config store 必须提供目录重建动作 reconcilePlatformModels。");
+assertIncludes("src/components/layout/client-root-init.tsx", "reconcilePlatformModels", "应用启动必须把平台目录同步进 config store。");
+assertIncludes("src/components/model-picker.tsx", "暂无可用模型，请联系管理员在后台配置平台模型", "模型空态文案应引导联系管理员配置平台模型。");
+assertNotMatches("src/stores/use-config-store.ts", /grok-imagine-video/, "config store 不得保留占位模型默认值。");
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);
