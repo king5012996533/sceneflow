@@ -10,7 +10,10 @@ const MAX_PROXY_REQUEST_BYTES = 32 * 1024 * 1024;
 // 原始文件上传（Replicate Files API 等）：base64 包一层后约 40MB，兼容服务器 nginx 50m 限制
 const MAX_PROXY_RAW_BYTES = 30 * 1024 * 1024;
 const MAX_PROXY_ENVELOPE_BYTES = 41 * 1024 * 1024;
-const PROXY_TIMEOUT_MS = 120_000;
+// 图片/视频中转模型（ggwk/中转站）出图常需 30~120s + 排队，120s 偏紧。
+// nginx proxy_read_timeout 已配 300s；此值取 240s，让应用先于 nginx 返回带说明的超时 JSON，
+// 避免 nginx 掐断产生裸 504。
+const PROXY_TIMEOUT_MS = 240_000;
 const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "prefer", "x-api-key", "x-request-id", "x-sf-provider", "x-sf-model"]);
 
 type KeySource = "platform" | "none";
