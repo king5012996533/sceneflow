@@ -13,7 +13,9 @@ const MAX_PROXY_ENVELOPE_BYTES = 41 * 1024 * 1024;
 // 图片/视频中转模型（ggwk/中转站）出图常需 30~120s + 排队，120s 偏紧。
 // nginx proxy_read_timeout 已配 300s；此值取 240s，让应用先于 nginx 返回带说明的超时 JSON，
 // 避免 nginx 掐断产生裸 504。
-const PROXY_TIMEOUT_MS = 240_000;
+// 非流式请求超时上限：慢中转（排队 + 慢模型）单次出图可达 5-10 分钟。
+// 曾为 240s，ggwk 等中转站收单即扣费、出图超过 240s 时会被这里中止导致「扣费无结果」。
+const PROXY_TIMEOUT_MS = 600_000;
 const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "prefer", "x-api-key", "x-request-id", "x-sf-provider", "x-sf-model"]);
 
 type KeySource = "platform" | "none";
