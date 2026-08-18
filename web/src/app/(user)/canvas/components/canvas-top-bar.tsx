@@ -19,22 +19,22 @@ function MenuLabel({ text, shortcut }: { text: string; shortcut: string }) {
     );
 }
 
-function CompactAgentStatus({ status, onClick }: { status: CompactAgentStatusData; onClick: () => void }) {
+function CompactAgentStatus({ status, active, onClick }: { status: CompactAgentStatusData; active: boolean; onClick: () => void }) {
     const colorTheme = useThemeStore((state) => state.theme);
     const theme = canvasThemes[colorTheme];
-    const label = status.connected ? "已连接到本地 Codex" : status.enabled ? status.activity || "连接中" : "正在连接本地 Codex";
+    const label = status.connected ? "Codex 已连接" : status.enabled ? status.activity || "Codex 连接中" : "连接 Codex";
     const dotColor = status.connected ? "#22c55e" : status.enabled ? "#f59e0b" : theme.node.muted;
 
     return (
         <button
             type="button"
-            className="flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium transition hover:opacity-85"
-            style={{ background: theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
+            className="flex h-9 items-center gap-2 rounded-full px-3 text-sm font-medium transition hover:opacity-85"
+            style={{ background: active ? theme.toolbar.activeBg : theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
             onClick={onClick}
             title="打开本地 Codex 面板"
         >
             <span className="size-2 rounded-full" style={{ background: dotColor }} />
-            <span className="max-w-[180px] truncate">{label}</span>
+            <span className="max-w-[160px] truncate">{label}</span>
         </button>
     );
 }
@@ -179,20 +179,22 @@ export function CanvasTopBar({
                     </div>
                 </div>
 
-                <div className="pointer-events-auto flex items-center gap-1.5">
-                    {compactAgentStatus ? <CompactAgentStatus status={compactAgentStatus} onClick={onToggleAgent} /> : null}
+                <div className="pointer-events-auto flex items-center gap-2">
+                    {compactAgentStatus ? (
+                        <CompactAgentStatus status={compactAgentStatus} active={agentOpen} onClick={onToggleAgent} />
+                    ) : (
+                        <Button
+                            type="text"
+                            className="!h-9 !rounded-full !px-3 !font-medium"
+                            style={{ background: agentOpen ? theme.toolbar.activeBg : theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
+                            icon={<Bot className="size-4" />}
+                            onClick={onToggleAgent}
+                        >
+                            Agent
+                        </Button>
+                    )}
                     <CreditBalanceBadge variant="canvas" style={{ color: theme.node.text }} />
                     <UserStatusActions variant="canvas" onOpenShortcuts={() => setShortcutsOpen(true)} />
-                    <span className="h-6 w-px" style={{ background: theme.toolbar.border }} />
-                    <Button
-                        type="text"
-                        className="!h-10 !rounded-xl !px-3 !font-medium"
-                        style={{ background: agentOpen ? theme.toolbar.activeBg : theme.toolbar.panel, color: theme.node.text, boxShadow: "0 10px 30px rgba(28,25,23,.10)" }}
-                        icon={<Bot className="size-4" />}
-                        onClick={onToggleAgent}
-                    >
-                        Agent
-                    </Button>
                 </div>
             </div>
             <Modal title="快捷键" open={shortcutsOpen} onCancel={() => setShortcutsOpen(false)} footer={null} centered>
