@@ -15,6 +15,7 @@ const PUBLIC_PATHS = [
     "/api/auth/github/callback",
     "/api/payments/callback",
     "/api/prompts",
+    "/api/billing/packages", // 积分包价目公开（定价页展示用）；下单接口仍保护
 ];
 
 const STATIC_PREFIXES = [

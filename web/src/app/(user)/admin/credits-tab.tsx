@@ -7,6 +7,7 @@ import { Coins, Wallet } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
 import { formatCny } from "@/lib/format";
+import CreditPackagesAdmin from "./credit-packages-admin";
 
 type AdminCreditTx = {
     id: string;
@@ -135,11 +136,7 @@ export default function CreditsTab() {
             dataIndex: "amount",
             width: 100,
             align: "right",
-            render: (value: number) => (
-                <span className={value > 0 ? "font-medium text-emerald-600" : value < 0 ? "font-medium text-rose-500" : undefined}>
-                    {value > 0 ? `+${value}` : value}
-                </span>
-            ),
+            render: (value: number) => <span className={value > 0 ? "font-medium text-emerald-600" : value < 0 ? "font-medium text-rose-500" : undefined}>{value > 0 ? `+${value}` : value}</span>,
         },
         {
             title: "余额",
@@ -157,6 +154,8 @@ export default function CreditsTab() {
 
     return (
         <div className="space-y-4">
+            <CreditPackagesAdmin />
+
             <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                 <div className="mb-4 flex flex-wrap items-center gap-3">
                     <div className="sf-serif flex items-center gap-2 text-[17px] font-semibold">
@@ -178,12 +177,7 @@ export default function CreditsTab() {
                         className="w-72"
                         allowClear
                     />
-                    <InputNumber
-                        value={adjustAmount}
-                        onChange={setAdjustAmount}
-                        placeholder="积分数（正=充值，负=扣减）"
-                        className="w-44"
-                    />
+                    <InputNumber value={adjustAmount} onChange={setAdjustAmount} placeholder="积分数（正=充值，负=扣减）" className="w-44" />
                     <Input value={adjustNote} onChange={(event) => setAdjustNote(event.target.value)} placeholder="备注（可选）" maxLength={200} className="w-64" />
                     <Button type="primary" loading={submitting} onClick={() => void submitAdjust()}>
                         确认调整
@@ -201,14 +195,7 @@ export default function CreditsTab() {
                         <span className="text-[#7a6d63]">
                             全体用户余额合计：<span className="font-semibold text-[#201914]">{totalBalance.toLocaleString("zh-CN")} 积分</span>
                         </span>
-                        <Select
-                            value={typeFilter}
-                            onChange={setTypeFilter}
-                            placeholder="全部类型"
-                            allowClear
-                            options={Object.entries(TYPE_META).map(([value, meta]) => ({ label: meta.label, value }))}
-                            className="w-32"
-                        />
+                        <Select value={typeFilter} onChange={setTypeFilter} placeholder="全部类型" allowClear options={Object.entries(TYPE_META).map(([value, meta]) => ({ label: meta.label, value }))} className="w-32" />
                     </div>
                 </div>
                 <Table<AdminCreditTx> rowKey="id" loading={loading} dataSource={transactions} columns={columns} size="small" pagination={{ pageSize: 20, hideOnSinglePage: true, size: "small" }} />
