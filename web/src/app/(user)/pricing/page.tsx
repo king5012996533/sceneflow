@@ -2,15 +2,25 @@
 
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { CreditPackagesSection } from "@/components/credits/credit-packages-section";
 import { useCreditBalance } from "@/hooks/use-credit-balance";
+import { apiPath } from "@/lib/app-paths";
+import { getGenerationCreditsCost, type GenerationKind } from "@/lib/credit-pricing";
 
-const RATE_ROWS = [
-    { name: "gpt-image", mode: "标准", credits: "10 积分" },
-    { name: "Seedance 2.0", mode: "720p", credits: "15 积分" },
-    { name: "Seedance 2.0", mode: "1080p", credits: "30 积分" },
+type RateCardRow = { model: string; mode: string; kind: GenerationKind; credits: number };
+
+/** 接口不可用时的兜底行（与扣费同款内置草案计算，避免再次硬编码） */
+const FALLBACK_RATE_CARD: RateCardRow[] = [
+    { model: "gpt-image-1", mode: "标准", kind: "image", credits: getGenerationCreditsCost("image", { model: "gpt-image-1" }) },
+    { model: "seedance-1-pro", mode: "720p", kind: "video", credits: getGenerationCreditsCost("video", { model: "seedance-1-pro" }) },
+    { model: "seedance-1-pro", mode: "1080p", kind: "video", credits: getGenerationCreditsCost("video", { model: "seedance-1-pro", vquality: "1080p" }) },
 ];
+
+function unitWord(kind: GenerationKind): string {
+    return kind === "image" ? "每张" : kind === "video" ? "每条" : "每次";
+}
 
 const PAY_STEPS = [
     { title: "下单生成订单", desc: "点击「立即充值」创建积分包订单，获得订单号与应付金额。" },
@@ -20,6 +30,19 @@ const PAY_STEPS = [
 
 export default function PricingPage() {
     const { balance, loading: balanceLoading } = useCreditBalance();
+    const [rateCard, setRateCard] = useState<RateCardRow[]>(FALLBACK_RATE_CARD);
+
+    useEffect(() => {
+        // 单价示例与计费规则：后台运营配置 / 逐模型定价驱动，接口失败时退回内置草案
+        void fetch(apiPath("/api/billing/packages"), { cache: "no-store" })
+            .then((res) => res.json())
+            .then((json) => {
+                if (Array.isArray(json?.rateCard) && json.rateCard.length) setRateCard(json.rateCard);
+            })
+            .catch(() => {
+                // 静默：保留内置草案兜底
+            });
+    }, []);
 
     return (
         <main className="h-full overflow-y-auto bg-[#fbf6ee] text-[#201914]">
@@ -52,13 +75,13 @@ export default function PricingPage() {
                     </div>
                     <div className="border-b border-[#ded2c3] py-6 md:border-b-0 md:border-l md:py-7 md:px-8">
                         <div className="sf-mono text-[10px] uppercase tracking-[0.12em] text-[#7a6d63]">Rate Card / 生成单价示例</div>
-                        <p className="mt-2.5 text-[13px] leading-[1.9] text-[#4c4037]">
-                            gpt-image 每张 <b className="font-semibold text-[#201914]">10 积分</b>
-                            <br />
-                            Seedance 720p 每次 <b className="font-semibold text-[#201914]">15 积分</b>
-                            <br />
-                            Seedance 1080p 每次 <b className="font-semibold text-[#201914]">30 积分</b>
-                        </p>
+                        <div className="mt-2.5 text-[13px] leading-[1.9] text-[#4c4037]">
+                            {rateCard.map((row) => (
+                                <p key={`${row.model}-${row.mode}`}>
+                                    {row.model} {row.mode !== "标准" ? row.mode : ""} {unitWord(row.kind)} <b className="font-semibold text-[#201914]">{row.credits} 积分</b>
+                                </p>
+                            ))}
+                        </div>
                     </div>
                     <div className="py-6 md:border-l md:py-7 md:pl-8">
                         <div className="sf-mono text-[10px] uppercase tracking-[0.12em] text-[#7a6d63]">Notes / 充值说明</div>
@@ -89,11 +112,11 @@ export default function PricingPage() {
                                     <span>档位</span>
                                     <span className="text-right">单次消耗</span>
                                 </div>
-                                {RATE_ROWS.map((row) => (
-                                    <div key={`${row.name}-${row.mode}`} className="grid grid-cols-[7fr_3fr_3fr] gap-3 border-b border-[#ded2c3] py-3.5 text-sm">
-                                        <span className="font-medium">{row.name}</span>
+                                {rateCard.map((row) => (
+                                    <div key={`${row.model}-${row.mode}`} className="grid grid-cols-[7fr_3fr_3fr] gap-3 border-b border-[#ded2c3] py-3.5 text-sm">
+                                        <span className="font-medium">{row.model}</span>
                                         <span className="text-[#4c4037]">{row.mode}</span>
-                                        <span className="sf-mono text-right text-xs text-[#9b5b32]">{row.credits}</span>
+                                        <span className="sf-mono text-right text-xs text-[#9b5b32]">{row.credits} 积分</span>
                                     </div>
                                 ))}
                             </div>
