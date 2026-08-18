@@ -29,8 +29,11 @@ export const useUserStore = create<UserStore>()((set) => ({
     await fetch("/canvas/api/auth/logout", { method: "POST", credentials: "include", cache: "no-store" }).catch(() => null);
   },
   fetchSession: async () => {
+    // 偶发网络/服务器卡顿兜底：15s 无响应即中止，避免界面永久停在加载态
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
     try {
-      const res = await fetch("/canvas/api/auth/session", { credentials: "include", cache: "no-store" });
+      const res = await fetch("/canvas/api/auth/session", { credentials: "include", cache: "no-store", signal: controller.signal });
       const data = await res.json();
       if (data.user?.id) {
         const changed = setActiveLocalUserId(data.user.id);
@@ -54,6 +57,8 @@ export const useUserStore = create<UserStore>()((set) => ({
       set({ user: null });
       const changed = setActiveLocalUserId(null);
       if (changed && !isAuthPage()) window.location.reload();
+    } finally {
+      clearTimeout(timer);
     }
   },
 }));

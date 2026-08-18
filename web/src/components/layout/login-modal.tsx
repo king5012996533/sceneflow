@@ -68,6 +68,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ phone: target, code }),
+          signal: AbortSignal.timeout(20000),
         });
         const data = await res.json();
         if (!res.ok) { message.error(data.error || "登录失败"); return; }
@@ -82,6 +83,7 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: target, password }),
+          signal: AbortSignal.timeout(20000),
         });
         const data = await res.json();
         if (!res.ok) { message.error(data.error || "登录失败"); return; }
@@ -90,8 +92,9 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
         onClose();
         onSuccess?.();
       }
-    } catch {
-      message.error("网络错误");
+    } catch (err) {
+      const isTimeout = err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
+      message.error(isTimeout ? "登录超时，请重试" : "网络错误");
     } finally {
       setLoading(false);
     }

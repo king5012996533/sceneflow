@@ -57,7 +57,12 @@ export default function LoginPage() {
     const router = useRouter();
     const { message } = App.useApp();
     const fetchSession = useUserStore((s) => s.fetchSession);
-    const from = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") || "/canvas/canvas" : "/canvas/canvas";
+    // 仅允许站内路径作为登录回跳目标（防开放重定向；兼容旧 /canvas/... 别名）
+    const from = (() => {
+        if (typeof window === "undefined") return "/canvas/canvas";
+        const raw = new URLSearchParams(window.location.search).get("from");
+        return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/canvas/canvas";
+    })();
 
     const [target, setTarget] = useState("");
     const [password, setPassword] = useState("");
@@ -124,6 +129,7 @@ export default function LoginPage() {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ phone: target, code }),
+                    signal: AbortSignal.timeout(20000),
                 });
             } else {
                 if (!password) {
@@ -135,6 +141,7 @@ export default function LoginPage() {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email: target, password }),
+                    signal: AbortSignal.timeout(20000),
                 });
             }
             const data = await res.json();
@@ -145,8 +152,14 @@ export default function LoginPage() {
             setFeedback({ text: "验证通过，正在安全登录…", error: false });
             await fetchSession();
             router.push(from);
-        } catch {
-            setFeedback({ text: "网络错误", error: true });
+            // 兜底：偶发客户端导航卡住时硬跳转，避免一直停在登录页
+            window.setTimeout(() => {
+                const p = window.location.pathname;
+                if (p.endsWith("/login") || p.endsWith("/register")) window.location.href = from;
+            }, 10000);
+        } catch (err) {
+            const isTimeout = err instanceof DOMException && (err.name === "TimeoutError" || err.name === "AbortError");
+            setFeedback({ text: isTimeout ? "登录超时，请重试" : "网络错误", error: true });
         } finally {
             setLoading(false);
         }
