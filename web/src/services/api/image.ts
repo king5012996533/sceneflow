@@ -218,31 +218,105 @@ function gcd(a: number, b: number): number {
     return x || 1;
 }
 
-function resolveImageDataUrl(item: Record<string, unknown>) {
-    if (typeof item.b64_json === "string" && item.b64_json) {
-        return `data:image/png;base64,${item.b64_json}`;
-    }
-    if (typeof item.url === "string" && item.url) {
-        return item.url;
+function resolveImageDataUrl(item: Record<string, unknown>): string | null {
+    // 标准 OpenAI 字段（base64 或 URL），以及中转站常见的非标准字段名
+    const b64 = pickString(item, ["b64_json", "b64", "base64", "b64_data", "image_b64"]);
+    if (b64) return /^data:image\//i.test(b64) ? b64 : `data:image/png;base64,${b64}`;
+    const url = pickString(item, ["url", "image_url", "img_url", "cdn_url"]);
+    if (url) return url;
+    const image = pickString(item, ["image", "output"]);
+    if (image && (/^https?:\/\//i.test(image) || /^data:image\//i.test(image))) return image;
+    // 嵌套结构：{url: {url: "..."}} / {image: {url: "..."}} / {output: [...]} 等
+    for (const key of ["url", "image_url", "image", "output"]) {
+        const nested = item[key];
+        if (Array.isArray(nested)) {
+            const value = resolveImageList(nested);
+            if (value) return value;
+        } else if (nested && typeof nested === "object") {
+            const value = resolveImageDataUrl(nested as Record<string, unknown>);
+            if (value) return value;
+        }
     }
     return null;
+}
+
+function resolveImageList(items: unknown[]): string | null {
+    for (const entry of items) {
+        if (typeof entry === "string") {
+            if (/^https?:\/\//i.test(entry) || /^data:image\//i.test(entry)) return entry;
+        } else if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+            const value = resolveImageDataUrl(entry as Record<string, unknown>);
+            if (value) return value;
+        }
+    }
+    return null;
+}
+
+function pickString(record: Record<string, unknown>, keys: string[]) {
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === "string" && value) return value;
+    }
+    return "";
 }
 
 function parseImagePayload(payload: ImageApiResponse) {
     if (typeof payload.code === "number" && payload.code !== 0) {
         throw new Error(payload.msg || "请求失败");
     }
-    const images =
-        payload.data
-            ?.map(resolveImageDataUrl)
-            .filter((value): value is string => Boolean(value))
-            .map((dataUrl) => ({ id: nanoid(), dataUrl })) || [];
+    const candidates: unknown[] = [];
+    if (Array.isArray(payload.data)) {
+        candidates.push(...payload.data);
+    } else if (typeof payload.data === "string") {
+        candidates.push(payload.data);
+    } else if (payload.data && typeof payload.data === "object") {
+        // data 为对象：{images: [...]} / {items: [...]} / {list: [...]} 等
+        const record = payload.data as Record<string, unknown>;
+        for (const key of ["images", "items", "list", "data"]) {
+            const value = record[key];
+            if (Array.isArray(value)) candidates.push(...value);
+        }
+    }
+    // 顶层兜底：{images: [...]} / {output: [...]}
+    for (const key of ["images", "output"]) {
+        const value = (payload as unknown as Record<string, unknown>)[key];
+        if (Array.isArray(value)) candidates.push(...value);
+    }
+    const images = candidates
+        .map((item) =>
+            item && typeof item === "object" && !Array.isArray(item)
+                ? resolveImageDataUrl(item as Record<string, unknown>)
+                : typeof item === "string" && (/^https?:\/\//i.test(item) || /^data:image\//i.test(item))
+                  ? item
+                  : null,
+        )
+        .filter((value): value is string => Boolean(value))
+        .map((dataUrl) => ({ id: nanoid(), dataUrl }));
 
     if (images.length === 0) {
-        throw new Error("接口没有返回图片");
+        // 附带上游响应结构摘要，便于定位中转站的非标准返回格式
+        throw new Error(`接口没有返回图片（上游返回结构：${describePayloadShape(payload)}）。如中转站已扣费，请把该结构反馈给我们以适配。`);
     }
 
     return images;
+}
+
+function describePayloadShape(payload: unknown): string {
+    if (!payload || typeof payload !== "object") return String(payload).slice(0, 60);
+    const record = payload as Record<string, unknown>;
+    const top = Object.keys(record).slice(0, 6).join(",");
+    const data = record.data;
+    if (Array.isArray(data)) {
+        const first = data[0];
+        if (first && typeof first === "object") {
+            return `顶层{${top}}，data 数组${data.length}项，项字段{${Object.keys(first as Record<string, unknown>).slice(0, 6).join(",")}}`;
+        }
+        return `顶层{${top}}，data 数组${data.length}项`;
+    }
+    if (data && typeof data === "object") {
+        return `顶层{${top}}，data 对象字段{${Object.keys(data as Record<string, unknown>).slice(0, 6).join(",")}}`;
+    }
+    return `顶层{${top}}`;
 }
 
 function readAxiosError(error: unknown, fallback: string) {

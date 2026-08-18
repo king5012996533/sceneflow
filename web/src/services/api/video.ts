@@ -58,19 +58,74 @@ function proxyHintHeaders(config: Pick<AiConfig, "apiFormat" | "baseUrl" | "mode
     };
 }
 
+// 轮询上限按供应商区分：中转站（ggwk 等）收单即扣费，任务可能在本地判超时后仍在上游运行并继续计费，
+// 因此轮询窗口要明显长于常见视频模型耗时（veo/sora/seedance 等 5~20 分钟），避免「扣费但前端显示失败」。
+const POLL_ATTEMPTS: Record<VideoGenerationTask["provider"], number> = {
+    openai: 480, // 2.5s × 480 ≈ 20 分钟
+    seedance: 240, // 5s × 240 ≈ 20 分钟
+    aigccc: 240, // 5s × 240 ≈ 20 分钟
+    minimax: 180, // 10s × 180 ≈ 30 分钟
+    replicate: 480, // 1.5s × 480 ≈ 12 分钟
+};
+// 状态接口瞬时抖动（5xx、429 限流、网络瞬断）不应立刻判死任务：任务已在上游受理，通常仍在生成并计费
+const MAX_CONSECUTIVE_POLL_FAILURES = 8;
+
 export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationResult> {
     const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options);
     if (task.result) return task.result;
-    const delayMs = task.provider === "aigccc" ? 5000 : task.provider === "seedance" ? 5000 : task.provider === "replicate" ? 1500 : task.provider === "minimax" ? 10000 : 2500;
-    for (let attempt = 0; attempt < 120; attempt += 1) {
+    const delayMs = videoPollDelayMs(task.provider);
+    const attempts = POLL_ATTEMPTS[task.provider];
+    let consecutiveFailures = 0;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
         if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-        const state = await pollVideoGenerationTask(config, task, options);
+        let pollFailed = false;
+        let state: VideoGenerationTaskState;
+        try {
+            state = await pollVideoGenerationTask(config, task, options);
+        } catch (error) {
+            if (!isTransientPollError(error) || consecutiveFailures >= MAX_CONSECUTIVE_POLL_FAILURES - 1) throw error;
+            consecutiveFailures += 1;
+            pollFailed = true;
+            state = { status: "pending" };
+        }
         if (state.status === "completed") return state.result;
         if (state.status === "failed") throw new Error(state.error);
-        if (attempt === 119) throw new Error(`${task.provider === "seedance" ? "Seedance " : ""}视频生成超时，请稍后重试`);
+        if (!pollFailed) consecutiveFailures = 0;
+        if (attempt === attempts - 1) throw new Error(videoPollTimeoutMessage(task.provider, attempts, delayMs));
         await delay(delayMs, options?.signal);
     }
-    throw new Error("视频生成超时，请稍后重试");
+    throw new Error(videoPollTimeoutMessage(task.provider, attempts, delayMs));
+}
+
+function videoPollDelayMs(provider: VideoGenerationTask["provider"]) {
+    switch (provider) {
+        case "aigccc":
+        case "seedance":
+            return 5000;
+        case "replicate":
+            return 1500;
+        case "minimax":
+            return 10000;
+        default:
+            return 2500;
+    }
+}
+
+function videoPollTimeoutMessage(provider: VideoGenerationTask["provider"], attempts: number, delayMs: number) {
+    const minutes = Math.max(1, Math.round((attempts * delayMs) / 60000));
+    const prefix = provider === "seedance" ? "Seedance " : "";
+    return `${prefix}视频生成超时：上游已受理任务但超过约 ${minutes} 分钟仍未完成，任务可能仍在上游生成并已计费。请稍后到中转站后台确认任务状态；或降低时长/分辨率后重试。`;
+}
+
+function isTransientPollError(error: unknown) {
+    if (error instanceof DOMException && error.name === "AbortError") return false;
+    if (axios.isCancel(error)) return false;
+    const message = error instanceof Error ? error.message : String(error);
+    if (/请求已取消/.test(message)) return false;
+    // 4xx（除 429 限流）说明状态接口本身有问题（404 任务不存在等），属于确定性失败，不重试
+    const status = Number((message.match(/\((\d{3})\)/) || [])[1] || 0);
+    if (status >= 400 && status < 500 && status !== 429) return false;
+    return true;
 }
 
 export async function createVideoGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationTask> {

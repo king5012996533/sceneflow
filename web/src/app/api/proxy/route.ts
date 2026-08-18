@@ -15,6 +15,7 @@ const MAX_PROXY_ENVELOPE_BYTES = 41 * 1024 * 1024;
 // 避免 nginx 掐断产生裸 504。
 // 非流式请求超时上限：慢中转（排队 + 慢模型）单次出图可达 5-10 分钟。
 // 曾为 240s，ggwk 等中转站收单即扣费、出图超过 240s 时会被这里中止导致「扣费无结果」。
+// 注意：部署侧 nginx proxy_read_timeout 必须 ≥ 此值，否则 nginx 会先掐断连接（裸 504）。
 const PROXY_TIMEOUT_MS = 600_000;
 const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "prefer", "x-api-key", "x-request-id", "x-sf-provider", "x-sf-model"]);
 
@@ -28,6 +29,9 @@ export async function POST(req: NextRequest) {
     if (contentLength > MAX_PROXY_ENVELOPE_BYTES) {
         return NextResponse.json({ error: "请求内容过大：素材总请求体超过代理限制。请压缩素材、减少参考素材数量，或改用公网素材 URL。" }, { status: 413 });
     }
+
+    // 标记本次是否由我们自己的超时中止（区别于网络错误等），用于给客户端返回可操作的中文说明
+    let timedOut = false;
 
     try {
         const { url, method = "POST", headers = {}, body, bodyBase64, responseType, stream = false } = await req.json();
@@ -85,7 +89,7 @@ export async function POST(req: NextRequest) {
         const controller = new AbortController();
         // 流式请求（SSE/文本流）不设超时：长对话可能持续数分钟，由客户端自行中止；
         // 非流式请求保持 120s 上限防止上游挂起。
-        const timeout = stream ? null : setTimeout(() => controller.abort(), PROXY_TIMEOUT_MS);
+        const timeout = stream ? null : setTimeout(() => { timedOut = true; controller.abort(); }, PROXY_TIMEOUT_MS);
 
         try {
             const response = await fetchSafely(target.toString(), {
@@ -129,6 +133,13 @@ export async function POST(req: NextRequest) {
             if (timeout) clearTimeout(timeout);
         }
     } catch (err: unknown) {
+        // 我们自己的超时中止：上游（通常是中转站）可能已收单并扣费、仍在生成，只是响应超过了时限
+        if (timedOut) {
+            return NextResponse.json(
+                { error: `上游处理超时（超过 ${PROXY_TIMEOUT_MS / 60000} 分钟），请求已中止。任务可能仍在上游运行并已计费，请稍后到中转站后台确认任务状态；如已出图/出片，把上游任务 ID 反馈给我们以便找回结果。` },
+                { status: 504 },
+            );
+        }
         const message = err instanceof Error ? err.message : "代理请求失败";
         const cause = err instanceof Error && err.cause instanceof Error && err.cause.message && err.cause.message !== message ? `: ${err.cause.message}` : "";
         console.error("[proxy]", message + cause);

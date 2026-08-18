@@ -51,6 +51,14 @@ export function summarizeCanvasGenerationError(message?: string | null): CanvasG
         };
     }
 
+    if (text.includes("接口没有返回图片")) {
+        return {
+            title: "接口未返回图片",
+            hint: "上游已受理请求，但返回内容里没有可识别的图片数据（可能是中转站的非标准响应格式）。中转站可能已扣费，请把「原始错误」里的响应结构反馈给我们适配；也可先降低分辨率或更换模型重试。",
+            requestId,
+        };
+    }
+
     if (isSafetyError(text, lower)) {
         return {
             title: "参考素材未通过审核",
@@ -78,7 +86,7 @@ export function summarizeCanvasGenerationError(message?: string | null): CanvasG
     if (lower.includes("timeout") || lower.includes("timed out") || text.includes("超时")) {
         return {
             title: "生成超时",
-            hint: "上游任务响应较慢。视频任务可适当降低时长、分辨率或稍后重试。",
+            hint: "上游任务响应较慢或仍在生成中。中转站可能已按任务计费，请到中转站后台确认任务状态；视频任务可降低时长、分辨率后重试。",
             requestId,
         };
     }
