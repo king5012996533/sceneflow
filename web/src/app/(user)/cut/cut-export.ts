@@ -163,8 +163,8 @@ export async function exportCutVideo(clips: CutClip[], onProgress: (progress: nu
             throw new Error(`ffmpeg 合成失败（退出码 ${exitCode}）${detail ? `：${detail}` : ""}`);
         }
 
-        const data = (await ffmpeg.readFile(outputName)) as Uint8Array<ArrayBuffer>;
-        return { blob: new Blob([data], { type: "video/mp4" }), width: canvasW, height: canvasH };
+        const data = await ffmpeg.readFile(outputName);
+        return { blob: new Blob([data.slice()], { type: "video/mp4" }), width: canvasW, height: canvasH };
     } finally {
         for (const name of [...inputNames, outputName]) {
             try {
