@@ -3,6 +3,7 @@ export type CanvasBackgroundMode = "dots" | "lines" | "blank";
 
 export const canvasThemes = {
     light: {
+        name: "light",
         canvas: {
             background: "#f4f2ed",
             dot: "rgba(68,64,60,.28)",
@@ -31,6 +32,7 @@ export const canvasThemes = {
         },
     },
     dark: {
+        name: "dark",
         canvas: {
             background: "#181715",
             dot: "rgba(245,245,244,.24)",
@@ -60,6 +62,7 @@ export const canvasThemes = {
     },
     // 创作台暖色编辑风（与导航/定价页/管理后台同一套品牌语言）
     warm: {
+        name: "warm",
         canvas: {
             background: "#f6efe4",
             dot: "rgba(155,91,50,.20)",

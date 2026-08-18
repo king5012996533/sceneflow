@@ -141,7 +141,7 @@ export function NavDrawer({ open, activeToolSlug, onClose }: NavDrawerProps) {
                         <BookOpen className="size-3.5" />
                         文档
                     </a>
-                    <AnimatedThemeToggler theme={theme} onThemeChange={setTheme} className="flex h-8 items-center gap-1.5 rounded-[9px] px-2 text-xs font-medium text-[#7a6d63] transition hover:bg-[#f1e3cf] hover:text-[#201914]">
+                    <AnimatedThemeToggler theme={theme === "dark" ? "dark" : "light"} onThemeChange={setTheme} className="flex h-8 items-center gap-1.5 rounded-[9px] px-2 text-xs font-medium text-[#7a6d63] transition hover:bg-[#f1e3cf] hover:text-[#201914]">
                         {theme === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
                         <span>主题</span>
                     </AnimatedThemeToggler>

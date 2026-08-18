@@ -13,7 +13,20 @@ import { summarizeCanvasGenerationError } from "../utils/canvas-generation-error
 import type { CanvasResourceReference } from "../utils/canvas-resource-references";
 
 type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
-const selectionBlue = "#2f80ff";
+
+type CanvasThemeLike = (typeof canvasThemes)[keyof typeof canvasThemes];
+
+/** 主题感知的卡片强调色：选中 / 激活 / 加载统一用它，替代硬编码冷蓝。 */
+function accentColor(theme: CanvasThemeLike) {
+    return theme.name === "warm" ? "#9b5b32" : theme.node.activeStroke;
+}
+
+/** 主题感知的节点状态色：loading 用强调色，error 用柔红，success 弱化。 */
+function statusColorOf(theme: CanvasThemeLike, status: string | undefined) {
+    if (status === "loading") return accentColor(theme);
+    if (status === "error") return theme.name === "warm" ? "#c0533a" : "#f87171";
+    return theme.node.muted;
+}
 
 type CanvasNodeProps = {
     data: CanvasNodeData;
@@ -120,9 +133,9 @@ export const CanvasNode = React.memo(function CanvasNode({
     const isBatchRoot = data.type === CanvasNodeType.Image && Boolean(data.metadata?.isBatchRoot) && batchCount > 1;
     const isBatchChild = data.type === CanvasNodeType.Image && Boolean(data.metadata?.batchRootId);
     const isActive = isConnectionTarget || isSelected || isFocusRelated;
-    const imageBorderColor = isActive ? selectionBlue : isRelated && !isBatchChild ? theme.node.muted : "transparent";
+    const imageBorderColor = isActive ? accentColor(theme) : isRelated && !isBatchChild ? theme.node.muted : "transparent";
     const nodeStatus = data.metadata?.status;
-    const statusColor = nodeStatus === "loading" ? selectionBlue : nodeStatus === "error" ? "#f87171" : nodeStatus === "success" ? theme.node.muted : "transparent";
+    const statusColor = statusColorOf(theme, nodeStatus);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const titleInputRef = useRef<HTMLInputElement>(null);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -338,13 +351,13 @@ export const CanvasNode = React.memo(function CanvasNode({
                 className="relative h-full w-full overflow-visible rounded-2xl border transition-[box-shadow,border-color] duration-150"
                 style={{
                     background: hasImageContent || hasVideoContent || hasDirectorShotContent || isGroup ? "transparent" : theme.node.fill,
-                    borderColor: hasImageContent ? (hovered && !isActive && !isBatchChild ? theme.node.muted : imageBorderColor) : isActive ? selectionBlue : isRelated ? theme.node.muted : hovered ? theme.node.muted : theme.node.stroke,
+                    borderColor: hasImageContent ? (hovered && !isActive && !isBatchChild ? theme.node.muted : imageBorderColor) : isActive ? accentColor(theme) : isRelated ? theme.node.muted : hovered ? theme.node.muted : theme.node.stroke,
                     transform: isDragging ? "scale(1.02)" : undefined,
                     transition: "transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease",
                     boxShadow: isDragging
-                        ? `0 26px 64px rgba(0,0,0,.32), 0 0 0 1px ${isActive ? selectionBlue : theme.node.muted}44`
+                        ? `0 26px 64px rgba(0,0,0,.32), 0 0 0 1px ${isActive ? accentColor(theme) : theme.node.muted}44`
                         : isActive
-                          ? `0 0 0 1.5px ${selectionBlue}66, 0 10px 34px rgba(47,128,255,.16)`
+                          ? `0 0 0 1.5px ${accentColor(theme)}66, 0 10px 34px ${theme.name === "warm" ? "rgba(155,91,50,.18)" : "rgba(47,128,255,.16)"}`
                           : isRelated && !isBatchChild
                             ? `0 0 0 1px ${theme.node.muted}55, 0 18px 48px rgba(0,0,0,.14)`
                             : hovered
@@ -404,7 +417,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                 </div>
 
                 {showImageInfo && hasImageContent ? <ImageInfoBar node={data} /> : null}
-                {resourceLabel ? <ResourceLabelBadge reference={resourceLabel} /> : null}
+                {resourceLabel ? <ResourceLabelBadge reference={resourceLabel} theme={theme} /> : null}
                 {data.metadata?.pipelineLabel ? <PipelineBadge node={data} /> : null}
 
                 {!hasImageContent && !hasVideoContent && !hasAudioContent && !hasDirectorShotContent && !isGroup ? (
@@ -487,9 +500,11 @@ function GroupContent({ node, theme }: NodeContentRendererProps) {
 
 function LoadingContent({ theme }: Pick<NodeContentRendererProps, "theme">) {
     return (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.activeStroke }}>
-            <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: theme.node.activeStroke }} />
-            <span className="text-[10px] tracking-[0.2em]">生成中</span>
+        <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: accentColor(theme) }}>
+            <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: accentColor(theme) }} />
+            <span className="text-[10px] tracking-[0.2em]" style={{ color: theme.node.muted }}>
+                生成中
+            </span>
         </div>
     );
 }
@@ -498,7 +513,7 @@ function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "
     const errorView = summarizeCanvasGenerationError(node.metadata?.errorDetails);
     return (
         <div className="flex max-w-[280px] flex-col items-center gap-3 px-5 text-center">
-            <div className="space-y-1 text-xs leading-5 text-red-300">
+            <div className="space-y-1 text-xs leading-5" style={{ color: theme.name === "warm" ? "#b3452f" : "#f87171" }}>
                 <div className="font-medium">{errorView.title}</div>
                 <div className="opacity-90">{errorView.hint}</div>
                 {errorView.requestId ? <div className="truncate text-[10px] opacity-60">Request id: {errorView.requestId}</div> : null}
@@ -576,8 +591,16 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
     );
 }
 
-function ResourceLabelBadge({ reference }: { reference: CanvasResourceReference }) {
-    return <span className={`pointer-events-none absolute right-2 top-2 z-30 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${reference.active ? "bg-[#2f80ff] text-white shadow-sm" : "bg-black/35 text-white/75"}`}>{reference.label}</span>;
+function ResourceLabelBadge({ reference, theme }: { reference: CanvasResourceReference; theme: CanvasThemeLike }) {
+    const accent = accentColor(theme);
+    return (
+        <span
+            className={`pointer-events-none absolute right-2 top-2 z-30 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${reference.active ? "text-white shadow-sm" : "bg-black/35 text-white/75"}`}
+            style={reference.active ? { background: accent } : undefined}
+        >
+            {reference.label}
+        </span>
+    );
 }
 
 function ImageNodeContent(props: NodeContentRendererProps) {
@@ -615,10 +638,10 @@ function ImageNodeContent(props: NodeContentRendererProps) {
 function EmptyImageContent({ theme, isBatchRoot, batchCount, batchExpanded, batchOpening, batchRecovering, onToggleBatch }: NodeContentRendererProps) {
     const content = (
         <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
-            <div className="flex size-14 items-center justify-center rounded-2xl" style={{ background: theme.toolbar.activeBg }}>
-                <ImageIcon className="size-6 opacity-30" />
+            <div className="flex size-14 items-center justify-center rounded-2xl border" style={{ background: theme.toolbar.activeBg, borderColor: theme.node.stroke }}>
+                <ImageIcon className="size-6 opacity-40" />
             </div>
-            <span className="text-[10px] tracking-[0.18em] opacity-50">空图片节点</span>
+            <span className="text-[10px] tracking-[0.18em] opacity-60">空图片节点</span>
         </div>
     );
     if (isBatchRoot)
@@ -634,8 +657,10 @@ function VideoNodeContent({ node, theme }: NodeContentRendererProps) {
     if (!node.metadata?.content)
         return (
             <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
-                <Video className="size-7 opacity-35" />
-                <span className="text-sm">空视频节点</span>
+                <div className="flex size-14 items-center justify-center rounded-2xl border" style={{ background: theme.toolbar.activeBg, borderColor: theme.node.stroke }}>
+                    <Video className="size-6 opacity-40" />
+                </div>
+                <span className="text-[10px] tracking-[0.18em] opacity-60">空视频节点</span>
             </div>
         );
     return <video src={node.metadata.content} controls className="h-full w-full rounded-[18px] bg-black object-contain" data-canvas-no-zoom />;
@@ -644,9 +669,11 @@ function VideoNodeContent({ node, theme }: NodeContentRendererProps) {
 function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
     if (!node.metadata?.content)
         return (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-2" style={{ color: theme.node.placeholder }}>
-                <Music2 className="size-7 opacity-35" />
-                <span className="text-sm">空音频节点</span>
+            <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
+                <div className="flex size-14 items-center justify-center rounded-2xl border" style={{ background: theme.toolbar.activeBg, borderColor: theme.node.stroke }}>
+                    <Music2 className="size-6 opacity-40" />
+                </div>
+                <span className="text-[10px] tracking-[0.18em] opacity-60">空音频节点</span>
             </div>
         );
     return (
@@ -706,7 +733,9 @@ function ImageContent({
                     onMouseDown={(event) => event.stopPropagation()}
                     onPointerDown={(event) => event.stopPropagation()}
                 >
-                    <span className="leading-none text-[#2f80ff]">{batchCount}</span>
+                    <span className="leading-none" style={{ color: accentColor(theme) }}>
+                        {batchCount}
+                    </span>
                     <ChevronRight className={`size-3.5 opacity-55 transition-transform ${batchExpanded ? "rotate-90" : ""}`} />
                 </button>
             ) : null}
@@ -722,7 +751,7 @@ function ImageContent({
                     onMouseDown={(event) => event.stopPropagation()}
                     onPointerDown={(event) => event.stopPropagation()}
                 >
-                    <Star className="size-3.5 text-[#2f80ff]" />
+                    <Star className="size-3.5" style={{ color: accentColor(theme) }} />
                     设为主图
                 </button>
             ) : null}
@@ -803,7 +832,7 @@ function ConnectionHandleDot({ side, visible, onMouseDown }: { side: "left" | "r
             } ${visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
             onMouseDown={onMouseDown}
         >
-            <div className="size-3 rounded-full border-2 transition-all hover:scale-125" style={{ background: theme.node.panel, borderColor: theme.node.muted }} />
+            <div className="size-3 rounded-full border-2 transition-all hover:scale-125" style={{ background: theme.node.panel, borderColor: accentColor(theme) }} />
         </div>
     );
 }

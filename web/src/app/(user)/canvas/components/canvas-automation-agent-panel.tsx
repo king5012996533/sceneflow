@@ -51,7 +51,7 @@ const SAMPLE_PROMPT = `素材准备：
 
 export function CanvasAutomationAgentPanel({ snapshot, config, onApplyOps }: CanvasAutomationAgentPanelProps) {
     const themeName = useThemeStore((state) => state.theme);
-    const theme = themeName === "dark" ? canvasThemes.dark : canvasThemes.light;
+    const theme = canvasThemes[themeName];
     const [prompt, setPrompt] = useState("");
     const [autoRun, setAutoRun] = useState(false);
     const [plan, setPlan] = useState<AutomationPlan | null>(null);

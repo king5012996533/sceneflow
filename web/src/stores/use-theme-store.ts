@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type ThemeName = "light" | "dark";
+export type ThemeName = "light" | "dark" | "warm";
 
 type ThemeStore = {
     theme: ThemeName;

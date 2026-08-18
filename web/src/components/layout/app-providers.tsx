@@ -27,7 +27,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         document.documentElement.classList.toggle("dark", dark);
-        document.documentElement.style.colorScheme = theme;
+        document.documentElement.style.colorScheme = theme === "warm" ? "light" : theme;
     }, [dark, theme]);
 
     return (

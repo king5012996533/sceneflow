@@ -37,7 +37,7 @@ type CanvasOrchestratorPanelProps = {
 
 export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCall }: CanvasOrchestratorPanelProps) {
     const themeName = useThemeStore((state) => state.theme);
-    const themeObj = themeName === "dark" ? canvasThemes.dark : canvasThemes.light;
+    const themeObj = canvasThemes[themeName];
     const user = useUserStore((state) => state.user);
 
     const [messages, setMessages] = useState<OrchestratorMessage[]>([]);
