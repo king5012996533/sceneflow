@@ -77,6 +77,8 @@ export function useCanvasConnectionCreation(options: UseCanvasConnectionCreation
                     connection: currentConnection,
                     position: screenToCanvas(clientX, clientY),
                 });
+                // The menu owns the next step; the free-floating preview must stop now.
+                setConnecting(null);
             }
         },
         [connectNodes, getConnectionDropTarget, screenToCanvas, setConnecting],

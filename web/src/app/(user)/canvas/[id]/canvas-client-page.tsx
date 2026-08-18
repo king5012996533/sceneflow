@@ -232,7 +232,7 @@ function InfiniteCanvasPage() {
     const nodesRef = useRef(nodes);
     const connectionsRef = useRef(connections);
 
-    const { selectionBox, selectionBoxRef, startSelectionBox, clearSelectionBox, handleGlobalPointerMove } = useCanvasPointerInteractions({
+    const { selectionBox, selectionBoxRef, startSelectionBox, clearSelectionBox, handleGlobalPointerMove: handleSelectionPointerMove } = useCanvasPointerInteractions({
         screenToCanvas,
         nodesRef,
         selectedNodeIdsRef,
@@ -948,50 +948,70 @@ function InfiniteCanvasPage() {
         [handleNodePointerDown],
     );
 
-    const handleGlobalMouseMove = useCallback(
-        (event: MouseEvent) => {
-            if (dragRef.current.isDraggingNode) {
-                handleNodeDragPointerMove(event);
-                return;
-            }
+    const pointerMoveRafRef = useRef<number | null>(null);
+    const latestPointerRef = useRef<PointerEvent | null>(null);
 
-            if (connectingParamsRef.current) {
-                setMouseWorld(screenToCanvas(event.clientX, event.clientY));
-            }
-            updateConnectionTarget(event.clientX, event.clientY);
+    const handleGlobalPointerMove = useCallback(
+        (event: PointerEvent) => {
+            latestPointerRef.current = event;
+            if (pointerMoveRafRef.current !== null) return;
+
+            pointerMoveRafRef.current = requestAnimationFrame(() => {
+                pointerMoveRafRef.current = null;
+                const latest = latestPointerRef.current;
+                if (!latest) return;
+
+                if (dragRef.current.isDraggingNode) {
+                    handleNodeDragPointerMove(latest as unknown as MouseEvent);
+                } else if (connectingParamsRef.current) {
+                    setMouseWorld(screenToCanvas(latest.clientX, latest.clientY));
+                    updateConnectionTarget(latest.clientX, latest.clientY);
+                }
+
+                handleSelectionPointerMove(latest);
+            });
         },
-        [handleNodeDragPointerMove, screenToCanvas, updateConnectionTarget],
+        [handleNodeDragPointerMove, handleSelectionPointerMove, screenToCanvas, updateConnectionTarget],
     );
 
-    const handleGlobalMouseUp = useCallback(
-        (event: MouseEvent) => {
+    const handleGlobalPointerUp = useCallback(
+        (event: PointerEvent) => {
+            if (pointerMoveRafRef.current !== null) {
+                cancelAnimationFrame(pointerMoveRafRef.current);
+                pointerMoveRafRef.current = null;
+            }
+            latestPointerRef.current = null;
             finishNodeDrag(event.clientX, event.clientY);
-
             clearSelectionBox();
-
             finishConnection(event.clientX, event.clientY);
         },
         [finishNodeDrag, clearSelectionBox, finishConnection],
     );
 
+    const cancelGlobalPointerInteraction = useCallback(() => {
+        if (pointerMoveRafRef.current !== null) {
+            cancelAnimationFrame(pointerMoveRafRef.current);
+            pointerMoveRafRef.current = null;
+        }
+        latestPointerRef.current = null;
+        finishNodeDrag();
+        clearSelectionBox();
+        cancelConnection();
+    }, [cancelConnection, clearSelectionBox, finishNodeDrag]);
+
     useEffect(() => {
-        const handlePointerUp = (event: PointerEvent) => finishNodeDrag(event.clientX, event.clientY);
-        const cancelNodeDrag = () => finishNodeDrag();
-        window.addEventListener("mousemove", handleGlobalMouseMove);
-        window.addEventListener("mouseup", handleGlobalMouseUp);
-        window.addEventListener("pointerup", handlePointerUp);
-        window.addEventListener("pointercancel", cancelNodeDrag);
-        window.addEventListener("blur", cancelNodeDrag);
+        window.addEventListener("pointerup", handleGlobalPointerUp);
+        window.addEventListener("pointercancel", cancelGlobalPointerInteraction);
+        window.addEventListener("blur", cancelGlobalPointerInteraction);
         window.addEventListener("pointermove", handleGlobalPointerMove);
         return () => {
-            window.removeEventListener("mousemove", handleGlobalMouseMove);
-            window.removeEventListener("mouseup", handleGlobalMouseUp);
-            window.removeEventListener("pointerup", handlePointerUp);
-            window.removeEventListener("pointercancel", cancelNodeDrag);
-            window.removeEventListener("blur", cancelNodeDrag);
+            window.removeEventListener("pointerup", handleGlobalPointerUp);
+            window.removeEventListener("pointercancel", cancelGlobalPointerInteraction);
+            window.removeEventListener("blur", cancelGlobalPointerInteraction);
             window.removeEventListener("pointermove", handleGlobalPointerMove);
+            if (pointerMoveRafRef.current !== null) cancelAnimationFrame(pointerMoveRafRef.current);
         };
-    }, [finishNodeDrag, handleGlobalMouseMove, handleGlobalMouseUp, handleGlobalPointerMove]);
+    }, [cancelGlobalPointerInteraction, handleGlobalPointerMove, handleGlobalPointerUp]);
 
     const createImageFileNode = useCallback(async (file: File, position: Position) => {
         const image = await uploadImage(file);

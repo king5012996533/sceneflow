@@ -86,7 +86,7 @@ export function useCanvasNodeDrag(options: UseCanvasNodeDragOptions) {
     );
 
     const handleNodeDragPointerMove = useCallback(
-        (event: MouseEvent) => {
+        (event: MouseEvent | PointerEvent) => {
             const currentViewport = viewportRef.current;
 
             if (!dragRef.current.isDraggingNode) return;
