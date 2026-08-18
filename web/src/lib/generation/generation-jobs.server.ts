@@ -9,7 +9,7 @@ import { getOperationNumber, getPricingDefaults } from "@/lib/operation-config";
 const STALE_JOB_MS = 30 * 60 * 1000;
 
 // 套餐系统已下线：不再有并发权益。保留固定并发守卫防止单用户打爆上游（防滥用常量，非权益概念，可调）。
-const MAX_CONCURRENT_JOBS = 3;
+const MAX_CONCURRENT_JOBS = 8;
 
 type BeginGenerationInput = {
     requestKey: string;
