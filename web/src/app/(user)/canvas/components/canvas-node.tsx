@@ -779,14 +779,10 @@ function ImageNodeContent(props: NodeContentRendererProps) {
 function EmptyImageContent({ node, theme, isBatchRoot, batchCount, batchExpanded, batchOpening, batchRecovering, onToggleBatch }: NodeContentRendererProps) {
     const typeColor = typeColorOf(node, theme);
     const fieldBg = mixHex(theme.node.panel, "#000000", theme.name === "dark" ? 0.12 : 0.04);
-    const gridLine = `${theme.node.stroke}59`;
     const emptyLabel = node.type === CanvasNodeType.Config ? "空配置节点" : node.type === CanvasNodeType.DirectorShot ? "空分镜节点" : "空图片节点";
     const content = (
-        <div className="relative h-full w-full overflow-hidden rounded-[2px] border" style={{ borderColor: `${theme.node.stroke}a6`, background: fieldBg }}>
-            <div className="absolute inset-0 opacity-60" style={{ backgroundImage: `linear-gradient(90deg, transparent 49%, ${gridLine} 50%, transparent 51%), linear-gradient(transparent 49%, ${gridLine} 50%, transparent 51%)`, backgroundSize: "26px 26px" }} />
-            <div className="absolute" style={{ width: "80%", height: "140%", left: "-18%", top: "25%", border: `1px solid ${typeColor}5c`, transform: "rotate(-33deg)" }} />
-            <div className="absolute" style={{ width: "44%", aspectRatio: "1", right: "10%", top: "-18%", border: `1px solid ${typeColor}82`, borderRadius: "50%" }} />
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ color: typeColor }}>
+        <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[2px] border" style={{ borderColor: `${theme.node.stroke}a6`, background: fieldBg }}>
+            <div className="flex flex-col items-center justify-center gap-3" style={{ color: typeColor }}>
                 <ImageIcon className="size-6 opacity-50" strokeWidth={1.5} />
                 <span className="text-[10px] tracking-[0.18em]" style={{ color: theme.node.placeholder }}>{emptyLabel}</span>
             </div>
@@ -806,14 +802,11 @@ function VideoNodeContent({ node, theme }: NodeContentRendererProps) {
         const typeColor = typeColorOf(node, theme);
         const fieldBg = mixHex(theme.node.panel, "#000000", theme.name === "dark" ? 0.12 : 0.04);
         return (
-            <div className="relative h-full w-full overflow-hidden rounded-[2px] border" style={{ borderColor: `${theme.node.stroke}a6`, background: fieldBg }}>
-                <div className="absolute" style={{ inset: "15px 18px", border: `1px solid ${typeColor}5e`, transform: "skewY(-8deg)" }} />
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ color: typeColor }}>
-                    <span className="grid size-[29px] place-items-center rounded-full border" style={{ borderColor: typeColor, color: typeColor }}>
-                        <Play className="size-3 translate-x-px" fill="currentColor" strokeWidth={0} />
-                    </span>
-                    <span className="text-[10px] tracking-[0.18em]" style={{ color: theme.node.placeholder }}>空视频节点</span>
-                </div>
+            <div className="relative flex h-full w-full flex-col items-center justify-center gap-3 overflow-hidden rounded-[2px] border" style={{ borderColor: `${theme.node.stroke}a6`, background: fieldBg }}>
+                <span className="grid size-[29px] place-items-center rounded-full border" style={{ borderColor: typeColor, color: typeColor }}>
+                    <Play className="size-3 translate-x-px" fill="currentColor" strokeWidth={0} />
+                </span>
+                <span className="text-[10px] tracking-[0.18em]" style={{ color: theme.node.placeholder }}>空视频节点</span>
             </div>
         );
     }

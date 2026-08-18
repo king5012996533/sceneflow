@@ -10,11 +10,11 @@ type CanvasNodeSpec = {
 
 export const NODE_DEFAULT_SIZE = {
     [CanvasNodeType.Image]: { width: 340, height: 240, title: "New Generation" },
-    [CanvasNodeType.Text]: { width: 340, height: 240, title: "Note" },
-    [CanvasNodeType.Config]: { width: 340, height: 240, title: "生成配置" },
-    [CanvasNodeType.Video]: { width: 420, height: 236, title: "Video" },
+    [CanvasNodeType.Text]: { width: 280, height: 240, title: "Note" },
+    [CanvasNodeType.Config]: { width: 320, height: 260, title: "生成配置" },
+    [CanvasNodeType.Video]: { width: 420, height: 260, title: "Video" },
     [CanvasNodeType.Audio]: { width: 340, height: 120, title: "Audio" },
-    [CanvasNodeType.DirectorShot]: { width: 420, height: 280, title: "3D 镜头" },
+    [CanvasNodeType.DirectorShot]: { width: 400, height: 300, title: "3D 镜头" },
     [CanvasNodeType.Group]: { width: 480, height: 320, title: "编组" },
 } satisfies Record<CanvasNodeType, { width: number; height: number; title: string }>;
 
