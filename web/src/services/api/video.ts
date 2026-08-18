@@ -81,14 +81,15 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
         // Aigccc（Seedance 2.0 第三方网关）必须优先于 isSeedanceVideoConfig 判断（模型能力标定为 seedance-video 时会命中 seedance 分支）
         return createAigcccVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
-    if (isSeedanceVideoConfig(requestConfig)) {
-        return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
-    }
     if (requestConfig.apiFormat === "replicate") {
+        // Replicate 先于 seedance 启发式：凭证格式是权威依据，模型名含 seedance 也必须走 /v1/predictions
         return createReplicateVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
     if (requestConfig.apiFormat === "minimax") {
         return createMiniMaxVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
+    }
+    if (isSeedanceVideoConfig(requestConfig)) {
+        return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
     if (videoReferences.length || audioReferences.length) {
         throw new Error("当前视频接口不支持参考视频或参考音频，请切换到 Seedance 2.0 / 火山 Agent Plan 模型，或移除参考素材");
@@ -751,6 +752,12 @@ function assertSeedanceAudioReferences(audioReferences: ReferenceAudio[]) {
 }
 
 function seedanceApiUrl(config: AiConfig, taskId?: string) {
+    // 防呆：该路径是火山 Seedance 的任务接口（/contents/generations/tasks），
+    // 只有 seedance / 火山类渠道能走到；Replicate / MiniMax / Aigccc 凭证若被误路由到此处
+    // 上游会 404，这里直接抛出明确错误，避免把请求打到不存在的路径。
+    if (config.apiFormat === "replicate" || config.apiFormat === "minimax" || config.apiFormat === "aigccc") {
+        throw new Error(`视频渠道 ${config.apiFormat} 不应使用 Seedance 任务接口，请检查模型与凭证的绑定`);
+    }
     const base = config.baseUrl.trim().replace(/\/+$/, "");
     const taskPath = "/contents/generations/tasks";
     const lowerBase = base.toLowerCase();
