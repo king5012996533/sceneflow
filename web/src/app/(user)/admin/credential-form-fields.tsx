@@ -35,6 +35,16 @@ type CredentialFormFieldsProps = {
     editMode: boolean;
 };
 
+/** 「绑定模型」输入框占位符：Replicate 等供应商的模型名有特殊格式，按供应商提示 */
+const MODELS_PLACEHOLDER: Record<string, string> = {
+    replicate: "Replicate 格式：owner/模型名，如 prunaai/p-video, black-forest-labs/flux-schnell",
+    minimax: "如：MiniMax-H3, gpt-image-1",
+    seedance: "如：seedance-2.0-pro, seedance-2.0-max",
+    aigccc: "如：seedance-2.0-pro, seedance-2.0-max",
+    gemini: "如：gemini-2.5-flash-image",
+};
+const MODELS_PLACEHOLDER_DEFAULT = "如：gpt-image-1, dall-e-3";
+
 export function parseModelList(models: string): string[] {
     return Array.from(
         new Set(
@@ -90,7 +100,7 @@ export function CredentialFormFields({ form, onChange, editMode }: CredentialFor
             </div>
             <div>
                 <div className="mb-1 text-sm text-[#201914]">绑定模型（逗号分隔；留空 = 全部）</div>
-                <Input value={form.models} placeholder="如：MiniMax-H3, gpt-image-2" onChange={(event) => set({ models: event.target.value })} />
+                <Input value={form.models} placeholder={MODELS_PLACEHOLDER[form.provider] ?? MODELS_PLACEHOLDER_DEFAULT} onChange={(event) => set({ models: event.target.value })} />
             </div>
             <div>
                 <div className="mb-1 text-sm text-[#201914]">优先级（越大越优先，同供应商多 Key 时生效）</div>
@@ -98,7 +108,7 @@ export function CredentialFormFields({ form, onChange, editMode }: CredentialFor
             </div>
             <div>
                 <div className="mb-1 text-sm text-[#201914]">逐模型能力标定（与前端画质 / 分辨率 / 比例 / 时长等一一对应）</div>
-                <CredentialCapabilityEditor models={models} value={form.capabilities} onChange={(capabilities) => set({ capabilities })} />
+                <CredentialCapabilityEditor models={models} value={form.capabilities} provider={form.provider} onChange={(capabilities) => set({ capabilities })} />
             </div>
             <div>
                 <div className="mb-1 text-sm text-[#201914]">逐模型积分定价（图片每张 / 视频每条 / 音频每次 / 文本每次；未配置 = 全局默认 → 内置草案）</div>

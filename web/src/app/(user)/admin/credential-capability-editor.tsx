@@ -15,6 +15,8 @@ type CredentialCapabilityEditorProps = {
     models: string[];
     value: CredentialCapabilitiesMap;
     onChange: (next: CredentialCapabilitiesMap) => void;
+    /** 供应商标识（如 replicate），用于提示该供应商的模型名格式 */
+    provider?: string;
 };
 
 /** 已知模型名的默认能力；未知模型名（文本/音频等无标定参数的类型）返回 undefined = 无需标定 */
@@ -22,17 +24,25 @@ function initialSpecForModel(model: string): ModelCapabilitySpec | undefined {
     return defaultCapabilityForModel(model) ?? undefined;
 }
 
+/** 空态引导文案里的模型名格式提示（按供应商区分） */
+function modelFormatHint(provider?: string): string {
+    if (provider === "replicate") {
+        return "按「owner/模型名」格式填写（如 prunaai/p-video、black-forest-labs/flux-schnell）";
+    }
+    return "填写模型名（逗号分隔，如 gpt-image-1、dall-e-3）";
+}
+
 /**
  * 逐模型能力标定编辑器。
  * 只有「启用」的模型才会进入 capabilities 并下发给前端设置面板。
  */
-export function CredentialCapabilityEditor({ models, value, onChange }: CredentialCapabilityEditorProps) {
+export function CredentialCapabilityEditor({ models, value, onChange, provider }: CredentialCapabilityEditorProps) {
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
     if (!models.length) {
         return (
             <div className="rounded-lg border border-dashed border-[#ded2c3] px-3 py-4 text-center text-xs leading-5 text-[#7a6d63]">
-                暂无可标定的模型：先在下方「绑定模型」里填写模型名（逗号分隔），保存后即可在这里逐模型标定画质 / 分辨率 / 比例 / 时长等参数。
+                暂无可标定的模型：先在「绑定模型」里{modelFormatHint(provider)}，保存后即可在这里逐模型标定画质 / 分辨率 / 比例 / 时长等参数。
             </div>
         );
     }
