@@ -18,7 +18,7 @@ type CredentialPricingEditorProps = {
 
 const PRICING_FIELDS: Array<{ key: keyof ModelPricing; label: string; hint: string }> = [
     { key: "imageCredits", label: "图片生成（每张）", hint: "如 3：生成一张扣 3 积分" },
-    { key: "videoCreditsPerSecond", label: "视频生成（每秒）", hint: "如 2：10 秒视频扣 20 积分；自动时长按 6 秒计" },
+    { key: "videoCredits", label: "视频生成（每条）", hint: "如 15：无论时长，生成一条视频扣 15 积分" },
     { key: "audioCredits", label: "音频生成（每次）", hint: "留空 = 内置 1 积分" },
     { key: "textCredits", label: "文本 / 工具（每次）", hint: "留空 = 内置 0 积分（不扣）" },
 ];
@@ -86,7 +86,7 @@ export function CredentialPricingEditor({ models, value, onChange }: CredentialP
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="text-xs leading-5 text-[#7a6d63]">未启用：该模型所有生成均按内置草案扣积分（图片 1–10、视频 15–30、音频 1、文本/工具 0）。打开开关后可按类型设置积分。</div>
+                                    <div className="text-xs leading-5 text-[#7a6d63]">未启用：该模型所有生成按「全局默认（运营配置）→ 内置草案」扣积分（图片 1–10、视频每条 15–30、音频 1、文本/工具 0）。打开开关后可按类型设置积分。</div>
                                 )}
                             </div>
                         ) : null}

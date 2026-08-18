@@ -1,24 +1,35 @@
 /**
- * 积分定价（内置草案 + 后台可配置覆盖）与平台成本估算。
+ * 积分定价（内置草案 + 后台全局默认 + 逐模型覆盖）与平台成本估算。
  *
- * ⚠️ 内置数值为初始草案。后台可在「平台密钥 → 逐模型定价」按模型覆盖：
- * 图片每张、视频每秒、音频每次、文本/工具每次；未配置的模型退回此处草案。
+ * 三层取值优先级：
+ * 1. 逐模型定价（后台「平台密钥 → 逐模型定价」，按模型名精确匹配）
+ * 2. 全局默认定价（后台「运营配置」，图片/视频/音频/文本各一条；未配置 = 跳过本层）
+ * 3. 内置草案（本文件硬编码，仅为兜底初始值）
+ *
+ * ⚠️ 视频按「条」计费（与上游结算口径一致）：每条固定积分，与时长无关。
  * Phase 2 上线后必须按 GenerationJob.costCents 实账校准（D4）。
- * 定价原则：积分成本 = ceil(平台成本(分) / 单积分价格(分) × 毛利系数)，保证毛利为正。
  * 本模块为纯函数（无 DB/服务端依赖），客户端预检、成本展示与服务端扣费共用。
  */
 
 export type GenerationKind = "image" | "video" | "audio" | "text" | "tool";
 
-/** 单个模型的后台可配置积分定价（全部可选，留空 = 该项走内置草案） */
+/** 单个模型的后台可配置积分定价（全部可选，留空 = 该项走全局默认/内置草案） */
 export type ModelPricing = {
     /** 每张图片扣积分 */
     imageCredits?: number;
-    /** 视频每秒扣积分（实际扣费 = 每秒 × 计费时长，向上取整） */
-    videoCreditsPerSecond?: number;
+    /** 每条视频扣积分（按条计费，与时长无关） */
+    videoCredits?: number;
     /** 每次音频扣积分 */
     audioCredits?: number;
     /** 每次文本/工具调用扣积分 */
+    textCredits?: number;
+};
+
+/** 全局默认定价（后台「运营配置」读取，逐模型定价之下、内置草案之上） */
+export type PricingDefaults = {
+    imageCredits?: number;
+    videoCredits?: number;
+    audioCredits?: number;
     textCredits?: number;
 };
 
@@ -43,42 +54,37 @@ function isHighQuality(metadata?: GenerationMetadata): boolean {
     return vquality === "high" || vquality.includes("1080") || quality === "hd" || quality === "high";
 }
 
-/** 视频计费时长（秒）：videoSeconds 正整数取整；-1（seedance 自动时长）/ 非法 / 缺失 → 按 6 秒计（草案常数，可调） */
-export function effectiveVideoSeconds(metadata?: GenerationMetadata): number {
-    const raw = Math.floor(Number(metadata?.videoSeconds));
-    if (Number.isFinite(raw) && raw > 0) return Math.max(1, Math.min(60, raw));
-    return 6;
-}
-
 /**
  * 单次生成消耗积分（admin 跳过计费，调用方自行处理）。
- * configured 为后台逐模型定价（命中优先），未命中走内置草案。
+ * 取值优先级：configured（后台逐模型定价）> defaults（后台全局默认）> 内置草案。
+ * 视频按条计费：每条固定积分，与时长无关。
  */
-export function getGenerationCreditsCost(kind: GenerationKind, metadata?: GenerationMetadata, configured?: ModelPricing): number {
+export function getGenerationCreditsCost(kind: GenerationKind, metadata?: GenerationMetadata, configured?: ModelPricing, defaults?: PricingDefaults): number {
     const model = modelName(metadata);
     switch (kind) {
         case "image": {
             if (configured?.imageCredits !== undefined) return Math.max(0, Math.floor(configured.imageCredits));
+            if (defaults?.imageCredits !== undefined) return Math.max(0, Math.floor(defaults.imageCredits));
             if (model.includes("gpt-image") || model.includes("dall-e")) return 10;
             if (model.includes("minimax") || model.includes("hailuo") || model.includes("h3")) return 1;
             return 2;
         }
         case "video": {
-            if (configured?.videoCreditsPerSecond !== undefined) {
-                return Math.max(0, Math.ceil(Math.floor(configured.videoCreditsPerSecond) * effectiveVideoSeconds(metadata)));
-            }
+            if (configured?.videoCredits !== undefined) return Math.max(0, Math.floor(configured.videoCredits));
+            if (defaults?.videoCredits !== undefined) return Math.max(0, Math.floor(defaults.videoCredits));
             if (model.includes("seedance") || model.includes("doubao")) return isHighQuality(metadata) ? 30 : 15;
             if (model.includes("replicate") || model.includes("/")) return 20;
-            if (model.includes("minimax") || model.includes("h3")) return 15;
             return 15;
         }
         case "audio":
             if (configured?.audioCredits !== undefined) return Math.max(0, Math.floor(configured.audioCredits));
+            if (defaults?.audioCredits !== undefined) return Math.max(0, Math.floor(defaults.audioCredits));
             return 1;
         case "text":
         case "tool":
             // 对话/工具类默认不计积分（沿用 agent-lab 的每日配额逻辑）；后台可配
             if (configured?.textCredits !== undefined) return Math.max(0, Math.floor(configured.textCredits));
+            if (defaults?.textCredits !== undefined) return Math.max(0, Math.floor(defaults.textCredits));
             return 0;
         default:
             return 2;

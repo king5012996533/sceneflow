@@ -166,7 +166,7 @@ export type CredentialInput = {
     models?: string[];
     /** 逐模型能力标定；空对象 = 该凭证所有模型都不做能力限制（前端退回内置默认） */
     capabilities?: CredentialCapabilities;
-    /** 逐模型积分定价（图片每张 / 视频每秒 / 音频每次 / 文本每次）；缺省 = 内置草案 */
+    /** 逐模型积分定价（图片每张 / 视频每条 / 音频每次 / 文本每次）；缺省 = 全局默认 → 内置草案 */
     pricing?: CredentialPricing;
     enabled?: boolean;
     priority?: number;

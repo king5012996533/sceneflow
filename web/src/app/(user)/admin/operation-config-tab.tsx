@@ -24,6 +24,10 @@ type EditorSpec = {
 const EDITORS: EditorSpec[] = [
     { key: "daily_credit_grant", label: "免费用户每日赠送积分", description: "每次生成前自动赠送，按自然日幂等（0 = 不赠送）", kind: "number", defaultValue: 3 },
     { key: "signup_credit_grant", label: "新用户一次性赠送积分", description: "登录时自动发放一次（0 = 不赠送）", kind: "number", defaultValue: 50 },
+    { key: "image_credit", label: "图片生成默认积分（每张）", description: "全局默认：未逐模型定价的模型按此扣费（0 = 免费）；逐模型定价优先", kind: "number", defaultValue: 2 },
+    { key: "video_credit", label: "视频生成默认积分（每条）", description: "全局默认：每条视频固定扣费，与时长无关（0 = 免费）；逐模型定价优先", kind: "number", defaultValue: 15 },
+    { key: "audio_credit", label: "音频生成默认积分（每次）", description: "全局默认：未逐模型定价的模型按此扣费（0 = 免费）；逐模型定价优先", kind: "number", defaultValue: 1 },
+    { key: "text_credit", label: "文本 / 工具默认积分（每次）", description: "全局默认：对话/工具类按此扣费（0 = 不扣）；逐模型定价优先", kind: "number", defaultValue: 0 },
 ];
 
 /** 运营配置（daily_credit_grant 等），保存后 ≤30s 生效（进程内缓存 TTL） */

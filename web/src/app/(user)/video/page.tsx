@@ -20,7 +20,7 @@ import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { createGeneratedVideoTask, persistGeneratedVideo, pollGeneratedVideoTask, type VideoGenerationTask } from "@/lib/generation/generation-request";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
-import { getPlatformPricing } from "@/stores/platform-catalog-store";
+import { getPlatformPricing, getPricingDefaults } from "@/stores/platform-catalog-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -106,7 +106,7 @@ export default function VideoPage() {
 
     const model = effectiveConfig.videoModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
-    const unitCost = getGenerationCreditsCost("video", { model, videoModel: model, videoSeconds: effectiveConfig.videoSeconds }, getPlatformPricing(model));
+    const unitCost = getGenerationCreditsCost("video", { model, videoModel: model, videoSeconds: effectiveConfig.videoSeconds }, getPlatformPricing(model), getPricingDefaults());
 
     useEffect(() => {
         if (!running || !startedAt) return;
@@ -178,8 +178,8 @@ export default function VideoPage() {
     const generate = async () => {
         const snapshot = buildRequestSnapshot();
         if (!snapshot) return;
-        // 积分预检（服务端为最终裁决，这里只做体验拦截；定价优先取后台逐模型配置，视频按每秒×时长）
-        const required = getGenerationCreditsCost("video", { model, videoModel: model, videoSeconds: effectiveConfig.videoSeconds }, getPlatformPricing(model));
+        // 积分预检（服务端为最终裁决，这里只做体验拦截；定价三层：逐模型 > 全局默认 > 内置草案，视频按条计费）
+        const required = getGenerationCreditsCost("video", { model, videoModel: model, videoSeconds: effectiveConfig.videoSeconds }, getPlatformPricing(model), getPricingDefaults());
         if (user?.role !== "admin" && creditBalance !== null && creditBalance < required) {
             quotaModalRef.current?.open({ balance: creditBalance, required });
             return;
@@ -591,11 +591,7 @@ export default function VideoPage() {
                                     开始生成
                                 </Button>
                                 <p className="sf-mono mt-2.5 text-center text-[10.5px] text-[#b7a99b]">
-                                    预计消耗{" "}
-                                    <b className="font-bold text-[#9b5b32]">
-                                        ≈ {unitCost} 积分 / {normalizeVideoSeconds(effectiveConfig.videoSeconds)}s
-                                    </b>{" "}
-                                    · 余额 {creditBalance == null ? "—" : creditBalance.toLocaleString("zh-CN")}
+                                    预计消耗 <b className="font-bold text-[#9b5b32]">≈ {unitCost} 积分 / 条</b> · 余额 {creditBalance == null ? "—" : creditBalance.toLocaleString("zh-CN")}
                                 </p>
                             </div>
                         </div>

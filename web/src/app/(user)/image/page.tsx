@@ -12,7 +12,7 @@ import { AssetPickerModal, type InsertAssetPayload } from "@/app/(user)/canvas/c
 import { canvasThemes } from "@/lib/canvas-theme";
 import { imageReferenceLabel } from "@/lib/image-reference-prompt";
 import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
-import { getPlatformPricing } from "@/stores/platform-catalog-store";
+import { getPlatformPricing, getPricingDefaults } from "@/stores/platform-catalog-store";
 import { sceneflowTheme } from "@/lib/sceneflow-theme";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
@@ -101,7 +101,7 @@ export default function ImagePage() {
     const model = effectiveConfig.imageModel || effectiveConfig.model;
     const canGenerate = Boolean(prompt.trim());
     const generationCount = Math.max(1, Math.min(10, Number(config.count) || 1));
-    const unitCost = getGenerationCreditsCost("image", { model, imageModel: model }, getPlatformPricing(model));
+    const unitCost = getGenerationCreditsCost("image", { model, imageModel: model }, getPlatformPricing(model), getPricingDefaults());
 
     useEffect(() => {
         if (!running || !startedAt) return;
@@ -151,8 +151,8 @@ export default function ImagePage() {
             message.error("请输入生图提示词");
             return;
         }
-        // 积分预检（服务端为最终裁决，这里只做体验拦截；定价优先取后台逐模型配置）
-        const required = getGenerationCreditsCost("image", { model, imageModel: model }, getPlatformPricing(model)) * generationCount;
+        // 积分预检（服务端为最终裁决，这里只做体验拦截；定价三层：逐模型 > 全局默认 > 内置草案）
+        const required = getGenerationCreditsCost("image", { model, imageModel: model }, getPlatformPricing(model), getPricingDefaults()) * generationCount;
         if (user?.role !== "admin" && creditBalance !== null && creditBalance < required) {
             quotaModalRef.current?.open({ balance: creditBalance, required });
             return;

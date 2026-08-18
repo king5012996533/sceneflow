@@ -4,7 +4,7 @@ import { deductCredits, ensureDailyCreditGrant, refundCredits } from "@/lib/cred
 import { estimateGenerationCostCents, generationModel, getGenerationCreditsCost, type GenerationKind } from "@/lib/credit-pricing";
 import { resolveConfiguredPricing } from "@/lib/credential-store.server";
 import { normalizeGenerationMetadata } from "@/lib/generation/generation-config";
-import { getOperationNumber } from "@/lib/operation-config";
+import { getOperationNumber, getPricingDefaults } from "@/lib/operation-config";
 
 const STALE_JOB_MS = 30 * 60 * 1000;
 
@@ -30,11 +30,12 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     const isAdmin = user?.role === "admin";
-    // 积分制：非 admin 按「模型 × 类型」扣积分；定价优先取后台逐模型配置（图片每张 / 视频每秒），未配置退回内置草案
-    // 计费前先把客户端 metadata 按服务端口径规范化（时长 clamp、模型去空白），计费与落库都基于规范化结果（H-6 服务端确权）
+    // 积分制：非 admin 按「模型 × 类型」扣积分；定价三层：后台逐模型配置 > 运营配置全局默认 > 内置草案
+    // （图片每张 / 视频每条 / 音频每次 / 文本每次）。计费前先把客户端 metadata 按服务端口径规范化（时长 clamp、模型去空白），计费与落库都基于规范化结果（H-6 服务端确权）
     const normalizedMetadata = normalizeGenerationMetadata(input.metadata) as Record<string, unknown> | undefined;
     const configuredPricing = !isAdmin ? await resolveConfiguredPricing(generationModel(normalizedMetadata)) : null;
-    const creditsCost = !isAdmin ? getGenerationCreditsCost(input.kind, normalizedMetadata, configuredPricing ?? undefined) : 0;
+    const pricingDefaults = !isAdmin ? await getPricingDefaults() : undefined;
+    const creditsCost = !isAdmin ? getGenerationCreditsCost(input.kind, normalizedMetadata, configuredPricing ?? undefined, pricingDefaults) : 0;
     const costCents = estimateGenerationCostCents(input.kind, normalizedMetadata);
     // 每日赠送积分在事务外读取（操作配置走进程内缓存，避免在事务内发起独立连接）
     const dailyGrant = !isAdmin ? await getOperationNumber("daily_credit_grant", 3) : 0;

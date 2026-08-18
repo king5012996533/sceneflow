@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/ic-prisma";
+import type { PricingDefaults } from "@/lib/credit-pricing";
 
 /**
- * OperationConfig 读取方（目前该表只有 admin 写入、无任何消费方）。
+ * OperationConfig 读取方（admin 写入，服务端读取）。
  * 提供带 TTL 的进程内缓存，避免每个请求都打库；admin 修改后最多 30s 生效。
  */
 
@@ -36,6 +37,25 @@ export async function getOperationNumber(key: string, fallback = 0): Promise<num
     const value = await getOperationConfigValue(key, fallback);
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/**
+ * 全局默认定价（后台「运营配置」配置，逐模型定价之下、内置草案之上）。
+ * 只返回已配置的键（数值 ≥0 整数）；未配置的键返回 undefined，调用方走内置草案。
+ */
+export async function getPricingDefaults(): Promise<PricingDefaults> {
+    const pick = async (key: string): Promise<number | undefined> => {
+        const value = await getOperationConfigValue(key);
+        if (value === null || value === undefined || value === "") return undefined; // 未配置 → 跳过本层，走内置草案
+        const parsed = Math.floor(Number(value));
+        return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+    };
+    return {
+        imageCredits: await pick("image_credit"),
+        videoCredits: await pick("video_credit"),
+        audioCredits: await pick("audio_credit"),
+        textCredits: await pick("text_credit"),
+    };
 }
 
 export function invalidateOperationConfigCache(key?: string) {

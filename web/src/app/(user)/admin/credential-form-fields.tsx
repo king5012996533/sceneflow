@@ -36,7 +36,14 @@ type CredentialFormFieldsProps = {
 };
 
 export function parseModelList(models: string): string[] {
-    return Array.from(new Set(models.split(/[,，\s]+/).map((model) => model.trim()).filter(Boolean)));
+    return Array.from(
+        new Set(
+            models
+                .split(/[,，\s]+/)
+                .map((model) => model.trim())
+                .filter(Boolean),
+        ),
+    );
 }
 
 /** 落库前只保留「仍在绑定列表里」且「已启用标定」的模型能力 */
@@ -94,7 +101,7 @@ export function CredentialFormFields({ form, onChange, editMode }: CredentialFor
                 <CredentialCapabilityEditor models={models} value={form.capabilities} onChange={(capabilities) => set({ capabilities })} />
             </div>
             <div>
-                <div className="mb-1 text-sm text-[#201914]">逐模型积分定价（图片每张 / 视频每秒 / 音频每次 / 文本每次；未配置 = 内置草案）</div>
+                <div className="mb-1 text-sm text-[#201914]">逐模型积分定价（图片每张 / 视频每条 / 音频每次 / 文本每次；未配置 = 全局默认 → 内置草案）</div>
                 <CredentialPricingEditor models={models} value={form.pricing} onChange={(pricing) => set({ pricing })} />
             </div>
         </div>

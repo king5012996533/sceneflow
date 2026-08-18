@@ -200,7 +200,7 @@ model ProviderCredential {
   keyEnc      String                         // AES-256-GCM：base64(iv:tag:cipher)
   models      String[]  @default([])         // 绑定的模型；空数组 = 该 provider 全部模型
   capabilities Json?                        // 逐模型能力标定（与前端设置面板一一对应），key=模型名
-  pricing      Json?                        // 逐模型积分定价（图片每张 / 视频每秒 / 音频每次 / 文本每次），key=模型名；缺省 = 内置草案
+  pricing      Json?                        // 逐模型积分定价（图片每张 / 视频每条 / 音频每次 / 文本每次），key=模型名；缺省 = 全局默认 → 内置草案
   enabled     Boolean  @default(true)
   priority    Int      @default(0)           // 同 provider 多 Key 时的优先级（越大越优先）
   createdById String?

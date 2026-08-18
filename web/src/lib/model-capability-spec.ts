@@ -171,7 +171,18 @@ export function inferModelKindByName(model: string): ModelCapabilityKind | null 
     const isAudio = value.includes("audio") || value.includes("tts") || value.includes("speech") || value.includes("voice") || value.includes("music") || value.includes("sound");
     const isVideo = value.includes("seedance") || value.includes("video") || value.includes("sora") || value.includes("veo") || value.includes("kling") || value.includes("wan") || value.includes("hailuo");
     if (isVideo) return value.includes("seedance") ? SEEDANCE_VIDEO_KIND : GENERIC_VIDEO_KIND;
-    const isImage = !isAudio && (value.includes("seedream") || value.includes("gpt-image") || value.includes("image") || value.includes("dall-e") || value.includes("dalle") || value.includes("imagen") || value.includes("flux") || value.includes("sdxl") || value.includes("stable-diffusion") || value.includes("midjourney"));
+    const isImage =
+        !isAudio &&
+        (value.includes("seedream") ||
+            value.includes("gpt-image") ||
+            value.includes("image") ||
+            value.includes("dall-e") ||
+            value.includes("dalle") ||
+            value.includes("imagen") ||
+            value.includes("flux") ||
+            value.includes("sdxl") ||
+            value.includes("stable-diffusion") ||
+            value.includes("midjourney"));
     if (isImage) return IMAGE_KIND;
     return null;
 }
@@ -275,8 +286,8 @@ export function sanitizePricing(input: unknown): CredentialPricing | undefined {
         const pricing: ModelPricing = {};
         const imageCredits = toPricingNumber(value.imageCredits);
         if (imageCredits !== undefined) pricing.imageCredits = imageCredits;
-        const videoCreditsPerSecond = toPricingNumber(value.videoCreditsPerSecond);
-        if (videoCreditsPerSecond !== undefined) pricing.videoCreditsPerSecond = videoCreditsPerSecond;
+        const videoCredits = toPricingNumber(value.videoCredits);
+        if (videoCredits !== undefined) pricing.videoCredits = videoCredits;
         const audioCredits = toPricingNumber(value.audioCredits);
         if (audioCredits !== undefined) pricing.audioCredits = audioCredits;
         const textCredits = toPricingNumber(value.textCredits);

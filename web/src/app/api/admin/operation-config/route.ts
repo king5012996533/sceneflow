@@ -10,6 +10,10 @@ export const dynamic = "force-dynamic";
 const KNOWN_KEYS: Record<string, { description: string }> = {
     daily_credit_grant: { description: "免费用户每日赠送积分（0 = 不赠送）" },
     signup_credit_grant: { description: "新用户一次性赠送积分（0 = 不赠送）" },
+    image_credit: { description: "图片生成全局默认积分（每张；未逐模型定价时按此扣费）" },
+    video_credit: { description: "视频生成全局默认积分（每条，与时长无关；未逐模型定价时按此扣费）" },
+    audio_credit: { description: "音频生成全局默认积分（每次；未逐模型定价时按此扣费）" },
+    text_credit: { description: "文本/工具全局默认积分（每次；未逐模型定价时按此扣费）" },
 };
 
 export async function GET(req: NextRequest) {
