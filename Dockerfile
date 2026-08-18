@@ -7,6 +7,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lock
 COPY VERSION /app/VERSION
 COPY CHANGELOG.md /app/CHANGELOG.md
 COPY web ./
+ENV NODE_OPTIONS=--max-old-space-size=1024
 RUN bun run build
 
 # 运行镜像：只启动 Next.js，AI 请求由浏览器前台直连用户自己的接口。

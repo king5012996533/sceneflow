@@ -15,6 +15,17 @@ export default function nextConfig(phase: string): NextConfig {
 
     return {
         output: "standalone",
+        // 2G 内存服务器：构建并发限制为 1，避免多个 worker 各占一块大堆内存；
+        // webpack 兜底构建时在主子进程内编译（不另开 worker）并启用省内存模式。
+        experimental: {
+            cpus: 1,
+            webpackBuildWorker: false,
+            webpackMemoryOptimizations: true,
+        },
+        // 完整类型检查由提交前的 npm run typecheck 负责；服务器构建可设 SKIP_BUILD_TYPECHECK=1 跳过以省内存。
+        typescript: {
+            ignoreBuildErrors: process.env.SKIP_BUILD_TYPECHECK === "1",
+        },
         allowedDevOrigins: isDev ? ["*.*.*.*"] : [],
         async headers() {
             return [
