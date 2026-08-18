@@ -149,7 +149,7 @@ export default function AdminPage() {
         if (checkingAccess) return;
         if (user?.role !== "admin") {
             message.error("没有管理员权限");
-            router.replace("/canvas");
+            router.replace("/canvas/canvas");
             return;
         }
         void loadAll();

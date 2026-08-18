@@ -125,7 +125,7 @@ export default function PricingPage() {
 
                 {/* 底部返回 */}
                 <div className="pb-12">
-                    <Link href="/canvas" className="inline-flex items-center gap-2 text-sm font-medium text-[#9b5b32] transition hover:text-[#7c4526]">
+                    <Link href="/canvas/canvas" className="inline-flex items-center gap-2 text-sm font-medium text-[#9b5b32] transition hover:text-[#7c4526]">
                         回到画布
                         <ArrowRight className="h-4 w-4" />
                     </Link>

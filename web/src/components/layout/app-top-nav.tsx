@@ -20,7 +20,8 @@ export function AppTopNav() {
     const pathname = usePathname();
     const [navOpen, setNavOpen] = useState(false);
     const fetchSession = useUserStore((state) => state.fetchSession);
-    const hideHeader = /^\/canvas\/[^/]+/.test(pathname);
+    // 项目页隐藏顶栏；画布库页固定位于 /canvas/canvas（/canvas 是旧版落地页别名），需保留顶栏
+    const hideHeader = /^\/canvas\/[^/]+/.test(pathname) && pathname !== "/canvas/canvas";
 
     useEffect(() => {
         void fetchSession();
@@ -61,22 +62,10 @@ export function AppTopNav() {
                             aria-label={navOpen ? "关闭导航菜单" : "打开导航菜单"}
                             title="导航菜单"
                             onClick={() => setNavOpen(true)}
-                            className={cn(
-                                "relative flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-[#ded2c3] bg-[#fffdf8] transition hover:border-[#9b5b32] hover:bg-[#f1e3cf] sm:size-9",
-                            )}
+                            className={cn("relative flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-[#ded2c3] bg-[#fffdf8] transition hover:border-[#9b5b32] hover:bg-[#f1e3cf] sm:size-9")}
                         >
-                            <span
-                                className={cn(
-                                    "absolute left-1/2 h-[2px] w-4 -ml-2 rounded-[2px] bg-[#201914] transition-all duration-200",
-                                    navOpen ? "top-1/2 -translate-y-1/2 rotate-45" : "top-[calc(50%-4px)]",
-                                )}
-                            />
-                            <span
-                                className={cn(
-                                    "absolute left-1/2 h-[2px] w-4 -ml-2 rounded-[2px] bg-[#201914] transition-all duration-200",
-                                    navOpen ? "top-1/2 -translate-y-1/2 -rotate-45" : "top-[calc(50%+2px)]",
-                                )}
-                            />
+                            <span className={cn("absolute left-1/2 h-[2px] w-4 -ml-2 rounded-[2px] bg-[#201914] transition-all duration-200", navOpen ? "top-1/2 -translate-y-1/2 rotate-45" : "top-[calc(50%-4px)]")} />
+                            <span className={cn("absolute left-1/2 h-[2px] w-4 -ml-2 rounded-[2px] bg-[#201914] transition-all duration-200", navOpen ? "top-1/2 -translate-y-1/2 -rotate-45" : "top-[calc(50%+2px)]")} />
                         </button>
                     </div>
                 </div>

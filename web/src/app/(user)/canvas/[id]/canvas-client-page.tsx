@@ -292,7 +292,7 @@ function InfiniteCanvasPage() {
         setProjectLoaded(false);
         const project = openProject(projectId);
         if (!project) {
-            router.replace("/canvas");
+            router.replace("/canvas/canvas");
             return;
         }
 
@@ -913,7 +913,7 @@ function InfiniteCanvasPage() {
     const deleteCurrentProject = useCallback(() => {
         deleteProjects([projectId]);
         cleanupAssetImages();
-        router.push("/canvas");
+        router.push("/canvas/canvas");
     }, [cleanupAssetImages, deleteProjects, projectId, router]);
 
     const handleCanvasMouseDown = useCallback(
@@ -1571,7 +1571,7 @@ function InfiniteCanvasPage() {
                     canUndo={historyState.canUndo}
                     canRedo={historyState.canRedo}
                     onHome={() => router.push("/")}
-                    onProjects={() => router.push("/canvas")}
+                    onProjects={() => router.push("/canvas/canvas")}
                     onCreateProject={createAndOpenProject}
                     onDeleteProject={deleteCurrentProject}
                     onImportImage={() => handleUploadRequest()}

@@ -57,7 +57,7 @@ export default function LoginPage() {
     const router = useRouter();
     const { message } = App.useApp();
     const fetchSession = useUserStore((s) => s.fetchSession);
-    const from = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") || "/canvas" : "/canvas";
+    const from = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") || "/canvas/canvas" : "/canvas/canvas";
 
     const [target, setTarget] = useState("");
     const [password, setPassword] = useState("");
@@ -289,7 +289,7 @@ export default function LoginPage() {
 
                     <p className="sf-login-signup">
                         还没有账户？
-                        <button type="button" className="sf-login-link" onClick={() => router.push("/canvas/register")}>
+                        <button type="button" className="sf-login-link" onClick={() => router.push("/register")}>
                             创建账户
                         </button>
                     </p>

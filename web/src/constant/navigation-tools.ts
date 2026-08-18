@@ -5,6 +5,8 @@ export const navigationTools = [
         slug: "canvas",
         label: "我的画布",
         icon: Maximize2,
+        // 画布库的入口 URL：/canvas 已映射为旧版落地页，库页使用旧外链形式 /canvas/canvas
+        path: "/canvas/canvas",
     },
     {
         slug: "image",
@@ -44,7 +46,7 @@ export const navigationTools = [
     },
 ] as const;
 
-export type NavigationTool = (typeof navigationTools)[number];
+export type NavigationTool = (typeof navigationTools)[number] & { path?: string };
 export type NavigationToolSlug = NavigationTool["slug"];
 
 export function getVisibleNavigationTools(role?: string | null) {

@@ -70,7 +70,7 @@ export default function Home() {
                         </h1>
                         <p className="cover-lead">SceneFlow 把提示词、参考图、角色资产、镜头规划与生成结果，沉淀进同一块无限画布。让每一次灵感都能被复用、被推进，也被真正留下。</p>
                         <div className="cover-actions">
-                            <Link className="btn btn-primary" href="/canvas">
+                            <Link className="btn btn-primary" href="/canvas/canvas">
                                 进入生产画布 ↗
                             </Link>
                             <Link className="btn btn-ghost" href="/pricing">
@@ -355,7 +355,7 @@ export default function Home() {
                         </h2>
                         <p>SceneFlow 开放内测中。加入 80+ 真实创作者，从一张画布开始你的下一部作品。</p>
                         <div className="cover-actions" style={{ marginBottom: 0 }}>
-                            <Link className="btn btn-primary" href="/canvas">
+                            <Link className="btn btn-primary" href="/canvas/canvas">
                                 进入生产画布 ↗
                             </Link>
                             <Link className="btn btn-ghost" href="/pricing">
