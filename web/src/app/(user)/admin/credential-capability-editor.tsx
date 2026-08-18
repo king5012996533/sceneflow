@@ -30,7 +30,11 @@ export function CredentialCapabilityEditor({ models, value, onChange }: Credenti
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
     if (!models.length) {
-        return <div className="rounded-lg border border-dashed border-[#ded2c3] px-3 py-4 text-center text-xs text-[#7a6d63]">先在「绑定模型」里填写模型名（逗号分隔），即可逐模型标定画质 / 分辨率 / 比例等参数。</div>;
+        return (
+            <div className="rounded-lg border border-dashed border-[#ded2c3] px-3 py-4 text-center text-xs leading-5 text-[#7a6d63]">
+                暂无可标定的模型：先在下方「绑定模型」里填写模型名（逗号分隔），保存后即可在这里逐模型标定画质 / 分辨率 / 比例 / 时长等参数。
+            </div>
+        );
     }
 
     return (

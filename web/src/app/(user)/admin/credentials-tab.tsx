@@ -247,6 +247,7 @@ export default function CredentialsTab() {
                 cancelText="取消"
                 destroyOnHidden
                 width={640}
+                styles={{ body: { maxHeight: "min(62vh, 560px)", overflowY: "auto", paddingRight: 4 } }}
             >
                 <CredentialFormFields form={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} editMode={Boolean(editing)} />
             </Modal>
