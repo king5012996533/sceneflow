@@ -90,7 +90,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
         <ImageSettingsTheme theme={theme}>
             <div className={className} style={{ color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()}>
                 {showTitle ? <div className="text-sm font-medium">视频设置</div> : null}
-                <SettingGroup title="清晰度" color={theme.node.muted}>
+                <SettingGroup index={4} title="清晰度" en="CLARITY" color={theme.node.muted} faintColor={theme.node.faint}>
                     <div className="grid grid-cols-3 gap-2.5">
                         {clarityOptionsShown.map((item) => (
                             <OptionPill key={item.value} selected={resolution === item.value} theme={theme} onClick={() => onConfigChange("vquality", item.value)}>
@@ -100,7 +100,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
                         <ResolutionInput value={resolution} theme={theme} onChange={(value) => onConfigChange("vquality", value)} />
                     </div>
                 </SettingGroup>
-                <SettingGroup title="尺寸" color={theme.node.muted}>
+                <SettingGroup index={5} title="尺寸" en="SIZE" color={theme.node.muted} faintColor={theme.node.faint}>
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
                         <DimensionInput prefix="W" value={dimensions.width} disabled={size === "auto"} theme={theme} onChange={(value) => updateDimension("width", value)} />
                         <span className="text-lg opacity-45">↔</span>
@@ -111,19 +111,24 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
                             <button
                                 key={item.value}
                                 type="button"
-                                className="flex h-[78px] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border bg-transparent text-sm transition hover:opacity-80"
-                                style={{ borderColor: size === item.value ? theme.node.text : theme.node.stroke, color: theme.node.text }}
+                                className="flex h-[78px] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border text-sm transition hover:opacity-80"
+                                style={{
+                                    borderColor: size === item.value ? theme.node.activeStroke : theme.node.stroke,
+                                    background: size === item.value ? theme.node.fill : "transparent",
+                                    boxShadow: size === item.value ? `inset 0 0 0 1px ${theme.node.activeStroke}` : "none",
+                                    color: theme.node.text,
+                                }}
                                 onMouseDown={(event) => event.stopPropagation()}
                                 onClick={() => onConfigChange("size", item.value)}
                             >
-                                <SizePreview width={item.width} height={item.height} color={theme.node.text} />
+                                <SizePreview width={item.width} height={item.height} color={size === item.value ? theme.node.activeStroke : theme.node.text} />
                                 <span>{item.label}</span>
-                                {item.value === "auto" ? null : <span className="text-[11px] leading-none opacity-55">{item.value}</span>}
+                                {item.value === "auto" ? null : <span className="sf-mono text-[10px] leading-none opacity-55">{item.value}</span>}
                             </button>
                         ))}
                     </div>
                 </SettingGroup>
-                <SettingGroup title="秒数" color={theme.node.muted}>
+                <SettingGroup index={6} title="秒数" en="SECONDS" color={theme.node.muted} faintColor={theme.node.faint}>
                     <div className="grid grid-cols-3 gap-2.5">
                         {secondsOptionsShown.map((value) => (
                             <OptionPill key={value} selected={seconds === String(value)} theme={theme} onClick={() => onConfigChange("videoSeconds", String(value))}>
@@ -134,7 +139,7 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
                     </div>
                 </SettingGroup>
                 {isPrunaVideo ? (
-                    <SettingGroup title="输出" color={theme.node.muted}>
+                    <SettingGroup index={7} title="输出" en="OUTPUT" color={theme.node.muted} faintColor={theme.node.faint}>
                         <div className="grid gap-2 rounded-xl border p-2.5" style={{ borderColor: theme.node.stroke }}>
                             <SwitchRow label="草稿模式（更快更省）" checked={draftMode} theme={theme} onChange={(checked) => onConfigChange("videoDraft", String(checked))} />
                         </div>
@@ -188,7 +193,7 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
         <ImageSettingsTheme theme={theme}>
             <div className={className} style={{ color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()}>
                 {showTitle ? <div className="text-sm font-medium">视频设置</div> : null}
-                <SettingGroup title="分辨率" color={theme.node.muted}>
+                <SettingGroup index={4} title="分辨率" en="RESOLUTION" color={theme.node.muted} faintColor={theme.node.faint}>
                     <div className="grid grid-cols-3 gap-2.5">
                         {resolutionOptionsShown.map((item) => {
                             const disabled = item.value === "1080p" && isSeedanceFastModel(model);
@@ -201,25 +206,30 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
                     </div>
                     {isSeedanceFastModel(model) ? <div className="text-[11px] leading-4 opacity-55">fast 模型不支持 1080p，会自动使用 720p。</div> : null}
                 </SettingGroup>
-                <SettingGroup title="比例" color={theme.node.muted}>
+                <SettingGroup index={5} title="比例" en="RATIO" color={theme.node.muted} faintColor={theme.node.faint}>
                     <div className="grid grid-cols-3 gap-2.5">
                         {ratioOptionsShown.map((item) => (
                             <button
                                 key={item.value}
                                 type="button"
-                                className="flex h-[68px] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border bg-transparent px-1 text-sm transition hover:opacity-80"
-                                style={{ borderColor: ratio === item.value ? theme.node.text : theme.node.stroke, color: theme.node.text }}
+                                className="flex h-[68px] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border px-1 text-sm transition hover:opacity-80"
+                                style={{
+                                    borderColor: ratio === item.value ? theme.node.activeStroke : theme.node.stroke,
+                                    background: ratio === item.value ? theme.node.fill : "transparent",
+                                    boxShadow: ratio === item.value ? `inset 0 0 0 1px ${theme.node.activeStroke}` : "none",
+                                    color: theme.node.text,
+                                }}
                                 onMouseDown={(event) => event.stopPropagation()}
                                 onClick={() => onConfigChange("size", item.value)}
                             >
-                                <SizePreview width={ratioPreview(item.value).width} height={ratioPreview(item.value).height} color={theme.node.text} />
+                                <SizePreview width={ratioPreview(item.value).width} height={ratioPreview(item.value).height} color={ratio === item.value ? theme.node.activeStroke : theme.node.text} />
                                 <span>{item.label}</span>
-                                <span className="text-[10px] leading-none opacity-55">{item.value === "adaptive" ? "adaptive" : seedancePixelLabel(resolution, item.value)}</span>
+                                <span className="sf-mono text-[9px] leading-none opacity-55">{item.value === "adaptive" ? "adaptive" : seedancePixelLabel(resolution, item.value)}</span>
                             </button>
                         ))}
                     </div>
                 </SettingGroup>
-                <SettingGroup title="时长" color={theme.node.muted}>
+                <SettingGroup index={6} title="时长" en="DURATION" color={theme.node.muted} faintColor={theme.node.faint}>
                     <div className="grid grid-cols-4 gap-2.5">
                         {durationOptionsShown.map((value) => (
                             <OptionPill key={value} selected={duration === value} theme={theme} onClick={() => onConfigChange("videoSeconds", String(value))}>
@@ -229,7 +239,7 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
                     </div>
                     <NumberInput value={String(duration)} min={-1} max={15} theme={theme} onChange={(value) => onConfigChange("videoSeconds", value)} />
                 </SettingGroup>
-                <SettingGroup title="输出" color={theme.node.muted}>
+                <SettingGroup index={7} title="输出" en="OUTPUT" color={theme.node.muted} faintColor={theme.node.faint}>
                     <div className="grid gap-2 rounded-xl border p-2.5" style={{ borderColor: theme.node.stroke }}>
                         {audioEnabled ? <SwitchRow label="生成声音" checked={generateAudio} theme={theme} onChange={(checked) => onConfigChange("videoGenerateAudio", String(checked))} /> : null}
                         {watermarkEnabled ? <SwitchRow label="添加水印" checked={watermark} theme={theme} onChange={(checked) => onConfigChange("videoWatermark", String(checked))} /> : null}
@@ -274,8 +284,13 @@ function OptionPill({ selected, disabled = false, theme, onClick, children }: { 
         <button
             type="button"
             disabled={disabled}
-            className="h-9 cursor-pointer rounded-full border px-2 text-sm transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-35"
-            style={{ background: "transparent", borderColor: selected ? theme.node.text : theme.node.stroke, color: theme.node.text }}
+            className="h-9 cursor-pointer rounded-full border px-2 text-sm font-medium transition hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-35"
+            style={{
+                background: selected ? theme.node.fill : "transparent",
+                borderColor: selected ? theme.node.activeStroke : theme.node.stroke,
+                boxShadow: selected ? `inset 0 0 0 1px ${theme.node.activeStroke}` : "none",
+                color: theme.node.text,
+            }}
             onMouseDown={(event) => event.stopPropagation()}
             onClick={onClick}
         >
@@ -284,11 +299,14 @@ function OptionPill({ selected, disabled = false, theme, onClick, children }: { 
     );
 }
 
-function SettingGroup({ title, color, children }: { title: string; color: string; children: ReactNode }) {
+function SettingGroup({ title, en, index, color, faintColor, children }: { title: string; en: string; index?: number; color: string; faintColor: string; children: ReactNode }) {
     return (
         <div className="space-y-2.5">
-            <div className="text-xs font-medium" style={{ color }}>
-                {title}
+            <div className="sf-mono flex items-baseline gap-2 text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color }}>
+                <span>{typeof index === "number" ? `${String(index).padStart(2, "0")} · ${en}` : en}</span>
+                <span className="normal-case font-semibold tracking-normal" style={{ color: faintColor }}>
+                    {title}
+                </span>
             </div>
             {children}
         </div>
@@ -301,12 +319,12 @@ function ResolutionInput({ value, theme, onChange }: { value: string; theme: Can
             <input
                 type="number"
                 min={1}
-                className="min-w-0 flex-1 bg-transparent px-3 text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="sf-mono min-w-0 flex-1 bg-transparent px-3 text-center font-semibold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 value={value}
                 onChange={(event) => onChange(event.target.value)}
                 onMouseDown={(event) => event.stopPropagation()}
             />
-            <span className="grid w-7 place-items-center pr-1" style={{ color: theme.node.muted }}>
+            <span className="grid w-7 place-items-center pr-1 sf-mono" style={{ color: theme.node.muted }}>
                 p
             </span>
         </label>
@@ -316,14 +334,14 @@ function ResolutionInput({ value, theme, onChange }: { value: string; theme: Can
 function DimensionInput({ prefix, value, disabled, theme, onChange }: { prefix: string; value: number; disabled: boolean; theme: CanvasTheme; onChange: (value: number | null) => void }) {
     return (
         <label className="flex h-9 overflow-hidden rounded-xl text-sm" style={{ background: theme.node.fill, color: theme.node.text, opacity: disabled ? 0.55 : 1 }}>
-            <span className="grid w-9 place-items-center" style={{ color: theme.node.muted }}>
+            <span className="grid w-9 place-items-center sf-mono text-xs" style={{ color: theme.node.muted }}>
                 {prefix}
             </span>
             <input
                 type="number"
                 min={1}
                 disabled={disabled}
-                className="min-w-0 flex-1 bg-transparent px-2 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="sf-mono min-w-0 flex-1 bg-transparent px-2 font-semibold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 value={value || ""}
                 onChange={(event) => onChange(Number(event.target.value) || null)}
                 onMouseDown={(event) => event.stopPropagation()}
@@ -338,7 +356,7 @@ function NumberInput({ value, min, max, theme, onChange }: { value: string; min:
             type="number"
             min={min}
             max={max}
-            className="h-9 rounded-full border bg-transparent px-3 text-center text-sm outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            className="sf-mono h-9 rounded-full border bg-transparent px-3 text-center text-sm font-semibold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             style={{ borderColor: theme.node.stroke, color: theme.node.text, WebkitTextFillColor: theme.node.text }}
             value={value}
             onChange={(event) => onChange(event.target.value)}

@@ -96,7 +96,9 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
             >
                 {showTitle ? <div className="text-sm font-medium">图像设置</div> : null}
                 <div className="space-y-2.5">
-                    <SettingTitle color={theme.node.muted}>质量</SettingTitle>
+                    <SettingTitle index={4} en="QUALITY" color={theme.node.muted} faintColor={theme.node.faint}>
+                        质量
+                    </SettingTitle>
                     <div className="grid grid-cols-4 gap-2.5">
                         {effectiveQualities.map((item) => (
                             <OptionPill key={item.value} selected={quality === item.value} theme={theme} onClick={() => onConfigChange("quality", item.value)}>
@@ -107,7 +109,9 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
                 </div>
                 <div className="space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
-                        <SettingTitle color={theme.node.muted}>尺寸</SettingTitle>
+                        <SettingTitle index={5} en="SIZE" color={theme.node.muted} faintColor={theme.node.faint}>
+                            尺寸
+                        </SettingTitle>
                         <div className="flex items-center gap-2">
                             <span className="text-xs font-medium" style={{ color: theme.node.muted }}>
                                 16倍数对齐
@@ -124,25 +128,35 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
                     </div>
                 </div>
                 <div className="space-y-2.5">
-                    <SettingTitle color={theme.node.muted}>宽高比</SettingTitle>
+                    <SettingTitle index={6} en="ASPECT" color={theme.node.muted} faintColor={theme.node.faint}>
+                        宽高比
+                    </SettingTitle>
                     <div className="grid grid-cols-4 gap-2.5">
                         {effectiveAspects.map((item) => (
                             <button
                                 key={item.value}
                                 type="button"
-                                className="flex h-[72px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border bg-transparent text-sm transition hover:opacity-80"
-                                style={{ borderColor: selectedAspect?.value === item.value ? theme.node.text : theme.node.stroke, background: "transparent", color: theme.node.text }}
+                                className="flex h-[74px] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border text-sm transition hover:opacity-80"
+                                style={{
+                                    borderColor: selectedAspect?.value === item.value ? theme.node.activeStroke : theme.node.stroke,
+                                    background: selectedAspect?.value === item.value ? theme.node.fill : "transparent",
+                                    boxShadow: selectedAspect?.value === item.value ? `inset 0 0 0 1px ${theme.node.activeStroke}` : "none",
+                                    color: theme.node.text,
+                                }}
                                 onMouseDown={(event) => event.stopPropagation()}
                                 onClick={() => selectAspect(item.value)}
                             >
-                                <AspectIcon type={item.icon} width={item.width} height={item.height} color={theme.node.text} />
+                                <AspectIcon type={item.icon} width={item.width} height={item.height} color={selectedAspect?.value === item.value ? theme.node.activeStroke : theme.node.text} />
                                 <span>{item.label}</span>
+                                {item.width && item.height ? <span className="sf-mono text-[9px] leading-none opacity-55">{item.width === item.height ? `${item.width}²` : `${item.width}·${item.height}`}</span> : null}
                             </button>
                         ))}
                     </div>
                 </div>
                 <div className="space-y-2.5">
-                    <SettingTitle color={theme.node.muted}>生成张数</SettingTitle>
+                    <SettingTitle index={7} en="COUNT" color={theme.node.muted} faintColor={theme.node.faint}>
+                        生成张数
+                    </SettingTitle>
                     <div className="grid grid-cols-4 gap-2.5">
                         {Array.from({ length: quickCount }, (_, index) => index + 1).map((value) => (
                             <OptionPill key={value} selected={count === value} theme={theme} onClick={() => onConfigChange("count", String(value))}>
@@ -182,8 +196,13 @@ function OptionPill({ selected, theme, onClick, children }: { selected: boolean;
     return (
         <button
             type="button"
-            className="h-9 cursor-pointer rounded-full border px-2 text-sm transition hover:opacity-80"
-            style={{ background: "transparent", borderColor: selected ? theme.node.text : theme.node.stroke, color: theme.node.text }}
+            className="h-9 cursor-pointer rounded-full border px-2 text-sm font-medium transition hover:opacity-80"
+            style={{
+                background: selected ? theme.node.fill : "transparent",
+                borderColor: selected ? theme.node.activeStroke : theme.node.stroke,
+                boxShadow: selected ? `inset 0 0 0 1px ${theme.node.activeStroke}` : "none",
+                color: selected ? theme.node.text : theme.node.text,
+            }}
             onMouseDown={(event) => event.stopPropagation()}
             onClick={onClick}
         >
@@ -201,14 +220,14 @@ function DimensionInput({ prefix, value, disabled, theme, alignToStep, onChange 
 
     return (
         <label className="flex h-9 overflow-hidden rounded-xl text-sm" style={{ background: theme.node.fill, color: theme.node.text, opacity: disabled ? 0.55 : 1 }}>
-            <span className="grid w-9 place-items-center" style={{ color: theme.node.muted }}>
+            <span className="grid w-9 place-items-center sf-mono text-xs" style={{ color: theme.node.muted }}>
                 {prefix}
             </span>
             <input
                 type="number"
                 min={1}
                 disabled={disabled}
-                className="min-w-0 flex-1 bg-transparent px-2 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="sf-mono min-w-0 flex-1 bg-transparent px-2 font-semibold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 defaultValue={value || ""}
                 key={`${prefix}-${value}`}
                 onBlur={(event) => commit(event.currentTarget)}
@@ -228,7 +247,7 @@ function CountInput({ value, max, theme, onChange }: { value: number; max: numbe
                 type="number"
                 min={1}
                 max={max}
-                className="min-w-0 flex-1 bg-transparent px-3 text-center outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                className="sf-mono min-w-0 flex-1 bg-transparent px-3 text-center font-semibold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 style={{ color: theme.node.text, WebkitTextFillColor: theme.node.text }}
                 value={value || ""}
                 onChange={(event) => onChange(Number(event.target.value) || null)}
@@ -250,10 +269,13 @@ function AspectIcon({ type, width, height, color }: { type: string; width: numbe
     );
 }
 
-function SettingTitle({ children, color }: { children: string; color: string }) {
+function SettingTitle({ children, en, index, color, faintColor }: { children: string; en: string; index?: number; color: string; faintColor: string }) {
     return (
-        <div className="text-xs font-medium" style={{ color }}>
-            {children}
+        <div className="sf-mono flex items-baseline gap-2 text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color }}>
+            <span>{typeof index === "number" ? `${String(index).padStart(2, "0")} · ${en}` : en}</span>
+            <span className="normal-case font-semibold tracking-normal" style={{ color: faintColor }}>
+                {children}
+            </span>
         </div>
     );
 }

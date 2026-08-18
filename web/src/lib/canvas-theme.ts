@@ -1,4 +1,4 @@
-export type CanvasColorTheme = "light" | "dark";
+export type CanvasColorTheme = "light" | "dark" | "warm";
 export type CanvasBackgroundMode = "dots" | "lines" | "blank";
 
 export const canvasThemes = {
@@ -56,6 +56,35 @@ export const canvasThemes = {
             itemHover: "#292524",
             activeBg: "#3a3631",
             activeText: "#f5f5f4",
+        },
+    },
+    // 创作台暖色编辑风（与导航/定价页/管理后台同一套品牌语言）
+    warm: {
+        canvas: {
+            background: "#f6efe4",
+            dot: "rgba(155,91,50,.20)",
+            line: "rgba(155,91,50,.12)",
+            selectionStroke: "#201914",
+            selectionFill: "rgba(32,25,20,.06)",
+        },
+        node: {
+            label: "#7a6d63",
+            fill: "#f1e3cf",
+            panel: "#fffdf8",
+            stroke: "#ded2c3",
+            activeStroke: "#9b5b32",
+            placeholder: "#b7a99b",
+            text: "#201914",
+            muted: "#7a6d63",
+            faint: "#b7a99b",
+        },
+        toolbar: {
+            panel: "rgba(255,253,248,.96)",
+            border: "#ded2c3",
+            item: "#7a6d63",
+            itemHover: "#f1e3cf",
+            activeBg: "#f1e3cf",
+            activeText: "#201914",
         },
     },
 } as const;
