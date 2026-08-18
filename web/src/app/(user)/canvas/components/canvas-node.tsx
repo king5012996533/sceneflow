@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { ChevronRight, Image as ImageIcon, Layers, Music2, RefreshCw, Star, Video } from "lucide-react";
+import { ChevronRight, CircleAlert, Clapperboard, Image as ImageIcon, Layers, Music2, Play, RefreshCw, SlidersHorizontal, Star, Type as TypeIcon, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
@@ -16,16 +16,54 @@ type ResizeCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 type CanvasThemeLike = (typeof canvasThemes)[keyof typeof canvasThemes];
 
-/** 主题感知的卡片强调色：选中 / 激活 / 加载统一用它，替代硬编码冷蓝。 */
-function accentColor(theme: CanvasThemeLike) {
-    return theme.name === "warm" ? "#9b5b32" : theme.node.activeStroke;
+/** 活动色（加载 / 进行中）：统一使用类型色板中的橙色。 */
+function activityColor(theme: CanvasThemeLike) {
+    return theme.type.video;
 }
 
-/** 主题感知的节点状态色：loading 用强调色，error 用柔红，success 弱化。 */
+/** 类型色：每种节点一种品牌色，用于端口、图标、选中描边与状态点。 */
+function typeColorOf(node: CanvasNodeData, theme: CanvasThemeLike) {
+    switch (node.type) {
+        case CanvasNodeType.Image:
+            return theme.type.image;
+        case CanvasNodeType.Video:
+            return theme.type.video;
+        case CanvasNodeType.Text:
+            return theme.type.text;
+        case CanvasNodeType.Config:
+            return theme.type.config;
+        case CanvasNodeType.Audio:
+            return theme.type.audio;
+        case CanvasNodeType.DirectorShot:
+            return theme.type.director;
+        case CanvasNodeType.Group:
+            return theme.type.group;
+        default:
+            return theme.node.muted;
+    }
+}
+
+/** 主题感知的节点状态色：loading 用活动橙，error 用警示红，其余弱化。 */
 function statusColorOf(theme: CanvasThemeLike, status: string | undefined) {
-    if (status === "loading") return accentColor(theme);
-    if (status === "error") return theme.name === "warm" ? "#c0533a" : "#f87171";
+    if (status === "loading") return activityColor(theme);
+    if (status === "error") return theme.type.danger;
     return theme.node.muted;
+}
+
+/** 混合两个 6 位 hex 颜色，weight 为后者占比（0-1）。 */
+function mixHex(a: string, b: string, weight: number) {
+    const pa = parseInt(a.slice(1), 16);
+    const pb = parseInt(b.slice(1), 16);
+    const ra = (pa >> 16) & 255;
+    const ga = (pa >> 8) & 255;
+    const ba = pa & 255;
+    const rb = (pb >> 16) & 255;
+    const gb = (pb >> 8) & 255;
+    const bb = pb & 255;
+    const r = Math.round(ra + (rb - ra) * weight);
+    const g = Math.round(ga + (gb - ga) * weight);
+    const bl = Math.round(ba + (bb - ba) * weight);
+    return `rgb(${r}, ${g}, ${bl})`;
 }
 
 type CanvasNodeProps = {
@@ -133,9 +171,9 @@ export const CanvasNode = React.memo(function CanvasNode({
     const isBatchRoot = data.type === CanvasNodeType.Image && Boolean(data.metadata?.isBatchRoot) && batchCount > 1;
     const isBatchChild = data.type === CanvasNodeType.Image && Boolean(data.metadata?.batchRootId);
     const isActive = isConnectionTarget || isSelected || isFocusRelated;
-    const imageBorderColor = isActive ? accentColor(theme) : isRelated && !isBatchChild ? theme.node.muted : "transparent";
     const nodeStatus = data.metadata?.status;
     const statusColor = statusColorOf(theme, nodeStatus);
+    const typeColor = typeColorOf(data, theme);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const titleInputRef = useRef<HTMLInputElement>(null);
     const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -312,52 +350,17 @@ export const CanvasNode = React.memo(function CanvasNode({
             }}
             onContextMenu={(event) => onContextMenu(event, data.id)}
         >
-            {isSelected || hovered || isEditingTitle ? (
-                <div className="absolute left-3 top-[-28px] z-[65] max-w-[calc(100%-24px)]" onMouseDown={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()}>
-                    {isEditingTitle ? (
-                        <input
-                            ref={titleInputRef}
-                            value={titleDraft}
-                            maxLength={64}
-                            className="h-6 max-w-full border-0 border-b border-dashed bg-transparent px-0 text-left text-xs font-medium outline-none"
-                            style={{ borderColor: theme.node.muted, color: theme.node.text }}
-                            onChange={(event) => setTitleDraft(event.target.value)}
-                            onBlur={finishTitleEditing}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter") finishTitleEditing();
-                                if (event.key === "Escape") {
-                                    setTitleDraft(data.title || "");
-                                    setIsEditingTitle(false);
-                                }
-                            }}
-                        />
-                    ) : (
-                        <button
-                            type="button"
-                            className="block max-w-full truncate border-b border-dashed border-transparent px-0 py-0.5 text-left text-xs font-medium opacity-75 transition hover:border-current hover:opacity-100"
-                            style={{ color: theme.node.text }}
-                            title="双击重命名"
-                            onDoubleClick={(event) => {
-                                event.stopPropagation();
-                                setIsEditingTitle(true);
-                            }}
-                        >
-                            {data.title || "未命名"}
-                        </button>
-                    )}
-                </div>
-            ) : null}
             <div
-                className="relative h-full w-full overflow-visible rounded-2xl border transition-[box-shadow,border-color] duration-150"
+                className="relative flex h-full w-full flex-col overflow-visible rounded-[4px] border transition-[box-shadow,border-color] duration-150"
                 style={{
-                    background: hasImageContent || hasVideoContent || hasDirectorShotContent || isGroup ? "transparent" : theme.node.fill,
-                    borderColor: hasImageContent ? (hovered && !isActive && !isBatchChild ? theme.node.muted : imageBorderColor) : isActive ? accentColor(theme) : isRelated ? theme.node.muted : hovered ? theme.node.muted : theme.node.stroke,
-                    transform: isDragging ? "scale(1.02)" : undefined,
-                    transition: "transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease",
+                    background: hasImageContent || hasVideoContent || hasDirectorShotContent || isGroup ? "transparent" : hovered && !isDragging ? theme.node.panelHover : theme.node.panel,
+                    borderColor: isActive ? typeColor : hovered && !isBatchChild ? mixHex(theme.node.stroke, typeColor, 0.45) : isRelated && !isBatchChild ? theme.node.muted : theme.node.stroke,
+                    transform: isDragging ? "scale(1.02)" : hovered ? "translateY(-2px)" : undefined,
+                    transition: "transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease, background 150ms ease",
                     boxShadow: isDragging
-                        ? `0 26px 64px rgba(0,0,0,.32), 0 0 0 1px ${isActive ? accentColor(theme) : theme.node.muted}44`
+                        ? `0 26px 64px rgba(0,0,0,.32), 0 0 0 1px ${typeColor}44`
                         : isActive
-                          ? `0 0 0 1.5px ${accentColor(theme)}66, 0 10px 34px ${theme.name === "warm" ? "rgba(155,91,50,.18)" : "rgba(47,128,255,.16)"}`
+                          ? `0 0 0 2px ${typeColor}38, 0 10px 34px rgba(0,0,0,.16)`
                           : isRelated && !isBatchChild
                             ? `0 0 0 1px ${theme.node.muted}55, 0 18px 48px rgba(0,0,0,.14)`
                             : hovered
@@ -381,61 +384,117 @@ export const CanvasNode = React.memo(function CanvasNode({
                     setIsEditingContent(true);
                 }}
             >
+                {/* 卡头：类型图标 + 标题（双击重命名）+ 状态 */}
+                <div className="flex h-[38px] shrink-0 items-center gap-2 border-b px-2.5" style={{ background: theme.node.panel, borderColor: `${theme.node.stroke}a6` }}>
+                    <span className="grid size-[17px] shrink-0 place-items-center" style={{ color: typeColor }}>
+                        <NodeTypeIcon type={data.type} className="size-[15px]" strokeWidth={1.5} />
+                    </span>
+                    {isEditingTitle ? (
+                        <input
+                            ref={titleInputRef}
+                            value={titleDraft}
+                            maxLength={64}
+                            className="min-w-0 flex-1 border-b border-dashed bg-transparent text-xs font-semibold outline-none"
+                            style={{ borderColor: theme.node.muted, color: theme.node.text }}
+                            onChange={(event) => setTitleDraft(event.target.value)}
+                            onBlur={finishTitleEditing}
+                            onMouseDown={(event) => event.stopPropagation()}
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onKeyDown={(event) => {
+                                if (event.key === "Enter") finishTitleEditing();
+                                if (event.key === "Escape") {
+                                    setTitleDraft(data.title || "");
+                                    setIsEditingTitle(false);
+                                }
+                            }}
+                        />
+                    ) : (
+                        <span
+                            className="min-w-0 flex-1 truncate text-xs font-semibold"
+                            style={{ color: theme.node.text }}
+                            title="双击重命名"
+                            onDoubleClick={(event) => {
+                                event.stopPropagation();
+                                setIsEditingTitle(true);
+                            }}
+                        >
+                            {data.title || "未命名"}
+                        </span>
+                    )}
+                    <span className="shrink-0 font-mono text-[9px] leading-none" style={{ color: isSelected || hovered ? typeColor : theme.node.faint }}>
+                        {isSelected ? "选中" : hovered ? "悬浮" : NODE_TYPE_LABELS[data.type]}
+                    </span>
+                </div>
+
+                {/* 卡体：内容区 */}
+                <div className="relative min-h-0 flex-1 p-2.5">
+                    <div
+                        className={`relative flex h-full w-full items-center justify-center rounded-[inherit] ${isBatchRoot ? "overflow-visible" : "overflow-hidden"}`}
+                        style={
+                            {
+                                "--batch-from-x": `${batchMotion?.x || 0}px`,
+                                "--batch-from-y": `${batchMotion?.y || 0}px`,
+                                "--batch-from-rotate": `${6 + (batchMotion?.index || 0) * 4}deg`,
+                                animation: data.metadata?.batchRootId ? (batchClosing ? "canvas-batch-child-out 260ms cubic-bezier(.4,0,.2,1) both" : "canvas-batch-child-in 340ms cubic-bezier(.2,.85,.18,1) both") : undefined,
+                                animationDelay: data.metadata?.batchRootId ? `${batchClosing ? 0 : 45 + (batchMotion?.index || 0) * 24}ms` : undefined,
+                            } as React.CSSProperties
+                        }
+                    >
+                        <NodeContent
+                            node={data}
+                            theme={theme}
+                            isEditingContent={isEditingContent}
+                            textareaRef={textareaRef}
+                            isBatchRoot={isBatchRoot}
+                            batchCount={batchCount}
+                            batchExpanded={batchExpanded}
+                            batchOpening={batchOpening}
+                            batchRecovering={batchRecovering}
+                            renderNodeContent={renderNodeContent}
+                            mentionReferences={mentionReferences}
+                            onContentChange={onContentChange}
+                            onTitleChange={onTitleChange}
+                            onStopEditing={() => setIsEditingContent(false)}
+                            onRetry={onRetry}
+                            onGenerateImage={onGenerateImage}
+                            onToggleBatch={() => onToggleBatch?.(data.id)}
+                            onSetBatchPrimary={() => onSetBatchPrimary?.(data)}
+                        />
+                    </div>
+
+                    {data.type === CanvasNodeType.Text ? (
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(to top, ${theme.node.panel}cc, transparent)` }} />
+                    ) : null}
+
+                    {nodeStatus && nodeStatus !== "idle" ? (
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[3px] overflow-hidden">
+                            <div
+                                className="h-full w-full"
+                                style={{
+                                    background: statusColor,
+                                    opacity: nodeStatus === "loading" ? undefined : nodeStatus === "error" ? 0.95 : 0.4,
+                                    animation: nodeStatus === "loading" ? "canvas-status-pulse 1.2s ease-in-out infinite" : undefined,
+                                }}
+                            />
+                        </div>
+                    ) : null}
+                </div>
+
+                {/* 卡脚：状态点 + 状态文字 / 元信息 */}
                 <div
-                    className={`relative flex h-full w-full items-center justify-center rounded-[inherit] ${isBatchRoot ? "overflow-visible" : "overflow-hidden"}`}
-                    style={
-                        {
-                            background: hasImageContent || hasVideoContent || hasDirectorShotContent || isGroup ? "transparent" : theme.node.fill,
-                            "--batch-from-x": `${batchMotion?.x || 0}px`,
-                            "--batch-from-y": `${batchMotion?.y || 0}px`,
-                            "--batch-from-rotate": `${6 + (batchMotion?.index || 0) * 4}deg`,
-                            animation: data.metadata?.batchRootId ? (batchClosing ? "canvas-batch-child-out 260ms cubic-bezier(.4,0,.2,1) both" : "canvas-batch-child-in 340ms cubic-bezier(.2,.85,.18,1) both") : undefined,
-                            animationDelay: data.metadata?.batchRootId ? `${batchClosing ? 0 : 45 + (batchMotion?.index || 0) * 24}ms` : undefined,
-                        } as React.CSSProperties
-                    }
+                    className="flex h-[29px] shrink-0 items-center justify-between gap-2 border-t px-2.5 font-mono text-[9px] leading-none"
+                    style={{ background: theme.node.panel, borderColor: `${theme.node.stroke}a6`, color: theme.node.muted }}
                 >
-                    <NodeContent
-                        node={data}
-                        theme={theme}
-                        isEditingContent={isEditingContent}
-                        textareaRef={textareaRef}
-                        isBatchRoot={isBatchRoot}
-                        batchCount={batchCount}
-                        batchExpanded={batchExpanded}
-                        batchOpening={batchOpening}
-                        batchRecovering={batchRecovering}
-                        renderNodeContent={renderNodeContent}
-                        mentionReferences={mentionReferences}
-                        onContentChange={onContentChange}
-                        onTitleChange={onTitleChange}
-                        onStopEditing={() => setIsEditingContent(false)}
-                        onRetry={onRetry}
-                        onGenerateImage={onGenerateImage}
-                        onToggleBatch={() => onToggleBatch?.(data.id)}
-                        onSetBatchPrimary={() => onSetBatchPrimary?.(data)}
-                    />
+                    <span className="flex min-w-0 items-center gap-1.5">
+                        <i className="size-[5px] shrink-0 rounded-full" style={{ background: nodeStatus === "loading" ? activityColor(theme) : nodeStatus === "error" ? theme.type.danger : typeColor }} />
+                        <span className="truncate">{statusLabelOf(data, nodeStatus)}</span>
+                    </span>
+                    <span className="truncate" style={{ color: theme.node.faint }}>{footMetaOf(data, batchCount)}</span>
                 </div>
 
                 {showImageInfo && hasImageContent ? <ImageInfoBar node={data} /> : null}
-                {resourceLabel ? <ResourceLabelBadge reference={resourceLabel} theme={theme} /> : null}
+                {resourceLabel ? <ResourceLabelBadge reference={resourceLabel} theme={theme} color={typeColor} /> : null}
                 {data.metadata?.pipelineLabel ? <PipelineBadge node={data} /> : null}
-
-                {!hasImageContent && !hasVideoContent && !hasAudioContent && !hasDirectorShotContent && !isGroup ? (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(to top, ${theme.canvas.background}66, transparent)` }} />
-                ) : null}
-
-                {nodeStatus && nodeStatus !== "idle" ? (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[3px] overflow-hidden rounded-b-2xl">
-                        <div
-                            className="h-full w-full"
-                            style={{
-                                background: statusColor,
-                                opacity: nodeStatus === "loading" ? undefined : nodeStatus === "error" ? 0.95 : 0.4,
-                                animation: nodeStatus === "loading" ? "canvas-status-pulse 1.2s ease-in-out infinite" : undefined,
-                            }}
-                        />
-                    </div>
-                ) : null}
 
                 <ResizeHandle corner="top-left" onMouseDown={handleResizeMouseDown} />
                 <ResizeHandle corner="top-right" onMouseDown={handleResizeMouseDown} />
@@ -443,8 +502,8 @@ export const CanvasNode = React.memo(function CanvasNode({
                 <ResizeHandle corner="bottom-right" onMouseDown={handleResizeMouseDown} />
             </div>
 
-            <ConnectionHandleDot side="left" visible={!isGroup && (hovered || isSelected || isConnecting)} onMouseDown={(event) => onConnectStart(event, data.id, "target")} />
-            <ConnectionHandleDot side="right" visible={!isGroup && data.type !== CanvasNodeType.Config && (hovered || isSelected || isConnecting)} onMouseDown={(event) => onConnectStart(event, data.id, "source")} />
+            <ConnectionHandleDot side="left" color={typeColor} visible={!isGroup && (hovered || isSelected || isConnecting)} onMouseDown={(event) => onConnectStart(event, data.id, "target")} />
+            <ConnectionHandleDot side="right" color={typeColor} visible={!isGroup && data.type !== CanvasNodeType.Config && (hovered || isSelected || isConnecting)} onMouseDown={(event) => onConnectStart(event, data.id, "source")} />
 
             {showPanel && renderPanel ? <div className="absolute left-1/2 top-full z-[70] w-[600px] -translate-x-1/2 pt-4">{renderPanel(data)}</div> : null}
         </div>
@@ -463,9 +522,83 @@ function NodeContent(props: NodeContentRendererProps) {
     return Renderer ? <Renderer {...props} /> : <UnknownNodeContent theme={props.theme} />;
 }
 
+const NODE_TYPE_LABELS: Record<CanvasNodeType, string> = {
+    [CanvasNodeType.Image]: "图片",
+    [CanvasNodeType.Video]: "视频",
+    [CanvasNodeType.Text]: "文本",
+    [CanvasNodeType.Config]: "配置",
+    [CanvasNodeType.Audio]: "音频",
+    [CanvasNodeType.DirectorShot]: "分镜",
+    [CanvasNodeType.Group]: "分组",
+};
+
+function nodeTypeIcon(type: CanvasNodeType) {
+    switch (type) {
+        case CanvasNodeType.Image:
+            return ImageIcon;
+        case CanvasNodeType.Video:
+            return Video;
+        case CanvasNodeType.Text:
+            return TypeIcon;
+        case CanvasNodeType.Config:
+            return SlidersHorizontal;
+        case CanvasNodeType.Audio:
+            return Music2;
+        case CanvasNodeType.DirectorShot:
+            return Clapperboard;
+        case CanvasNodeType.Group:
+            return Layers;
+        default:
+            return ImageIcon;
+    }
+}
+
+function NodeTypeIcon({ type, className, strokeWidth }: { type: CanvasNodeType; className?: string; strokeWidth?: number }) {
+    const Icon = nodeTypeIcon(type);
+    return <Icon className={className} strokeWidth={strokeWidth} />;
+}
+
+function statusLabelOf(node: CanvasNodeData, status: string | undefined) {
+    if (status === "loading") return "生成中";
+    if (status === "error") return "处理失败";
+    switch (node.type) {
+        case CanvasNodeType.Text:
+            return "有效";
+        case CanvasNodeType.Config:
+            return "已同步";
+        case CanvasNodeType.Video:
+            return "已缓存";
+        case CanvasNodeType.DirectorShot:
+            return "分镜就绪";
+        case CanvasNodeType.Group:
+            return "分组";
+        default:
+            return "已就绪";
+    }
+}
+
+function footMetaOf(node: CanvasNodeData, batchCount: number) {
+    const meta = node.metadata;
+    if (node.type === CanvasNodeType.Image) {
+        if (meta?.isBatchRoot && batchCount > 1) return `${batchCount} 张图片`;
+        const w = meta?.naturalWidth;
+        const h = meta?.naturalHeight;
+        const dims = w && h ? `${Math.round(w)} × ${Math.round(h)}` : "";
+        const size = meta?.bytes ? formatBytes(meta.bytes) : "";
+        return dims || size ? [dims, size].filter(Boolean).join(" · ") : "图片";
+    }
+    if (node.type === CanvasNodeType.Text) return `${meta?.content?.length ?? 0} 字符`;
+    if (node.type === CanvasNodeType.Config) return "配置参数";
+    if (node.type === CanvasNodeType.Video) return meta?.bytes ? formatBytes(meta.bytes) : "视频";
+    if (node.type === CanvasNodeType.Audio) return meta?.bytes ? formatBytes(meta.bytes) : "音频";
+    if (node.type === CanvasNodeType.Group) return `${meta?.groupChildIds?.length ?? 0} 项`;
+    if (node.type === CanvasNodeType.DirectorShot) return "分镜脚本";
+    return "";
+}
+
 function PipelineBadge({ node }: { node: CanvasNodeData }) {
     return (
-        <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-[calc(100%-24px)] rounded-full border border-black/10 bg-white/90 px-2.5 py-1 text-xs font-medium text-[#242529] shadow-sm backdrop-blur">
+        <div className="pointer-events-none absolute left-3 top-[-26px] z-30 max-w-[calc(100%-24px)] rounded-full border border-black/10 bg-white/90 px-2.5 py-1 text-xs font-medium text-[#242529] shadow-sm backdrop-blur">
             <span className="block truncate">{node.metadata?.pipelineLabel}</span>
         </div>
     );
@@ -500,37 +633,46 @@ function GroupContent({ node, theme }: NodeContentRendererProps) {
 
 function LoadingContent({ theme }: Pick<NodeContentRendererProps, "theme">) {
     return (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: accentColor(theme) }}>
-            <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: accentColor(theme) }} />
+        <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: activityColor(theme) }}>
+            <div className="size-10 animate-spin rounded-full border-2" style={{ borderColor: theme.node.stroke, borderTopColor: activityColor(theme) }} />
             <span className="text-[10px] tracking-[0.2em]" style={{ color: theme.node.muted }}>
                 生成中
             </span>
+            <span className="h-[3px] w-7" style={{ background: `linear-gradient(90deg, ${activityColor(theme)} 42%, ${theme.node.stroke} 42%)` }} />
         </div>
     );
 }
 
 function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "node" | "theme" | "onRetry">) {
     const errorView = summarizeCanvasGenerationError(node.metadata?.errorDetails);
+    const danger = theme.type.danger;
     return (
-        <div className="flex max-w-[280px] flex-col items-center gap-3 px-5 text-center">
-            <div className="space-y-1 text-xs leading-5" style={{ color: theme.name === "warm" ? "#b3452f" : "#f87171" }}>
-                <div className="font-medium">{errorView.title}</div>
-                <div className="opacity-90">{errorView.hint}</div>
-                {errorView.requestId ? <div className="truncate text-[10px] opacity-60">Request id: {errorView.requestId}</div> : null}
+        <div className="flex h-full w-full items-center justify-center p-1">
+            <div className="w-full rounded-[2px] border p-2.5" style={{ borderColor: mixHex(theme.node.stroke, danger, 0.4), background: mixHex(theme.node.panel, danger, 0.06) }}>
+                <div className="flex items-center gap-2.5">
+                    <span className="grid size-[30px] shrink-0 place-items-center rounded-full border" style={{ borderColor: `${danger}5c`, color: danger }}>
+                        <CircleAlert className="size-4" strokeWidth={1.5} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                        <strong className="block truncate text-[11px] font-semibold" style={{ color: theme.node.text }}>{errorView.title}</strong>
+                        <span className="mt-1 block font-mono text-[9px] leading-[1.4]" style={{ color: theme.node.muted }}>{errorView.hint}</span>
+                        {errorView.requestId ? <div className="mt-0.5 truncate font-mono text-[9px]" style={{ color: theme.node.faint }}>Request id: {errorView.requestId}</div> : null}
+                    </div>
+                    <button
+                        type="button"
+                        className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-medium transition hover:scale-[1.02]"
+                        style={{ background: theme.toolbar.panel, borderColor: `${danger}73`, color: danger }}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            onRetry?.(node);
+                        }}
+                        onMouseDown={(event) => event.stopPropagation()}
+                    >
+                        <RefreshCw className="size-3.5" />
+                        重试
+                    </button>
+                </div>
             </div>
-            <button
-                type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition hover:scale-[1.02]"
-                style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
-                onClick={(event) => {
-                    event.stopPropagation();
-                    onRetry?.(node);
-                }}
-                onMouseDown={(event) => event.stopPropagation()}
-            >
-                <RefreshCw className="size-3.5" />
-                重试
-            </button>
         </div>
     );
 }
@@ -548,7 +690,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
     const textStyle = { fontSize: `${fontSize}px`, lineHeight: `${Math.round(fontSize * 1.65)}px`, color: theme.node.text, caretColor: theme.node.activeStroke, boxSizing: "border-box" } as React.CSSProperties;
 
     return (
-        <div className="flex h-full w-full flex-col overflow-hidden pt-8">
+        <div className="flex h-full w-full flex-col overflow-hidden pl-2.5 pt-1" style={{ borderLeft: `2px solid ${typeColorOf(node, theme)}` }}>
             <button
                 type="button"
                 className="absolute right-3 top-3 z-20 inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-medium opacity-85 backdrop-blur-md transition hover:scale-[1.02] hover:opacity-100"
@@ -568,7 +710,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
             {isEditingContent ? (
                 <CanvasResourceMentionTextarea
                     ref={textareaRef}
-                    className="thin-scrollbar block h-full w-full resize-none overflow-y-auto whitespace-pre-wrap break-words border-none bg-transparent pl-4 pr-14 pt-0 pb-4 m-0 font-mono outline-none select-text appearance-none"
+                    className="thin-scrollbar block h-full w-full resize-none overflow-y-auto whitespace-pre-wrap break-words border-none bg-transparent pl-1 pr-14 pt-0 pb-4 m-0 font-mono outline-none select-text appearance-none"
                     style={textStyle}
                     value={node.metadata?.content || ""}
                     references={mentionReferences}
@@ -583,7 +725,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
                     onWheel={(event) => event.stopPropagation()}
                 />
             ) : (
-                <div className="thin-scrollbar block h-full w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent pl-4 pr-14 pt-0 pb-4 font-mono" style={textStyle} onWheel={(event) => event.stopPropagation()}>
+                <div className="thin-scrollbar block h-full w-full overflow-y-auto whitespace-pre-wrap break-words bg-transparent pl-1 pr-14 pt-0 pb-4 font-mono" style={textStyle} onWheel={(event) => event.stopPropagation()}>
                     {node.metadata?.content || <span style={{ color: theme.node.placeholder }}>双击编辑文字</span>}
                 </div>
             )}
@@ -591,12 +733,11 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
     );
 }
 
-function ResourceLabelBadge({ reference, theme }: { reference: CanvasResourceReference; theme: CanvasThemeLike }) {
-    const accent = accentColor(theme);
+function ResourceLabelBadge({ reference, theme, color }: { reference: CanvasResourceReference; theme: CanvasThemeLike; color: string }) {
     return (
         <span
-            className={`pointer-events-none absolute right-2 top-2 z-30 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${reference.active ? "text-white shadow-sm" : "bg-black/35 text-white/75"}`}
-            style={reference.active ? { background: accent } : undefined}
+            className={`pointer-events-none absolute right-3 top-[-26px] z-30 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${reference.active ? "text-white shadow-sm" : "bg-black/35 text-white/75"}`}
+            style={reference.active ? { background: color } : undefined}
         >
             {reference.label}
         </span>
@@ -635,13 +776,20 @@ function ImageNodeContent(props: NodeContentRendererProps) {
     );
 }
 
-function EmptyImageContent({ theme, isBatchRoot, batchCount, batchExpanded, batchOpening, batchRecovering, onToggleBatch }: NodeContentRendererProps) {
+function EmptyImageContent({ node, theme, isBatchRoot, batchCount, batchExpanded, batchOpening, batchRecovering, onToggleBatch }: NodeContentRendererProps) {
+    const typeColor = typeColorOf(node, theme);
+    const fieldBg = mixHex(theme.node.panel, "#000000", theme.name === "dark" ? 0.12 : 0.04);
+    const gridLine = `${theme.node.stroke}59`;
+    const emptyLabel = node.type === CanvasNodeType.Config ? "空配置节点" : node.type === CanvasNodeType.DirectorShot ? "空分镜节点" : "空图片节点";
     const content = (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
-            <div className="flex size-14 items-center justify-center rounded-2xl border" style={{ background: theme.toolbar.activeBg, borderColor: theme.node.stroke }}>
-                <ImageIcon className="size-6 opacity-40" />
+        <div className="relative h-full w-full overflow-hidden rounded-[2px] border" style={{ borderColor: `${theme.node.stroke}a6`, background: fieldBg }}>
+            <div className="absolute inset-0 opacity-60" style={{ backgroundImage: `linear-gradient(90deg, transparent 49%, ${gridLine} 50%, transparent 51%), linear-gradient(transparent 49%, ${gridLine} 50%, transparent 51%)`, backgroundSize: "26px 26px" }} />
+            <div className="absolute" style={{ width: "80%", height: "140%", left: "-18%", top: "25%", border: `1px solid ${typeColor}5c`, transform: "rotate(-33deg)" }} />
+            <div className="absolute" style={{ width: "44%", aspectRatio: "1", right: "10%", top: "-18%", border: `1px solid ${typeColor}82`, borderRadius: "50%" }} />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ color: typeColor }}>
+                <ImageIcon className="size-6 opacity-50" strokeWidth={1.5} />
+                <span className="text-[10px] tracking-[0.18em]" style={{ color: theme.node.placeholder }}>{emptyLabel}</span>
             </div>
-            <span className="text-[10px] tracking-[0.18em] opacity-60">空图片节点</span>
         </div>
     );
     if (isBatchRoot)
@@ -654,16 +802,22 @@ function EmptyImageContent({ theme, isBatchRoot, batchCount, batchExpanded, batc
 }
 
 function VideoNodeContent({ node, theme }: NodeContentRendererProps) {
-    if (!node.metadata?.content)
+    if (!node.metadata?.content) {
+        const typeColor = typeColorOf(node, theme);
+        const fieldBg = mixHex(theme.node.panel, "#000000", theme.name === "dark" ? 0.12 : 0.04);
         return (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-3" style={{ color: theme.node.placeholder }}>
-                <div className="flex size-14 items-center justify-center rounded-2xl border" style={{ background: theme.toolbar.activeBg, borderColor: theme.node.stroke }}>
-                    <Video className="size-6 opacity-40" />
+            <div className="relative h-full w-full overflow-hidden rounded-[2px] border" style={{ borderColor: `${theme.node.stroke}a6`, background: fieldBg }}>
+                <div className="absolute" style={{ inset: "15px 18px", border: `1px solid ${typeColor}5e`, transform: "skewY(-8deg)" }} />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3" style={{ color: typeColor }}>
+                    <span className="grid size-[29px] place-items-center rounded-full border" style={{ borderColor: typeColor, color: typeColor }}>
+                        <Play className="size-3 translate-x-px" fill="currentColor" strokeWidth={0} />
+                    </span>
+                    <span className="text-[10px] tracking-[0.18em]" style={{ color: theme.node.placeholder }}>空视频节点</span>
                 </div>
-                <span className="text-[10px] tracking-[0.18em] opacity-60">空视频节点</span>
             </div>
         );
-    return <video src={node.metadata.content} controls className="h-full w-full rounded-[18px] bg-black object-contain" data-canvas-no-zoom />;
+    }
+    return <video src={node.metadata.content} controls className="h-full w-full rounded-[2px] border bg-black object-contain" style={{ borderColor: `${theme.node.stroke}a6` }} data-canvas-no-zoom />;
 }
 
 function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
@@ -677,7 +831,7 @@ function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
             </div>
         );
     return (
-        <div className="flex h-full w-full flex-col justify-center gap-3 px-4" style={{ background: theme.node.fill, color: theme.node.text }}>
+        <div className="flex h-full w-full flex-col justify-center gap-3 px-4" style={{ background: theme.node.panel, color: theme.node.text }}>
             <div className="flex min-w-0 items-center gap-2 text-sm opacity-70">
                 <Music2 className="size-4 shrink-0" />
                 <span className="truncate">{node.title || "音频"}</span>
@@ -711,7 +865,7 @@ function ImageContent({
 
     return (
         <BatchFrame batchCount={isBatchRoot ? batchCount : 0} batchExpanded={batchExpanded} batchOpening={batchOpening} batchRecovering={batchRecovering} onToggleBatch={onToggleBatch}>
-            <div className="h-full w-full overflow-hidden rounded-3xl">
+            <div className="h-full w-full overflow-hidden rounded-[2px] border" style={{ borderColor: `${theme.node.stroke}a6`, background: "#000" }}>
                 <img
                     src={node.metadata!.content!}
                     alt={node.title}
@@ -733,7 +887,7 @@ function ImageContent({
                     onMouseDown={(event) => event.stopPropagation()}
                     onPointerDown={(event) => event.stopPropagation()}
                 >
-                    <span className="leading-none" style={{ color: accentColor(theme) }}>
+                    <span className="leading-none" style={{ color: typeColorOf(node, theme) }}>
                         {batchCount}
                     </span>
                     <ChevronRight className={`size-3.5 opacity-55 transition-transform ${batchExpanded ? "rotate-90" : ""}`} />
@@ -751,7 +905,7 @@ function ImageContent({
                     onMouseDown={(event) => event.stopPropagation()}
                     onPointerDown={(event) => event.stopPropagation()}
                 >
-                    <Star className="size-3.5" style={{ color: accentColor(theme) }} />
+                    <Star className="size-3.5" style={{ color: typeColorOf(node, theme) }} />
                     设为主图
                 </button>
             ) : null}
@@ -764,7 +918,7 @@ function ImageInfoBar({ node }: { node: CanvasNodeData }) {
     const height = Math.round(node.metadata?.naturalHeight || node.height);
     const size = formatBytes(node.metadata?.bytes || 0);
     return (
-        <div className="pointer-events-none absolute bottom-3 right-3 z-40 max-w-[calc(100%-24px)]">
+        <div className="pointer-events-none absolute bottom-10 left-3 z-40 max-w-[calc(100%-24px)]">
             <span className="max-w-full truncate rounded-md bg-black/55 px-2 py-1 text-[11px] font-medium leading-none text-white backdrop-blur-sm">
                 {width} x {height}
                 {size ? ` · ${size}` : ""}
@@ -822,17 +976,17 @@ function ResizeHandle({ corner, onMouseDown }: { corner: ResizeCorner; onMouseDo
     return <div className={`absolute z-50 size-7 ${positionClass}`} onMouseDown={(event) => onMouseDown(event, corner)} />;
 }
 
-function ConnectionHandleDot({ side, visible, onMouseDown }: { side: "left" | "right"; visible: boolean; onMouseDown: (event: React.MouseEvent) => void }) {
+function ConnectionHandleDot({ side, visible, color, onMouseDown }: { side: "left" | "right"; visible: boolean; color: string; onMouseDown: (event: React.MouseEvent) => void }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
 
     return (
         <div
             className={`absolute top-1/2 z-30 flex size-12 -translate-y-1/2 cursor-crosshair items-center justify-center transition-opacity duration-150 ${
                 side === "left" ? "-left-6" : "-right-6"
-            } ${visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`}
+            } ${visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-60"}`}
             onMouseDown={onMouseDown}
         >
-            <div className="size-3 rounded-full border-2 transition-all hover:scale-125" style={{ background: theme.node.panel, borderColor: accentColor(theme) }} />
+            <div className="size-[10px] rounded-full border-2 transition-all hover:scale-125" style={{ background: color, borderColor: theme.canvas.background, boxShadow: `0 0 0 1px ${color}73` }} />
         </div>
     );
 }
