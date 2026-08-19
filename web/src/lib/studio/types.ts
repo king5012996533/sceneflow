@@ -6,6 +6,9 @@ import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 /** 一次生成的目标类型：图片或视频 */
 export type StudioKind = "image" | "video";
 
+/** 内置风格预设 id（会话级，见 style-presets.ts） */
+export type StudioStylePresetId = "none" | "wuxia-film" | "wuxia-hardlight";
+
 /** 图片生成结果（与生图工作台的 GeneratedImage 对应） */
 export type StudioImageResult = {
     kind: "image";
@@ -47,6 +50,8 @@ export type StudioMessage = {
     error?: string;
     /** 视频异步任务句柄；页面刷新后凭它恢复轮询 */
     task?: GuardedVideoGenerationTask;
+    /** 发送时应用的风格预设 id（无则省略） */
+    stylePreset?: StudioStylePresetId;
     createdAt: number;
 };
 
@@ -56,6 +61,8 @@ export type StudioSession = {
     title: string;
     messages: StudioMessage[];
     config: AiConfig;
+    /** 会话级风格预设 id（默认 none） */
+    stylePreset?: StudioStylePresetId;
     createdAt: number;
     updatedAt: number;
 };

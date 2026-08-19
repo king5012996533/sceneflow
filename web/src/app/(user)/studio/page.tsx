@@ -20,7 +20,8 @@ import { SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
 import { detectStudioKind, imageSizeToVideoSize, videoSizeToImageSize } from "@/lib/studio/detect-kind";
 import { executeStudioInstruction, pollVideoTask } from "@/lib/studio/execute";
 import { deleteSession, readSession, readSessionMetas, saveSession, type StudioSessionMeta } from "@/lib/studio/session-store";
-import type { StudioMessage, StudioSession } from "@/lib/studio/types";
+import { applyStylePreset } from "@/lib/studio/style-presets";
+import type { StudioMessage, StudioSession, StudioStylePresetId } from "@/lib/studio/types";
 import { sceneflowTheme } from "@/lib/sceneflow-theme";
 import { uploadImage } from "@/services/image-storage";
 import { uploadMediaFile } from "@/services/file-storage";
@@ -74,6 +75,8 @@ export default function StudioPage() {
     const activeSessionIdRef = useRef<string | null>(null);
     const createdAtRef = useRef<number>(Date.now());
     const configRef = useRef<AiConfig>(effectiveConfig);
+    const [stylePreset, setStylePreset] = useState<StudioStylePresetId>("none");
+    const stylePresetRef = useRef<StudioStylePresetId>("none");
     const activePollIdsRef = useRef<Set<string>>(new Set());
     const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -95,6 +98,10 @@ export default function StudioPage() {
     useEffect(() => {
         configRef.current = effectiveConfig;
     }, [effectiveConfig]);
+
+    useEffect(() => {
+        stylePresetRef.current = stylePreset;
+    }, [stylePreset]);
 
     useEffect(() => {
         activeSessionIdRef.current = activeSessionId;
@@ -134,6 +141,7 @@ export default function StudioPage() {
             title: nextMessages[0]?.prompt?.slice(0, 12) || "新会话",
             messages: nextMessages,
             config: nextConfig,
+            stylePreset: stylePresetRef.current,
             createdAt: createdAtRef.current,
             updatedAt: Date.now(),
         };
@@ -193,9 +201,11 @@ export default function StudioPage() {
         setActiveSessionId(id);
         setMessages([]);
         messagesRef.current = [];
+        stylePresetRef.current = "none";
+        setStylePreset("none");
         setSessions((prev) => [{ id, title: "新会话", createdAt: now, updatedAt: now, messageCount: 0 }, ...prev]);
         resetDraft();
-        void saveSession({ id, title: "新会话", messages: [], config: configRef.current, createdAt: now, updatedAt: now });
+        void saveSession({ id, title: "新会话", messages: [], config: configRef.current, stylePreset: "none", createdAt: now, updatedAt: now });
     }, [resetDraft]);
 
     const switchSession = useCallback(
@@ -209,6 +219,9 @@ export default function StudioPage() {
             setActiveSessionId(id);
             setMessages(session.messages);
             messagesRef.current = session.messages;
+            const preset = session.stylePreset ?? "none";
+            stylePresetRef.current = preset;
+            setStylePreset(preset);
             applySessionConfig(session.config);
             resetDraft();
             resumePending(session.messages);
@@ -247,6 +260,9 @@ export default function StudioPage() {
                     setActiveSessionId(session.id);
                     setMessages(session.messages);
                     messagesRef.current = session.messages;
+                    const preset = session.stylePreset ?? "none";
+                    stylePresetRef.current = preset;
+                    setStylePreset(preset);
                     applySessionConfig(session.config);
                     resumePending(session.messages);
                 } else {
@@ -377,11 +393,13 @@ export default function StudioPage() {
         }
 
         const instructionConfig = buildInstructionConfig(kind);
+        const finalPrompt = applyStylePreset(text, kind, stylePresetRef.current);
         const userMessage: StudioMessage = {
             id: nanoid(),
             role: "user",
             kind,
             prompt: text,
+            stylePreset: stylePresetRef.current,
             references: [...references],
             videoReferences: [...videoReferences],
             audioReferences: [...audioReferences],
@@ -389,12 +407,14 @@ export default function StudioPage() {
             status: "success",
             createdAt: Date.now(),
         };
-        const assistantMessage: StudioMessage = { id: nanoid(), role: "assistant", kind, prompt: text, references: [], videoReferences: [], audioReferences: [], results: [], status: "pending", createdAt: Date.now() };
+        const assistantMessage: StudioMessage = { id: nanoid(), role: "assistant", kind, prompt: text, stylePreset: stylePresetRef.current, references: [], videoReferences: [], audioReferences: [], results: [], status: "pending", createdAt: Date.now() };
         appendMessages([userMessage, assistantMessage]);
         resetDraft();
         setSending(true);
         try {
-            await executeStudioInstruction({ kind, prompt: text, references: [...references], videoReferences: [...videoReferences], audioReferences: [...audioReferences], config: instructionConfig }, (patch) => updateMessage(assistantMessage.id, patch));
+            await executeStudioInstruction({ kind, prompt: finalPrompt, references: [...references], videoReferences: [...videoReferences], audioReferences: [...audioReferences], config: instructionConfig }, (patch) =>
+                updateMessage(assistantMessage.id, patch),
+            );
         } catch (error) {
             const errorMessage = error instanceof InsufficientCreditsError ? error.message : error instanceof Error ? error.message : "生成失败";
             if (error instanceof InsufficientCreditsError) quotaModalRef.current?.open({ message: errorMessage });
@@ -461,9 +481,10 @@ export default function StudioPage() {
             const kind = item.kind;
             const model = kind === "image" ? effectiveConfig.imageModel || effectiveConfig.model : effectiveConfig.videoModel || effectiveConfig.model;
             const instructionConfig = buildInstructionConfig(kind);
+            const finalPrompt = applyStylePreset(item.prompt, kind, item.stylePreset ?? "none");
             updateMessage(item.id, { status: "pending", error: undefined, results: [], task: undefined });
             setSending(true);
-            void executeStudioInstruction({ kind, prompt: item.prompt, references: item.references, videoReferences: item.videoReferences, audioReferences: item.audioReferences, config: instructionConfig }, (patch) => updateMessage(item.id, patch))
+            void executeStudioInstruction({ kind, prompt: finalPrompt, references: item.references, videoReferences: item.videoReferences, audioReferences: item.audioReferences, config: instructionConfig }, (patch) => updateMessage(item.id, patch))
                 .catch((error) => {
                     const errorMessage = error instanceof InsufficientCreditsError ? error.message : error instanceof Error ? error.message : "生成失败";
                     if (error instanceof InsufficientCreditsError) quotaModalRef.current?.open({ message: errorMessage });
@@ -543,6 +564,7 @@ export default function StudioPage() {
                                     audioReferences={audioReferences}
                                     modeOverride={modeOverride}
                                     detectedKind={detectedKind}
+                                    stylePreset={stylePreset}
                                     sending={sending}
                                     creditCost={creditCost}
                                     onDraftChange={setDraft}
@@ -569,6 +591,8 @@ export default function StudioPage() {
                     onClose={() => setSettingsOpen(false)}
                     kind={effectiveKind}
                     config={effectiveConfig}
+                    stylePreset={stylePreset}
+                    onStylePresetChange={setStylePreset}
                     onModelChange={(model) => updateConfig(effectiveKind === "image" ? "imageModel" : "videoModel", model)}
                     onConfigChange={updateConfig}
                 />

@@ -6,7 +6,8 @@ import { Button, Input, Segmented, Tooltip } from "antd";
 
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
-import type { StudioKind } from "@/lib/studio/types";
+import { getStylePreset } from "@/lib/studio/style-presets";
+import type { StudioKind, StudioStylePresetId } from "@/lib/studio/types";
 
 export type StudioMode = StudioKind | "auto";
 
@@ -17,6 +18,7 @@ type StudioComposerProps = {
     audioReferences: ReferenceAudio[];
     modeOverride: StudioMode;
     detectedKind: StudioKind;
+    stylePreset: StudioStylePresetId;
     sending: boolean;
     creditCost: number | null;
     onDraftChange: (value: string) => void;
@@ -41,6 +43,7 @@ export function StudioComposer({
     audioReferences,
     modeOverride,
     detectedKind,
+    stylePreset,
     sending,
     creditCost,
     onDraftChange,
@@ -189,6 +192,11 @@ export function StudioComposer({
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {stylePreset !== "none" ? (
+                        <button type="button" onClick={onOpenSettings} className="rounded-full border border-[#ded2c3] bg-[#f6efe4] px-2 py-0.5 text-[11px] text-[#7a3f1f] transition hover:border-[#9b5b32]">
+                            {getStylePreset(stylePreset).label}
+                        </button>
+                    ) : null}
                     <span className="sf-mono text-[11px] text-[#b7a99b]">
                         {modeOverride === "auto" ? `自动 · ${effectiveKind === "image" ? "将生成图片" : "将生成视频"}` : effectiveKind === "image" ? "图片模式" : "视频模式"}
                         {creditCost !== null ? ` · ≈${creditCost} 积分/次` : ""}

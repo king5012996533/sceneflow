@@ -3,6 +3,7 @@
 import { Music2, Sparkles, VideoIcon } from "lucide-react";
 import { Button } from "antd";
 
+import { getStylePreset } from "@/lib/studio/style-presets";
 import type { StudioMessage } from "@/lib/studio/types";
 import { ResultCard } from "./result-card";
 
@@ -43,6 +44,7 @@ export function MessageList({ messages, onQuickPrompt, onUseAsReference, onSaveT
                     <div key={message.id} className="flex justify-end">
                         <div className="max-w-[88%] rounded-2xl bg-black px-4 py-3 text-sm leading-6 text-white">
                             <div className="whitespace-pre-wrap break-words">{message.prompt}</div>
+                            {message.stylePreset && message.stylePreset !== "none" ? <div className="mt-1.5 text-[10px] text-white/50">风格：{getStylePreset(message.stylePreset).label}</div> : null}
                             {message.references.length || message.videoReferences.length || message.audioReferences.length ? (
                                 <div className="mt-2 flex flex-wrap gap-2">
                                     {message.references.map((ref, index) => (
