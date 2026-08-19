@@ -1,4 +1,4 @@
-import { CreditCard, FileText, ImagePlus, Images, Maximize2, Scissors, Shield, Video } from "lucide-react";
+import { CreditCard, FileText, Images, Maximize2, Scissors, Shield, Sparkles } from "lucide-react";
 
 export const navigationTools = [
     {
@@ -9,14 +9,9 @@ export const navigationTools = [
         path: "/canvas/canvas",
     },
     {
-        slug: "image",
-        label: "生图工作台",
-        icon: ImagePlus,
-    },
-    {
-        slug: "video",
-        label: "视频创作台",
-        icon: Video,
+        slug: "studio",
+        label: "创作台",
+        icon: Sparkles,
     },
     {
         slug: "prompts",
