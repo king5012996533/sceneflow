@@ -1,17 +1,17 @@
 "use client";
 
-import { Download, FolderPlus, ImageIcon, LoaderCircle, RefreshCw, VideoIcon } from "lucide-react";
+import { Bookmark, Download, Maximize2, RotateCw, TriangleAlert, WandSparkles } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Button, Image, Tag, Tooltip } from "antd";
 import { saveAs } from "file-saver";
 
-import type { StudioMessage } from "@/lib/studio/types";
+import type { StudioMessage, StudioResult } from "@/lib/studio/types";
 
 type ResultCardProps = {
     message: StudioMessage;
     onUseAsReference: (message: StudioMessage) => void;
     onSaveToAssets: (message: StudioMessage) => void;
     onRetry: (message: StudioMessage) => void;
+    onPreview?: (payload: { src: string; caption: string }) => void;
 };
 
 function useElapsed(active: boolean, startedAt: number) {
@@ -32,85 +32,126 @@ function formatElapsed(ms: number) {
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function ResultCard({ message, onUseAsReference, onSaveToAssets, onRetry }: ResultCardProps) {
+function formatBytes(bytes: number | undefined) {
+    if (!bytes) return "";
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+function resultDuration(results: StudioResult[]) {
+    const first = results[0];
+    if (!first) return "";
+    return formatElapsed(first.durationMs);
+}
+
+export function ResultCard({ message, onUseAsReference, onSaveToAssets, onRetry, onPreview }: ResultCardProps) {
     const elapsed = useElapsed(message.status === "pending", message.createdAt);
     const kindLabel = message.kind === "image" ? "图片" : "视频";
-    const KindIcon = message.kind === "image" ? ImageIcon : VideoIcon;
+
+    if (message.status === "pending") {
+        return (
+            <div className="generation-card">
+                <div className="generation-main">
+                    <div className="loader-ring" />
+                    <strong>正在生成{kindLabel}…</strong>
+                    <p>已耗时 {formatElapsed(elapsed)}</p>
+                </div>
+                <div className="generation-status">
+                    <span>请稍候，模型正在创作</span>
+                    <strong>SceneFlow</strong>
+                </div>
+            </div>
+        );
+    }
+
+    if (message.status === "failed") {
+        return (
+            <div className="failure-card">
+                <div className="failure-icon">
+                    <TriangleAlert />
+                </div>
+                <div className="failure-copy">
+                    <strong>生成失败</strong>
+                    <span>{message.error || "未知错误，请重试"}</span>
+                </div>
+                <button type="button" className="retry-button" onClick={() => onRetry(message)}>
+                    <RotateCw />
+                    重试
+                </button>
+            </div>
+        );
+    }
+
+    const images = message.results.filter((result) => result.kind === "image");
+    const videos = message.results.filter((result) => result.kind === "video");
+
+    if (message.kind === "video" || videos.length) {
+        return (
+            <div className="w-full max-w-[620px]">
+                {videos.map((result, index) => (
+                    <div key={result.id} className="video-result">
+                        <div className="video-stage">
+                            <video src={result.url} controls preload="metadata" />
+                        </div>
+                        <div className="video-meta">
+                            <strong>{message.prompt}</strong>
+                            <span>{formatElapsed(result.durationMs || 0)}</span>
+                        </div>
+                        <div className="video-actions">
+                            <button type="button" className="result-link save-trigger" onClick={() => onSaveToAssets(message)}>
+                                <Bookmark />
+                                保存到素材库
+                            </button>
+                            <button type="button" className="result-link" onClick={() => saveAs(result.url, `video-${result.id}.mp4`)}>
+                                <Download />
+                                下载
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    if (!images.length) return null;
 
     return (
-        <div className="w-full max-w-[560px] rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-4 shadow-[0_12px_40px_rgba(57,48,34,0.08)]">
-            <div className="mb-3 flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
-                    <Tag className="!m-0 !flex !shrink-0 !items-center !gap-1 !rounded-full !border-[#ded2c3] !bg-[#f6efe4] !px-2.5 !py-0.5 !text-[11px] !text-[#9b5b32]">
-                        <KindIcon className="size-3" />
-                        {kindLabel}
-                    </Tag>
-                    <p className="sf-mono truncate text-[11px] leading-5 text-[#7a6d63]">{message.prompt}</p>
-                </div>
-                <span className="shrink-0 text-[11px] text-[#b7a99b]">{formatElapsed(message.results[0]?.durationMs || elapsed)}</span>
-            </div>
-
-            {message.status === "pending" ? (
-                <div className="flex items-center gap-3 rounded-xl bg-[#f6efe4] px-4 py-6 text-sm text-[#7a6d63]">
-                    <LoaderCircle className="size-5 animate-spin text-[#9b5b32]" />
-                    <span>
-                        正在生成{kindLabel}… 已耗时 {formatElapsed(elapsed)}
-                    </span>
-                </div>
-            ) : message.status === "failed" ? (
-                <div className="flex items-center justify-between gap-3 rounded-xl bg-[#fdf1ec] px-4 py-3 text-sm text-[#b3423a]">
-                    <span className="min-w-0 break-words">{message.error || "生成失败"}</span>
-                    <Button size="small" icon={<RefreshCw className="size-3.5" />} onClick={() => onRetry(message)} className="!shrink-0">
-                        重试
-                    </Button>
-                </div>
-            ) : message.kind === "image" ? (
-                <Image.PreviewGroup>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        {message.results.map((result) =>
-                            result.kind === "image" ? (
-                                <div key={result.id} className="group relative overflow-hidden rounded-xl border border-[#ded2c3]">
-                                    <Image src={result.dataUrl} alt={message.prompt} className="aspect-square w-full object-cover" />
-                                    <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1 bg-gradient-to-t from-black/50 to-transparent p-1.5 opacity-0 transition group-hover:opacity-100">
-                                        <Tooltip title="下载">
-                                            <Button size="small" className="!h-6 !min-w-6 !rounded-full !bg-white/90 !p-0" icon={<Download className="size-3.5" />} onClick={() => saveAs(result.dataUrl, `image-${result.id}.png`)} />
-                                        </Tooltip>
-                                        <Tooltip title="保存到素材库">
-                                            <Button size="small" className="!h-6 !min-w-6 !rounded-full !bg-white/90 !p-0" icon={<FolderPlus className="size-3.5" />} onClick={() => onSaveToAssets(message)} />
-                                        </Tooltip>
-                                    </div>
-                                </div>
-                            ) : null,
-                        )}
-                    </div>
-                </Image.PreviewGroup>
-            ) : (
-                <div>
-                    {message.results.map((result) =>
-                        result.kind === "video" ? (
-                            <div key={result.id} className="space-y-2">
-                                <video src={result.url} controls className="w-full rounded-xl border border-[#ded2c3] bg-black" />
-                                <div className="flex justify-end gap-2">
-                                    <Button size="small" icon={<Download className="size-3.5" />} onClick={() => saveAs(result.url, "video.mp4")}>
-                                        下载
-                                    </Button>
-                                    <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onSaveToAssets(message)}>
-                                        保存到素材库
-                                    </Button>
-                                </div>
+        <div className="result-group">
+            {images.map((result, index) => (
+                <article key={result.id} className="result-card">
+                    <div className="result-media">
+                        <img className="previewable" src={result.dataUrl} alt={message.prompt} onClick={() => onPreview?.({ src: result.dataUrl, caption: `${kindLabel} · ${String(index + 1).padStart(2, "0")}` })} />
+                        <div className="result-overlay">
+                            <span>{String(index + 1).padStart(2, "0")}</span>
+                            <div className="overlay-actions">
+                                <button type="button" className="overlay-button preview-trigger" aria-label="预览图片" onClick={() => onPreview?.({ src: result.dataUrl, caption: `${kindLabel} · ${String(index + 1).padStart(2, "0")}` })}>
+                                    <Maximize2 />
+                                </button>
+                                <button type="button" className="overlay-button save-trigger" aria-label="保存到素材库" onClick={() => onSaveToAssets(message)}>
+                                    <Bookmark />
+                                </button>
+                                <button type="button" className="overlay-button" aria-label="下载图片" onClick={() => saveAs(result.dataUrl, `image-${result.id}.png`)}>
+                                    <Download />
+                                </button>
                             </div>
-                        ) : null,
-                    )}
-                </div>
-            )}
-
-            {message.status === "success" ? (
-                <div className="mt-3 flex justify-end">
-                    <Button size="small" type="primary" ghost onClick={() => onUseAsReference(message)}>
-                        继续编辑这张{kindLabel} →
-                    </Button>
-                </div>
-            ) : null}
+                        </div>
+                    </div>
+                    <div className="result-info">
+                        <strong>{message.prompt}</strong>
+                        <span>
+                            {result.width}×{result.height}
+                            {formatBytes(result.bytes) ? ` · ${formatBytes(result.bytes)}` : ""}
+                        </span>
+                    </div>
+                    <div className="result-footer">
+                        <span>{resultDuration(message.results)}</span>
+                        <button type="button" className="result-link continue-trigger" onClick={() => onUseAsReference(message)}>
+                            <WandSparkles />
+                            继续编辑
+                        </button>
+                    </div>
+                </article>
+            ))}
         </div>
     );
 }

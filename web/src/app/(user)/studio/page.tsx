@@ -1,9 +1,9 @@
 "use client";
 
-import { History, SlidersHorizontal } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { App, Button, ConfigProvider, Drawer, Modal } from "antd";
+import { App, ConfigProvider, Modal } from "antd";
 import { nanoid } from "nanoid";
+import { ChevronDown, CircleHelp, Menu, PanelLeftClose, PanelLeftOpen, SlidersHorizontal, Sparkles, X } from "lucide-react";
 
 import { AssetPickerModal, type InsertAssetPayload } from "@/app/(user)/canvas/components/asset-picker-modal";
 import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
@@ -31,6 +31,8 @@ import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
+
+import "./workbench.css";
 
 function isSupportedAudioFile(file: File) {
     return file.type === "audio/mpeg" || file.type === "audio/mp3" || file.type === "audio/wav" || file.type === "audio/x-wav" || /\.(mp3|wav)$/i.test(file.name);
@@ -92,8 +94,10 @@ export default function StudioPage() {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [assetPickerOpen, setAssetPickerOpen] = useState(false);
     const [promptDialogOpen, setPromptDialogOpen] = useState(false);
-    const [sessionsDrawerOpen, setSessionsDrawerOpen] = useState(false);
+    const [railCollapsed, setRailCollapsed] = useState(false);
+    const [mobileRailOpen, setMobileRailOpen] = useState(false);
     const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [preview, setPreview] = useState<{ src: string; caption: string } | null>(null);
 
     useEffect(() => {
         configRef.current = effectiveConfig;
@@ -505,58 +509,101 @@ export default function StudioPage() {
     if (loading) {
         return (
             <ConfigProvider theme={sceneflowTheme("sceneflow-workbench")}>
-                <div className="flex h-full items-center justify-center bg-[#f6efe4] text-sm text-[#b7a99b]">加载中…</div>
+                <div className="flex h-full items-center justify-center bg-[#f6efe4] text-sm text-[#8a7d70]">加载中…</div>
             </ConfigProvider>
         );
     }
 
     return (
         <ConfigProvider theme={sceneflowTheme("sceneflow-workbench")}>
-            <div className="flex h-full flex-col overflow-hidden bg-[#f6efe4] text-[#201914]">
-                <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-                    {/* 移动端会话抽屉 */}
-                    <Drawer title="创作会话" placement="left" width={300} open={sessionsDrawerOpen} onClose={() => setSessionsDrawerOpen(false)} styles={{ body: { padding: 12, background: "#f6efe4" } }}>
-                        <SessionPanel sessions={sessions} activeId={activeSessionId} onSelect={(id) => void switchSession(id)} onCreate={createSession} onDelete={(id) => setDeleteConfirmId(id)} />
-                    </Drawer>
-
-                    {/* 侧栏：会话列表 */}
-                    <aside className="hidden w-[300px] shrink-0 flex-col border-r border-[#e4d9c9] p-4 lg:flex">
-                        <SessionPanel sessions={sessions} activeId={activeSessionId} onSelect={(id) => void switchSession(id)} onCreate={createSession} onDelete={(id) => setDeleteConfirmId(id)} />
-                    </aside>
-
-                    {/* 主对话区 */}
-                    <main className="flex min-w-0 flex-1 flex-col">
-                        <header className="flex items-center justify-between gap-3 border-b border-[#e4d9c9] px-4 py-2.5">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <Button size="small" type="text" icon={<History className="size-4" />} onClick={() => setSessionsDrawerOpen(true)} className="!shrink-0 lg:!hidden" />
-                                <div className="min-w-0">
-                                    <h1 className="sf-serif truncate text-[15px] font-semibold text-[#201914]">{activeSessionTitle}</h1>
-                                    <p className="sf-mono text-[10px] text-[#b7a99b]">
-                                        {effectiveKind === "image" ? "图片生成" : "视频生成"} · {activeModel || "未选择模型"}
-                                    </p>
-                                </div>
+            <div className="sf-workbench h-full">
+                <div className="app-shell">
+                    <header className="topbar">
+                        <div className="topbar-left">
+                            <button type="button" className="icon-button mobile-session-toggle" aria-label="打开会话栏" onClick={() => setMobileRailOpen((value) => !value)}>
+                                <Menu />
+                            </button>
+                            <div className="brand-lockup">
+                                <div className="brand-mark">S</div>
+                                <span className="brand-name">SceneFlow</span>
                             </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                                <span className="sf-mono hidden text-[11px] text-[#b7a99b] sm:inline">余额 {creditBalance == null ? "—" : creditBalance.toLocaleString("zh-CN")}</span>
-                                <Button size="small" icon={<SlidersHorizontal className="size-3.5" />} onClick={() => setSettingsOpen(true)}>
-                                    参数
-                                </Button>
-                            </div>
-                        </header>
-
-                        <div ref={scrollRef} className="thin-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
-                            <div className="mx-auto max-w-3xl">
-                                <MessageList messages={messages} onQuickPrompt={(text) => setDraft(text)} onUseAsReference={useResultAsReference} onSaveToAssets={saveResultToAssets} onRetry={(item) => retryMessage(item)} />
-                                {sending ? (
-                                    <div className="mt-6 flex justify-center">
-                                        <span className="sf-mono text-[11px] text-[#b7a99b]">生成中…</span>
-                                    </div>
-                                ) : null}
+                            <div className="divider-vertical" />
+                            <div className="session-title">
+                                <strong>{activeSessionTitle}</strong>
+                                <ChevronDown className="chevron" />
                             </div>
                         </div>
+                        <div className="topbar-right">
+                            <div className="credit-pill" title="今日积分余额">
+                                <Sparkles className="credit-icon" />
+                                <span className="credit-value">{creditBalance == null ? "—" : creditBalance.toLocaleString("zh-CN")}</span>
+                                <span className="credit-label">积分</span>
+                            </div>
+                            <div className="topbar-actions">
+                                <button type="button" className="icon-button" aria-label="帮助" onClick={() => message.info("这是 SceneFlow 创作台：描述画面即可生成图片/视频，结果可继续编辑。")}>
+                                    <CircleHelp />
+                                </button>
+                                <button type="button" className="icon-button" aria-label="打开参数设置" onClick={() => setSettingsOpen(true)}>
+                                    <SlidersHorizontal />
+                                </button>
+                            </div>
+                        </div>
+                    </header>
 
-                        <div className="px-4 pb-4 pt-2 md:px-6">
-                            <div className="mx-auto max-w-3xl">
+                    <div className="workspace">
+                        {/* 会话栏（桌面可折叠 / 移动端抽屉） */}
+                        <aside className={`session-rail ${railCollapsed ? "is-collapsed" : ""} ${mobileRailOpen ? "is-mobile-open" : ""}`}>
+                            <div className="rail-top">
+                                <span className="rail-label">会话</span>
+                                <button
+                                    type="button"
+                                    className="icon-button"
+                                    aria-label={railCollapsed ? "展开会话栏" : "收起会话栏"}
+                                    onClick={() => {
+                                        if (window.innerWidth <= 780) {
+                                            setMobileRailOpen(false);
+                                            return;
+                                        }
+                                        setRailCollapsed((value) => !value);
+                                    }}
+                                >
+                                    {railCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+                                </button>
+                            </div>
+                            <SessionPanel
+                                sessions={sessions}
+                                activeId={activeSessionId}
+                                onSelect={(id) => {
+                                    setMobileRailOpen(false);
+                                    void switchSession(id);
+                                }}
+                                onCreate={createSession}
+                                onDelete={(id) => setDeleteConfirmId(id)}
+                            />
+                        </aside>
+
+                        {/* 主对话区 */}
+                        <main className="conversation-pane">
+                            <div ref={scrollRef} className="conversation-scroll thin-scrollbar">
+                                <div className="conversation-inner">
+                                    <MessageList
+                                        messages={messages}
+                                        onQuickPrompt={(text) => {
+                                            setDraft(text);
+                                            requestAnimationFrame(() => {
+                                                const el = scrollRef.current;
+                                                if (el) el.scrollTop = el.scrollHeight;
+                                            });
+                                        }}
+                                        onUseAsReference={useResultAsReference}
+                                        onSaveToAssets={saveResultToAssets}
+                                        onRetry={(item) => retryMessage(item)}
+                                        onPreview={(payload) => setPreview(payload)}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="composer-wrap">
                                 <StudioComposer
                                     draft={draft}
                                     references={references}
@@ -582,8 +629,8 @@ export default function StudioPage() {
                                     onRemoveAudioReference={(index) => setAudioReferences((value) => value.filter((_, i) => i !== index))}
                                 />
                             </div>
-                        </div>
-                    </main>
+                        </main>
+                    </div>
                 </div>
 
                 <StudioSettingsDrawer
@@ -596,6 +643,22 @@ export default function StudioPage() {
                     onModelChange={(model) => updateConfig(effectiveKind === "image" ? "imageModel" : "videoModel", model)}
                     onConfigChange={updateConfig}
                 />
+
+                {/* 图片放大预览 */}
+                <div
+                    className={`preview-modal ${preview ? "is-open" : ""}`}
+                    onClick={(event) => {
+                        if (event.target === event.currentTarget) setPreview(null);
+                    }}
+                >
+                    <div className="preview-frame">
+                        <button type="button" className="preview-close" aria-label="关闭预览" onClick={() => setPreview(null)}>
+                            <X />
+                        </button>
+                        {preview ? <img src={preview.src} alt="放大预览" /> : null}
+                        <div className="preview-caption">{preview ? `${preview.caption} · 放大预览` : ""}</div>
+                    </div>
+                </div>
 
                 <PromptSelectDialog open={promptDialogOpen} onOpenChange={setPromptDialogOpen} onSelect={setDraft} />
                 <AssetPickerModal open={assetPickerOpen} onInsert={(payload) => void insertPickedAsset(payload)} onClose={() => setAssetPickerOpen(false)} />

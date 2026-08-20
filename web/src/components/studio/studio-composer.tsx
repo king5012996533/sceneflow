@@ -1,15 +1,20 @@
 "use client";
 
-import { BookOpen, ClipboardPaste, FolderPlus, Music2, Send, SlidersHorizontal, Upload, VideoIcon, X } from "lucide-react";
+import { ArrowUp, AudioLines, Clapperboard, Clipboard, ImagePlus, Library, NotebookTabs, X } from "lucide-react";
 import { useRef } from "react";
-import { Button, Input, Segmented, Tooltip } from "antd";
 
-import type { ReferenceImage } from "@/types/image";
-import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { getStylePreset } from "@/lib/studio/style-presets";
 import type { StudioKind, StudioStylePresetId } from "@/lib/studio/types";
+import type { ReferenceImage } from "@/types/image";
+import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
 export type StudioMode = StudioKind | "auto";
+
+const MODES: { value: StudioMode; label: string }[] = [
+    { value: "auto", label: "自动" },
+    { value: "image", label: "图片" },
+    { value: "video", label: "视频" },
+];
 
 type StudioComposerProps = {
     draft: string;
@@ -65,9 +70,18 @@ export function StudioComposer({
     const audioInputRef = useRef<HTMLInputElement>(null);
 
     const effectiveKind = modeOverride === "auto" ? detectedKind : modeOverride;
+    const hasAttachments = references.length || videoReferences.length || audioReferences.length;
+    const styleLabel = stylePreset !== "none" ? getStylePreset(stylePreset).label : "";
+    const costNote = [
+        styleLabel ? `风格：${styleLabel}` : "",
+        modeOverride === "auto" ? `自动 · 将生成${effectiveKind === "image" ? "图片" : "视频"}` : effectiveKind === "image" ? "图片模式" : "视频模式",
+        creditCost !== null ? `≈${creditCost} 积分/次` : "",
+    ]
+        .filter(Boolean)
+        .join(" · ");
 
     return (
-        <div className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-3 shadow-[0_12px_40px_rgba(57,48,34,0.08)]">
+        <div className="composer">
             <input
                 ref={imageInputRef}
                 type="file"
@@ -105,105 +119,89 @@ export function StudioComposer({
                 }}
             />
 
-            {references.length || videoReferences.length || audioReferences.length ? (
-                <div className="mb-3 flex flex-wrap gap-2">
+            {hasAttachments ? (
+                <div className="attachment-tray has-items">
                     {references.map((ref, index) => (
-                        <div key={ref.id} className="group relative">
-                            <img src={ref.dataUrl} alt={ref.name} className="size-12 rounded-lg border border-[#ded2c3] object-cover" />
-                            <button
-                                type="button"
-                                aria-label="移除参考图"
-                                onClick={() => onRemoveReference(index)}
-                                className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-black/70 text-white opacity-0 transition group-hover:opacity-100"
-                            >
-                                <X className="size-3" />
+                        <div key={ref.id} className="attachment-chip">
+                            <img src={ref.dataUrl} alt={ref.name} />
+                            <button type="button" aria-label="移除参考图" onClick={() => onRemoveReference(index)}>
+                                <X />
                             </button>
                         </div>
                     ))}
                     {videoReferences.map((ref, index) => (
-                        <div key={ref.id} className="flex items-center gap-1.5 rounded-lg border border-[#ded2c3] bg-[#f6efe4] px-2 py-1 text-[11px] text-[#7a6d63]">
-                            <VideoIcon className="size-3.5" />
-                            <span className="max-w-24 truncate">{ref.name}</span>
-                            <button type="button" aria-label="移除参考视频" onClick={() => onRemoveVideoReference(index)} className="text-[#b7a99b] hover:text-[#201914]">
-                                <X className="size-3" />
+                        <div key={ref.id} className="attachment-chip" title={ref.name}>
+                            <span className="attachment-icon">
+                                <Clapperboard />
+                            </span>
+                            <button type="button" aria-label="移除参考视频" onClick={() => onRemoveVideoReference(index)}>
+                                <X />
                             </button>
                         </div>
                     ))}
                     {audioReferences.map((ref, index) => (
-                        <div key={ref.id} className="flex items-center gap-1.5 rounded-lg border border-[#ded2c3] bg-[#f6efe4] px-2 py-1 text-[11px] text-[#7a6d63]">
-                            <Music2 className="size-3.5" />
-                            <span className="max-w-24 truncate">{ref.name}</span>
-                            <button type="button" aria-label="移除参考音频" onClick={() => onRemoveAudioReference(index)} className="text-[#b7a99b] hover:text-[#201914]">
-                                <X className="size-3" />
+                        <div key={ref.id} className="attachment-chip" title={ref.name}>
+                            <span className="attachment-icon">
+                                <AudioLines />
+                            </span>
+                            <button type="button" aria-label="移除参考音频" onClick={() => onRemoveAudioReference(index)}>
+                                <X />
                             </button>
                         </div>
                     ))}
                 </div>
             ) : null}
 
-            <Input.TextArea
+            <textarea
                 value={draft}
+                rows={3}
+                placeholder="描述一个画面，或继续编辑上一张图。Enter 发送，Shift+Enter 换行。"
                 onChange={(event) => onDraftChange(event.target.value)}
-                onPressEnter={(event) => {
-                    if (!event.shiftKey) {
+                onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
                         event.preventDefault();
-                        onSend();
+                        if (!sending) onSend();
                     }
                 }}
-                autoSize={{ minRows: 2, maxRows: 6 }}
-                placeholder="描述你要的画面，例如：一只橘猫戴着飞行员眼镜坐在云端，赛博朋克风格。Enter 发送，Shift+Enter 换行。"
                 disabled={sending}
-                className="!border-0 !bg-transparent !px-1 !shadow-none focus:!shadow-none"
             />
 
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-[#f0e8dc] pt-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                    <Segmented
-                        size="small"
-                        value={modeOverride}
-                        onChange={(value) => onModeChange(value as StudioMode)}
-                        options={[
-                            { label: "自动", value: "auto" },
-                            { label: "图片", value: "image" },
-                            { label: "视频", value: "video" },
-                        ]}
-                    />
-                    <Tooltip title="上传参考图片（最多 9 张）">
-                        <Button size="small" type="text" icon={<Upload className="size-4" />} onClick={() => imageInputRef.current?.click()} disabled={sending} />
-                    </Tooltip>
-                    <Tooltip title="上传参考视频（最多 3 个）">
-                        <Button size="small" type="text" icon={<VideoIcon className="size-4" />} onClick={() => videoInputRef.current?.click()} disabled={sending} />
-                    </Tooltip>
-                    <Tooltip title="上传参考音频（最多 3 个）">
-                        <Button size="small" type="text" icon={<Music2 className="size-4" />} onClick={() => audioInputRef.current?.click()} disabled={sending} />
-                    </Tooltip>
-                    <Tooltip title="粘贴剪切板图片">
-                        <Button size="small" type="text" icon={<ClipboardPaste className="size-4" />} onClick={onPasteClipboard} disabled={sending} />
-                    </Tooltip>
-                    <Tooltip title="从素材库选择">
-                        <Button size="small" type="text" icon={<FolderPlus className="size-4" />} onClick={onOpenAssetPicker} disabled={sending} />
-                    </Tooltip>
-                    <Tooltip title="提示词库">
-                        <Button size="small" type="text" icon={<BookOpen className="size-4" />} onClick={onOpenPromptDialog} disabled={sending} />
-                    </Tooltip>
-                    <Tooltip title="生成参数">
-                        <Button size="small" type="text" icon={<SlidersHorizontal className="size-4" />} onClick={onOpenSettings} />
-                    </Tooltip>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    {stylePreset !== "none" ? (
-                        <button type="button" onClick={onOpenSettings} className="rounded-full border border-[#ded2c3] bg-[#f6efe4] px-2 py-0.5 text-[11px] text-[#7a3f1f] transition hover:border-[#9b5b32]">
-                            {getStylePreset(stylePreset).label}
+            <div className="composer-bottom">
+                <div className="composer-left">
+                    <div className="mode-switch">
+                        {MODES.map((mode) => (
+                            <button key={mode.value} type="button" className={`mode-button ${modeOverride === mode.value ? "is-active" : ""}`} data-mode={mode.value} onClick={() => onModeChange(mode.value)}>
+                                {mode.label}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="asset-actions">
+                        <button type="button" className="asset-button" data-asset="image" aria-label="添加图片" onClick={() => imageInputRef.current?.click()} disabled={sending}>
+                            <ImagePlus />
                         </button>
-                    ) : null}
-                    <span className="sf-mono text-[11px] text-[#b7a99b]">
-                        {modeOverride === "auto" ? `自动 · ${effectiveKind === "image" ? "将生成图片" : "将生成视频"}` : effectiveKind === "image" ? "图片模式" : "视频模式"}
-                        {creditCost !== null ? ` · ≈${creditCost} 积分/次` : ""}
-                    </span>
-                    <Button type="primary" icon={<Send className="size-4" />} onClick={onSend} loading={sending} className="!rounded-xl">
-                        生成
-                    </Button>
+                        <button type="button" className="asset-button" data-asset="video" aria-label="添加视频" onClick={() => videoInputRef.current?.click()} disabled={sending}>
+                            <Clapperboard />
+                        </button>
+                        <button type="button" className="asset-button" data-asset="audio" aria-label="添加音频" onClick={() => audioInputRef.current?.click()} disabled={sending}>
+                            <AudioLines />
+                        </button>
+                        <button type="button" className="asset-button" data-asset="clipboard" aria-label="从剪贴板添加" onClick={onPasteClipboard} disabled={sending}>
+                            <Clipboard />
+                        </button>
+                        <button type="button" className="asset-button" data-asset="library" aria-label="从素材库添加" onClick={onOpenAssetPicker} disabled={sending}>
+                            <Library />
+                        </button>
+                        <button type="button" className="asset-button" data-asset="prompt" aria-label="打开提示词库" onClick={onOpenPromptDialog} disabled={sending}>
+                            <NotebookTabs />
+                        </button>
+                    </div>
+                </div>
+                <div className="composer-right">
+                    <span className="cost-note">{costNote}</span>
+                    <span className="keyboard-hint">Enter 发送 · Shift+Enter 换行</span>
+                    <button type="button" className="primary-button" onClick={onSend} disabled={sending} aria-label="发送">
+                        {sending ? <span className="inline-block size-3 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : <ArrowUp />}
+                    </button>
                 </div>
             </div>
         </div>
