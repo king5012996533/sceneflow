@@ -1,6 +1,7 @@
 import { createGeneratedVideoTask, persistGeneratedVideo, pollGeneratedVideoTask, requestGeneratedImages, type GuardedVideoGenerationTask } from "@/lib/generation/generation-request";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { seedanceVideoReferenceError, seedanceVideoReferenceHint } from "@/lib/seedance-video";
+import { uploadImage } from "@/services/image-storage";
 import type { AiConfig } from "@/stores/use-config-store";
 import { nanoid } from "nanoid";
 import type { StudioImageResult, StudioInstruction, StudioMessage, StudioVideoResult } from "./types";
@@ -25,14 +26,18 @@ async function runImageGeneration(instruction: StudioInstruction, onUpdate: (upd
     const result = await requestGeneratedImages({ config: instruction.config, prompt: instruction.prompt, references: instruction.references });
     const image = result[0];
     if (!image) throw new Error("接口没有返回图片");
-    const meta = await readImageMeta(image.dataUrl);
+    // 持久化到存储（与参考图同一套）：会话只留 storageKey，避免每次保存把全部 base64 重写进 IndexedDB。
+    // 存储失败（配额等）时回退为 dataUrl 直存，不阻塞生成。
+    const persisted = await uploadImage(image.dataUrl).catch(() => null);
+    const meta = persisted ? { width: persisted.width, height: persisted.height } : await readImageMeta(image.dataUrl);
     const studioImage: StudioImageResult = {
         kind: "image",
         id: image.id,
-        dataUrl: image.dataUrl,
+        dataUrl: persisted?.url ?? image.dataUrl,
+        storageKey: persisted?.storageKey,
         width: meta.width,
         height: meta.height,
-        bytes: getDataUrlByteSize(image.dataUrl),
+        bytes: persisted?.bytes ?? getDataUrlByteSize(image.dataUrl),
         durationMs: performance.now() - startedAt,
     };
     onUpdate({ status: "success", results: [studioImage], error: undefined });
