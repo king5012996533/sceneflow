@@ -15,9 +15,9 @@ type CreditBalanceCardProps = {
 /** 积分余额卡片（定价页 / 账单页共用） */
 export function CreditBalanceCard({ balance, loading, onRefresh, actionHref = "/billing", actionLabel = "充值 / 明细" }: CreditBalanceCardProps) {
     return (
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#e6e8ec] bg-white p-5 shadow-[0_4px_24px_rgba(16,24,40,0.06)]">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#dde2dc] bg-white p-5 shadow-[0_4px_24px_rgba(16,24,40,0.06)]">
             <div className="flex items-center gap-4">
-                <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-[#eef1ff] text-[#4f6bff]">
+                <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-[#e7ece8] text-[#75827c]">
                     <Coins className="size-6" />
                 </div>
                 <div>
@@ -33,13 +33,13 @@ export function CreditBalanceCard({ balance, loading, onRefresh, actionHref = "/
                     <button
                         type="button"
                         onClick={onRefresh}
-                        className="grid size-10 place-items-center rounded-xl border border-[#e6e8ec] text-[#667085] transition hover:border-[#c7d2fe] hover:text-[#4f6bff]"
+                        className="grid size-10 place-items-center rounded-xl border border-[#dde2dc] text-[#67726b] transition hover:border-[#c7d2fe] hover:text-[#75827c]"
                         title="刷新余额"
                     >
                         <RefreshCw className="size-4" />
                     </button>
                 ) : null}
-                <Link href={actionHref} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#4f5dff] px-4 text-sm font-medium text-white transition hover:opacity-90">
+                <Link href={actionHref} className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#75827c] px-4 text-sm font-medium text-white transition hover:opacity-90">
                     {actionLabel}
                     <ArrowRight className="size-4" />
                 </Link>

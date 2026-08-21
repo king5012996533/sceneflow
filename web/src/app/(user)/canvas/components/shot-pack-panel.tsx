@@ -34,7 +34,7 @@ export function ShotPackPanel({ node, imageNodes, busy, onClose, onAddShot, onSp
     const sourceOptions = availableImages.map((item) => ({ label: item.title || item.id, value: item.id }));
 
     return (
-        <div className="thin-scrollbar max-h-[620px] overflow-y-auto rounded-2xl border border-[#ded8cd] bg-[#fffaf1] p-4 text-[#111827] shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="thin-scrollbar max-h-[620px] overflow-y-auto rounded-2xl border border-[#ded8cd] bg-[#f7f9f5] p-4 text-[#111827] shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3 border-b border-[#e8dfd1] pb-3">
                 <div>
                     <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#4f46e5]">
@@ -91,7 +91,7 @@ export function ShotPackPanel({ node, imageNodes, busy, onClose, onAddShot, onSp
                 {pack.shots.length ? (
                     pack.shots.map((shot, index) => (
                         <div key={shot.id} className="grid grid-cols-[72px_1fr_84px] gap-3 rounded-xl border border-[#e8dfd1] bg-white p-2">
-                            <img src={shot.imageUrl} alt={shot.title} className="h-16 w-[72px] rounded-lg bg-[#f3f0ea] object-cover" />
+                            <img src={shot.imageUrl} alt={shot.title} className="h-16 w-[72px] rounded-lg bg-[#f7f9f5] object-cover" />
                             <div className="min-w-0 space-y-2">
                                 <div className="grid grid-cols-[1fr_80px] gap-2">
                                     <Input value={shot.title} placeholder={`镜头 ${index + 1}`} onChange={(event) => onUpdateShot(shot.id, { title: event.target.value })} />

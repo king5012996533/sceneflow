@@ -157,10 +157,10 @@ export default function CredentialsTab() {
     }
 
     return (
-        <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+        <section className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
             <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="sf-serif flex items-center gap-2 text-[17px] font-semibold">
-                    <KeyRound className="size-4 text-[#9b5b32]" />
+                    <KeyRound className="size-4 text-[#a0713f]" />
                     平台密钥
                 </div>
                 <div className="flex items-center gap-2">
@@ -172,7 +172,7 @@ export default function CredentialsTab() {
                     </Button>
                 </div>
             </div>
-            <p className="mb-4 text-xs leading-5 text-[#7a6d63]">
+            <p className="mb-4 text-xs leading-5 text-[#67726b]">
                 平台统一配置上游 API Key（AES-256-GCM 加密存储，明文永不进客户端）。代理按目标地址匹配注入；多个凭证按优先级取用。逐模型「能力标定」与前端画质 / 分辨率 / 比例 / 时长等参数一一对应，改完约 60 秒内生效（客户端目录缓存）。
             </p>
 
@@ -203,7 +203,7 @@ export default function CredentialsTab() {
                                             </Tag>
                                         ))
                                     ) : (
-                                        <span className="text-xs text-[#7a6d63]">全部</span>
+                                        <span className="text-xs text-[#67726b]">全部</span>
                                     )}
                                     {value.length > 4 ? <Tag>+{value.length - 4}</Tag> : null}
                                     {capCount ? <Tag color="blue">能力标定 {capCount}</Tag> : null}

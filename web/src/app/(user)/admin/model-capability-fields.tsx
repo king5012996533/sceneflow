@@ -66,7 +66,7 @@ export function ModelCapabilityFields({ model, spec, onChange }: ModelCapability
                     恢复默认
                 </Button>
             </div>
-            <p className="text-xs leading-5 text-[#7a6d63]">勾选该模型支持的能力；不勾选 = 全部支持。保存后约 60 秒内在生成设置面板生效。</p>
+            <p className="text-xs leading-5 text-[#67726b]">勾选该模型支持的能力；不勾选 = 全部支持。保存后约 60 秒内在生成设置面板生效。</p>
             {spec.kind === IMAGE_KIND ? <ImageFields spec={spec} onChange={onChange} /> : null}
             {spec.kind === SEEDANCE_VIDEO_KIND ? <SeedanceFields spec={spec} onChange={onChange} /> : null}
             {spec.kind === GENERIC_VIDEO_KIND ? <GenericVideoFields spec={spec} onChange={onChange} /> : null}
@@ -75,7 +75,7 @@ export function ModelCapabilityFields({ model, spec, onChange }: ModelCapability
 }
 
 function FieldLabel({ children }: { children: string }) {
-    return <div className="mb-1 text-sm text-[#201914]">{children}</div>;
+    return <div className="mb-1 text-sm text-[#2a3330]">{children}</div>;
 }
 
 function ImageFields({ spec, onChange }: { spec: ImageCapabilitySpec; onChange: (next: ModelCapabilitySpec) => void }) {
@@ -138,11 +138,11 @@ function SeedanceFields({ spec, onChange }: { spec: SeedanceVideoCapabilitySpec;
                 />
             </div>
             <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 text-sm text-[#201914]">
+                <label className="flex items-center gap-2 text-sm text-[#2a3330]">
                     <Switch size="small" checked={spec.audio} onChange={(checked) => onChange({ ...spec, audio: checked })} />
                     生成声音
                 </label>
-                <label className="flex items-center gap-2 text-sm text-[#201914]">
+                <label className="flex items-center gap-2 text-sm text-[#2a3330]">
                     <Switch size="small" checked={spec.watermark} onChange={(checked) => onChange({ ...spec, watermark: checked })} />
                     添加水印
                 </label>

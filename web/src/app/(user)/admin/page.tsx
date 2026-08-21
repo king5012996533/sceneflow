@@ -185,8 +185,8 @@ export default function AdminPage() {
 
     if (checkingAccess || user?.role !== "admin") {
         return (
-            <main className="grid h-full place-items-center bg-[#f6efe4] px-6">
-                <div className="rounded-xl border border-[#ded2c3] bg-[#fffdf8] p-6 text-sm text-[#7a6d63] shadow-sm">正在校验管理员权限...</div>
+            <main className="grid h-full place-items-center bg-[#f4f6f2] px-6">
+                <div className="rounded-xl border border-[#dde2dc] bg-[#ffffff] p-6 text-sm text-[#67726b] shadow-sm">正在校验管理员权限...</div>
             </main>
         );
     }
@@ -195,18 +195,18 @@ export default function AdminPage() {
 
     return (
         <ConfigProvider theme={adminTheme}>
-            <main className="h-full overflow-y-auto bg-[#f6efe4] px-6 py-8 text-[#201914]">
+            <main className="h-full overflow-y-auto bg-[#f4f6f2] px-6 py-8 text-[#2a3330]">
                 <div className="mx-auto max-w-[1180px]">
                     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
                         <div>
-                            <div className="mb-2.5 inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.24em] text-[#9b5b32]">
+                            <div className="mb-2.5 inline-flex items-center gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.24em] text-[#a0713f]">
                                 <Shield className="size-3.5" />
                                 ADMIN · 控制台
                             </div>
-                            <h1 className="sf-serif text-[30px] font-semibold tracking-[0.01em] text-[#201914]">管理后台</h1>
-                            <p className="mt-2 max-w-[520px] text-[13px] leading-relaxed text-[#7a6d63]">内测期间订单由管理员人工确认后入账，待处理订单会以红点标注。</p>
+                            <h1 className="sf-serif text-[30px] font-semibold tracking-[0.01em] text-[#2a3330]">管理后台</h1>
+                            <p className="mt-2 max-w-[520px] text-[13px] leading-relaxed text-[#67726b]">内测期间订单由管理员人工确认后入账，待处理订单会以红点标注。</p>
                         </div>
-                        <Button loading={loading} onClick={() => void loadAll()} className="!border-[#ded2c3] !bg-[#fffdf8] !text-[#201914]">
+                        <Button loading={loading} onClick={() => void loadAll()} className="!border-[#dde2dc] !bg-[#ffffff] !text-[#2a3330]">
                             刷新数据
                         </Button>
                     </div>
@@ -225,10 +225,10 @@ export default function AdminPage() {
                                 key: "users",
                                 label: "用户管理",
                                 children: (
-                                    <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+                                    <section className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                                         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                                             <div className="sf-serif flex items-center gap-2 text-[17px] font-semibold">
-                                                <Users className="size-4 text-[#9b5b32]" />
+                                                <Users className="size-4 text-[#a0713f]" />
                                                 用户列表
                                             </div>
                                             <Input.Search value={query} onChange={(event) => setQuery(event.target.value)} onSearch={() => void loadAll()} placeholder="搜索邮箱、昵称、手机号" className="max-w-md" />
@@ -248,19 +248,19 @@ export default function AdminPage() {
                                                     <tr key={item.id}>
                                                         <td className="py-3">
                                                             <div className="flex items-center gap-3">
-                                                                <span className="sf-serif flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[#9b5b32] text-[14px] font-semibold text-[#fffaf2]">
+                                                                <span className="sf-serif flex size-[30px] shrink-0 items-center justify-center rounded-[9px] bg-[#a0713f] text-[14px] font-semibold text-[#ffffff]">
                                                                     {(item.name || item.email || "U").slice(0, 1).toUpperCase()}
                                                                 </span>
                                                                 <div className="min-w-0">
-                                                                    <div className="font-medium text-[#201914]">{item.name || item.email}</div>
-                                                                    <div className="text-xs text-[#7a6d63]">{item.email}</div>
-                                                                    {item.phone ? <div className="text-[11px] text-[#b7a99b]">{item.phone}</div> : null}
+                                                                    <div className="font-medium text-[#2a3330]">{item.name || item.email}</div>
+                                                                    <div className="text-xs text-[#67726b]">{item.email}</div>
+                                                                    {item.phone ? <div className="text-[11px] text-[#9aa49e]">{item.phone}</div> : null}
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td className="py-3 text-sm text-[#5a4f47]">
+                                                        <td className="py-3 text-sm text-[#3c4742]">
                                                             <div>{formatDateTime(item.createdAt)}</div>
-                                                            <div className="text-xs text-[#b7a99b]">{formatRelativeTime(item.createdAt)}</div>
+                                                            <div className="text-xs text-[#9aa49e]">{formatRelativeTime(item.createdAt)}</div>
                                                         </td>
                                                         <td className="py-3">
                                                             <Select
@@ -295,9 +295,9 @@ export default function AdminPage() {
                                     </span>
                                 ),
                                 children: (
-                                    <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+                                    <section className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                                         <div className="sf-serif mb-4 flex items-center gap-2 text-[17px] font-semibold">
-                                            <CreditCard className="size-4 text-[#9b5b32]" />
+                                            <CreditCard className="size-4 text-[#a0713f]" />
                                             订单列表
                                             {pendingOrders > 0 ? <Tag color="red">{pendingOrders} 笔待处理</Tag> : null}
                                         </div>
@@ -319,14 +319,14 @@ export default function AdminPage() {
                                                         <td className="py-3 font-mono text-xs">{order.orderNo}</td>
                                                         <td className="py-3">
                                                             <div className="font-medium">{order.user.name || order.user.email}</div>
-                                                            <div className="text-xs text-[#7a6d63]">{order.user.email}</div>
+                                                            <div className="text-xs text-[#67726b]">{order.user.email}</div>
                                                         </td>
                                                         <td className="py-3">{order.package?.name || "—"}</td>
                                                         <td className="py-3">{formatCny(order.amount)}</td>
                                                         <td className="py-3">{order.provider === "manual" ? "人工确认" : order.provider}</td>
-                                                        <td className="py-3 text-sm text-[#5a4f47]">
+                                                        <td className="py-3 text-sm text-[#3c4742]">
                                                             <div>{formatDateTime(order.createdAt)}</div>
-                                                            <div className="text-xs text-[#b7a99b]">{formatRelativeTime(order.createdAt)}</div>
+                                                            <div className="text-xs text-[#9aa49e]">{formatRelativeTime(order.createdAt)}</div>
                                                         </td>
                                                         <td className="py-3">
                                                             <Select
@@ -358,9 +358,9 @@ export default function AdminPage() {
                                 key: "jobs",
                                 label: "生成记录",
                                 children: (
-                                    <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+                                    <section className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                                         <div className="sf-serif mb-4 flex items-center gap-2 text-[17px] font-semibold">
-                                            <FileText className="size-4 text-[#9b5b32]" />
+                                            <FileText className="size-4 text-[#a0713f]" />
                                             AI 生成任务
                                         </div>
                                         <DataTable empty={!generationJobs.length}>
@@ -377,7 +377,7 @@ export default function AdminPage() {
                                             <tbody>
                                                 {generationJobs.map((job) => (
                                                     <tr key={job.id}>
-                                                        <td className="py-3 text-sm text-[#5a4f47]">{formatDateTime(job.createdAt)}</td>
+                                                        <td className="py-3 text-sm text-[#3c4742]">{formatDateTime(job.createdAt)}</td>
                                                         <td className="py-3 text-sm">{job.user?.email || "-"}</td>
                                                         <td className="py-3">
                                                             <Tag>{job.kind}</Tag>
@@ -389,10 +389,10 @@ export default function AdminPage() {
                                                         <td className="py-3">
                                                             {job.resultUrl ? (
                                                                 <a href={job.resultUrl} target="_blank" rel="noopener noreferrer">
-                                                                    <img src={job.resultUrl} alt="生成结果" className="h-12 w-12 rounded border border-[#ded2c3] object-cover" />
+                                                                    <img src={job.resultUrl} alt="生成结果" className="h-12 w-12 rounded border border-[#dde2dc] object-cover" />
                                                                 </a>
                                                             ) : (
-                                                                <span className="text-xs text-[#b7a99b]">-</span>
+                                                                <span className="text-xs text-[#9aa49e]">-</span>
                                                             )}
                                                         </td>
                                                     </tr>
@@ -406,9 +406,9 @@ export default function AdminPage() {
                                 key: "audit",
                                 label: "审计日志",
                                 children: (
-                                    <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+                                    <section className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                                         <div className="sf-serif mb-4 flex items-center gap-2 text-[17px] font-semibold">
-                                            <History className="size-4 text-[#9b5b32]" />
+                                            <History className="size-4 text-[#a0713f]" />
                                             管理员操作记录
                                         </div>
                                         <DataTable empty={!auditLogs.length}>
@@ -425,14 +425,14 @@ export default function AdminPage() {
                                             <tbody>
                                                 {auditLogs.map((log) => (
                                                     <tr key={log.id}>
-                                                        <td className="py-3 text-sm text-[#5a4f47]">{formatDateTime(log.createdAt)}</td>
+                                                        <td className="py-3 text-sm text-[#3c4742]">{formatDateTime(log.createdAt)}</td>
                                                         <td className="py-3 text-sm">{log.actor?.email || "-"}</td>
                                                         <td className="py-3">
                                                             <Tag>{log.action}</Tag>
                                                         </td>
                                                         <td className="py-3 text-sm">{log.target}</td>
-                                                        <td className="py-3 font-mono text-xs text-[#7a6d63]">{log.targetId.slice(0, 12)}...</td>
-                                                        <td className="max-w-[200px] truncate py-3 text-xs text-[#b7a99b]">{JSON.stringify(log.metadata)}</td>
+                                                        <td className="py-3 font-mono text-xs text-[#67726b]">{log.targetId.slice(0, 12)}...</td>
+                                                        <td className="max-w-[200px] truncate py-3 text-xs text-[#9aa49e]">{JSON.stringify(log.metadata)}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -465,13 +465,13 @@ export default function AdminPage() {
 
 function Metric({ icon: Icon, label, value, caption }: { icon: typeof Users; label: string; value: string | number; caption: string }) {
     return (
-        <div className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-4 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
-            <div className="mb-2.5 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7a6d63]">
-                <Icon className="size-3.5 text-[#9b5b32]" />
+        <div className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-4 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+            <div className="mb-2.5 flex items-center gap-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[#67726b]">
+                <Icon className="size-3.5 text-[#a0713f]" />
                 {label}
             </div>
-            <div className="sf-serif text-[26px] font-semibold tracking-[0.01em] text-[#201914]">{value}</div>
-            <div className="mt-1 text-[11px] text-[#b7a99b]">{caption}</div>
+            <div className="sf-serif text-[26px] font-semibold tracking-[0.01em] text-[#2a3330]">{value}</div>
+            <div className="mt-1 text-[11px] text-[#9aa49e]">{caption}</div>
         </div>
     );
 }

@@ -28,7 +28,7 @@ export function UserStatusActions({ showThemeToggle = true, variant = "default",
     const { user, clearSession, fetchSession } = useUserStore();
     const canvasTheme = canvasThemes[theme];
     const naturalIconClass =
-        "inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#ded3c4] bg-[#fffefa] text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] transition hover:border-[#c6bbac] hover:bg-[#f2ede4] hover:text-[#050816] dark:border-white/10 dark:bg-stone-900 dark:text-stone-300 dark:hover:text-white [&_svg]:size-4";
+        "inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#ded3c4] bg-[#ffffff] text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] transition hover:border-[#c6bbac] hover:bg-[#f2f5f0] hover:text-[#050816] dark:border-white/10 dark:bg-stone-900 dark:text-stone-300 dark:hover:text-white [&_svg]:size-4";
     const iconStyle: CSSProperties | undefined = variant === "canvas" ? { color: canvasTheme.node.text } : variant === "home" ? { color: "rgba(255,255,255,.82)" } : undefined;
     const versionStyle = iconStyle;
     const gitHubClassName = "size-7 text-base";
@@ -69,7 +69,7 @@ export function UserStatusActions({ showThemeToggle = true, variant = "default",
                         href="/canvas/login"
                         className={cn(
                             "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition-all",
-                            variant === "home" ? "border-transparent text-white/68 hover:bg-white/8 hover:text-white" : "border-[#ded3c4] bg-[#fffefa] text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] hover:bg-[#f2ede4] hover:text-[#050816]",
+                            variant === "home" ? "border-transparent text-white/68 hover:bg-white/8 hover:text-white" : "border-[#ded3c4] bg-[#ffffff] text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] hover:bg-[#f2f5f0] hover:text-[#050816]",
                         )}
                     >
                         <User className="size-3.5" />
@@ -81,7 +81,7 @@ export function UserStatusActions({ showThemeToggle = true, variant = "default",
                             "sceneflow-register-action inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-all",
                             variant === "home"
                                 ? "border border-white/14 bg-white/8 text-white hover:bg-white/12"
-                                : "bg-[#4f5dff] text-white shadow-[0_10px_24px_rgba(79,93,255,0.18)] hover:bg-[#3846e8] dark:bg-white dark:text-stone-950 dark:hover:bg-stone-200",
+                                : "bg-[#75827c] text-white shadow-[0_10px_24px_rgba(79,93,255,0.18)] hover:bg-[#3846e8] dark:bg-white dark:text-stone-950 dark:hover:bg-stone-200",
                         )}
                     >
                         注册

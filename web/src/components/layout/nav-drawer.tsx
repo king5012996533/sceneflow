@@ -46,25 +46,25 @@ export function NavDrawer({ open, activeToolSlug, onClose }: NavDrawerProps) {
             maskClosable
             keyboard
             styles={{
-                content: { background: "#fffdf8", borderTop: "5px solid #201914", overflow: "hidden" },
+                content: { background: "#ffffff", borderTop: "5px solid #2a3330", overflow: "hidden" },
                 header: { display: "none" },
                 body: { padding: 0, display: "flex", flexDirection: "column", height: "100%" },
-                mask: { background: "rgba(32,25,20,0.30)" },
+                mask: { background: "rgba(42,51,48,0.30)" },
             }}
         >
             {/* 头部：品牌 + 关闭 */}
-            <div className="flex h-16 shrink-0 items-center justify-between border-b border-[#ded2c3] pl-5 pr-3.5">
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-[#dde2dc] pl-5 pr-3.5">
                 <Link href="/" onClick={onClose} className="flex items-center gap-2.5" aria-label="SceneFlow 首页">
                     <span
-                        className="size-5 shrink-0 bg-[#201914]"
+                        className="size-5 shrink-0 bg-[#2a3330]"
                         style={{
                             mask: `url(${publicPath("/logo.svg")}) center / contain no-repeat`,
                             WebkitMask: `url(${publicPath("/logo.svg")}) center / contain no-repeat`,
                         }}
                     />
-                    <span className="sf-serif text-[16px] font-semibold leading-none text-[#201914]">SceneFlow</span>
+                    <span className="sf-serif text-[16px] font-semibold leading-none text-[#2a3330]">SceneFlow</span>
                 </Link>
-                <button type="button" onClick={onClose} aria-label="关闭导航" title="关闭导航" className="flex size-8 shrink-0 items-center justify-center rounded-[9px] text-[#7a6d63] transition hover:bg-[#f1e3cf] hover:text-[#201914]">
+                <button type="button" onClick={onClose} aria-label="关闭导航" title="关闭导航" className="flex size-8 shrink-0 items-center justify-center rounded-[9px] text-[#67726b] transition hover:bg-[#e7ece8] hover:text-[#2a3330]">
                     <X className="size-4" />
                 </button>
             </div>
@@ -76,7 +76,7 @@ export function NavDrawer({ open, activeToolSlug, onClose }: NavDrawerProps) {
                     if (items.length === 0) return null;
                     return (
                         <div key={group.eyebrow}>
-                            <p className="sf-mono mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#7a6d63]">{group.eyebrow}</p>
+                            <p className="sf-mono mb-2 px-2.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#67726b]">{group.eyebrow}</p>
                             <div className="space-y-0.5">
                                 {items.map((tool) => {
                                     const Icon = tool.icon;
@@ -87,11 +87,11 @@ export function NavDrawer({ open, activeToolSlug, onClose }: NavDrawerProps) {
                                             href={tool.path ?? `/${tool.slug}`}
                                             onClick={onClose}
                                             className={cn(
-                                                "relative flex h-11 items-center gap-3 rounded-[10px] px-2.5 text-[14px] font-medium text-[#7a6d63] transition hover:bg-[#f7f1e6] hover:text-[#201914]",
-                                                active && "bg-[#f1e3cf] font-semibold text-[#201914] before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-r-[3px] before:bg-[#9b5b32]",
+                                                "relative flex h-11 items-center gap-3 rounded-[10px] px-2.5 text-[14px] font-medium text-[#67726b] transition hover:bg-[#f7f9f5] hover:text-[#2a3330]",
+                                                active && "bg-[#e7ece8] font-semibold text-[#2a3330] before:absolute before:left-0 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-r-[3px] before:bg-[#a0713f]",
                                             )}
                                         >
-                                            <span className={cn("flex size-[30px] shrink-0 items-center justify-center rounded-[9px] border border-[#ded2c3] bg-[#fffdf8] text-[#7a6d63]", active && "border-transparent text-[#9b5b32]")}>
+                                            <span className={cn("flex size-[30px] shrink-0 items-center justify-center rounded-[9px] border border-[#dde2dc] bg-[#ffffff] text-[#67726b]", active && "border-transparent text-[#a0713f]")}>
                                                 <Icon className="size-[15px]" />
                                             </span>
                                             <span>{tool.label}</span>
@@ -105,13 +105,13 @@ export function NavDrawer({ open, activeToolSlug, onClose }: NavDrawerProps) {
             </nav>
 
             {/* 底部：用户区 / 登录注册 + 文档/主题 */}
-            <div className="shrink-0 border-t border-[#ded2c3] px-3.5 pb-3.5 pt-3">
+            <div className="shrink-0 border-t border-[#dde2dc] px-3.5 pb-3.5 pt-3">
                 {user ? (
                     <div className="flex items-center gap-2.5 px-1.5 pb-2.5 pt-1">
-                        <span className="sf-serif flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-[#9b5b32] text-[15px] font-semibold text-[#fffaf2]">{(user.name || user.email || "U").slice(0, 1).toUpperCase()}</span>
+                        <span className="sf-serif flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-[#a0713f] text-[15px] font-semibold text-[#ffffff]">{(user.name || user.email || "U").slice(0, 1).toUpperCase()}</span>
                         <div className="min-w-0 flex-1">
-                            <strong className="block truncate text-[13px] font-semibold text-[#201914]">{user.name || user.email}</strong>
-                            <small className="block truncate text-[11px] text-[#7a6d63]">{user.email}</small>
+                            <strong className="block truncate text-[13px] font-semibold text-[#2a3330]">{user.name || user.email}</strong>
+                            <small className="block truncate text-[11px] text-[#67726b]">{user.email}</small>
                         </div>
                         <button
                             type="button"
@@ -120,37 +120,37 @@ export function NavDrawer({ open, activeToolSlug, onClose }: NavDrawerProps) {
                             }}
                             title="退出登录"
                             aria-label="退出登录"
-                            className="flex size-8 shrink-0 items-center justify-center rounded-[9px] text-[#7a6d63] transition hover:bg-[#f6e3df] hover:text-[#a3342c]"
+                            className="flex size-8 shrink-0 items-center justify-center rounded-[9px] text-[#67726b] transition hover:bg-[#f6e8e5] hover:text-[#a3342c]"
                         >
                             <LogOut className="size-4" />
                         </button>
                     </div>
                 ) : (
                     <div className="flex items-center gap-2 px-1.5 pb-2.5 pt-1">
-                        <Link href="/login" onClick={onClose} className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-[9px] border border-[#ded2c3] bg-[#fffdf8] text-xs font-semibold text-[#201914] transition hover:bg-[#f2ede4]">
+                        <Link href="/login" onClick={onClose} className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-[9px] border border-[#dde2dc] bg-[#ffffff] text-xs font-semibold text-[#2a3330] transition hover:bg-[#f2f5f0]">
                             <UserRound className="size-3.5" />
                             登录
                         </Link>
-                        <Link href="/register" onClick={onClose} className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-[9px] bg-[#9b5b32] text-xs font-semibold text-[#fffaf2] transition hover:bg-[#8a4f2b]">
+                        <Link href="/register" onClick={onClose} className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-[9px] bg-[#a0713f] text-xs font-semibold text-[#ffffff] transition hover:bg-[#8a4f2b]">
                             注册
                         </Link>
                     </div>
                 )}
-                <div className="flex items-center border-t border-dashed border-[#ded2c3] pt-2">
-                    <a href={DOCS_URL} target="_blank" rel="noopener noreferrer" className="flex h-8 items-center gap-1.5 rounded-[9px] px-2 text-xs font-medium text-[#7a6d63] transition hover:bg-[#f1e3cf] hover:text-[#201914]">
+                <div className="flex items-center border-t border-dashed border-[#dde2dc] pt-2">
+                    <a href={DOCS_URL} target="_blank" rel="noopener noreferrer" className="flex h-8 items-center gap-1.5 rounded-[9px] px-2 text-xs font-medium text-[#67726b] transition hover:bg-[#e7ece8] hover:text-[#2a3330]">
                         <BookOpen className="size-3.5" />
                         文档
                     </a>
                     <AnimatedThemeToggler
                         theme={theme === "dark" ? "dark" : "light"}
                         onThemeChange={setTheme}
-                        className="flex h-8 items-center gap-1.5 rounded-[9px] px-2 text-xs font-medium text-[#7a6d63] transition hover:bg-[#f1e3cf] hover:text-[#201914]"
+                        className="flex h-8 items-center gap-1.5 rounded-[9px] px-2 text-xs font-medium text-[#67726b] transition hover:bg-[#e7ece8] hover:text-[#2a3330]"
                     >
                         {theme === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
                         <span>主题</span>
                     </AnimatedThemeToggler>
                     <span className="flex-1" />
-                    <span className="sf-mono text-[11px] tracking-[0.08em] text-[#b7a99b]">SF v0.9</span>
+                    <span className="sf-mono text-[11px] tracking-[0.08em] text-[#9aa49e]">SF v0.9</span>
                 </div>
             </div>
         </Drawer>

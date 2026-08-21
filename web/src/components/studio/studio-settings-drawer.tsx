@@ -50,7 +50,7 @@ export function StudioSettingsDrawer({ open, onClose, kind, config, stylePreset,
             <aside className={`settings-drawer ${open ? "is-open" : ""}`} aria-label="参数设置">
                 <div className="drawer-header">
                     <div className="drawer-title">
-                        <SlidersHorizontal className="size-4 text-[#884d2d]" />
+                        <SlidersHorizontal className="size-4 text-[#5f6d66]" />
                         <h2>{kind === "image" ? "图片生成参数" : "视频生成参数"}</h2>
                         <span>{kind === "image" ? "图片模式" : "视频模式"}</span>
                     </div>

@@ -9,7 +9,7 @@ export function ShotPackNodeContent({ node }: { node: CanvasNodeData }) {
     const shots = pack?.shots || [];
     if (node.metadata?.content) {
         return (
-            <div className="relative h-full w-full overflow-hidden rounded-3xl bg-[#f7f4ef]">
+            <div className="relative h-full w-full overflow-hidden rounded-3xl bg-[#f7f9f5]">
                 <img src={node.metadata.content} alt={node.title} draggable={false} className="pointer-events-none h-full w-full select-none object-contain" />
                 <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur">
                     镜头包 · {shots.length} 镜头
@@ -19,7 +19,7 @@ export function ShotPackNodeContent({ node }: { node: CanvasNodeData }) {
     }
 
     return (
-        <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#fffaf1] text-[#6b7280]">
+        <div className="flex h-full w-full flex-col items-center justify-center gap-3 bg-[#f7f9f5] text-[#6b7280]">
             <div className="flex size-16 items-center justify-center rounded-2xl bg-white shadow-sm">
                 <Images className="size-7 text-[#4f46e5]" />
             </div>

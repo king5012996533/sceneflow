@@ -8,7 +8,7 @@ import { useCanvasStore, type CanvasProject } from "../stores/use-canvas-store";
 import { useCanvasUiStore } from "../stores/use-canvas-ui-store";
 import { exportCanvasProjects } from "../utils/canvas-export";
 
-const NODE_COLORS = ["#9b5b32", "#6b6a4a", "#5f7a52", "#201914", "#b98d62", "#7a6d63"];
+const NODE_COLORS = ["#a0713f", "#6b6a4a", "#5f7a52", "#2a3330", "#8a5e33", "#67726b"];
 const PREVIEW_W = 340;
 const PREVIEW_H = 66;
 
@@ -35,7 +35,7 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
 
     return (
         <article
-            className="group relative flex min-h-44 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[#ded2c3] bg-[#fffdf8] shadow-[0_6px_18px_rgba(57,48,34,0.05)] transition-all duration-150 hover:-translate-y-[3px] hover:border-[#9b5b32] hover:shadow-[0_18px_44px_rgba(57,48,34,0.12)]"
+            className="group relative flex min-h-44 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[#dde2dc] bg-[#ffffff] shadow-[0_6px_18px_rgba(57,48,34,0.05)] transition-all duration-150 hover:-translate-y-[3px] hover:border-[#a0713f] hover:shadow-[0_18px_44px_rgba(57,48,34,0.12)]"
             onClick={() => !editing && open()}
         >
             <div className="relative h-[66px] shrink-0 overflow-hidden border-b border-[#eee4d5]">
@@ -45,7 +45,7 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
                     checked={selected}
                     onClick={(event) => event.stopPropagation()}
                     onChange={(event) => toggleSelected(project.id, event.target.checked)}
-                    className={`absolute left-3 top-3 z-10 size-4 cursor-pointer accent-[#9b5b32] transition-opacity ${selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                    className={`absolute left-3 top-3 z-10 size-4 cursor-pointer accent-[#a0713f] transition-opacity ${selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                     aria-label={`选择 ${project.title}`}
                 />
             </div>
@@ -62,16 +62,16 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
                         }}
                     >
                         <h2 className="sf-serif truncate text-base font-semibold leading-6 tracking-[0.01em]">{project.title}</h2>
-                        <p className="sf-mono mt-1.5 flex items-center gap-2.5 text-[10.5px] font-semibold tracking-[0.12em] text-[#7a6d63]">
+                        <p className="sf-mono mt-1.5 flex items-center gap-2.5 text-[10.5px] font-semibold tracking-[0.12em] text-[#67726b]">
                             {String(project.nodes.length).padStart(2, "0")} NODES
-                            <i className="size-[3px] rounded-full bg-[#ded2c3]" />
+                            <i className="size-[3px] rounded-full bg-[#dde2dc]" />
                             {String(project.connections.length).padStart(2, "0")} LINKS
                         </p>
                     </button>
                 )}
             </div>
             <div className="mt-auto flex items-center justify-between gap-3 px-4 py-2.5" onClick={(event) => event.stopPropagation()}>
-                <p className="sf-mono text-[10.5px] text-[#b7a99b]">更新 {new Date(project.updatedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</p>
+                <p className="sf-mono text-[10.5px] text-[#9aa49e]">更新 {new Date(project.updatedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</p>
                 <div className={`flex items-center gap-0.5 transition-opacity ${editing ? "" : "opacity-0 group-hover:opacity-100"}`}>
                     {editing ? (
                         <>
@@ -108,7 +108,7 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
 function MiniCanvasPreview({ project }: { project: CanvasProject }) {
     const nodes = project.nodes.slice(0, 6);
     const patternId = `mini-${project.id.replace(/[^a-zA-Z0-9]/g, "")}`;
-    const lineColor = "#c9b8a2";
+    const lineColor = "#dde2dc";
     const positions = nodes.map((node, index) => {
         const width = 28 + (index % 3) * 6;
         const height = 22 + (index % 2) * 4;
@@ -130,7 +130,7 @@ function MiniCanvasPreview({ project }: { project: CanvasProject }) {
                     </pattern>
                 ) : null}
             </defs>
-            {project.backgroundMode !== "blank" ? <rect width={PREVIEW_W} height={PREVIEW_H} fill={`url(#${patternId})`} /> : <rect width={PREVIEW_W} height={PREVIEW_H} fill="#f6efe4" />}
+            {project.backgroundMode !== "blank" ? <rect width={PREVIEW_W} height={PREVIEW_H} fill={`url(#${patternId})`} /> : <rect width={PREVIEW_W} height={PREVIEW_H} fill="#f4f6f2" />}
             {positions.map((item, index) => {
                 const next = positions[index + 1];
                 if (!next) return null;

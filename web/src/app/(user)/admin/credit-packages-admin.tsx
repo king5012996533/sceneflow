@@ -123,29 +123,29 @@ export default function CreditPackagesAdmin() {
         return (
             <div
                 key={key}
-                className={`grid grid-cols-2 items-center gap-3 rounded-lg border px-3 py-2.5 md:grid-cols-[1fr_88px_96px_80px_72px_56px_auto] ${row.isActive ? "border-[#ded2c3] bg-[#faf4ea]" : "border-dashed border-[#ded2c3] bg-[#f6efe4] opacity-75"}`}
+                className={`grid grid-cols-2 items-center gap-3 rounded-lg border px-3 py-2.5 md:grid-cols-[1fr_88px_96px_80px_72px_56px_auto] ${row.isActive ? "border-[#dde2dc] bg-[#f7f9f5]" : "border-dashed border-[#dde2dc] bg-[#f4f6f2] opacity-75"}`}
             >
                 <div className="min-w-0">
                     <Input value={row.name} maxLength={50} placeholder="套餐名称" onChange={(e) => (mode === "draft" ? setDraft({ ...(draft as PackageRow), name: e.target.value }) : patchRow(row.id, { name: e.target.value }))} />
                 </div>
                 <div>
-                    <div className="mb-0.5 text-[10px] text-[#7a6d63]">积分</div>
+                    <div className="mb-0.5 text-[10px] text-[#67726b]">积分</div>
                     <InputNumber className="w-full" min={1} max={10000000} value={row.credits} onChange={(v) => (mode === "draft" ? setDraft({ ...(draft as PackageRow), credits: v ?? 0 }) : patchRow(row.id, { credits: v ?? 0 }))} />
                 </div>
                 <div>
-                    <div className="mb-0.5 text-[10px] text-[#7a6d63]">价格（元）</div>
+                    <div className="mb-0.5 text-[10px] text-[#67726b]">价格（元）</div>
                     <InputNumber className="w-full" min={0.01} max={10000000} precision={2} value={row.priceYuan} onChange={(v) => (mode === "draft" ? setDraft({ ...(draft as PackageRow), priceYuan: v ?? 0 }) : patchRow(row.id, { priceYuan: v ?? 0 }))} />
                 </div>
                 <div>
-                    <div className="mb-0.5 text-[10px] text-[#7a6d63]">赠送</div>
+                    <div className="mb-0.5 text-[10px] text-[#67726b]">赠送</div>
                     <InputNumber className="w-full" min={0} max={10000000} value={row.bonusCredits} onChange={(v) => (mode === "draft" ? setDraft({ ...(draft as PackageRow), bonusCredits: v ?? 0 }) : patchRow(row.id, { bonusCredits: v ?? 0 }))} />
                 </div>
                 <div>
-                    <div className="mb-0.5 text-[10px] text-[#7a6d63]">排序</div>
+                    <div className="mb-0.5 text-[10px] text-[#67726b]">排序</div>
                     <InputNumber className="w-full" min={0} max={10000} value={row.sortOrder} onChange={(v) => (mode === "draft" ? setDraft({ ...(draft as PackageRow), sortOrder: v ?? 0 }) : patchRow(row.id, { sortOrder: v ?? 0 }))} />
                 </div>
                 <div>
-                    <div className="mb-0.5 text-[10px] text-[#7a6d63]">启用</div>
+                    <div className="mb-0.5 text-[10px] text-[#67726b]">启用</div>
                     <Switch size="small" checked={row.isActive} onChange={(checked) => (mode === "draft" ? setDraft({ ...(draft as PackageRow), isActive: checked }) : patchRow(row.id, { isActive: checked }))} />
                 </div>
                 <div className="col-span-2 flex justify-end gap-2 md:col-span-1">
@@ -163,24 +163,24 @@ export default function CreditPackagesAdmin() {
     }
 
     return (
-        <section className="rounded-2xl border border-[#ded2c3] bg-[#fffdf8] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+        <section className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
             <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
                 <div className="sf-serif flex items-center gap-2 text-[17px] font-semibold">
-                    <Tag className="size-4 text-[#9b5b32]" />
+                    <Tag className="size-4 text-[#a0713f]" />
                     积分套餐定价
                 </div>
                 <Button size="small" icon={<PackagePlus className="size-3.5" />} onClick={() => setDraft({ ...EMPTY_ROW, id: "draft" } as PackageRow)}>
                     新增套餐
                 </Button>
             </div>
-            <p className="mb-4 text-xs leading-5 text-[#7a6d63]">定价页 / 购买页实时读取启用中的套餐（停用即从页面下架）；改价不影响已生成的订单（金额为下单时快照）。</p>
+            <p className="mb-4 text-xs leading-5 text-[#67726b]">定价页 / 购买页实时读取启用中的套餐（停用即从页面下架）；改价不影响已生成的订单（金额为下单时快照）。</p>
             {loading ? (
-                <div className="py-6 text-center text-sm text-[#7a6d63]">加载中…</div>
+                <div className="py-6 text-center text-sm text-[#67726b]">加载中…</div>
             ) : (
                 <div className="space-y-2">
                     {rows.map((row) => renderRow(row, row.id, "edit"))}
                     {draft ? renderRow(draft, "draft", "draft") : null}
-                    {!rows.length && !draft ? <div className="py-6 text-center text-sm text-[#b7a99b]">暂无套餐，点击右上角「新增套餐」创建。</div> : null}
+                    {!rows.length && !draft ? <div className="py-6 text-center text-sm text-[#9aa49e]">暂无套餐，点击右上角「新增套餐」创建。</div> : null}
                 </div>
             )}
         </section>

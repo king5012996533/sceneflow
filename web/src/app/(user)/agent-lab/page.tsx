@@ -273,7 +273,7 @@ export default function AgentLabPage() {
     }
 
     return (
-        <main className="h-full min-h-0 overflow-auto bg-[#f5f2ec] text-[#171717]">
+        <main className="h-full min-h-0 overflow-auto bg-[#f7f9f5] text-[#171717]">
             <div className="mx-auto flex min-h-full max-w-5xl flex-col gap-4 px-4 py-5 md:px-6">
                 <header className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -323,7 +323,7 @@ export default function AgentLabPage() {
                                             <button
                                                 key={session.id}
                                                 type="button"
-                                                className={`w-full rounded-2xl border px-3 py-2 text-left text-sm transition ${active ? "border-black bg-black text-white" : "border-black/10 bg-[#fffdfa] hover:border-black/20"}`}
+                                                className={`w-full rounded-2xl border px-3 py-2 text-left text-sm transition ${active ? "border-black bg-black text-white" : "border-black/10 bg-[#ffffff] hover:border-black/20"}`}
                                                 onClick={() => switchSession(session)}
                                             >
                                                 <div className="truncate font-medium">{session.title || "新会话"}</div>
@@ -350,7 +350,7 @@ export default function AgentLabPage() {
                                             清空记忆
                                         </Button>
                                     </div>
-                                    <select value={personaId} onChange={(event) => setPersonaId(event.target.value)} className="h-10 w-full rounded-xl border border-black/10 bg-[#fffdfa] px-3 text-sm outline-none transition focus:border-black/30">
+                                    <select value={personaId} onChange={(event) => setPersonaId(event.target.value)} className="h-10 w-full rounded-xl border border-black/10 bg-[#ffffff] px-3 text-sm outline-none transition focus:border-black/30">
                                         {AGENT_PERSONAS.map((persona) => (
                                             <option key={persona.id} value={persona.id}>
                                                 {persona.name}
@@ -370,7 +370,7 @@ export default function AgentLabPage() {
                     </section>
                 ) : null}
 
-                <section className="flex min-h-[calc(100vh-150px)] flex-1 flex-col overflow-hidden rounded-[28px] border border-black/10 bg-[#fffdfa] shadow-[0_24px_80px_rgba(27,24,20,.08)]">
+                <section className="flex min-h-[calc(100vh-150px)] flex-1 flex-col overflow-hidden rounded-[28px] border border-black/10 bg-[#ffffff] shadow-[0_24px_80px_rgba(27,24,20,.08)]">
                     <div className="flex items-center justify-between border-b border-black/10 px-4 py-3 md:px-5">
                         <div className="min-w-0">
                             <div className="truncate font-semibold">{activeSession?.title || "创作对话"}</div>
@@ -386,7 +386,7 @@ export default function AgentLabPage() {
                     <div ref={scrollRef} className="min-h-0 flex-1 space-y-5 overflow-auto px-4 py-5 md:px-6">
                         {messages.map((item, index) => (
                             <div key={index} className={`flex ${item.role === "user" ? "justify-end" : "justify-start"}`}>
-                                <div className={`group/message relative max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 ${item.role === "user" ? "bg-black text-white" : "bg-[#f4eee6] text-black/80"}`}>
+                                <div className={`group/message relative max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 ${item.role === "user" ? "bg-black text-white" : "bg-[#f2f5f0] text-black/80"}`}>
                                     {item.role === "assistant" ? (
                                         <button
                                             type="button"
@@ -404,7 +404,7 @@ export default function AgentLabPage() {
                         ))}
                         {sending ? (
                             <div className="flex justify-start">
-                                <div className="inline-flex items-center gap-2 rounded-2xl bg-[#f4eee6] px-4 py-3 text-sm text-black/55">
+                                <div className="inline-flex items-center gap-2 rounded-2xl bg-[#f2f5f0] px-4 py-3 text-sm text-black/55">
                                     <LoaderCircle className="size-4 animate-spin" />
                                     正在思考创作方案...
                                 </div>
@@ -459,7 +459,7 @@ function createAgentLabSession(): AgentLabSession {
 }
 
 function PlanList({ title, items, empty, tone = "default" }: { title: string; items: string[]; empty: string; tone?: "default" | "warn" | "ok" }) {
-    const toneClass = tone === "warn" ? "border-[#d58b29]/20 bg-[#fff4e5] text-[#7a4a0b]" : tone === "ok" ? "border-[#2f9c66]/20 bg-[#edf8f1] text-[#1d6b43]" : "border-black/10 bg-black/[0.035] text-black/70";
+    const toneClass = tone === "warn" ? "border-[#d58b29]/20 bg-[#f7f0e3] text-[#7a4a0b]" : tone === "ok" ? "border-[#2f9c66]/20 bg-[#edf8f1] text-[#1d6b43]" : "border-black/10 bg-black/[0.035] text-black/70";
     return (
         <div className="mt-3">
             <div className="mb-2 text-xs font-medium text-black/50">{title}</div>
@@ -485,7 +485,7 @@ function CompactArtifact({ artifact, onCopy, onConfirm, onReject }: { artifact: 
     if (!hasPlan && !hasTools && !hasSelfCheck && !artifact.nextSteps.length) return null;
 
     return (
-        <details className="mb-3 rounded-2xl border border-black/10 bg-[#f7f1e8]">
+        <details className="mb-3 rounded-2xl border border-black/10 bg-[#f7f9f5]">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm">
                 <div className="min-w-0">
                     <div className="truncate font-semibold">执行建议：{artifact.title}</div>

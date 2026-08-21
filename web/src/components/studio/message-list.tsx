@@ -68,13 +68,13 @@ export function MessageList({ messages, onQuickPrompt, onUseAsReference, onSaveT
                                             ))}
                                             {message.videoReferences.map((ref) => (
                                                 <div key={ref.id} className="ref-thumb" title={ref.name} style={{ display: "grid", placeItems: "center" }}>
-                                                    <Clapperboard className="size-4 text-[#8a7d70]" />
+                                                    <Clapperboard className="size-4 text-[#67726b]" />
                                                     <span className="ref-type">视频</span>
                                                 </div>
                                             ))}
                                             {message.audioReferences.map((ref) => (
                                                 <div key={ref.id} className="ref-thumb" title={ref.name} style={{ display: "grid", placeItems: "center" }}>
-                                                    <AudioLines className="size-4 text-[#8a7d70]" />
+                                                    <AudioLines className="size-4 text-[#67726b]" />
                                                     <span className="ref-type">音频</span>
                                                 </div>
                                             ))}

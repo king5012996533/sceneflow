@@ -48,11 +48,11 @@ export default function BillingPage() {
         <main className="h-full overflow-y-auto bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#eef4ff_100%)] px-6 py-10 text-[#172033]">
             <div className="mx-auto max-w-7xl">
                 <div className="mb-8">
-                    <div className="mb-3 text-xs font-medium tracking-[0.18em] text-[#8a7f91]">BETA ACCESS</div>
+                    <div className="mb-3 text-xs font-medium tracking-[0.18em] text-[#67726b]">BETA ACCESS</div>
                     <h1 className="text-2xl font-semibold tracking-tight">积分账单</h1>
                 </div>
 
-                <section className="rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
+                <section className="rounded-2xl border border-[#dde2dc] bg-white/78 p-5 shadow-[0_20px_60px_rgba(42,51,48,0.06)]">
                     <div className="mb-5 flex items-center gap-2 text-sm font-medium">
                         <Coins className="size-5" />
                         积分余额与流水
@@ -63,7 +63,7 @@ export default function BillingPage() {
                     </div>
                 </section>
 
-                <section className="mt-4 rounded-2xl border border-[#eadfce] bg-white/78 p-5 shadow-[0_20px_60px_rgba(66,56,38,0.06)]">
+                <section className="mt-4 rounded-2xl border border-[#dde2dc] bg-white/78 p-5 shadow-[0_20px_60px_rgba(42,51,48,0.06)]">
                     <div className="mb-5 flex items-center gap-2 text-sm font-medium">
                         <CreditCard className="size-5" />
                         充值记录
@@ -71,7 +71,7 @@ export default function BillingPage() {
                     {orders.length ? (
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[640px] text-left text-sm">
-                                <thead className="border-b border-[#eadfce] text-[#8a7f91]">
+                                <thead className="border-b border-[#dde2dc] text-[#67726b]">
                                     <tr>
                                         <th className="py-3 font-medium">订单编号</th>
                                         <th className="py-3 font-medium">积分包</th>
@@ -91,7 +91,7 @@ export default function BillingPage() {
                                             <td className="py-3">
                                                 <Tag>{order.status}</Tag>
                                             </td>
-                                            <td className="py-3 text-[#8a7f91]">{new Date(order.createdAt).toLocaleString("zh-CN")}</td>
+                                            <td className="py-3 text-[#67726b]">{new Date(order.createdAt).toLocaleString("zh-CN")}</td>
                                         </tr>
                                     ))}
                                 </tbody>

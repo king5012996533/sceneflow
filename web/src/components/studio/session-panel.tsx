@@ -70,7 +70,7 @@ export function SessionPanel({ sessions, activeId, onSelect, onCreate, onDelete 
 
             <div className="session-list thin-scrollbar">
                 {sessions.length === 0 ? (
-                    <div className="px-3 py-6 text-center text-xs leading-5 text-[#8a7d70]">
+                    <div className="px-3 py-6 text-center text-xs leading-5 text-[#67726b]">
                         还没有会话
                         <br />
                         点「新会话」开始第一段创作

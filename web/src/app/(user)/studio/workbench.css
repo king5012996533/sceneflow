@@ -1,22 +1,22 @@
 .sf-workbench {
-    --paper: #f6efe4;
-    --paper-deep: #eee4d6;
-    --surface: #fffdf9;
-    --surface-soft: #fbf7f0;
-    --ink: #2b2723;
-    --ink-soft: #594e45;
-    --muted: #8a7d70;
-    --line: #ded2c2;
-    --line-strong: #cbbba8;
-    --accent: #aa6a43;
-    --accent-deep: #884d2d;
-    --accent-soft: #ead0b9;
-    --success: #5d856a;
-    --success-soft: #e2eee4;
-    --danger: #aa6251;
-    --danger-soft: #f3e0d8;
-    --shadow: 0 18px 48px rgba(83, 57, 37, 0.08);
-    --shadow-soft: 0 6px 20px rgba(83, 57, 37, 0.06);
+    --paper: #f4f6f2;
+    --paper-deep: #e9eee9;
+    --surface: #ffffff;
+    --surface-soft: #f7f9f5;
+    --ink: #2a3330;
+    --ink-soft: #3c4742;
+    --muted: #67726b;
+    --line: #dde2dc;
+    --line-strong: #c5cdc6;
+    --accent: #75827c;
+    --accent-deep: #5f6d66;
+    --accent-soft: #e7ece8;
+    --success: #4e7c5d;
+    --success-soft: #e6f0e8;
+    --danger: #b0564b;
+    --danger-soft: #f6e8e5;
+    --shadow: 0 18px 48px rgba(42, 51, 48, 0.08);
+    --shadow-soft: 0 6px 20px rgba(42, 51, 48, 0.06);
     --radius: 12px;
     --mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", ui-monospace, monospace;
     --serif: Georgia, "Songti SC", "Noto Serif CJK SC", serif;
@@ -653,7 +653,7 @@
     overflow: hidden;
     border: 1px solid var(--line-strong);
     border-radius: 11px;
-    background: rgba(255, 253, 249, 0.62);
+    background: rgba(255, 255, 255, 0.62);
 }
 .sf-workbench .generation-card::before {
     content: "";
@@ -718,9 +718,9 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    border: 1px solid #e6c6bc;
+    border: 1px solid #f0d5cd;
     border-radius: 11px;
-    background: rgba(255, 253, 249, 0.62);
+    background: rgba(255, 255, 255, 0.62);
 }
 .sf-workbench .failure-icon {
     width: 32px;
@@ -753,7 +753,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    border: 1px solid #dcb4a7;
+    border: 1px solid #e6bdb4;
     border-radius: 8px;
     color: var(--danger);
     background: var(--danger-soft);
@@ -904,7 +904,7 @@
     line-height: 1.65;
 }
 .sf-workbench .composer textarea::placeholder {
-    color: #a79889;
+    color: #9aa49e;
 }
 .sf-workbench .composer-bottom {
     min-height: 48px;
@@ -947,7 +947,7 @@
 .sf-workbench .mode-button.is-active {
     color: var(--ink);
     background: var(--surface);
-    box-shadow: 0 1px 3px rgba(83, 57, 37, 0.1);
+    box-shadow: 0 1px 3px rgba(42, 51, 48, 0.1);
     font-weight: 650;
 }
 .sf-workbench .asset-actions {
@@ -989,7 +989,7 @@
     gap: 7px;
     border-radius: 8px;
     background: var(--accent);
-    color: #fffdf9;
+    color: #ffffff;
     font-size: 12px;
     font-weight: 650;
     box-shadow: 0 4px 10px rgba(170, 106, 67, 0.18);
@@ -1016,7 +1016,7 @@
     flex-direction: column;
     border-left: 1px solid var(--line-strong);
     background: var(--surface);
-    box-shadow: -18px 0 48px rgba(83, 57, 37, 0.14);
+    box-shadow: -18px 0 48px rgba(42, 51, 48, 0.14);
     transform: translateX(102%);
     transition: transform 0.24s ease;
 }
@@ -1133,7 +1133,7 @@
 .sf-workbench .segment.is-active {
     color: var(--ink);
     background: var(--surface);
-    box-shadow: 0 1px 3px rgba(83, 57, 37, 0.1);
+    box-shadow: 0 1px 3px rgba(42, 51, 48, 0.1);
     font-weight: 650;
 }
 .sf-workbench .style-scroll {
@@ -1161,7 +1161,7 @@
 }
 .sf-workbench .style-card.is-active {
     border-color: var(--accent);
-    background: #f8eee3;
+    background: #e9eee9;
     box-shadow: inset 0 0 0 1px var(--accent);
 }
 .sf-workbench .style-preview {
@@ -1313,7 +1313,7 @@
         left: 0;
         width: 264px;
         transform: translateX(-100%);
-        box-shadow: 10px 0 28px rgba(83, 57, 37, 0.12);
+        box-shadow: 10px 0 28px rgba(42, 51, 48, 0.12);
     }
     .sf-workbench .session-rail.is-mobile-open {
         transform: translateX(0);
@@ -1627,7 +1627,7 @@
 }
 .sf-workbench .result-card {
     border-radius: 8px;
-    box-shadow: 0 5px 18px rgba(83, 57, 37, 0.07);
+    box-shadow: 0 5px 18px rgba(42, 51, 48, 0.07);
 }
 .sf-workbench .result-media {
     aspect-ratio: 4 / 5;

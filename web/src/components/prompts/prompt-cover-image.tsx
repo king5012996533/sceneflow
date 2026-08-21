@@ -5,12 +5,12 @@ import { useMemo, useState } from "react";
 // 无图/加载失败时的设计化封面：v2 暖纸编辑部同源色系 + 标题排版，
 // 每张封面按标题+分类哈希从色板中稳定取色，不会出现"出错感"的灰块。
 const COVER_PALETTES = [
-    { bg: "#f5eee1", bg2: "#e7d9c0", ink: "#26221c" },
-    { bg: "#ede2cd", bg2: "#dcc9a8", ink: "#26221c" },
-    { bg: "#fdfaf3", bg2: "#ecd9b8", ink: "#4a3b2a" },
-    { bg: "#26221c", bg2: "#3d3327", ink: "#f5eee1" },
-    { bg: "#b85c33", bg2: "#96401f", ink: "#fdfaf3" },
-    { bg: "#d8c9ae", bg2: "#c4b294", ink: "#26221c" },
+    { bg: "#f4f6f2", bg2: "#e3eae3", ink: "#2a3330" },
+    { bg: "#e9eee9", bg2: "#d3dcd4", ink: "#2a3330" },
+    { bg: "#f7f9f5", bg2: "#e7e2d3", ink: "#3c4742" },
+    { bg: "#2a3330", bg2: "#39443e", ink: "#f4f6f2" },
+    { bg: "#a0713f", bg2: "#8a5e33", ink: "#ffffff" },
+    { bg: "#dde2dc", bg2: "#c5cdc6", ink: "#2a3330" },
 ];
 
 function hashSeed(value: string) {

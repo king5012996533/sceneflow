@@ -325,7 +325,7 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
     }
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col bg-[#fffdfa] text-[#171717]">
+        <div className="flex min-h-0 flex-1 flex-col bg-[#ffffff] text-[#171717]">
             <div className="flex items-center justify-between border-b border-black/10 px-4 py-3">
                 <div className="min-w-0">
                     <div className="truncate text-sm font-semibold">创作 Agent</div>
@@ -350,7 +350,7 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
             <div ref={scrollRef} className="thin-scrollbar min-h-0 flex-1 space-y-5 overflow-auto px-4 py-5">
                 {messages.map((item, index) => (
                     <div key={index} className={`flex ${item.role === "user" ? "justify-end" : "justify-start"}`}>
-                        <div className={`group/message relative max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-6 ${item.role === "user" ? "bg-black text-white" : "bg-[#f4eee6] text-black/80"}`}>
+                        <div className={`group/message relative max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-6 ${item.role === "user" ? "bg-black text-white" : "bg-[#f2f5f0] text-black/80"}`}>
                             {item.role === "assistant" ? (
                                 <button
                                     type="button"
@@ -368,7 +368,7 @@ export function CanvasCreativeAgentPanel({ snapshot, config, onApplyOps }: Canva
                 ))}
                 {sending ? (
                     <div className="flex justify-start">
-                        <div className="inline-flex items-center gap-2 rounded-2xl bg-[#f4eee6] px-4 py-3 text-sm text-black/55">
+                        <div className="inline-flex items-center gap-2 rounded-2xl bg-[#f2f5f0] px-4 py-3 text-sm text-black/55">
                             <LoaderCircle className="size-4 animate-spin" />
                             正在思考...
                         </div>
@@ -476,7 +476,7 @@ function CompactCanvasPlan({
 }) {
     if (!artifact.plan && !artifact.selfCheck && !artifact.toolActions?.length) return null;
     return (
-        <div className="mb-2 rounded-2xl border border-black/10 bg-[#f7f1e8]">
+        <div className="mb-2 rounded-2xl border border-black/10 bg-[#f7f9f5]">
             <div className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
                 <span className="min-w-0 truncate font-medium">执行建议：{artifact.title}</span>
                 {artifact.selfCheck ? <Tag color={artifact.selfCheck.score >= 80 ? "green" : artifact.selfCheck.score >= 60 ? "orange" : "red"}>{artifact.selfCheck.score}</Tag> : null}

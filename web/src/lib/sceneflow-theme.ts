@@ -2,7 +2,7 @@ import type { ThemeConfig } from "antd";
 import { theme as antdTheme } from "antd";
 
 /**
- * SceneFlow 暖色编辑风 antd 主题（与导航/定价页/管理后台同一套品牌语言）。
+ * SceneFlow 灰绿主题 antd 主题（与导航/定价页/管理后台同一套品牌语言）。
  * cssVar key 需要每个独立 ConfigProvider 唯一，避免跨页面 token 串扰。
  */
 export function sceneflowTheme(cssVarKey: string): ThemeConfig {
@@ -10,62 +10,62 @@ export function sceneflowTheme(cssVarKey: string): ThemeConfig {
         algorithm: antdTheme.defaultAlgorithm,
         cssVar: { key: cssVarKey },
         token: {
-            colorPrimary: "#9b5b32",
-            colorInfo: "#9b5b32",
-            colorLink: "#9b5b32",
-            colorLinkHover: "#8a4f2b",
-            colorLinkActive: "#7d4726",
-            colorText: "#201914",
-            colorTextSecondary: "#7a6d63",
-            colorTextTertiary: "#b7a99b",
-            colorBgBase: "#f6efe4",
-            colorBgContainer: "#fffdf8",
-            colorBgElevated: "#fffdf8",
-            colorBorder: "#ded2c3",
-            colorBorderSecondary: "#eee4d5",
-            colorSplit: "#eee4d5",
+            colorPrimary: "#a0713f",
+            colorInfo: "#a0713f",
+            colorLink: "#a0713f",
+            colorLinkHover: "#8a5e33",
+            colorLinkActive: "#7a5230",
+            colorText: "#2a3330",
+            colorTextSecondary: "#67726b",
+            colorTextTertiary: "#9aa49e",
+            colorBgBase: "#f4f6f2",
+            colorBgContainer: "#ffffff",
+            colorBgElevated: "#ffffff",
+            colorBorder: "#dde2dc",
+            colorBorderSecondary: "#e9eee9",
+            colorSplit: "#e9eee9",
             borderRadius: 10,
         },
         components: {
             Button: {
                 primaryShadow: "none",
-                defaultBg: "#fffdf8",
-                defaultBorderColor: "#ded2c3",
-                defaultColor: "#201914",
-                defaultHoverBg: "#f1e3cf",
-                defaultHoverBorderColor: "#9b5b32",
-                defaultHoverColor: "#201914",
+                defaultBg: "#ffffff",
+                defaultBorderColor: "#dde2dc",
+                defaultColor: "#2a3330",
+                defaultHoverBg: "#e7ece8",
+                defaultHoverBorderColor: "#a0713f",
+                defaultHoverColor: "#2a3330",
                 dangerShadow: "none",
             },
             Select: {
-                optionSelectedBg: "#f1e3cf",
-                optionActiveBg: "#faf4ea",
-                selectorBg: "#fffdf8",
+                optionSelectedBg: "#e7ece8",
+                optionActiveBg: "#f7f9f5",
+                selectorBg: "#ffffff",
             },
             Switch: {
-                colorPrimary: "#9b5b32",
+                colorPrimary: "#a0713f",
             },
             Tag: {
-                defaultBg: "#f7f1e6",
-                defaultColor: "#5a4f47",
+                defaultBg: "#f7f9f5",
+                defaultColor: "#3c4742",
             },
             Modal: {
-                contentBg: "#fffdf8",
-                headerBg: "#fffdf8",
-                footerBg: "#fffdf8",
+                contentBg: "#ffffff",
+                headerBg: "#ffffff",
+                footerBg: "#ffffff",
             },
             Input: {
-                activeBorderColor: "#9b5b32",
-                hoverBorderColor: "#c6a88f",
+                activeBorderColor: "#a0713f",
+                hoverBorderColor: "#75827c",
             },
             InputNumber: {
-                activeBorderColor: "#9b5b32",
-                hoverBorderColor: "#c6a88f",
+                activeBorderColor: "#a0713f",
+                hoverBorderColor: "#75827c",
             },
             Checkbox: {
-                colorPrimary: "#9b5b32",
+                colorPrimary: "#a0713f",
             },
-            // Drawer/Modal 的容器背景走全局 colorBgElevated（#fffdf8），antd 6 不再暴露 contentBg token
+            // Drawer/Modal 的容器背景走全局 colorBgElevated（#ffffff），antd 6 不再暴露 contentBg token
         },
     };
 }
