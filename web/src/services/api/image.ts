@@ -439,13 +439,28 @@ async function waitForReplicatePrediction(prediction: ReplicatePrediction, confi
 
 function parseReplicateImagePayload(payload: ReplicatePrediction) {
     if (payload.status === "failed" || payload.status === "canceled") throw new Error(readReplicateError(payload.error));
-    const values = Array.isArray(payload.output) ? payload.output : payload.output ? [payload.output] : [];
-    const images = values
-        .map((item) => (typeof item === "string" ? item : item && typeof item === "object" && "url" in item && typeof item.url === "string" ? item.url : null))
-        .filter((value): value is string => Boolean(value))
-        .map((dataUrl) => ({ id: nanoid(), dataUrl }));
+    const images = findImageUrls(payload.output).map((dataUrl) => ({ id: nanoid(), dataUrl }));
     if (!images.length) throw new Error("Replicate 接口没有返回图片");
     return images;
+}
+
+function findImageUrls(value: unknown, results: string[] = [], seen = new Set<object>()) {
+    if (typeof value === "string") {
+        if (/^(https?:\/\/|data:image\/)/i.test(value) && !results.includes(value)) results.push(value);
+        return results;
+    }
+    if (!value || typeof value !== "object") return results;
+    if (seen.has(value)) return results;
+    seen.add(value);
+    if (Array.isArray(value)) {
+        value.forEach((item) => findImageUrls(item, results, seen));
+        return results;
+    }
+    const record = value as Record<string, unknown>;
+    for (const key of ["url", "image", "image_url", "images", "output", "file"]) {
+        findImageUrls(record[key], results, seen);
+    }
+    return results;
 }
 
 function readReplicateError(error: unknown) {

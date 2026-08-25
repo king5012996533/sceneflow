@@ -99,6 +99,12 @@ export function useCanvasVideoGeneration(options: UseCanvasVideoGenerationOption
                             : node,
                     ),
                 );
+            } catch (error) {
+                if (!(error instanceof DOMException && error.name === "AbortError")) {
+                    const errorDetails = error instanceof Error ? error.message : "视频生成失败";
+                    setNodes((prev) => prev.map((node) => (node.id === videoId ? { ...node, metadata: { ...node.metadata, status: "error", errorDetails } } : node)));
+                }
+                throw error;
             } finally {
                 finishGenerationRequest(videoId, controller);
             }

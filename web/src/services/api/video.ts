@@ -759,21 +759,21 @@ function parseReplicateVideoUrl(payload: ReplicatePrediction) {
     return url;
 }
 
-function findFirstUrl(value: unknown): string | null {
-    if (typeof value === "string") return /^https?:\/\//i.test(value) ? value : null;
+function findFirstUrl(value: unknown, seen = new Set<object>): string | null {
+    if (typeof value === "string") return /^(https?:\/\/|data:video\/)/i.test(value) ? value : null;
+    if (!value || typeof value !== "object" || seen.has(value)) return null;
+    seen.add(value);
     if (Array.isArray(value)) {
         for (const item of value) {
-            const found = findFirstUrl(item);
+            const found = findFirstUrl(item, seen);
             if (found) return found;
         }
         return null;
     }
-    if (value && typeof value === "object") {
-        const record = value as Record<string, unknown>;
-        for (const key of ["url", "video", "output", "file"]) {
-            const found = findFirstUrl(record[key]);
-            if (found) return found;
-        }
+    const record = value as Record<string, unknown>;
+    for (const key of ["url", "video", "video_url", "output", "file", "files", "content"]) {
+        const found = findFirstUrl(record[key], seen);
+        if (found) return found;
     }
     return null;
 }
