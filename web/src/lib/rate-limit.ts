@@ -7,7 +7,7 @@ export interface RateLimitConfig {
 }
 
 export async function checkRateLimit(key: string, config: RateLimitConfig): Promise<boolean> {
-  if (!prisma) return true; // 数据库不可用时放行
+  if (!prisma) return false; // 生产数据库不可用时拒绝敏感请求，避免限流失效
   const now = new Date();
   const entry = await prisma.rateLimitEntry.findUnique({ where: { key } });
 

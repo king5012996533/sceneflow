@@ -20,6 +20,10 @@ function dailyPeriodKey(date = new Date()): string {
     return `${y}-${m}-${d}`;
 }
 
+async function lockUserCredits(client: Db, userId: string) {
+    await client.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+}
+
 export async function ensureCreditBalance(client: Db, userId: string): Promise<void> {
     await client.creditBalance.upsert({
         where: { userId },
@@ -38,6 +42,7 @@ export async function getCreditBalance(client: Db, userId: string): Promise<numb
  */
 export async function deductCredits(client: Db, userId: string, amount: number, refId: string, note?: string): Promise<CreditDeductResult> {
     if (amount <= 0) return { allowed: true, balance: await getCreditBalance(client, userId), cost: 0 };
+    await lockUserCredits(client, userId);
     await ensureCreditBalance(client, userId);
     const updated = await client.creditBalance.updateMany({
         where: { userId, balance: { gte: amount } },
@@ -58,12 +63,15 @@ export async function deductCredits(client: Db, userId: string, amount: number, 
  */
 export async function grantCredits(client: Db, userId: string, amount: number, type: "purchase" | "grant" | "adjust", refType: string, refId?: string, note?: string): Promise<number> {
     if (amount <= 0) return getCreditBalance(client, userId);
+    await lockUserCredits(client, userId);
     await ensureCreditBalance(client, userId);
+    if (refId) {
+        const existing = await client.creditTransaction.findFirst({ where: { userId, type, refType, refId }, select: { id: true } });
+        if (existing) return getCreditBalance(client, userId);
+    }
     await client.creditBalance.update({ where: { userId }, data: { balance: { increment: amount } } });
     const balance = await getCreditBalance(client, userId);
-    await client.creditTransaction.create({
-        data: { userId, type, amount, balanceAfter: balance, refType, refId, note },
-    });
+    await client.creditTransaction.create({ data: { userId, type, amount, balanceAfter: balance, refType, refId, note } });
     return balance;
 }
 
@@ -72,6 +80,7 @@ export async function grantCredits(client: Db, userId: string, amount: number, t
  */
 export async function refundCredits(client: Db, userId: string, amount: number, refId: string, note?: string): Promise<number> {
     if (amount <= 0) return getCreditBalance(client, userId);
+    await lockUserCredits(client, userId);
     const existing = await client.creditTransaction.findFirst({
         where: { userId, refType: "generation_job", refId, type: "refund" },
         select: { id: true },
@@ -92,6 +101,7 @@ export async function refundCredits(client: Db, userId: string, amount: number, 
  */
 export async function ensureDailyCreditGrant(client: Db, userId: string, dailyAmount: number): Promise<number> {
     if (dailyAmount <= 0) return getCreditBalance(client, userId);
+    await lockUserCredits(client, userId);
     const refId = dailyPeriodKey();
     const existing = await client.creditTransaction.findFirst({
         where: { userId, refType: "daily_grant", refId },

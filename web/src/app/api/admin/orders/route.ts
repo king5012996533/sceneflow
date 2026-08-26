@@ -44,36 +44,27 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json({ error: "订单状态无效" }, { status: 400 });
         }
 
-        // 幂等守卫：仅当订单从「非 paid」迁移到「paid」时执行入账，重复确认不会重复到账
-        const existing = await prisma.order.findUnique({ where: { id: orderId } });
-        if (!existing) return NextResponse.json({ error: "订单不存在" }, { status: 404 });
-        const transitionToPaid = status === "paid" && existing.status !== "paid";
+        const result = await prisma.$transaction(async (tx) => {
+            const existing = await tx.order.findUnique({ where: { id: orderId } });
+            if (!existing) return { order: null, credited: false };
+            if (existing.status === "paid" && status !== "paid") throw new Error("已支付订单不能直接改为其他状态");
+            if (status === "paid" && existing.status !== "pending") throw new Error("只有待支付订单可以确认支付");
 
-        const order = await prisma.order.update({
-            where: { id: orderId },
-            data: status === "paid" ? { status, paidAt: new Date() } : { status },
-            include: { user: { select: { id: true, email: true, name: true } }, package: true },
-        });
+            const claimed = status === "paid"
+                ? await tx.order.updateMany({ where: { id: orderId, status: "pending" }, data: { status, paidAt: new Date() } })
+                : await tx.order.updateMany({ where: { id: orderId }, data: { status } });
+            if (!claimed.count) return { order: await tx.order.findUnique({ where: { id: orderId }, include: { user: { select: { id: true, email: true, name: true } }, package: true } }), credited: false };
 
-        // 手动确认：订单置为「已支付」时入账积分（与支付回调逻辑一致，幂等由上面的 transitionToPaid 守卫保证）
-        if (transitionToPaid) {
-            if (order.packageId && order.package) {
+            const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { user: { select: { id: true, email: true, name: true } }, package: true } });
+            if (status === "paid" && order.package) {
                 const credits = order.package.credits + order.package.bonusCredits;
-                await grantCredits(prisma as never, order.userId, credits, "purchase", "order", orderId, `积分包「${order.package.name}」到账 ${credits} 积分`);
+                await grantCredits(tx, order.userId, credits, "purchase", "order", orderId, `积分包「${order.package.name}」到账 ${credits} 积分`);
             }
-        }
-
-        await prisma.adminAuditLog.create({
-            data: {
-                actorId: admin.id,
-                action: "order.status",
-                target: "order",
-                targetId: orderId,
-                metadata: body,
-            },
+            await tx.adminAuditLog.create({ data: { actorId: admin.id, action: "order.status", target: "order", targetId: orderId, metadata: body } });
+            return { order, credited: status === "paid" };
         });
-
-        return NextResponse.json({ order });
+        if (!result.order) return NextResponse.json({ error: "订单不存在" }, { status: 404 });
+        return NextResponse.json({ order: result.order });
     } catch (error) {
         console.error("[admin/orders:patch]", error);
         return NextResponse.json({ error: "更新订单失败" }, { status: 500 });

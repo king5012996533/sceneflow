@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/ic-prisma";
 import { getCurrentUser } from "@/lib/current-user";
+import { isSameOriginRequest } from "@/lib/auth";
 
 type UserConfigDelegate = {
     findUnique: (args: { where: { userId: string } }) => Promise<{ config: unknown } | null>;
@@ -44,6 +45,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     const user = await getCurrentUser(req);
     if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
+    if (!isSameOriginRequest(req)) return NextResponse.json({ error: "请求来源不合法" }, { status: 403 });
 
     const body = await req.json();
 

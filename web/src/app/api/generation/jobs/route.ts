@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireCurrentUser } from "@/lib/current-user";
+import { isSameOriginRequest } from "@/lib/auth";
 import { beginGenerationJob, GenerationPolicyError } from "@/lib/generation/generation-jobs.server";
 import type { GenerationKind } from "@/lib/credit-pricing";
 
@@ -10,6 +11,7 @@ export async function POST(req: NextRequest) {
     try {
         const user = await requireCurrentUser(req);
         if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
+        if (!isSameOriginRequest(req)) return NextResponse.json({ error: "请求来源不合法" }, { status: 403 });
 
         const body = await req.json().catch(() => ({}));
         const kind = String(body.kind || "") as GenerationKind;

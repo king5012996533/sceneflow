@@ -36,6 +36,9 @@ export default function nextConfig(phase: string): NextConfig {
                         { key: "X-Frame-Options", value: "SAMEORIGIN" },
                         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
                         { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+                        ...(process.env.NODE_ENV === "production"
+                            ? [{ key: "Content-Security-Policy", value: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data: https:; connect-src 'self' https: wss:; worker-src 'self' blob:;" }]
+                            : []),
                     ],
                 },
             ];

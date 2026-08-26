@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
+import { isSameOriginRequest } from "@/lib/auth";
 import { assertAllowedProxyUrl, fetchSafely, isHostOrSubdomain } from "@/lib/url-safety";
-import { resolvePlatformCredential } from "@/lib/credential-store.server";
+import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ type KeySource = "platform" | "none";
 export async function POST(req: NextRequest) {
     const user = await requireCurrentUser(req);
     if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
+    if (!isSameOriginRequest(req)) return NextResponse.json({ error: "请求来源不合法" }, { status: 403 });
 
     const contentLength = Number(req.headers.get("content-length") || 0);
     if (contentLength > MAX_PROXY_ENVELOPE_BYTES) {
@@ -46,6 +48,7 @@ export async function POST(req: NextRequest) {
         const sfModel = typeof safeHeaders["x-sf-model"] === "string" ? safeHeaders["x-sf-model"] : undefined;
 
         const platformCred = await resolvePlatformCredential({ targetUrl: target.toString(), provider: sfProvider, model: sfModel });
+        if (!platformCred || !isCredentialTargetAllowed(platformCred.baseUrl, target.toString())) return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
 
         let finalToken = "";
         let keySource: KeySource = "none";

@@ -63,3 +63,11 @@ export function clearAuthCookie(response: NextResponse) {
   });
   return applyPrivateNoStore(response);
 }
+
+export function isSameOriginRequest(req: { headers: Headers; nextUrl: { origin: string } }) {
+  const origin = req.headers.get("origin");
+  if (!origin) return true;
+  const configured = process.env.PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  const allowed = configured ? new URL(configured).origin : req.nextUrl.origin;
+  return origin === allowed;
+}

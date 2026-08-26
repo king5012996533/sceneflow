@@ -125,6 +125,14 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
     });
 }
 
+export async function bindExternalGenerationJob(userId: string, jobId: string, input: { provider: string; model: string; externalId: string; externalGetUrl: string; externalStatus?: string }) {
+    if (!prisma) throw new Error("Database unavailable");
+    return (prisma.generationJob as any).updateMany({
+        where: { id: jobId, userId, status: "running", externalId: null },
+        data: { provider: input.provider, providerModel: input.model, externalId: input.externalId, externalGetUrl: input.externalGetUrl, externalStatus: input.externalStatus || "starting", nextPollAt: new Date() },
+    });
+}
+
 export class GenerationPolicyError extends Error {
     constructor(
         message: string,

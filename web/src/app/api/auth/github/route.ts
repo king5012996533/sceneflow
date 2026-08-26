@@ -8,11 +8,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "GitHub OAuth 未配置" }, { status: 503 });
   }
 
-  // 从 Host / x-forwarded-host 构造外部 URL（standalone 模式下 req.nextUrl.origin 是 localhost）
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "xingtudesign.com";
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  const basePath = "/canvas";
-  const baseUrl = `${proto}://${host}${basePath}`;
+  const configuredBase = process.env.PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://xingtudesign.com/canvas";
+  const baseUrl = configuredBase.replace(/\/+$/, "");
   const redirectUri = `${baseUrl}/api/auth/github/callback`;
 
   // 生成一次性随机 state，存 HttpOnly cookie，防 OAuth CSRF / 账号绑定攻击

@@ -9,6 +9,7 @@ import { normalizeMiniMaxResolution } from "@/lib/minimax-video";
 import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
+import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
 
 type VideoResponse = { id: string; status?: string; error?: { message?: string } };
 type ApiVideoResponse = VideoResponse | { code?: number; data?: VideoResponse | null; msg?: string };
@@ -71,8 +72,8 @@ const POLL_ATTEMPTS: Record<VideoGenerationTask["provider"], number> = {
 // 状态接口瞬时抖动（5xx、429 限流、网络瞬断）不应立刻判死任务：任务已在上游受理，通常仍在生成并计费
 const MAX_CONSECUTIVE_POLL_FAILURES = 8;
 
-export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationResult> {
-    const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options);
+export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions, serverJobId?: string): Promise<VideoGenerationResult> {
+    const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options, serverJobId);
     if (task.result) return task.result;
     const delayMs = videoPollDelayMs(task.provider);
     const attempts = POLL_ATTEMPTS[task.provider];
@@ -129,7 +130,7 @@ function isTransientPollError(error: unknown) {
     return true;
 }
 
-export async function createVideoGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationTask> {
+export async function createVideoGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions, serverJobId?: string): Promise<VideoGenerationTask> {
     const selectedModel = (config.videoModel || config.model).trim();
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
     assertVideoConfig(requestConfig, requestConfig.model);
@@ -139,7 +140,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     }
     if (requestConfig.apiFormat === "replicate") {
         // Replicate 先于 seedance 启发式：凭证格式是权威依据，模型名含 seedance 也必须走 /v1/predictions
-        return createReplicateVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
+        return createReplicateVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options, serverJobId);
     }
     if (requestConfig.apiFormat === "minimax") {
         return createMiniMaxVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
@@ -552,8 +553,14 @@ function aigcccReferenceUrl(url: string, message: string) {
     return url;
 }
 
-async function createReplicateVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+async function createReplicateVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions, serverJobId?: string): Promise<VideoGenerationTask> {
     const input = await buildReplicateVideoInput(config, model, prompt, references, videoReferences, audioReferences);
+    if (serverJobId) {
+        const job = await startServerReplicateJob(serverJobId, model, input, options?.signal);
+        const urls = archivedMediaUrls(job);
+        if (!urls.length) throw new Error("Replicate 任务已完成但没有归档视频");
+        return { id: String(job.externalId || "server"), provider: "replicate", model, result: { url: urls[0], mimeType: "video/mp4" } };
+    }
     try {
         const prediction = await proxyFetch<ReplicatePrediction>({
             url: replicateApiUrl(config, model),

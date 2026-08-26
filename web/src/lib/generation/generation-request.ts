@@ -51,14 +51,14 @@ export type ToolGenerationRequest = {
 
 export async function requestGeneratedImages({ config, prompt, references = [], mask, options }: ImageGenerationRequest) {
     const count = Math.max(1, Math.min(50, Math.floor(Number(config.count) || 1)));
-    return runGuardedGeneration("image", count, generationMetadata(config, prompt, references.length), () =>
-        references.length ? requestEdit(config, prompt, references, mask, options) : requestGeneration(config, prompt, options),
+    return runGuardedGeneration("image", count, generationMetadata(config, prompt, references.length), (job) =>
+        references.length ? requestEdit(config, prompt, references, mask, options, job.id) : requestGeneration(config, prompt, options, job.id),
     );
 }
 
 export async function requestGeneratedVideo({ config, prompt, references = [], videoReferences = [], audioReferences = [], options }: VideoGenerationRequest) {
-    return runGuardedGeneration("video", 1, generationMetadata(config, prompt, references.length + videoReferences.length + audioReferences.length), () =>
-        requestVideoGeneration(config, prompt, references, videoReferences, audioReferences, options),
+    return runGuardedGeneration("video", 1, generationMetadata(config, prompt, references.length + videoReferences.length + audioReferences.length), (job) =>
+        requestVideoGeneration(config, prompt, references, videoReferences, audioReferences, options, job.id),
     );
 }
 
@@ -67,7 +67,7 @@ export type GuardedVideoGenerationTask = VideoGenerationTask & { generationJobId
 export async function createGeneratedVideoTask({ config, prompt, references = [], videoReferences = [], audioReferences = [], options }: VideoGenerationRequest): Promise<GuardedVideoGenerationTask> {
     const job = await beginClientGeneration("video", 1, generationMetadata(config, prompt, references.length + videoReferences.length + audioReferences.length));
     try {
-        const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options);
+        const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options, job.id);
         return { ...task, generationJobId: job.id };
     } catch (error) {
         await finishClientGeneration(job.id, "failed", error).catch(() => undefined);
@@ -76,11 +76,19 @@ export async function createGeneratedVideoTask({ config, prompt, references = []
 }
 
 export async function pollGeneratedVideoTask(config: AiConfig, task: GuardedVideoGenerationTask, options?: GenerationRequestOptions): Promise<VideoGenerationTaskState> {
-    const state = await pollVideoGenerationTask(config, task, options);
-    if (task.generationJobId && state.status !== "pending") {
-        await finishClientGeneration(task.generationJobId, state.status === "completed" ? "succeeded" : "failed", state.status === "failed" ? state.error : undefined);
+    try {
+        const state = await pollVideoGenerationTask(config, task, options);
+        if (task.generationJobId && state.status !== "pending") {
+            await finishClientGeneration(task.generationJobId, state.status === "completed" ? "succeeded" : "failed", state.status === "failed" ? state.error : undefined);
+        }
+        return state;
+    } catch (error) {
+        if (task.generationJobId) {
+            const status = error instanceof DOMException && error.name === "AbortError" ? "cancelled" : "failed";
+            await finishClientGeneration(task.generationJobId, status, error).catch((settlementError) => console.error("[generation] failed to settle video task", settlementError));
+        }
+        throw error;
     }
-    return state;
 }
 
 export async function persistGeneratedVideo(result: Awaited<ReturnType<typeof requestGeneratedVideo>>) {

@@ -83,9 +83,20 @@ function hostMatches(credentialBaseUrl: string, targetUrl: string): boolean {
     const credHost = extractHost(credentialBaseUrl);
     const targetHost = extractHost(targetUrl);
     if (!credHost || !targetHost) return false;
-    // 只允许「同域或目标域是凭证域的子域」；禁止反向后缀匹配（凭证域是目标域的子域），
-    // 防止攻击者用父域/更短后缀骗取平台 Key（H-1）。
     return isHostOrSubdomain(targetHost, credHost);
+}
+
+export function isCredentialTargetAllowed(credentialBaseUrl: string, targetUrl: string): boolean {
+    try {
+        const base = new URL(credentialBaseUrl);
+        const target = new URL(targetUrl);
+        if (base.protocol !== "https:" || target.protocol !== "https:") return false;
+        if (target.origin !== base.origin) return false;
+        const basePath = base.pathname.replace(/\/+$/, "");
+        return !basePath || target.pathname === basePath || target.pathname.startsWith(`${basePath}/`);
+    } catch {
+        return false;
+    }
 }
 
 function modelMatches(models: string[], model?: string): boolean {
@@ -118,7 +129,7 @@ export async function resolveConfiguredPricing(model: string): Promise<ModelPric
  * 匹配策略：先按 host 匹配；多个候选时用 provider 提示消歧，再用 model 过滤；
  * 都不满足时回退到 host 匹配的最高优先级凭证。找不到返回 null。
  */
-export async function resolvePlatformCredential(options: { targetUrl: string; provider?: string; model?: string }): Promise<ResolvedCredential | null> {
+export async function resolvePlatformCredential(options: { targetUrl?: string; provider?: string; model?: string }): Promise<ResolvedCredential | null> {
     if (!prisma) return null;
     const { targetUrl, provider, model } = options;
 
@@ -127,13 +138,15 @@ export async function resolvePlatformCredential(options: { targetUrl: string; pr
         orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
     })) as unknown as CredentialRow[];
 
-    const hostMatched = credentials.filter((credential) => hostMatches(credential.baseUrl, targetUrl));
-    if (!hostMatched.length) return null;
+    const hostMatched = targetUrl ? credentials.filter((credential) => hostMatches(credential.baseUrl, targetUrl)) : [];
+    const providerMatched = !hostMatched.length && provider ? credentials.filter((credential) => credential.provider === provider) : [];
+    const matched = hostMatched.length ? hostMatched : providerMatched;
+    if (!matched.length) return null;
 
     // provider 提示消歧（提示与凭证标签不一致时忽略提示，不硬过滤）
-    let candidates = hostMatched;
+    let candidates = matched;
     if (provider) {
-        const withProvider = hostMatched.filter((credential) => credential.provider === provider);
+        const withProvider = matched.filter((credential) => credential.provider === provider);
         if (withProvider.length) candidates = withProvider;
     }
 

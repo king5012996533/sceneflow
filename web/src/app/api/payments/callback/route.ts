@@ -71,16 +71,18 @@ export async function POST(req: NextRequest) {
             });
 
             if (!paid) {
-                const failed = await tx.order.update({
-                    where: { id: order.id },
+                const failedClaim = await tx.order.updateMany({
+                    where: { id: order.id, status: "pending" },
                     data: { status: "failed", providerOrderNo },
                 });
+                const failed = await tx.order.findUnique({ where: { id: order.id } });
+                if (!failedClaim.count) return { order: failed, credited: false, credits: 0, balance: null };
                 return { order: failed, credited: false, credits: 0, balance: null };
             }
 
             // 幂等领取：只有订单还不是「已支付」时才置为已支付并入账积分
             const claimed = await tx.order.updateMany({
-                where: { id: order.id, status: { not: "paid" } },
+                where: { id: order.id, status: "pending" },
                 data: { status: "paid", paidAt: new Date(), providerOrderNo },
             });
 

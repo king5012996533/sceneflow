@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createOrderNo, type PaymentProvider } from "@/lib/billing";
 import { requireCurrentUser } from "@/lib/current-user";
+import { isSameOriginRequest } from "@/lib/auth";
 import { prisma } from "@/lib/ic-prisma";
 
 const providers = new Set(["wechat", "alipay", "stripe", "manual"]);
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
 
         const user = await requireCurrentUser(req);
         if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
+        if (!isSameOriginRequest(req)) return NextResponse.json({ error: "请求来源不合法" }, { status: 403 });
 
         const body = await req.json();
         const packageId = String(body.packageId || "");

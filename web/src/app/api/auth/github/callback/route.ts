@@ -4,10 +4,8 @@ import { prisma } from "@/lib/ic-prisma";
 import { setAuthCookie, signToken } from "@/lib/auth";
 
 // 从请求头构造外部 base URL（standalone 模式下 req.url 是 localhost）
-function getExternalBase(req: NextRequest): string {
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "xingtudesign.com";
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  return `${proto}://${host}`;
+function getExternalBase(): string {
+  return (process.env.PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://xingtudesign.com/canvas").replace(/\/+$/, "").replace(/\/canvas$/, "");
 }
 
 export async function GET(req: NextRequest) {
@@ -15,18 +13,18 @@ export async function GET(req: NextRequest) {
   const state = req.nextUrl.searchParams.get("state");
   const cookieState = req.cookies.get("oauth_state")?.value;
   if (!state || !cookieState || state !== cookieState) {
-    return NextResponse.redirect(new URL("/canvas?error=github_state_mismatch", getExternalBase(req)));
+    return NextResponse.redirect(new URL("/canvas?error=github_state_mismatch", getExternalBase()));
   }
 
   const code = req.nextUrl.searchParams.get("code");
   if (!code) {
-    return NextResponse.redirect(new URL("/canvas?error=github_no_code", getExternalBase(req)));
+    return NextResponse.redirect(new URL("/canvas?error=github_no_code", getExternalBase()));
   }
 
   const clientId = process.env.GITHUB_CLIENT_ID;
   const clientSecret = process.env.GITHUB_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(new URL("/canvas?error=github_not_configured", getExternalBase(req)));
+    return NextResponse.redirect(new URL("/canvas?error=github_not_configured", getExternalBase()));
   }
 
   try {
@@ -38,7 +36,7 @@ export async function GET(req: NextRequest) {
     });
     const tokenData = await tokenRes.json();
     if (tokenData.error) {
-      return NextResponse.redirect(new URL("/login?error=github_token_failed", req.url));
+      return NextResponse.redirect(new URL("/canvas/login?error=github_token_failed", getExternalBase()));
     }
 
     // 获取 GitHub 用户信息
@@ -52,12 +50,12 @@ export async function GET(req: NextRequest) {
       headers: { Authorization: `Bearer ${tokenData.access_token}`, Accept: "application/json" },
     });
     const emails = await emailRes.json();
-    const primaryEmail = emails.find((e: { primary: boolean; verified: boolean }) => e.primary && e.verified)?.email
+    const primaryEmail = String(emails.find((e: { primary: boolean; verified: boolean }) => e.primary && e.verified)?.email
       || emails.find((e: { verified: boolean }) => e.verified)?.email
-      || `${githubUser.login}@github.local`;
+      || `${githubUser.login}@github.local`).trim().toLowerCase();
 
     if (!prisma) {
-      return NextResponse.redirect(new URL("/login?error=db_unavailable", req.url));
+      return NextResponse.redirect(new URL("/canvas/login?error=db_unavailable", getExternalBase()));
     }
 
     // 查找或创建用户
@@ -88,13 +86,13 @@ export async function GET(req: NextRequest) {
 
     // 签发 JWT，设置 cookie
     const token = signToken({ userId: user.id, email: user.email });
-    const base = getExternalBase(req);
+    const base = getExternalBase();
     const response = NextResponse.redirect(new URL("/canvas", base));
     // 一次性 state 用后即焚，防重放
     response.cookies.delete("oauth_state");
     return setAuthCookie(response, token);
   } catch (err: unknown) {
     console.error("GitHub OAuth error:", err);
-    return NextResponse.redirect(new URL("/canvas?error=github_failed", getExternalBase(req)));
+    return NextResponse.redirect(new URL("/canvas?error=github_failed", getExternalBase()));
   }
 }

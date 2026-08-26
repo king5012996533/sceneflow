@@ -7,6 +7,7 @@ import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
 import { proxyFetch, proxyFetchStream } from "./proxy-client";
+import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
 
 export type AiTextMessage = {
     role: "system" | "user" | "assistant";
@@ -410,7 +411,13 @@ function replicateHeaders(config: Pick<AiConfig, "apiKey" | "apiFormat" | "baseU
     };
 }
 
-async function requestReplicateImages(config: AiConfig, input: Record<string, unknown>, options?: RequestOptions) {
+async function requestReplicateImages(config: AiConfig, input: Record<string, unknown>, options?: RequestOptions, serverJobId?: string) {
+    if (serverJobId) {
+        const job = await startServerReplicateJob(serverJobId, config.model, input, options?.signal);
+        const urls = archivedMediaUrls(job);
+        if (!urls.length) throw new Error("Replicate 任务已完成但没有归档图片");
+        return urls.map((dataUrl) => ({ id: nanoid(), dataUrl }));
+    }
     const prediction = await proxyFetch<ReplicatePrediction>({
         url: replicateApiUrl(config),
         method: "POST",
@@ -928,7 +935,7 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
     return images;
 }
 
-export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions) {
+export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions, serverJobId?: string) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     if (requestConfig.apiFormat === "gemini") {
@@ -952,7 +959,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 output_format: "webp",
                 number_of_images: n,
                 output_compression: 90,
-            }, options);
+            }, options, serverJobId);
         } catch (error) {
             throw new Error(readAxiosError(error, "request failed"));
         }
@@ -978,7 +985,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     }
 }
 
-export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], mask?: ReferenceImage, options?: RequestOptions) {
+export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], mask?: ReferenceImage, options?: RequestOptions, serverJobId?: string) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const quality = normalizeQuality(config.quality);
@@ -1005,7 +1012,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                 output_format: "webp",
                 number_of_images: n,
                 output_compression: 90,
-            }, options);
+            }, options, serverJobId);
         } catch (error) {
             throw new Error(readAxiosError(error, "request failed"));
         }

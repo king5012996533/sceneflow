@@ -8,3 +8,9 @@ services:
     envVars:
       - key: PORT
         value: 3000
+      - key: GENERATION_WORKER_SECRET
+        sync: false
+      - key: GENERATION_MEDIA_DIR
+        value: /var/data/generation-media
+      - key: PUBLIC_APP_URL
+        value: https://xingtudesign.com/canvas

@@ -70,6 +70,19 @@ model GenerationJob {
   error          String?
   metadata       Json?
   resultUrl      String?                       // 生成结果 URL（图片/视频）
+  provider       String?
+  providerModel  String?
+  externalId     String?
+  externalGetUrl String?
+  externalStatus String?
+  resultData     Json?
+  archiveKey     String?
+  archiveMimeType String?
+  archiveSize    Int?
+  lastPolledAt   DateTime?
+  nextPollAt     DateTime?
+  pollAttempts   Int      @default(0)
+  progress       Int?
   quotaRefunded  Boolean  @default(false)
   creditsCost    Int      @default(0)          // 本次消耗积分（失败退款依据）
   costCents      Int?                          // 平台估算成本（分，供对账与定价校准）
@@ -79,6 +92,8 @@ model GenerationJob {
   updatedAt      DateTime @updatedAt
 
   @@index([userId, status])
+  @@index([status, nextPollAt])
+  @@unique([provider, externalId])
   @@index([userId, createdAt])
 }
 
@@ -122,6 +137,7 @@ model CreditTransaction {
 
   @@index([userId, createdAt])
   @@index([refType, refId])
+  @@unique([userId, type, refType, refId])
 }
 
 model Order {

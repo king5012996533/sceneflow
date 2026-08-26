@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireCurrentUser } from "@/lib/current-user";
+import { isSameOriginRequest } from "@/lib/auth";
 import { finishGenerationJob, GenerationPolicyError } from "@/lib/generation/generation-jobs.server";
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {
         const user = await requireCurrentUser(req);
         if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
+        if (!isSameOriginRequest(req)) return NextResponse.json({ error: "请求来源不合法" }, { status: 403 });
 
         const { id } = await context.params;
         const body = await req.json().catch(() => ({}));

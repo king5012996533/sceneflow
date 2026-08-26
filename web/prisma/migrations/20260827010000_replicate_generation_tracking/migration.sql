@@ -1,0 +1,15 @@
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "provider" TEXT;
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "providerModel" TEXT;
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "externalId" TEXT;
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "externalGetUrl" TEXT;
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "externalStatus" TEXT;
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "resultData" JSONB;
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "archiveKey" TEXT;
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "archiveMimeType" TEXT;
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "archiveSize" INTEGER;
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "lastPolledAt" TIMESTAMP(3);
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "nextPollAt" TIMESTAMP(3);
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "pollAttempts" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "GenerationJob" ADD COLUMN IF NOT EXISTS "progress" INTEGER;
+CREATE UNIQUE INDEX IF NOT EXISTS "GenerationJob_provider_externalId_key" ON "GenerationJob" ("provider", "externalId");
+CREATE INDEX IF NOT EXISTS "GenerationJob_status_nextPollAt_idx" ON "GenerationJob" ("status", "nextPollAt");
