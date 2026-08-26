@@ -45,6 +45,11 @@ const MODELS_PLACEHOLDER: Record<string, string> = {
 };
 const MODELS_PLACEHOLDER_DEFAULT = "如：gpt-image-1, dall-e-3";
 
+/** Base URL 占位符：按供应商提示常见端点（MiniMax 走秘塔中转时用 metaso.cn） */
+const BASE_URL_PLACEHOLDER: Record<string, string> = {
+    minimax: "如：https://metaso.cn/api/minimax 或 https://api.minimaxi.com/v1",
+};
+
 export function parseModelList(models: string): string[] {
     return Array.from(
         new Set(
@@ -92,7 +97,7 @@ export function CredentialFormFields({ form, onChange, editMode }: CredentialFor
             </div>
             <div>
                 <div className="mb-1 text-sm text-[#2a3330]">Base URL</div>
-                <Input value={form.baseUrl} placeholder="如：https://api.minimax.chat/v1" onChange={(event) => set({ baseUrl: event.target.value })} />
+                <Input value={form.baseUrl} placeholder={BASE_URL_PLACEHOLDER[form.provider] ?? "如：https://api.minimax.chat/v1"} onChange={(event) => set({ baseUrl: event.target.value })} />
             </div>
             <div>
                 <div className="mb-1 text-sm text-[#2a3330]">API Key</div>

@@ -5,12 +5,17 @@ import { Button, Checkbox, InputNumber, Radio, Switch } from "antd";
 import {
     DEFAULT_GENERIC_VIDEO_CAPABILITY,
     DEFAULT_IMAGE_CAPABILITY,
+    DEFAULT_MINIMAX_VIDEO_CAPABILITY,
     DEFAULT_SEEDANCE_VIDEO_CAPABILITY,
     GENERIC_VIDEO_KIND,
     IMAGE_ASPECT_OPTIONS,
     IMAGE_KIND,
     IMAGE_MAX_COUNT_LIMIT,
     IMAGE_QUALITY_OPTIONS,
+    MINIMAX_DURATION_OPTIONS,
+    MINIMAX_RATIO_OPTIONS,
+    MINIMAX_RESOLUTION_OPTIONS,
+    MINIMAX_VIDEO_KIND,
     SEEDANCE_DURATION_OPTIONS,
     SEEDANCE_RATIO_OPTIONS,
     SEEDANCE_RESOLUTION_OPTIONS,
@@ -22,6 +27,10 @@ import {
     type ImageAspect,
     type ImageCapabilitySpec,
     type ImageQuality,
+    type MiniMaxDuration,
+    type MiniMaxRatio,
+    type MiniMaxResolution,
+    type MiniMaxVideoCapabilitySpec,
     type ModelCapabilityKind,
     type ModelCapabilitySpec,
     type SeedanceDuration,
@@ -44,6 +53,7 @@ const KIND_OPTIONS = [
     { value: IMAGE_KIND, label: "图片" },
     { value: GENERIC_VIDEO_KIND, label: "视频（通用）" },
     { value: SEEDANCE_VIDEO_KIND, label: "视频（Seedance）" },
+    { value: MINIMAX_VIDEO_KIND, label: "视频（MiniMax H3）" },
 ];
 
 /** 单个模型的参数能力编辑器：类型 + 勾选清单。空清单 = 全部支持（前端按内置默认展示）。 */
@@ -52,6 +62,7 @@ export function ModelCapabilityFields({ model, spec, onChange }: ModelCapability
         if (kind === spec.kind) return;
         if (kind === IMAGE_KIND) onChange({ ...DEFAULT_IMAGE_CAPABILITY });
         else if (kind === SEEDANCE_VIDEO_KIND) onChange({ ...DEFAULT_SEEDANCE_VIDEO_CAPABILITY });
+        else if (kind === MINIMAX_VIDEO_KIND) onChange({ ...DEFAULT_MINIMAX_VIDEO_CAPABILITY });
         else onChange({ ...DEFAULT_GENERIC_VIDEO_CAPABILITY });
     };
     const reset = () => {
@@ -69,6 +80,7 @@ export function ModelCapabilityFields({ model, spec, onChange }: ModelCapability
             <p className="text-xs leading-5 text-[#67726b]">勾选该模型支持的能力；不勾选 = 全部支持。保存后约 60 秒内在生成设置面板生效。</p>
             {spec.kind === IMAGE_KIND ? <ImageFields spec={spec} onChange={onChange} /> : null}
             {spec.kind === SEEDANCE_VIDEO_KIND ? <SeedanceFields spec={spec} onChange={onChange} /> : null}
+            {spec.kind === MINIMAX_VIDEO_KIND ? <MiniMaxFields spec={spec} onChange={onChange} /> : null}
             {spec.kind === GENERIC_VIDEO_KIND ? <GenericVideoFields spec={spec} onChange={onChange} /> : null}
         </div>
     );
@@ -83,21 +95,11 @@ function ImageFields({ spec, onChange }: { spec: ImageCapabilitySpec; onChange: 
         <div className="space-y-2.5">
             <div>
                 <FieldLabel>画质</FieldLabel>
-                <Checkbox.Group
-                    className="flex flex-wrap gap-x-4 gap-y-1"
-                    options={[...IMAGE_QUALITY_OPTIONS]}
-                    value={spec.qualities}
-                    onChange={(values) => onChange({ ...spec, qualities: values as ImageQuality[] })}
-                />
+                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...IMAGE_QUALITY_OPTIONS]} value={spec.qualities} onChange={(values) => onChange({ ...spec, qualities: values as ImageQuality[] })} />
             </div>
             <div>
                 <FieldLabel>宽高比（含 2k/4k 与自定义）</FieldLabel>
-                <Checkbox.Group
-                    className="grid grid-cols-3 gap-x-3 gap-y-1"
-                    options={[...IMAGE_ASPECT_OPTIONS]}
-                    value={spec.aspects}
-                    onChange={(values) => onChange({ ...spec, aspects: values as ImageAspect[] })}
-                />
+                <Checkbox.Group className="grid grid-cols-3 gap-x-3 gap-y-1" options={[...IMAGE_ASPECT_OPTIONS]} value={spec.aspects} onChange={(values) => onChange({ ...spec, aspects: values as ImageAspect[] })} />
             </div>
             <div className="flex items-center gap-3">
                 <FieldLabel>最大生成张数</FieldLabel>
@@ -112,30 +114,15 @@ function SeedanceFields({ spec, onChange }: { spec: SeedanceVideoCapabilitySpec;
         <div className="space-y-2.5">
             <div>
                 <FieldLabel>分辨率</FieldLabel>
-                <Checkbox.Group
-                    className="flex flex-wrap gap-x-4 gap-y-1"
-                    options={[...SEEDANCE_RESOLUTION_OPTIONS]}
-                    value={spec.resolutions}
-                    onChange={(values) => onChange({ ...spec, resolutions: values as SeedanceResolution[] })}
-                />
+                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...SEEDANCE_RESOLUTION_OPTIONS]} value={spec.resolutions} onChange={(values) => onChange({ ...spec, resolutions: values as SeedanceResolution[] })} />
             </div>
             <div>
                 <FieldLabel>画面比例</FieldLabel>
-                <Checkbox.Group
-                    className="grid grid-cols-3 gap-x-3 gap-y-1"
-                    options={[...SEEDANCE_RATIO_OPTIONS]}
-                    value={spec.ratios}
-                    onChange={(values) => onChange({ ...spec, ratios: values as SeedanceRatio[] })}
-                />
+                <Checkbox.Group className="grid grid-cols-3 gap-x-3 gap-y-1" options={[...SEEDANCE_RATIO_OPTIONS]} value={spec.ratios} onChange={(values) => onChange({ ...spec, ratios: values as SeedanceRatio[] })} />
             </div>
             <div>
                 <FieldLabel>时长</FieldLabel>
-                <Checkbox.Group
-                    className="flex flex-wrap gap-x-4 gap-y-1"
-                    options={[...SEEDANCE_DURATION_OPTIONS]}
-                    value={spec.durations}
-                    onChange={(values) => onChange({ ...spec, durations: values as SeedanceDuration[] })}
-                />
+                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...SEEDANCE_DURATION_OPTIONS]} value={spec.durations} onChange={(values) => onChange({ ...spec, durations: values as SeedanceDuration[] })} />
             </div>
             <div className="flex items-center gap-6">
                 <label className="flex items-center gap-2 text-sm text-[#2a3330]">
@@ -151,35 +138,49 @@ function SeedanceFields({ spec, onChange }: { spec: SeedanceVideoCapabilitySpec;
     );
 }
 
+function MiniMaxFields({ spec, onChange }: { spec: MiniMaxVideoCapabilitySpec; onChange: (next: ModelCapabilitySpec) => void }) {
+    return (
+        <div className="space-y-2.5">
+            <div>
+                <FieldLabel>分辨率</FieldLabel>
+                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...MINIMAX_RESOLUTION_OPTIONS]} value={spec.resolutions} onChange={(values) => onChange({ ...spec, resolutions: values as MiniMaxResolution[] })} />
+            </div>
+            <div>
+                <FieldLabel>画面比例</FieldLabel>
+                <Checkbox.Group className="grid grid-cols-3 gap-x-3 gap-y-1" options={[...MINIMAX_RATIO_OPTIONS]} value={spec.ratios} onChange={(values) => onChange({ ...spec, ratios: values as MiniMaxRatio[] })} />
+            </div>
+            <div>
+                <FieldLabel>时长（秒）</FieldLabel>
+                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...MINIMAX_DURATION_OPTIONS]} value={spec.durations} onChange={(values) => onChange({ ...spec, durations: values as MiniMaxDuration[] })} />
+            </div>
+            <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 text-sm text-[#2a3330]">
+                    <Switch size="small" checked={spec.audio} onChange={(checked) => onChange({ ...spec, audio: checked })} />
+                    生成声音（H3 原生立体声）
+                </label>
+                <label className="flex items-center gap-2 text-sm text-[#2a3330]">
+                    <Switch size="small" checked={spec.watermark} onChange={(checked) => onChange({ ...spec, watermark: checked })} />
+                    添加水印
+                </label>
+            </div>
+        </div>
+    );
+}
+
 function GenericVideoFields({ spec, onChange }: { spec: GenericVideoCapabilitySpec; onChange: (next: ModelCapabilitySpec) => void }) {
     return (
         <div className="space-y-2.5">
             <div>
                 <FieldLabel>清晰度</FieldLabel>
-                <Checkbox.Group
-                    className="flex flex-wrap gap-x-4 gap-y-1"
-                    options={[...VIDEO_CLARITY_OPTIONS]}
-                    value={spec.clarity}
-                    onChange={(values) => onChange({ ...spec, clarity: values as VideoClarity[] })}
-                />
+                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...VIDEO_CLARITY_OPTIONS]} value={spec.clarity} onChange={(values) => onChange({ ...spec, clarity: values as VideoClarity[] })} />
             </div>
             <div>
                 <FieldLabel>尺寸</FieldLabel>
-                <Checkbox.Group
-                    className="grid grid-cols-3 gap-x-3 gap-y-1"
-                    options={[...VIDEO_SIZE_OPTIONS]}
-                    value={spec.sizes}
-                    onChange={(values) => onChange({ ...spec, sizes: values as VideoSize[] })}
-                />
+                <Checkbox.Group className="grid grid-cols-3 gap-x-3 gap-y-1" options={[...VIDEO_SIZE_OPTIONS]} value={spec.sizes} onChange={(values) => onChange({ ...spec, sizes: values as VideoSize[] })} />
             </div>
             <div>
                 <FieldLabel>秒数</FieldLabel>
-                <Checkbox.Group
-                    className="flex flex-wrap gap-x-4 gap-y-1"
-                    options={[...VIDEO_SECONDS_OPTIONS]}
-                    value={spec.seconds}
-                    onChange={(values) => onChange({ ...spec, seconds: values as VideoSeconds[] })}
-                />
+                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...VIDEO_SECONDS_OPTIONS]} value={spec.seconds} onChange={(values) => onChange({ ...spec, seconds: values as VideoSeconds[] })} />
             </div>
         </div>
     );

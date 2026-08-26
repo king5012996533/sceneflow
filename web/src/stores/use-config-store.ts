@@ -523,6 +523,7 @@ export function inferApiFormatFromBaseUrl(baseUrl: string): ApiCallFormat | null
     if (value.includes("api.replicate.com") || value.includes("replicate.com/v1")) return "replicate";
     if (value.includes("generativelanguage.googleapis.com")) return "gemini";
     if (value.includes("api.minimaxi.com")) return "minimax";
+    if (value.includes("metaso.cn/api/minimax") || value.includes("metaso.cn")) return "minimax";
     if (value.includes("aigccc666.com")) return "aigccc";
     return null;
 }

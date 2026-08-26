@@ -16,6 +16,7 @@ import {
     seedanceRatioOptions,
     seedanceResolutionOptions,
 } from "@/lib/seedance-video";
+import { isMiniMaxVideoConfig, normalizeMiniMaxDuration, normalizeMiniMaxRatio, normalizeMiniMaxResolution, MINIMAX_DURATION_OPTIONS, MINIMAX_RATIO_OPTIONS, MINIMAX_RESOLUTION_OPTIONS } from "@/lib/minimax-video";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { usePlatformCapability } from "@/stores/platform-catalog-store";
 import { modelOptionName, type AiConfig } from "@/stores/use-config-store";
@@ -45,6 +46,9 @@ type VideoSettingsPanelProps = {
 };
 
 export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5" }: VideoSettingsPanelProps) {
+    if (isMiniMaxVideoConfig(config)) {
+        return <MiniMaxVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} />;
+    }
     if (isSeedanceVideoConfig(config)) {
         return <SeedanceVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} />;
     }
@@ -251,7 +255,106 @@ function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, 
 }
 
 export function videoResolutionLabel(value: string) {
+    // MiniMax H3：直接返回 768P / 2K
+    if (value === "768P" || value === "768p" || value === "2K" || value === "2k") return value.toUpperCase();
     return `${normalizeVideoResolutionValue(value)}p`;
+}
+
+function MiniMaxVideoSettingsPanel({ config, onConfigChange, theme, showTitle, className }: VideoSettingsPanelProps) {
+    const model = modelOptionName(config.model || config.videoModel);
+    const spec = usePlatformCapability(model);
+    const resolution = normalizeMiniMaxResolution(config.vquality);
+    const ratio = normalizeMiniMaxRatio(config.size) ?? "16:9";
+    const duration = normalizeMiniMaxDuration(config.videoSeconds);
+    const generateAudio = boolConfig(config.videoGenerateAudio, true);
+    const watermark = boolConfig(config.videoWatermark, false);
+    // 平台能力标定：有标定则按标定过滤选项；无标定（或标定为空）退回内置默认
+    const resolutionOptionsShown = spec?.kind === "minimax-video" && (spec.resolutions as string[]).length ? MINIMAX_RESOLUTION_OPTIONS.filter((item) => (spec.resolutions as string[]).includes(item.value)) : MINIMAX_RESOLUTION_OPTIONS;
+    const ratioOptionsShown = spec?.kind === "minimax-video" && (spec.ratios as string[]).length ? MINIMAX_RATIO_OPTIONS.filter((item) => (spec.ratios as string[]).includes(item.value)) : MINIMAX_RATIO_OPTIONS;
+    const durationOptionsShown = spec?.kind === "minimax-video" && (spec.durations as number[]).length ? MINIMAX_DURATION_OPTIONS.filter((item) => (spec.durations as number[]).includes(item.value)) : MINIMAX_DURATION_OPTIONS;
+    const audioEnabled = spec?.kind !== "minimax-video" || spec.audio;
+    const watermarkEnabled = spec?.kind !== "minimax-video" || spec.watermark;
+    // 收敛：当前值不在平台标定范围内时自动切到第一个允许值；不允许的声音/水印强制关闭
+    useEffect(() => {
+        if (spec?.kind !== "minimax-video") return;
+        const allowed = spec.resolutions as string[];
+        if (!allowed.length || allowed.includes(resolution)) return;
+        onConfigChange("vquality", allowed[0] || "768P");
+    }, [spec, resolution]);
+    useEffect(() => {
+        if (spec?.kind !== "minimax-video") return;
+        const allowed = spec.ratios as string[];
+        if (!allowed.length || allowed.includes(ratio)) return;
+        onConfigChange("size", allowed[0] || "16:9");
+    }, [spec, ratio]);
+    useEffect(() => {
+        if (spec?.kind !== "minimax-video") return;
+        const allowed = spec.durations as number[];
+        if (!allowed.length || allowed.includes(duration)) return;
+        onConfigChange("videoSeconds", String(allowed[0] ?? 6));
+    }, [spec, duration]);
+    useEffect(() => {
+        if (spec?.kind !== "minimax-video") return;
+        if (!spec.audio && generateAudio) onConfigChange("videoGenerateAudio", "false");
+        if (!spec.watermark && watermark) onConfigChange("videoWatermark", "false");
+    }, [spec, generateAudio, watermark]);
+
+    return (
+        <ImageSettingsTheme theme={theme}>
+            <div className={className} style={{ color: theme.node.text }} onMouseDown={(event) => event.stopPropagation()}>
+                {showTitle ? <div className="text-sm font-medium">视频设置</div> : null}
+                <SettingGroup index={4} title="分辨率" en="RESOLUTION" color={theme.node.muted} faintColor={theme.node.faint}>
+                    <div className="grid grid-cols-2 gap-2.5">
+                        {resolutionOptionsShown.map((item) => (
+                            <OptionPill key={item.value} selected={resolution === item.value} theme={theme} onClick={() => onConfigChange("vquality", item.value)}>
+                                {item.label}
+                            </OptionPill>
+                        ))}
+                    </div>
+                    <div className="text-[11px] leading-4 opacity-55">2K 画质更高，生成更慢、积分消耗更多。</div>
+                </SettingGroup>
+                <SettingGroup index={5} title="比例" en="RATIO" color={theme.node.muted} faintColor={theme.node.faint}>
+                    <div className="grid grid-cols-3 gap-2.5">
+                        {ratioOptionsShown.map((item) => (
+                            <button
+                                key={item.value}
+                                type="button"
+                                className="flex h-[68px] cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border px-1 text-sm transition hover:opacity-80"
+                                style={{
+                                    borderColor: ratio === item.value ? theme.node.activeStroke : theme.node.stroke,
+                                    background: ratio === item.value ? theme.node.fill : "transparent",
+                                    boxShadow: ratio === item.value ? `inset 0 0 0 1px ${theme.node.activeStroke}` : "none",
+                                    color: theme.node.text,
+                                }}
+                                onMouseDown={(event) => event.stopPropagation()}
+                                onClick={() => onConfigChange("size", item.value)}
+                            >
+                                <SizePreview width={ratioPreview(item.value).width} height={ratioPreview(item.value).height} color={ratio === item.value ? theme.node.activeStroke : theme.node.text} />
+                                <span>{item.label}</span>
+                                <span className="sf-mono text-[9px] leading-none opacity-55">{item.value}</span>
+                            </button>
+                        ))}
+                    </div>
+                </SettingGroup>
+                <SettingGroup index={6} title="时长" en="DURATION" color={theme.node.muted} faintColor={theme.node.faint}>
+                    <div className="grid grid-cols-4 gap-2.5">
+                        {durationOptionsShown.map((item) => (
+                            <OptionPill key={item.value} selected={duration === item.value} theme={theme} onClick={() => onConfigChange("videoSeconds", String(item.value))}>
+                                {`${item.value}s`}
+                            </OptionPill>
+                        ))}
+                    </div>
+                    <NumberInput value={String(duration)} min={4} max={15} theme={theme} onChange={(value) => onConfigChange("videoSeconds", value)} />
+                </SettingGroup>
+                <SettingGroup index={7} title="输出" en="OUTPUT" color={theme.node.muted} faintColor={theme.node.faint}>
+                    <div className="grid gap-2 rounded-xl border p-2.5" style={{ borderColor: theme.node.stroke }}>
+                        {audioEnabled ? <SwitchRow label="生成声音（H3 原生立体声）" checked={generateAudio} theme={theme} onChange={(checked) => onConfigChange("videoGenerateAudio", String(checked))} /> : null}
+                        {watermarkEnabled ? <SwitchRow label="添加水印" checked={watermark} theme={theme} onChange={(checked) => onConfigChange("videoWatermark", String(checked))} /> : null}
+                    </div>
+                </SettingGroup>
+            </div>
+        </ImageSettingsTheme>
+    );
 }
 
 export function videoSizeLabel(value: string) {

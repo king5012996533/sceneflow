@@ -51,7 +51,21 @@ export type GenericVideoCapabilitySpec = {
     seconds: VideoSeconds[];
 };
 
-export type ModelCapabilitySpec = ImageCapabilitySpec | SeedanceVideoCapabilitySpec | GenericVideoCapabilitySpec;
+// ---------- 视频 · MiniMax（H3：768P / 2K） ----------
+export type MiniMaxResolution = "768P" | "2K";
+export type MiniMaxRatio = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
+export type MiniMaxDuration = 4 | 5 | 6 | 8 | 10 | 12 | 15;
+
+export type MiniMaxVideoCapabilitySpec = {
+    kind: "minimax-video";
+    resolutions: MiniMaxResolution[];
+    ratios: MiniMaxRatio[];
+    durations: MiniMaxDuration[];
+    audio: boolean;
+    watermark: boolean;
+};
+
+export type ModelCapabilitySpec = ImageCapabilitySpec | SeedanceVideoCapabilitySpec | GenericVideoCapabilitySpec | MiniMaxVideoCapabilitySpec;
 export type ModelCapabilityKind = ModelCapabilitySpec["kind"];
 /** ProviderCredential.capabilities 的存储形状：模型名 → 能力标定 */
 export type CredentialCapabilities = Record<string, ModelCapabilitySpec>;
@@ -59,7 +73,8 @@ export type CredentialCapabilities = Record<string, ModelCapabilitySpec>;
 export const IMAGE_KIND = "image";
 export const GENERIC_VIDEO_KIND = "video";
 export const SEEDANCE_VIDEO_KIND = "seedance-video";
-export const MODEL_KINDS: readonly ModelCapabilityKind[] = [IMAGE_KIND, GENERIC_VIDEO_KIND, SEEDANCE_VIDEO_KIND];
+export const MINIMAX_VIDEO_KIND = "minimax-video";
+export const MODEL_KINDS: readonly ModelCapabilityKind[] = [IMAGE_KIND, GENERIC_VIDEO_KIND, SEEDANCE_VIDEO_KIND, MINIMAX_VIDEO_KIND];
 
 // ---------- 选项清单（后台编辑器 & 面板过滤共用） ----------
 
@@ -135,6 +150,30 @@ export const VIDEO_SECONDS_OPTIONS: ReadonlyArray<{ value: VideoSeconds; label: 
     { value: 20, label: "20s" },
 ];
 
+export const MINIMAX_RESOLUTION_OPTIONS: ReadonlyArray<{ value: MiniMaxResolution; label: string }> = [
+    { value: "768P", label: "768P" },
+    { value: "2K", label: "2K" },
+];
+
+export const MINIMAX_RATIO_OPTIONS: ReadonlyArray<{ value: MiniMaxRatio; label: string }> = [
+    { value: "16:9", label: "横屏" },
+    { value: "9:16", label: "竖屏" },
+    { value: "1:1", label: "方形" },
+    { value: "4:3", label: "标准横屏" },
+    { value: "3:4", label: "标准竖屏" },
+    { value: "21:9", label: "宽银幕" },
+];
+
+export const MINIMAX_DURATION_OPTIONS: ReadonlyArray<{ value: MiniMaxDuration; label: string }> = [
+    { value: 4, label: "4s" },
+    { value: 5, label: "5s" },
+    { value: 6, label: "6s" },
+    { value: 8, label: "8s" },
+    { value: 10, label: "10s" },
+    { value: 12, label: "12s" },
+    { value: 15, label: "15s" },
+];
+
 export const IMAGE_MAX_COUNT_LIMIT = 15;
 
 // ---------- 内置默认能力（模型名命中时后台预填 / 前端兜底参考） ----------
@@ -162,6 +201,15 @@ export const DEFAULT_GENERIC_VIDEO_CAPABILITY: GenericVideoCapabilitySpec = {
     seconds: VIDEO_SECONDS_OPTIONS.map((item) => item.value),
 };
 
+export const DEFAULT_MINIMAX_VIDEO_CAPABILITY: MiniMaxVideoCapabilitySpec = {
+    kind: "minimax-video",
+    resolutions: MINIMAX_RESOLUTION_OPTIONS.map((item) => item.value),
+    ratios: MINIMAX_RATIO_OPTIONS.map((item) => item.value),
+    durations: MINIMAX_DURATION_OPTIONS.map((item) => item.value),
+    audio: true,
+    watermark: false,
+};
+
 /**
  * 按模型名推断能力类型（与前端 use-config-store 的模型名启发式保持一致）。
  * 仅用于「预填默认」和「编辑默认选择」，推断不到时返回 null（文本/音频等暂不标定）。
@@ -169,6 +217,8 @@ export const DEFAULT_GENERIC_VIDEO_CAPABILITY: GenericVideoCapabilitySpec = {
 export function inferModelKindByName(model: string): ModelCapabilityKind | null {
     const value = (model.includes("::") ? model.slice(model.indexOf("::") + 2) : model).toLowerCase();
     const isAudio = value.includes("audio") || value.includes("tts") || value.includes("speech") || value.includes("voice") || value.includes("music") || value.includes("sound");
+    // MiniMax H3（海螺三代）：分辨率 768P / 2K，单独能力类型；优先于通用视频分类
+    if (value.includes("minimax") || value === "h3" || value.includes("h3-video") || value.includes("hailuo-h3")) return MINIMAX_VIDEO_KIND;
     const isVideo = value.includes("seedance") || value.includes("video") || value.includes("sora") || value.includes("veo") || value.includes("kling") || value.includes("wan") || value.includes("hailuo");
     if (isVideo) return value.includes("seedance") ? SEEDANCE_VIDEO_KIND : GENERIC_VIDEO_KIND;
     const isImage =
@@ -199,6 +249,9 @@ export function defaultCapabilityForModel(model: string): ModelCapabilitySpec | 
     if (kind === GENERIC_VIDEO_KIND) {
         return { kind, clarity: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.clarity], sizes: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.sizes], seconds: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.seconds] };
     }
+    if (kind === MINIMAX_VIDEO_KIND) {
+        return { kind, resolutions: [...DEFAULT_MINIMAX_VIDEO_CAPABILITY.resolutions], ratios: [...DEFAULT_MINIMAX_VIDEO_CAPABILITY.ratios], durations: [...DEFAULT_MINIMAX_VIDEO_CAPABILITY.durations], audio: true, watermark: false };
+    }
     return null;
 }
 
@@ -212,6 +265,9 @@ const SEEDANCE_DURATION_VALUES: readonly SeedanceDuration[] = [-1, 4, 5, 6, 8, 1
 const VIDEO_CLARITY_VALUES: readonly VideoClarity[] = ["720", "480"];
 const VIDEO_SIZE_VALUES: readonly VideoSize[] = ["1280x720", "720x1280", "1024x1024", "1792x1024", "1024x1792", "auto"];
 const VIDEO_SECONDS_VALUES: readonly VideoSeconds[] = [6, 10, 12, 16, 20];
+const MINIMAX_RESOLUTION_VALUES: readonly MiniMaxResolution[] = ["768P", "2K"];
+const MINIMAX_RATIO_VALUES: readonly MiniMaxRatio[] = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"];
+const MINIMAX_DURATION_VALUES: readonly MiniMaxDuration[] = [4, 5, 6, 8, 10, 12, 15];
 
 function pickStrings<T extends string>(input: unknown, allowed: readonly T[]): T[] {
     if (!Array.isArray(input)) return [...allowed];
@@ -256,6 +312,16 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
             resolutions: pickStrings(value.resolutions, SEEDANCE_RESOLUTION_VALUES),
             ratios: pickStrings(value.ratios, SEEDANCE_RATIO_VALUES),
             durations: pickNumbers(value.durations, SEEDANCE_DURATION_VALUES),
+            audio: value.audio !== false,
+            watermark: value.watermark === true,
+        };
+    }
+    if (kind === MINIMAX_VIDEO_KIND) {
+        return {
+            kind,
+            resolutions: pickStrings(value.resolutions, MINIMAX_RESOLUTION_VALUES),
+            ratios: pickStrings(value.ratios, MINIMAX_RATIO_VALUES),
+            durations: pickNumbers(value.durations, MINIMAX_DURATION_VALUES),
             audio: value.audio !== false,
             watermark: value.watermark === true,
         };

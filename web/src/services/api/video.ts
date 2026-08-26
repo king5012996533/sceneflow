@@ -5,6 +5,7 @@ import { dataUrlToFile, getDataUrlByteSize } from "@/lib/image-utils";
 import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
 import { boolConfig, buildSeedancePromptText, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceVideoReferenceError, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
+import { normalizeMiniMaxResolution } from "@/lib/minimax-video";
 import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -349,7 +350,7 @@ async function createMiniMaxVideoTask(config: AiConfig, model: string, prompt: s
     const payload = {
         model: minimaxModelName(model),
         content,
-        resolution: "2K",
+        resolution: normalizeMiniMaxResolution(config.vquality),
         duration: minimaxDuration(config.videoSeconds),
         ratio: minimaxRatio(config.size) ?? (images.length ? "adaptive" : "16:9"),
     };
@@ -759,7 +760,7 @@ function parseReplicateVideoUrl(payload: ReplicatePrediction) {
     return url;
 }
 
-function findFirstUrl(value: unknown, seen = new Set<object>): string | null {
+function findFirstUrl(value: unknown, seen = new Set<object>()): string | null {
     if (typeof value === "string") return /^(https?:\/\/|data:video\/)/i.test(value) ? value : null;
     if (!value || typeof value !== "object" || seen.has(value)) return null;
     seen.add(value);

@@ -51,7 +51,8 @@ export function modelName(metadata?: GenerationMetadata): string {
 function isHighQuality(metadata?: GenerationMetadata): boolean {
     const vquality = String(metadata?.vquality || "");
     const quality = String(metadata?.quality || "");
-    return vquality === "high" || vquality.includes("1080") || quality === "hd" || quality === "high";
+    // "2K"（MiniMax H3 高分辨率档）按高清计
+    return vquality.toLowerCase().includes("2k") || vquality === "high" || vquality.includes("1080") || quality === "hd" || quality === "high";
 }
 
 /**
@@ -72,6 +73,8 @@ export function getGenerationCreditsCost(kind: GenerationKind, metadata?: Genera
         case "video": {
             if (configured?.videoCredits !== undefined) return Math.max(0, Math.floor(configured.videoCredits));
             if (defaults?.videoCredits !== undefined) return Math.max(0, Math.floor(defaults.videoCredits));
+            // MiniMax H3（秘塔）：768P ≈ ¥0.19/秒、2K ≈ ¥0.29/秒；15 秒 2K 约 ¥4.35
+            if (model.includes("minimax") || model.includes("h3")) return isHighQuality(metadata) ? 40 : 20;
             if (model.includes("seedance") || model.includes("doubao")) return isHighQuality(metadata) ? 30 : 15;
             if (model.includes("replicate") || model.includes("/")) return 20;
             return 15;
@@ -103,7 +106,7 @@ export function estimateGenerationCostCents(kind: GenerationKind, metadata?: Gen
         case "video": {
             if (model.includes("seedance") || model.includes("doubao")) return isHighQuality(metadata) ? 80 : 40;
             if (model.includes("replicate")) return 100;
-            if (model.includes("minimax") || model.includes("h3")) return 50;
+            if (model.includes("minimax") || model.includes("h3")) return isHighQuality(metadata) ? 70 : 40;
             return 50;
         }
         case "audio":
