@@ -13,9 +13,9 @@ export function CreditSymbol({ className, ...props }: ComponentProps<"span">) {
 }
 
 /** 预估本次生成将扣除的积分（逐模型定价 > 全局默认 > 内置草案；与实扣一致） */
-export function estimatedRequestCost(kind: GenerationKind, model: string, options?: { count?: string | number; videoSeconds?: string | number }): number {
+export function estimatedRequestCost(kind: GenerationKind, model: string, options?: { count?: string | number; videoSeconds?: string | number; vquality?: string | number }): number {
     if (!model) return 0;
     const count = Math.max(1, Math.floor(Math.abs(Number(options?.count)) || 1));
     const configured = getPlatformPricing(model);
-    return getGenerationCreditsCost(kind, { model, videoSeconds: options?.videoSeconds }, configured, getPricingDefaults()) * count;
+    return getGenerationCreditsCost(kind, { model, videoSeconds: options?.videoSeconds, vquality: options?.vquality }, configured, getPricingDefaults()) * count;
 }

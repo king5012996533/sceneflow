@@ -354,6 +354,10 @@ export function sanitizePricing(input: unknown): CredentialPricing | undefined {
         if (imageCredits !== undefined) pricing.imageCredits = imageCredits;
         const videoCredits = toPricingNumber(value.videoCredits);
         if (videoCredits !== undefined) pricing.videoCredits = videoCredits;
+        const videoCreditsStandard = toPricingNumber(value.videoCreditsStandard);
+        if (videoCreditsStandard !== undefined) pricing.videoCreditsStandard = videoCreditsStandard;
+        const videoCreditsHigh = toPricingNumber(value.videoCreditsHigh);
+        if (videoCreditsHigh !== undefined) pricing.videoCreditsHigh = videoCreditsHigh;
         const audioCredits = toPricingNumber(value.audioCredits);
         if (audioCredits !== undefined) pricing.audioCredits = audioCredits;
         const textCredits = toPricingNumber(value.textCredits);

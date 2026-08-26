@@ -359,8 +359,8 @@ export default function StudioPage() {
     const effectiveKind = modeOverride === "auto" ? detectedKind : modeOverride;
     const activeModel = effectiveKind === "image" ? effectiveConfig.imageModel || effectiveConfig.model : effectiveConfig.videoModel || effectiveConfig.model;
     const creditCost = useMemo(
-        () => getGenerationCreditsCost(effectiveKind, { model: activeModel, [effectiveKind === "image" ? "imageModel" : "videoModel"]: activeModel, videoSeconds: effectiveConfig.videoSeconds }, getPlatformPricing(activeModel), getPricingDefaults()),
-        [activeModel, effectiveConfig.videoSeconds, effectiveKind],
+        () => getGenerationCreditsCost(effectiveKind, { model: activeModel, [effectiveKind === "image" ? "imageModel" : "videoModel"]: activeModel, videoSeconds: effectiveConfig.videoSeconds, vquality: effectiveKind === "video" ? effectiveConfig.vquality : undefined }, getPlatformPricing(activeModel), getPricingDefaults()),
+        [activeModel, effectiveConfig.videoSeconds, effectiveConfig.vquality, effectiveKind],
     );
 
     const buildInstructionConfig = useCallback(
@@ -390,7 +390,7 @@ export default function StudioPage() {
             message.warning("暂无可用模型，请联系管理员在后台配置平台模型");
             return;
         }
-        const required = getGenerationCreditsCost(kind, { model, [kind === "image" ? "imageModel" : "videoModel"]: model, videoSeconds: effectiveConfig.videoSeconds }, getPlatformPricing(model), getPricingDefaults());
+        const required = getGenerationCreditsCost(kind, { model, [kind === "image" ? "imageModel" : "videoModel"]: model, videoSeconds: effectiveConfig.videoSeconds, vquality: kind === "video" ? effectiveConfig.vquality : undefined }, getPlatformPricing(model), getPricingDefaults());
         if (user?.role !== "admin" && creditBalance !== null && creditBalance < required) {
             quotaModalRef.current?.open({ balance: creditBalance, required });
             return;

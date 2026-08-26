@@ -17,8 +17,12 @@ export type GenerationKind = "image" | "video" | "audio" | "text" | "tool";
 export type ModelPricing = {
     /** 每张图片扣积分 */
     imageCredits?: number;
-    /** 每条视频扣积分（按条计费，与时长无关） */
+    /** 每条视频扣积分（按条计费，与时长无关）。统一档，兼容旧配置；配了分档时被分档覆盖 */
     videoCredits?: number;
+    /** 每条标准分辨率视频扣积分（768P/720p/480p 等），优先于 videoCredits */
+    videoCreditsStandard?: number;
+    /** 每条高清视频扣积分（2K/1080p 等，按 vquality 判定），优先于 videoCredits */
+    videoCreditsHigh?: number;
     /** 每次音频扣积分 */
     audioCredits?: number;
     /** 每次文本/工具调用扣积分 */
@@ -71,7 +75,12 @@ export function getGenerationCreditsCost(kind: GenerationKind, metadata?: Genera
             return 2;
         }
         case "video": {
-            if (configured?.videoCredits !== undefined) return Math.max(0, Math.floor(configured.videoCredits));
+            if (configured?.videoCredits !== undefined || configured?.videoCreditsStandard !== undefined || configured?.videoCreditsHigh !== undefined) {
+                // 逐模型分档定价：高清档（2K/1080p）/ 标准档（768P/720p 等）优先，统一档兜底
+                if (isHighQuality(metadata) && configured.videoCreditsHigh !== undefined) return Math.max(0, Math.floor(configured.videoCreditsHigh));
+                if (!isHighQuality(metadata) && configured.videoCreditsStandard !== undefined) return Math.max(0, Math.floor(configured.videoCreditsStandard));
+                if (configured.videoCredits !== undefined) return Math.max(0, Math.floor(configured.videoCredits));
+            }
             if (defaults?.videoCredits !== undefined) return Math.max(0, Math.floor(defaults.videoCredits));
             // MiniMax H3（秘塔）：768P ≈ ¥0.19/秒、2K ≈ ¥0.29/秒；15 秒 2K 约 ¥4.35
             if (model.includes("minimax") || model.includes("h3")) return isHighQuality(metadata) ? 40 : 20;
