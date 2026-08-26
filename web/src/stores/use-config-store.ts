@@ -173,7 +173,7 @@ type ConfigStore = {
 
 function isVideoModelName(model: string) {
     const value = modelOptionName(model).toLowerCase();
-    return value.includes("seedance") || value.includes("video") || value.includes("sora") || value.includes("veo") || value.includes("kling") || value.includes("wan") || value.includes("hailuo");
+    return value.includes("seedance") || value.includes("video") || value.includes("sora") || value.includes("veo") || value.includes("kling") || value.includes("wan") || value.includes("hailuo") || value.includes("minimax-h") || value.includes("h3");
 }
 
 function isImageModelName(model: string) {
@@ -222,7 +222,7 @@ export function filterModelsByCapability(models: string[], capability?: ModelCap
 export function classifyCatalogModel(item: PlatformCatalogModel): ModelCapability {
     const kind = item.capabilities?.kind;
     if (kind === "image") return "image";
-    if (kind === "seedance-video" || kind === "video") return "video";
+    if (kind === "seedance-video" || kind === "video" || kind === "minimax-video") return "video";
     const name = modelOptionName(item.model);
     if (isVideoModelName(name)) return "video";
     if (isImageModelName(name)) return "image";
