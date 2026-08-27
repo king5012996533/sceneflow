@@ -91,9 +91,11 @@ export function isCredentialTargetAllowed(credentialBaseUrl: string, targetUrl: 
         const base = new URL(credentialBaseUrl);
         const target = new URL(targetUrl);
         if (base.protocol !== "https:" || target.protocol !== "https:") return false;
-        if (target.origin !== base.origin) return false;
-        const basePath = base.pathname.replace(/\/+$/, "");
-        return !basePath || target.pathname === basePath || target.pathname.startsWith(`${basePath}/`);
+        // 只校验「同源」（scheme + host + 端口），不做路径前缀限制。
+        // 各渠道端点拼接规则不同：minimaxApiUrl 剥掉 baseUrl 末尾 /v1 再拼 /v2/video_generation、
+        // buildApiUrl 对无 /v1 的 baseUrl 会补 /v1、seedance 走 /api/plan/v3/...，
+        // 路径前缀校验会误伤合法请求（H3 曾因此被 403）。host 与凭证精确同源即不构成 Key 泄露面。
+        return target.origin === base.origin;
     } catch {
         return false;
     }

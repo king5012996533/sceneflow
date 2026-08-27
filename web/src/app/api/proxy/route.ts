@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
 import { assertAllowedProxyUrl, fetchSafely, isHostOrSubdomain } from "@/lib/url-safety";
-import { resolvePlatformCredential } from "@/lib/credential-store.server";
+import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +47,13 @@ export async function POST(req: NextRequest) {
 
         const platformCred = await resolvePlatformCredential({ targetUrl: target.toString(), provider: sfProvider, model: sfModel });
 
+        // 代理白名单：只放行已注册渠道（目标必须与凭证同源）。
+        // 只做同源校验、不做路径前缀限制（各渠道端点拼接规则不同，见 isCredentialTargetAllowed）。
+        // 无凭证（未注册 host）或跨源目标直接拒绝，避免把请求发往任意地址。
+        if (!platformCred || !isCredentialTargetAllowed(platformCred.baseUrl, target.toString())) {
+            return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
+        }
+
         let finalToken = "";
         let keySource: KeySource = "none";
         if (platformCred) {
@@ -89,7 +96,12 @@ export async function POST(req: NextRequest) {
         const controller = new AbortController();
         // 流式请求（SSE/文本流）不设超时：长对话可能持续数分钟，由客户端自行中止；
         // 非流式请求保持 120s 上限防止上游挂起。
-        const timeout = stream ? null : setTimeout(() => { timedOut = true; controller.abort(); }, PROXY_TIMEOUT_MS);
+        const timeout = stream
+            ? null
+            : setTimeout(() => {
+                  timedOut = true;
+                  controller.abort();
+              }, PROXY_TIMEOUT_MS);
 
         try {
             const response = await fetchSafely(target.toString(), {
@@ -135,10 +147,7 @@ export async function POST(req: NextRequest) {
     } catch (err: unknown) {
         // 我们自己的超时中止：上游（通常是中转站）可能已收单并扣费、仍在生成，只是响应超过了时限
         if (timedOut) {
-            return NextResponse.json(
-                { error: `上游处理超时（超过 ${PROXY_TIMEOUT_MS / 60000} 分钟），请求已中止。任务可能仍在上游运行并已计费，请稍后到中转站后台确认任务状态；如已出图/出片，把上游任务 ID 反馈给我们以便找回结果。` },
-                { status: 504 },
-            );
+            return NextResponse.json({ error: `上游处理超时（超过 ${PROXY_TIMEOUT_MS / 60000} 分钟），请求已中止。任务可能仍在上游运行并已计费，请稍后到中转站后台确认任务状态；如已出图/出片，把上游任务 ID 反馈给我们以便找回结果。` }, { status: 504 });
         }
         const message = err instanceof Error ? err.message : "代理请求失败";
         const cause = err instanceof Error && err.cause instanceof Error && err.cause.message && err.cause.message !== message ? `: ${err.cause.message}` : "";

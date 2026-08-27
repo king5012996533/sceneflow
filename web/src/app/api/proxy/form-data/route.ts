@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
 import { assertAllowedProxyUrl, fetchSafely, isHostOrSubdomain } from "@/lib/url-safety";
-import { resolvePlatformCredential } from "@/lib/credential-store.server";
+import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
 import FormData from "form-data";
 
 export const runtime = "nodejs";
@@ -28,6 +28,11 @@ export async function POST(req: NextRequest) {
         const sfProvider = typeof safeHeaders["x-sf-provider"] === "string" ? safeHeaders["x-sf-provider"] : undefined;
         const sfModel = typeof safeHeaders["x-sf-model"] === "string" ? safeHeaders["x-sf-model"] : undefined;
         const platformCred = await resolvePlatformCredential({ targetUrl: target.toString(), provider: sfProvider, model: sfModel });
+
+        // 代理白名单：只放行已注册渠道（目标与凭证同源），无凭证或跨源目标直接拒绝
+        if (!platformCred || !isCredentialTargetAllowed(platformCred.baseUrl, target.toString())) {
+            return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
+        }
 
         if (platformCred) {
             if (platformCred.provider === "aigccc" || isHostOrSubdomain(target.hostname, "aigccc666.com")) {
