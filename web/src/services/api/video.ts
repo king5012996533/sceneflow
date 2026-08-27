@@ -72,7 +72,15 @@ const POLL_ATTEMPTS: Record<VideoGenerationTask["provider"], number> = {
 // 状态接口瞬时抖动（5xx、429 限流、网络瞬断）不应立刻判死任务：任务已在上游受理，通常仍在生成并计费
 const MAX_CONSECUTIVE_POLL_FAILURES = 8;
 
-export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions, serverJobId?: string): Promise<VideoGenerationResult> {
+export async function requestVideoGeneration(
+    config: AiConfig,
+    prompt: string,
+    references: ReferenceImage[] = [],
+    videoReferences: ReferenceVideo[] = [],
+    audioReferences: ReferenceAudio[] = [],
+    options?: RequestOptions,
+    serverJobId?: string,
+): Promise<VideoGenerationResult> {
     const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options, serverJobId);
     if (task.result) return task.result;
     const delayMs = videoPollDelayMs(task.provider);
@@ -130,7 +138,15 @@ function isTransientPollError(error: unknown) {
     return true;
 }
 
-export async function createVideoGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions, serverJobId?: string): Promise<VideoGenerationTask> {
+export async function createVideoGenerationTask(
+    config: AiConfig,
+    prompt: string,
+    references: ReferenceImage[] = [],
+    videoReferences: ReferenceVideo[] = [],
+    audioReferences: ReferenceAudio[] = [],
+    options?: RequestOptions,
+    serverJobId?: string,
+): Promise<VideoGenerationTask> {
     const selectedModel = (config.videoModel || config.model).trim();
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
     assertVideoConfig(requestConfig, requestConfig.model);
@@ -553,7 +569,16 @@ function aigcccReferenceUrl(url: string, message: string) {
     return url;
 }
 
-async function createReplicateVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions, serverJobId?: string): Promise<VideoGenerationTask> {
+async function createReplicateVideoTask(
+    config: AiConfig,
+    model: string,
+    prompt: string,
+    references: ReferenceImage[],
+    videoReferences: ReferenceVideo[],
+    audioReferences: ReferenceAudio[],
+    options?: RequestOptions,
+    serverJobId?: string,
+): Promise<VideoGenerationTask> {
     const input = await buildReplicateVideoInput(config, model, prompt, references, videoReferences, audioReferences);
     if (serverJobId) {
         const job = await startServerReplicateJob(serverJobId, model, input, options?.signal);
@@ -895,7 +920,13 @@ async function resolveSeedanceAudioUrl(audio: ReferenceAudio) {
 
 async function videoResultFromUrl(url: string, options?: RequestOptions): Promise<VideoGenerationResult> {
     try {
-        const response = await axios.get<Blob>(url, { responseType: "blob", signal: options?.signal });
+        const response = await axios.get<Blob>(url, {
+            responseType: "blob",
+            signal: options?.signal,
+            // 下载视频 blob 限时 15s：墙内/无 CORS 时快速失败回退 URL 直链播放（video 标签不要求 CORS），
+            // 避免「生成已完成但下载挂起」导致前端一直转圈
+            timeout: 15_000,
+        });
         await assertVideoBlob(response.data);
         return { blob: response.data };
     } catch (error) {

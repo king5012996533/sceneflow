@@ -19,20 +19,50 @@ const getStore = () => createScopedLocalForageStore("image_files");
 // 存储用量追踪（客户端估算）
 const STORAGE_KEY = "sceneflow:storage_usage";
 function getStorageUsage(): number {
-    try { return Number(localStorage.getItem(scopedStorageKey(STORAGE_KEY))) || 0; } catch { return 0; }
+    try {
+        return Number(localStorage.getItem(scopedStorageKey(STORAGE_KEY))) || 0;
+    } catch {
+        return 0;
+    }
 }
 function addStorageUsage(bytes: number) {
-    try { localStorage.setItem(scopedStorageKey(STORAGE_KEY), String(Math.max(0, getStorageUsage() + bytes))); } catch { /* localStorage 不可用时静默 */ }
+    try {
+        localStorage.setItem(scopedStorageKey(STORAGE_KEY), String(Math.max(0, getStorageUsage() + bytes)));
+    } catch {
+        /* localStorage 不可用时静默 */
+    }
 }
 function removeStorageUsage(bytes: number) {
-    try { localStorage.setItem(scopedStorageKey(STORAGE_KEY), String(Math.max(0, getStorageUsage() - bytes))); } catch { /* 同上 */ }
+    try {
+        localStorage.setItem(scopedStorageKey(STORAGE_KEY), String(Math.max(0, getStorageUsage() - bytes)));
+    } catch {
+        /* 同上 */
+    }
 }
 export function resetStorageUsage() {
-    try { localStorage.removeItem(scopedStorageKey(STORAGE_KEY)); } catch { /* 同上 */ }
+    try {
+        localStorage.removeItem(scopedStorageKey(STORAGE_KEY));
+    } catch {
+        /* 同上 */
+    }
+}
+
+const ASSET_PROXY_PATH = "/canvas/api/proxy/asset";
+
+// 获取素材 Blob：dataURL 本地解析；http(s) URL 走服务端下载代理，
+// 规避 CDN 无 CORS 头 / 墙内直连境外 CDN / CSP 非 https 拦截导致的 Failed to fetch
+async function fetchAssetBlob(input: string): Promise<Blob> {
+    if (/^data:/i.test(input)) return (await fetch(input)).blob();
+    const response = await fetch(`${ASSET_PROXY_PATH}?url=${encodeURIComponent(input)}`, { credentials: "include" });
+    if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(typeof payload?.error === "string" ? payload.error : "素材下载失败");
+    }
+    return response.blob();
 }
 
 export async function uploadImage(input: string | Blob): Promise<UploadedImage> {
-    const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
+    const blob = typeof input === "string" ? await fetchAssetBlob(input) : input;
     const storageKey = `image:${nanoid()}`;
     await getStore().setItem(storageKey, blob);
     addStorageUsage(blob.size);
