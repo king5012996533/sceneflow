@@ -2,6 +2,7 @@
 
 import { nanoid } from "nanoid";
 
+import { dataUrlToBlob } from "@/lib/image-utils";
 import { createScopedLocalForageStore, scopedStorageKey } from "@/lib/user-data-scope";
 
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
@@ -31,7 +32,26 @@ function removeStorageUsage(bytes: number) {
 }
 
 export async function uploadMediaFile(input: string | Blob, prefix = "file"): Promise<UploadedFile> {
-    const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
+    // dataURL 纯解码（atob），避免 CSP connect-src 无 data: 拦截 fetch(dataUrl)；
+    // 视频/音频公网 URL 下载加 15s 超时，失败快速抛错而非一直挂起
+    let blob: Blob;
+    if (typeof input === "string") {
+        if (/^data:/i.test(input)) {
+            blob = dataUrlToBlob(input);
+        } else {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15_000);
+            try {
+                blob = await (await fetch(input, { signal: controller.signal })).blob();
+            } catch (error) {
+                throw new Error(`素材下载失败：${(error as Error).message}`);
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
+    } else {
+        blob = input;
+    }
     const storageKey = `${prefix}:${nanoid()}`;
     await getStore().setItem(storageKey, blob);
     addStorageUsage(blob.size);

@@ -1,7 +1,7 @@
 "use client";
 
 import { nanoid } from "nanoid";
-import { readImageMeta } from "@/lib/image-utils";
+import { dataUrlToBlob, readImageMeta } from "@/lib/image-utils";
 import { createScopedLocalForageStore, scopedStorageKey } from "@/lib/user-data-scope";
 
 export type UploadedImage = {
@@ -49,10 +49,10 @@ export function resetStorageUsage() {
 
 const ASSET_PROXY_PATH = "/canvas/api/proxy/asset";
 
-// 获取素材 Blob：dataURL 本地解析；http(s) URL 走服务端下载代理，
-// 规避 CDN 无 CORS 头 / 墙内直连境外 CDN / CSP 非 https 拦截导致的 Failed to fetch
+// 获取素材 Blob：dataURL 纯解码（atob，不 fetch，避免 CSP connect-src 无 data: 拦截）；
+// http(s) URL 走服务端下载代理，规避 CDN 无 CORS 头 / 墙内直连境外 CDN 导致的 Failed to fetch
 async function fetchAssetBlob(input: string): Promise<Blob> {
-    if (/^data:/i.test(input)) return (await fetch(input)).blob();
+    if (/^data:/i.test(input)) return dataUrlToBlob(input);
     const response = await fetch(`${ASSET_PROXY_PATH}?url=${encodeURIComponent(input)}`, { credentials: "include" });
     if (!response.ok) {
         const payload = await response.json().catch(() => null);

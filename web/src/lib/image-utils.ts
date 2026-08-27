@@ -39,6 +39,28 @@ export function readFileAsDataUrl(file: File) {
     });
 }
 
+/**
+ * dataURL → Blob 纯解码（atob），不依赖 fetch(dataUrl)。
+ * 生产 CSP 的 connect-src 不含 data:，fetch(dataUrl) 会被浏览器拦截
+ * （Refused to connect because it violates CSP）导致「扣费但前端报网络错误」。
+ */
+export function dataUrlToBlob(dataUrl: string): Blob {
+    const commaIndex = dataUrl.indexOf(",");
+    if (commaIndex < 0) return new Blob([dataUrl], { type: "text/plain;charset=utf-8" });
+    const header = dataUrl.slice(0, commaIndex);
+    const content = dataUrl.slice(commaIndex + 1);
+    const mimeType = header.match(/^data:([^;,]*)/i)?.[1] || "application/octet-stream";
+    if (/;base64/i.test(header)) {
+        const binary = atob(content || "");
+        const bytes = new Uint8Array(binary.length);
+        for (let index = 0; index < binary.length; index += 1) {
+            bytes[index] = binary.charCodeAt(index);
+        }
+        return new Blob([bytes], { type: mimeType });
+    }
+    return new Blob([decodeURIComponent(content || "")], { type: mimeType });
+}
+
 export function readImageMeta(dataUrl: string) {
     return new Promise<{ width: number; height: number; mimeType: string }>((resolve) => {
         const image = new Image();
