@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
-import { isSameOriginRequest } from "@/lib/auth";
 import { assertAllowedProxyUrl, fetchSafely, isHostOrSubdomain } from "@/lib/url-safety";
-import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
+import { resolvePlatformCredential } from "@/lib/credential-store.server";
 import FormData from "form-data";
 
 export const runtime = "nodejs";
@@ -15,7 +14,6 @@ const ALLOWED_HEADER_NAMES = new Set(["authorization", "accept", "x-api-key", "x
 export async function POST(req: NextRequest) {
     const user = await requireCurrentUser(req);
     if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
-    if (!isSameOriginRequest(req)) return NextResponse.json({ error: "请求来源不合法" }, { status: 403 });
 
     const contentLength = Number(req.headers.get("content-length") || 0);
     if (contentLength > MAX_PROXY_REQUEST_BYTES) return NextResponse.json({ error: "请求内容过大：单张或多张参考素材的总上传体积超过代理限制。请压缩图片、减少参考素材，或改用公网素材 URL。" }, { status: 413 });
@@ -30,7 +28,6 @@ export async function POST(req: NextRequest) {
         const sfProvider = typeof safeHeaders["x-sf-provider"] === "string" ? safeHeaders["x-sf-provider"] : undefined;
         const sfModel = typeof safeHeaders["x-sf-model"] === "string" ? safeHeaders["x-sf-model"] : undefined;
         const platformCred = await resolvePlatformCredential({ targetUrl: target.toString(), provider: sfProvider, model: sfModel });
-        if (!platformCred || !isCredentialTargetAllowed(platformCred.baseUrl, target.toString())) return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
 
         if (platformCred) {
             if (platformCred.provider === "aigccc" || isHostOrSubdomain(target.hostname, "aigccc666.com")) {
