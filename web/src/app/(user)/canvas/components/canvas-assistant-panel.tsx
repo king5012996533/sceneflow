@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bot, Cpu, History, PanelRightClose, Plus, Settings2, Trash2, X } from "lucide-react";
+import { Bot, History, PanelRightClose, Plus, Settings2, Trash2, X } from "lucide-react";
 import { App, Button, Modal, Switch, Tooltip } from "antd";
 import { motion } from "motion/react";
 
-import { modelOptionName, resolveModelChannel, selectableModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { nanoid } from "nanoid";
 import { type ResponseToolCall } from "@/lib/generation/generation-request";
@@ -14,8 +14,8 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { imageReferenceLabel } from "@/lib/image-reference-prompt";
 import { DiaTextReveal } from "@/components/ui/dia-text-reveal";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { CanvasPromptLibrary } from "./canvas-prompt-library";
+import { AgentTextModelPicker } from "./canvas-agent-model-picker";
 import { AgentChatComposer, AgentChatMessage, AgentModeSwitch, AgentPanelTabs, AgentWorkingMessage, type CanvasAgentChatMessage, type CanvasAgentMode } from "./canvas-agent-chat-ui";
 import { CanvasAutomationAgentPanel } from "./canvas-automation-agent-panel";
 import { CanvasLocalAgentPanel } from "./canvas-local-agent-panel";
@@ -481,59 +481,6 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
     );
 }
 
-function AgentTextModelPicker({ config, value, onChange }: { config: AiConfig; value: string; onChange: (model: string) => void }) {
-    const options = useMemo(() => Array.from(new Set([value, ...selectableModelsByCapability(config, "text")].filter(Boolean))), [config, value]);
-    const current = value || "";
-    return (
-        <Select value={current} onValueChange={onChange}>
-            <SelectTrigger
-                hideChevron
-                className="h-7 min-w-0 max-w-[220px] gap-1.5 border-0 bg-transparent px-1 py-0 text-xs font-normal shadow-none hover:bg-transparent hover:opacity-75 focus-visible:border-transparent focus-visible:ring-0 data-[state=open]:ring-0 dark:bg-transparent dark:hover:bg-transparent"
-                title={current ? `${modelOptionName(current)} · ${resolveModelChannel(config, current).name}` : "选择文本模型"}
-                onMouseDown={(event) => event.stopPropagation()}
-                onPointerDown={(event) => event.stopPropagation()}
-            >
-                <AgentModelIcon model={current} />
-                <span className="min-w-0 truncate">{current ? modelOptionName(current) : "选择文本模型"}</span>
-                {current ? <span className="shrink-0 opacity-55">{resolveModelChannel(config, current).name}</span> : null}
-            </SelectTrigger>
-            <SelectContent data-canvas-no-zoom className="z-[1200] w-72 max-w-[calc(100vw-24px)]" position="popper" align="start" side="bottom" sideOffset={6} onPointerDown={(event) => event.stopPropagation()} onMouseDown={(event) => event.stopPropagation()}>
-                {options.length ? (
-                    options.map((model) => (
-                        <SelectItem key={model} value={model} textValue={`${modelOptionName(model)} ${resolveModelChannel(config, model).name}`}>
-                            <span className="flex min-w-0 items-center gap-2">
-                                <AgentModelIcon model={model} />
-                                <span className="min-w-0 flex-1 truncate">{modelOptionName(model)}</span>
-                                <span className="shrink-0 text-xs opacity-55">{resolveModelChannel(config, model).name}</span>
-                            </span>
-                        </SelectItem>
-                    ))
-                ) : (
-                    <SelectItem value="__empty_text_model__" disabled>
-                        暂无文本模型
-                    </SelectItem>
-                )}
-            </SelectContent>
-        </Select>
-    );
-}
-
-function AgentModelIcon({ model }: { model: string }) {
-    const icon = resolveModelIcon(modelOptionName(model));
-    return icon ? <img src={icon} alt="" className="size-4 shrink-0 dark:invert" /> : <Cpu className="size-4 shrink-0 opacity-70" />;
-}
-
-function resolveModelIcon(model: string) {
-    const name = model.toLowerCase();
-    if (name.includes("claude") || name.includes("anthropic")) return "/canvas/icons/claude.svg";
-    if (name.includes("gemini") || name.includes("google")) return "/canvas/icons/gemini.svg";
-    if (name.includes("gpt") || name.includes("openai")) return "/canvas/icons/openai.svg";
-    if (name.includes("grok")) return "/canvas/icons/grok.svg";
-    if (name.includes("deepseek")) return "/canvas/icons/deepseek.svg";
-    if (name.includes("glm")) return "/canvas/icons/glm.svg";
-    return "";
-}
-
 function AssistantHistory({
     sessions,
     activeSession,
@@ -590,7 +537,7 @@ function OnlineAgentSetupView({ theme, activeModel }: { theme: (typeof canvasThe
                 <div>
                     <div className="text-base font-semibold leading-6">连接配置</div>
                     <div className="mt-1 text-xs leading-5" style={{ color: theme.node.muted }}>
-                        网站 Agent 直接使用管理员在后台配置的平台文本模型。
+                        网站 Agent 使用下方选择的文本模型；可选项来自管理员在后台配置的平台模型目录。
                     </div>
                 </div>
                 <div className="rounded-lg border p-3" style={{ borderColor: theme.node.stroke }}>

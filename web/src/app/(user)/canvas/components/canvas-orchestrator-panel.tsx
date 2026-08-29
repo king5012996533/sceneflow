@@ -5,13 +5,14 @@ import { Button } from "antd";
 import { ArrowUp, Bot, History, LoaderCircle, Plus, X } from "lucide-react";
 import { nanoid } from "nanoid";
 
-import type { AiConfig } from "@/stores/use-config-store";
+import { useConfigStore, type AiConfig } from "@/stores/use-config-store";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { LocalUser } from "@/stores/use-user-store";
 import { requestGeneratedToolResponse, type ResponseInputMessage, type ResponseToolCall } from "@/lib/generation/generation-request";
 import { AgentChatComposer, AgentChatMessage, AgentPanelTabs, AgentWorkingMessage } from "./canvas-agent-chat-ui";
+import { AgentTextModelPicker } from "./canvas-agent-model-picker";
 import type { CanvasAgentChatMessage } from "./canvas-agent-chat-ui";
 import type { CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import type { CanvasAgentOp } from "../utils/canvas-agent-ops";
@@ -39,6 +40,7 @@ export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCa
     const themeName = useThemeStore((state) => state.theme);
     const themeObj = canvasThemes[themeName];
     const user = useUserStore((state) => state.user);
+    const updateConfig = useConfigStore((state) => state.updateConfig);
 
     const [messages, setMessages] = useState<OrchestratorMessage[]>([]);
     const [prompt, setPrompt] = useState("");
@@ -203,6 +205,7 @@ export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCa
                 theme={themeObj}
                 onPromptChange={setPrompt}
                 onSubmit={submit}
+                left={<AgentTextModelPicker config={config} value={config.textModel} onChange={(model) => updateConfig("textModel", model)} />}
             />
         </div>
     );

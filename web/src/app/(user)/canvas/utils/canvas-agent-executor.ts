@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import type { AiConfig } from "@/stores/use-config-store";
+import { modelOptionName, selectableModelsByCapability, type AiConfig } from "@/stores/use-config-store";
 import { requestGeneratedToolResponse, type AiTextMessage, type ResponseInputMessage, type ResponseFunctionTool, type ResponseToolCall } from "@/lib/generation/generation-request";
 import type { SubAgentDef, SubAgentTask, SubAgentResult, ProductionPlan } from "./canvas-agent-orchestrator-types";
 import { hasCircularDependency, topSortStages, ORCHESTRATOR_CONSTANTS } from "./canvas-agent-orchestrator-types";
@@ -42,6 +42,12 @@ export async function executeSubAgent(
 
     const log = (title: string, data?: unknown) => context.onLog(`[${def.name}] ${title}`, data);
 
+    // 子 Agent 文本模型解析：preferredModel 仅在平台目录文本列表中存在时生效，
+    // 否则（如中转站未提供 gpt-4o-mini）回退到用户选择的 textModel，避免硬编码模型导致请求必败。
+    const textModelNames = selectableModelsByCapability(config, "text").map(modelOptionName);
+    const preferred = def.preferredModel ? modelOptionName(def.preferredModel) : "";
+    const subAgentModel = (preferred && textModelNames.includes(preferred) ? preferred : "") || config.textModel || config.model;
+
     try {
         const messages = buildSubAgentMessages(def, task);
         const tools = resolveTools(def.toolNames);
@@ -58,7 +64,7 @@ export async function executeSubAgent(
             log(`步骤 ${stepsUsed}/${def.maxSteps} 开始`, { toolCount: tools.length });
  
             const result = await requestGeneratedToolResponse({
-                config: { ...config, model: def.preferredModel || config.textModel || config.model, systemPrompt: "" },
+                config: { ...config, model: subAgentModel, systemPrompt: "" },
                 messages: currentMessages,
                 tools,
                 toolChoice: tools.length ? "auto" : undefined,
