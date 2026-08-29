@@ -35,6 +35,6 @@ exec node server.js
 START
 chmod +x start.sh
 echo ">>> restart PM2..."
-PORT=3003 pm2 restart sceneflow --update-env --max-memory-restart 900M 2>/dev/null || PORT=3003 pm2 start start.sh --name sceneflow --max-memory-restart 900M
+PORT=3003 pm2 restart sceneflow --update-env --max-memory-restart 1200M 2>/dev/null || PORT=3003 pm2 start start.sh --name sceneflow --max-memory-restart 1200M
 pm2 save
 echo "=== DEPLOY DONE ==="

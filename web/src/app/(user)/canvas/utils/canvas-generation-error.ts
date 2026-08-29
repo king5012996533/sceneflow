@@ -19,6 +19,16 @@ export function summarizeCanvasGenerationError(message?: string | null): CanvasG
         };
     }
 
+    // 生成途中连接被掐断（代理收到 socket hang up / ECONNRESET 等，或服务端显式标记）。
+    // 必须放在 isNetworkError 之前：错误文案里含 fetch failed 等字样会被误归为「接口不可达」。
+    if (text.includes("上游连接中断") || /socket hang up|econnreset|econnrefused|epipe/i.test(lower)) {
+        return {
+            title: "上游连接中断",
+            hint: "生成过程中与模型服务的连接断开。任务可能仍在上游运行并已计费，请稍后到中转站后台确认任务状态；如已出图/出片，把上游任务 ID 反馈给我们以便找回结果。稍后可重试。",
+            requestId,
+        };
+    }
+
     if (isNetworkError(lower)) {
         return {
             title: "模型接口不可达",

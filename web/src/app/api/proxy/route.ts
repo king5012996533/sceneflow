@@ -19,7 +19,10 @@ const MAX_PROXY_ENVELOPE_BYTES = 41 * 1024 * 1024;
 // 浏览器报「请求没有成功到达模型服务」（Failed to fetch），而中转站已扣费。
 // 现取 900s（15 分钟）；部署侧 nginx proxy_read_timeout 必须 > 此值（1200s），
 // 确保应用先于 nginx 返回带说明的超时 JSON，而不是 nginx 裸断产生 Failed to fetch。
+// form-data 代理（参考图生图 /images/edits 主路径）已同步 900s，勿只改这里。
 const PROXY_TIMEOUT_MS = 900_000;
+// blob 透传（视频 /videos/{id}/content 等成品下载）的体积护栏：仅在有 Content-Length 时校验
+const MAX_PROXY_BLOB_BYTES = 200 * 1024 * 1024;
 const ALLOWED_HEADER_NAMES = new Set(["authorization", "content-type", "accept", "prefer", "x-api-key", "x-request-id", "x-sf-provider", "x-sf-model"]);
 
 type KeySource = "platform" | "none";
@@ -35,12 +38,21 @@ export async function POST(req: NextRequest) {
 
     // 标记本次是否由我们自己的超时中止（区别于网络错误等），用于给客户端返回可操作的中文说明
     let timedOut = false;
+    const startedAt = Date.now();
 
     try {
-        const { url, method = "POST", headers = {}, body, bodyBase64, responseType, stream = false } = await req.json();
+        const envelope = (await req.json()) as {
+            url?: unknown;
+            method?: unknown;
+            headers?: unknown;
+            body?: unknown;
+            bodyBase64?: unknown;
+            responseType?: unknown;
+            stream?: unknown;
+        };
 
-        const target = await assertAllowedProxyUrl(String(url || ""));
-        const safeHeaders = sanitizeHeaders(headers);
+        const target = await assertAllowedProxyUrl(String(envelope.url || ""));
+        const safeHeaders = sanitizeHeaders(envelope.headers);
 
         // —— API Key 解析（平台 Key 化） ——
         // 平台统一配置的凭证（按目标 host + 可选 provider/model 匹配，admin 在后台管理）；
@@ -87,8 +99,13 @@ export async function POST(req: NextRequest) {
         }
         console.log(`[proxy] key-source=${keySource} target=${target.hostname}${target.pathname}`);
 
-        const upstreamBody = buildUpstreamBody(body, bodyBase64, safeHeaders);
-        const isRawUpload = typeof bodyBase64 === "string" && bodyBase64.length > 0;
+        const upstreamBody = buildUpstreamBody(envelope.body, envelope.bodyBase64, safeHeaders);
+        const isRawUpload = typeof envelope.bodyBase64 === "string" && (envelope.bodyBase64 as string).length > 0;
+        // 大字段（base64 素材信封 / dataUrl 数组）转成上游请求体后立即解除引用：
+        // 慢中转单次生成最长等 15 分钟，别让 30-40MB 的请求体常驻内存推高 RSS（PM2 会按 900M 重启进程，
+        // 一旦重启 nginx 对所有在途请求裸断 502，而中转站已扣费）
+        envelope.body = undefined;
+        envelope.bodyBase64 = undefined;
         if (upstreamBody.byteLength > (isRawUpload ? MAX_PROXY_RAW_BYTES : MAX_PROXY_REQUEST_BYTES)) {
             return NextResponse.json(
                 { error: isRawUpload ? "素材文件过大：单个参考素材超过 30MB，请压缩后重试或改用公网素材 URL。" : "请求内容过大：单张或多张参考素材的总请求体超过代理限制。请压缩图片、减少参考素材，或改用公网素材 URL。" },
@@ -98,24 +115,27 @@ export async function POST(req: NextRequest) {
 
         const controller = new AbortController();
         // 流式请求（SSE/文本流）不设超时：长对话可能持续数分钟，由客户端自行中止；
-        // 非流式请求保持 120s 上限防止上游挂起。
-        const timeout = stream
+        // 非流式请求保持 900s 上限防止上游挂起（慢中转出图/出片可达 5-15 分钟，见 PROXY_TIMEOUT_MS 注释）。
+        const timeout = envelope.stream === true
             ? null
             : setTimeout(() => {
                   timedOut = true;
                   controller.abort();
               }, PROXY_TIMEOUT_MS);
 
+        const method = sanitizeMethod(envelope.method);
         try {
             const response = await fetchSafely(target.toString(), {
-                method: sanitizeMethod(method),
+                method,
                 headers: safeHeaders,
-                body: upstreamBody.value,
+                body: upstreamBody.value as BodyInit | undefined,
                 signal: controller.signal,
             });
+            // 请求体已发出（收到响应头即已写完），上游请求体缓冲可以释放
+            upstreamBody.value = undefined;
 
             // 流式透传（SSE / 文本流）：把上游 body 流原样转给客户端
-            if (stream) {
+            if (envelope.stream === true) {
                 return new NextResponse(response.body, {
                     status: response.status,
                     headers: {
@@ -126,13 +146,20 @@ export async function POST(req: NextRequest) {
                 });
             }
 
-            if (responseType === "blob") {
-                const blob = await response.arrayBuffer();
-                return new NextResponse(blob, {
+            if (envelope.responseType === "blob") {
+                // 成品素材（视频/图片）下载：直接把上游流透传给客户端，不在服务端整段缓冲。
+                // 视频可达几十上百 MB，曾用 arrayBuffer() 整段读入内存，多个视频并发完成时
+                // RSS 冲破 PM2 上限触发进程重启 → nginx 对所有在途请求裸断 502（中转站已扣费）。
+                const contentLength = response.headers.get("Content-Length");
+                if (contentLength && Number(contentLength) > MAX_PROXY_BLOB_BYTES) {
+                    return NextResponse.json({ error: "素材体积超过代理限制（200MB）" }, { status: 413 });
+                }
+                return new NextResponse(response.body, {
                     status: response.status,
                     headers: {
                         "Content-Type": response.headers.get("Content-Type") || "application/octet-stream",
-                        "Content-Length": String(blob.byteLength),
+                        ...(contentLength ? { "Content-Length": contentLength } : {}),
+                        "X-Accel-Buffering": "no",
                     },
                 });
             }
@@ -150,12 +177,21 @@ export async function POST(req: NextRequest) {
     } catch (err: unknown) {
         // 我们自己的超时中止：上游（通常是中转站）可能已收单并扣费、仍在生成，只是响应超过了时限
         if (timedOut) {
+            console.error(`[proxy] 上游超时中止 elapsed=${Math.round((Date.now() - startedAt) / 1000)}s`);
             return NextResponse.json({ error: `上游处理超时（超过 ${PROXY_TIMEOUT_MS / 60000} 分钟），请求已中止。任务可能仍在上游运行并已计费，请稍后到中转站后台确认任务状态；如已出图/出片，把上游任务 ID 反馈给我们以便找回结果。` }, { status: 504 });
         }
         const message = err instanceof Error ? err.message : "代理请求失败";
         const cause = err instanceof Error && err.cause instanceof Error && err.cause.message && err.cause.message !== message ? `: ${err.cause.message}` : "";
         console.error("[proxy]", message + cause);
-        const status = message.includes("不允许") || message.includes("非法") || message.includes("重定向") ? 400 : message.includes("超时") || message.includes("aborted") ? 504 : 502;
+        if (message.includes("不允许") || message.includes("非法") || message.includes("重定向")) {
+            return NextResponse.json({ error: message + cause }, { status: 400 });
+        }
+        // 生成途中连接被掐断（socket hang up / ECONNRESET 等）：上游往往已收单扣费、任务仍在跑。
+        // 归为 504 并给出可操作说明，不再裸报 502 让用户误以为是「上游接口异常」。
+        if (/socket hang up|econnreset|econnrefused|epipe|fetch failed|terminated|network error|getaddrinfo/i.test(message + cause)) {
+            return NextResponse.json({ error: `上游连接中断（${message + cause}）。任务可能仍在上游运行并已计费，请稍后到中转站后台确认任务状态；如已出图/出片，把上游任务 ID 反馈给我们以便找回结果。` }, { status: 504 });
+        }
+        const status = message.includes("超时") || message.includes("aborted") ? 504 : 502;
         return NextResponse.json({ error: message + cause }, { status });
     }
 }
@@ -181,7 +217,7 @@ function sanitizeHeaders(headers: unknown) {
 }
 
 // bodyBase64：客户端把本地文件 base64 后放进 JSON 信封，这里解码成二进制再转发（用于 Replicate Files API 等原始上传）
-function buildUpstreamBody(body: unknown, bodyBase64: unknown, headers: Record<string, string>) {
+function buildUpstreamBody(body: unknown, bodyBase64: unknown, headers: Record<string, string>): { value: Buffer | string | undefined; byteLength: number } {
     if (typeof bodyBase64 === "string" && bodyBase64.length > 0) {
         const buffer = Buffer.from(bodyBase64, "base64");
         return { value: buffer, byteLength: buffer.byteLength };
@@ -189,7 +225,7 @@ function buildUpstreamBody(body: unknown, bodyBase64: unknown, headers: Record<s
     return buildBody(body, headers);
 }
 
-function buildBody(body: unknown, headers: Record<string, string>) {
+function buildBody(body: unknown, headers: Record<string, string>): { value: Buffer | string | undefined; byteLength: number } {
     if (body === undefined || body === null) return { value: undefined, byteLength: 0 };
     if (typeof body === "string") return { value: body, byteLength: new TextEncoder().encode(body).byteLength };
 
