@@ -54,9 +54,11 @@ export function modelName(metadata?: GenerationMetadata): string {
 
 function isHighQuality(metadata?: GenerationMetadata): boolean {
     const vquality = String(metadata?.vquality || "");
-    const quality = String(metadata?.quality || "");
-    // "2K"（MiniMax H3 高分辨率档）按高清计
-    return vquality.toLowerCase().includes("2k") || vquality === "high" || vquality.includes("1080") || quality === "hd" || quality === "high";
+    // 仅看视频分辨率字段判定高清档（2K / 1080p / 显式 high）。
+    // ⚠️ 不要读 metadata.quality：那是「图片清晰度」（auto/high/...），视频任务会经
+    // buildNodeGenerationConfig 回退到全局图片设置，若参与判定，图片选了「高质量」的用户
+    // 生成 768P 视频也会被误按高清档扣费（预览只传 vquality，显示与实扣不一致）。
+    return vquality.toLowerCase().includes("2k") || vquality === "high" || vquality.includes("1080");
 }
 
 /**
