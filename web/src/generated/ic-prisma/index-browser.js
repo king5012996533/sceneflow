@@ -134,7 +134,9 @@ exports.Prisma.UserScalarFieldEnum = {
   bannedAt: 'bannedAt',
   banReason: 'banReason',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  referralCode: 'referralCode',
+  referredById: 'referredById'
 };
 
 exports.Prisma.UserConfigScalarFieldEnum = {
@@ -167,6 +169,19 @@ exports.Prisma.GenerationJobScalarFieldEnum = {
   error: 'error',
   metadata: 'metadata',
   resultUrl: 'resultUrl',
+  provider: 'provider',
+  providerModel: 'providerModel',
+  externalId: 'externalId',
+  externalGetUrl: 'externalGetUrl',
+  externalStatus: 'externalStatus',
+  resultData: 'resultData',
+  archiveKey: 'archiveKey',
+  archiveMimeType: 'archiveMimeType',
+  archiveSize: 'archiveSize',
+  lastPolledAt: 'lastPolledAt',
+  nextPollAt: 'nextPollAt',
+  pollAttempts: 'pollAttempts',
+  progress: 'progress',
   quotaRefunded: 'quotaRefunded',
   creditsCost: 'creditsCost',
   costCents: 'costCents',

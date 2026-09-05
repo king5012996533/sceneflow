@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdminUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 import { grantCredits } from "@/lib/credit-ledger";
+import { settleReferralForOrder } from "@/lib/referral";
 
 export async function GET(req: NextRequest) {
     try {
@@ -50,15 +51,15 @@ export async function PATCH(req: NextRequest) {
             if (existing.status === "paid" && status !== "paid") throw new Error("已支付订单不能直接改为其他状态");
             if (status === "paid" && existing.status !== "pending") throw new Error("只有待支付订单可以确认支付");
 
-            const claimed = status === "paid"
-                ? await tx.order.updateMany({ where: { id: orderId, status: "pending" }, data: { status, paidAt: new Date() } })
-                : await tx.order.updateMany({ where: { id: orderId }, data: { status } });
+            const claimed = status === "paid" ? await tx.order.updateMany({ where: { id: orderId, status: "pending" }, data: { status, paidAt: new Date() } }) : await tx.order.updateMany({ where: { id: orderId }, data: { status } });
             if (!claimed.count) return { order: await tx.order.findUnique({ where: { id: orderId }, include: { user: { select: { id: true, email: true, name: true } }, package: true } }), credited: false };
 
             const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { user: { select: { id: true, email: true, name: true } }, package: true } });
             if (status === "paid" && order.package) {
                 const credits = order.package.credits + order.package.bonusCredits;
                 await grantCredits(tx, order.userId, credits, "purchase", "order", orderId, `积分包「${order.package.name}」到账 ${credits} 积分`);
+                // 老带新邀请返利：与积分入账同一事务，幂等（refType=referral_*）
+                await settleReferralForOrder(tx, orderId, credits);
             }
             await tx.adminAuditLog.create({ data: { actorId: admin.id, action: "order.status", target: "order", targetId: orderId, metadata: body } });
             return { order, credited: status === "paid" };

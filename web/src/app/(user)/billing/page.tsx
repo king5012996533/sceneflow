@@ -9,6 +9,7 @@ import { formatCny } from "@/lib/format";
 import { CreditBalanceCard } from "@/components/credits/credit-balance-card";
 import { CreditTransactionsTable } from "@/components/credits/credit-transactions-table";
 import { CreditPackagesSection } from "@/components/credits/credit-packages-section";
+import { ReferralCard } from "@/components/credits/referral-card";
 import { useCreditBalance } from "@/hooks/use-credit-balance";
 
 type Order = {
@@ -62,6 +63,10 @@ export default function BillingPage() {
                         <CreditTransactionsTable limit={20} />
                     </div>
                 </section>
+
+                <div className="mt-4">
+                    <ReferralCard />
+                </div>
 
                 <section className="mt-4 rounded-2xl border border-[#dde2dc] bg-white/78 p-5 shadow-[0_20px_60px_rgba(42,51,48,0.06)]">
                     <div className="mb-5 flex items-center gap-2 text-sm font-medium">

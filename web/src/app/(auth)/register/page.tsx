@@ -9,6 +9,30 @@ import { useUserStore } from "@/stores/use-user-store";
 const PHONE_REGEX = /^1\d{10}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// 邀请码本地记忆：链接跳转/分享中断也不丢归属，30 天有效
+const REFERRAL_STORAGE_KEY = "ic_referral";
+const REFERRAL_STORAGE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function captureReferralCode(): string {
+    try {
+        const fromUrl = new URLSearchParams(window.location.search).get("ref")?.trim().toUpperCase();
+        if (fromUrl) {
+            localStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify({ code: fromUrl, ts: Date.now() }));
+            return fromUrl;
+        }
+        const raw = localStorage.getItem(REFERRAL_STORAGE_KEY);
+        if (!raw) return "";
+        const saved = JSON.parse(raw) as { code?: string; ts?: number };
+        if (!saved.code || !saved.ts || Date.now() - saved.ts > REFERRAL_STORAGE_TTL_MS) {
+            localStorage.removeItem(REFERRAL_STORAGE_KEY);
+            return "";
+        }
+        return saved.code;
+    } catch {
+        return "";
+    }
+}
+
 export default function RegisterPage() {
     const router = useRouter();
     const { message } = App.useApp();
@@ -22,6 +46,11 @@ export default function RegisterPage() {
     const [loading, setLoading] = useState(false);
     const [countdown, setCountdown] = useState(0);
     const [verifyToken, setVerifyToken] = useState("");
+    const [referralCode, setReferralCode] = useState("");
+
+    useEffect(() => {
+        setReferralCode(captureReferralCode());
+    }, []);
 
     useEffect(() => {
         if (countdown <= 0) return;
@@ -100,7 +129,7 @@ export default function RegisterPage() {
             const res = await fetch("/canvas/api/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: isPhone ? `${target}@phone.local` : target, password, name, verificationToken: verifyToken }),
+                body: JSON.stringify({ email: isPhone ? `${target}@phone.local` : target, password, name, verificationToken: verifyToken, refCode: referralCode || undefined }),
             });
             const data = await res.json();
             if (!res.ok) {
@@ -127,6 +156,7 @@ export default function RegisterPage() {
                     </div>
                     <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{step === 1 ? "注册账号" : step === 2 ? "输入验证码" : "设置密码"}</h1>
                     <p className="text-sm text-gray-500 mt-2">{step === 1 ? "注册后开始使用 SceneFlow" : step === 2 ? `验证码已发送至 ${target}` : "设置密码完成注册"}</p>
+                    {referralCode ? <div className="mt-3 rounded-lg bg-[#f3f7f2] px-3 py-2 text-xs text-[#4a6455]">已接受好友邀请（{referralCode}），首充享加成</div> : null}
                 </div>
 
                 <div className="space-y-4">

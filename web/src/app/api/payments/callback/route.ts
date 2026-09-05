@@ -5,6 +5,7 @@ import { type PaymentProvider } from "@/lib/billing";
 import { prisma } from "@/lib/ic-prisma";
 import { Prisma } from "@/generated/ic-prisma/client";
 import { grantCredits } from "@/lib/credit-ledger";
+import { settleReferralForOrder } from "@/lib/referral";
 
 const ALLOWED_PROVIDERS: ReadonlySet<string> = new Set(["wechat", "alipay", "stripe", "manual"]);
 const SIGNATURE_MAX_AGE_MS = 5 * 60 * 1000; // 签名时间戳新鲜度窗口：5 分钟
@@ -97,6 +98,8 @@ export async function POST(req: NextRequest) {
             if (!pkg) throw new Error("积分包不存在");
             const credits = pkg.credits + pkg.bonusCredits;
             const balance = await grantCredits(tx, order.userId, credits, "purchase", "order", order.id, `积分包「${pkg.name}」到账 ${credits} 积分`);
+            // 老带新邀请返利：与积分入账同一事务，幂等（refType=referral_*）
+            await settleReferralForOrder(tx, order.id, credits);
             const updatedOrder = await tx.order.findUniqueOrThrow({ where: { id: order.id } });
             return { order: updatedOrder, credited: true, credits, balance };
         });

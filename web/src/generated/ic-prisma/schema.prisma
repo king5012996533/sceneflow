@@ -31,6 +31,10 @@ model User {
   config             UserConfig?
   creditBalance      CreditBalance?
   creditTransactions CreditTransaction[]
+  referralCode       String?             @unique // 邀请码（注册生成/老用户首次使用时补发）
+  referredById       String? // 邀请人：注册时一次性绑定，终身不变
+  referredBy         User?               @relation("ReferralInviter", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals          User[]              @relation("ReferralInviter")
 }
 
 // 用户配置（API Key、模型设置等，跨设备同步）
@@ -60,25 +64,40 @@ model UsageRecord {
 }
 
 model GenerationJob {
-  id            String    @id @default(cuid())
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  requestKey    String    @unique
-  kind          String // image | video | audio | text | tool
-  count         Int       @default(1)
-  status        String    @default("running") // running | succeeded | failed | cancelled
-  error         String?
-  metadata      Json?
-  resultUrl     String? // 生成结果 URL（图片/视频）
-  quotaRefunded Boolean   @default(false)
-  creditsCost   Int       @default(0) // 本次消耗积分（失败退款依据）
-  costCents     Int? // 平台估算成本（分，供对账与定价校准）
-  startedAt     DateTime  @default(now())
-  finishedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestKey      String    @unique
+  kind            String // image | video | audio | text | tool
+  count           Int       @default(1)
+  status          String    @default("running") // running | succeeded | failed | cancelled
+  error           String?
+  metadata        Json?
+  resultUrl       String? // 生成结果 URL（图片/视频）
+  provider        String?
+  providerModel   String?
+  externalId      String?
+  externalGetUrl  String?
+  externalStatus  String?
+  resultData      Json?
+  archiveKey      String?
+  archiveMimeType String?
+  archiveSize     Int?
+  lastPolledAt    DateTime?
+  nextPollAt      DateTime?
+  pollAttempts    Int       @default(0)
+  progress        Int?
+  quotaRefunded   Boolean   @default(false)
+  creditsCost     Int       @default(0) // 本次消耗积分（失败退款依据）
+  costCents       Int? // 平台估算成本（分，供对账与定价校准）
+  startedAt       DateTime  @default(now())
+  finishedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
+  @@unique([provider, externalId])
   @@index([userId, status])
+  @@index([status, nextPollAt])
   @@index([userId, createdAt])
 }
 
@@ -120,6 +139,7 @@ model CreditTransaction {
   note         String?
   createdAt    DateTime @default(now())
 
+  @@unique([userId, type, refType, refId])
   @@index([userId, createdAt])
   @@index([refType, refId])
 }

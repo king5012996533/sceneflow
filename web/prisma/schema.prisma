@@ -31,6 +31,10 @@ model User {
   config        UserConfig?
   creditBalance CreditBalance?
   creditTransactions CreditTransaction[]
+  referralCode  String?   @unique            // 邀请码（注册生成/老用户首次使用时补发）
+  referredById  String?                       // 邀请人：注册时一次性绑定，终身不变
+  referredBy    User?     @relation("ReferralInviter", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals     User[]    @relation("ReferralInviter")
 }
 
 // 用户配置（API Key、模型设置等，跨设备同步）

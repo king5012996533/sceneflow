@@ -2236,6 +2236,7 @@ export namespace Prisma {
     generationJobs: number
     auditLogs: number
     creditTransactions: number
+    referrals: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -2244,6 +2245,7 @@ export namespace Prisma {
     generationJobs?: boolean | UserCountOutputTypeCountGenerationJobsArgs
     auditLogs?: boolean | UserCountOutputTypeCountAuditLogsArgs
     creditTransactions?: boolean | UserCountOutputTypeCountCreditTransactionsArgs
+    referrals?: boolean | UserCountOutputTypeCountReferralsArgs
   }
 
   // Custom InputTypes
@@ -2290,6 +2292,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountCreditTransactionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: CreditTransactionWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountReferralsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: UserWhereInput
   }
 
 
@@ -2384,6 +2393,8 @@ export namespace Prisma {
     banReason: string | null
     createdAt: Date | null
     updatedAt: Date | null
+    referralCode: string | null
+    referredById: string | null
   }
 
   export type UserMaxAggregateOutputType = {
@@ -2401,6 +2412,8 @@ export namespace Prisma {
     banReason: string | null
     createdAt: Date | null
     updatedAt: Date | null
+    referralCode: string | null
+    referredById: string | null
   }
 
   export type UserCountAggregateOutputType = {
@@ -2418,6 +2431,8 @@ export namespace Prisma {
     banReason: number
     createdAt: number
     updatedAt: number
+    referralCode: number
+    referredById: number
     _all: number
   }
 
@@ -2437,6 +2452,8 @@ export namespace Prisma {
     banReason?: true
     createdAt?: true
     updatedAt?: true
+    referralCode?: true
+    referredById?: true
   }
 
   export type UserMaxAggregateInputType = {
@@ -2454,6 +2471,8 @@ export namespace Prisma {
     banReason?: true
     createdAt?: true
     updatedAt?: true
+    referralCode?: true
+    referredById?: true
   }
 
   export type UserCountAggregateInputType = {
@@ -2471,6 +2490,8 @@ export namespace Prisma {
     banReason?: true
     createdAt?: true
     updatedAt?: true
+    referralCode?: true
+    referredById?: true
     _all?: true
   }
 
@@ -2561,6 +2582,8 @@ export namespace Prisma {
     banReason: string | null
     createdAt: Date
     updatedAt: Date
+    referralCode: string | null
+    referredById: string | null
     _count: UserCountAggregateOutputType | null
     _min: UserMinAggregateOutputType | null
     _max: UserMaxAggregateOutputType | null
@@ -2595,6 +2618,8 @@ export namespace Prisma {
     banReason?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    referralCode?: boolean
+    referredById?: boolean
     orders?: boolean | User$ordersArgs<ExtArgs>
     usageRecords?: boolean | User$usageRecordsArgs<ExtArgs>
     generationJobs?: boolean | User$generationJobsArgs<ExtArgs>
@@ -2602,6 +2627,8 @@ export namespace Prisma {
     config?: boolean | User$configArgs<ExtArgs>
     creditBalance?: boolean | User$creditBalanceArgs<ExtArgs>
     creditTransactions?: boolean | User$creditTransactionsArgs<ExtArgs>
+    referredBy?: boolean | User$referredByArgs<ExtArgs>
+    referrals?: boolean | User$referralsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -2620,6 +2647,9 @@ export namespace Prisma {
     banReason?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    referralCode?: boolean
+    referredById?: boolean
+    referredBy?: boolean | User$referredByArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
   export type UserSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -2637,6 +2667,9 @@ export namespace Prisma {
     banReason?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    referralCode?: boolean
+    referredById?: boolean
+    referredBy?: boolean | User$referredByArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
   export type UserSelectScalar = {
@@ -2654,9 +2687,11 @@ export namespace Prisma {
     banReason?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    referralCode?: boolean
+    referredById?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "name" | "password" | "phone" | "emailVerified" | "phoneVerified" | "avatarUrl" | "githubId" | "role" | "bannedAt" | "banReason" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "email" | "name" | "password" | "phone" | "emailVerified" | "phoneVerified" | "avatarUrl" | "githubId" | "role" | "bannedAt" | "banReason" | "createdAt" | "updatedAt" | "referralCode" | "referredById", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     orders?: boolean | User$ordersArgs<ExtArgs>
     usageRecords?: boolean | User$usageRecordsArgs<ExtArgs>
@@ -2665,10 +2700,16 @@ export namespace Prisma {
     config?: boolean | User$configArgs<ExtArgs>
     creditBalance?: boolean | User$creditBalanceArgs<ExtArgs>
     creditTransactions?: boolean | User$creditTransactionsArgs<ExtArgs>
+    referredBy?: boolean | User$referredByArgs<ExtArgs>
+    referrals?: boolean | User$referralsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
-  export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
-  export type UserIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {}
+  export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    referredBy?: boolean | User$referredByArgs<ExtArgs>
+  }
+  export type UserIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    referredBy?: boolean | User$referredByArgs<ExtArgs>
+  }
 
   export type $UserPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "User"
@@ -2680,6 +2721,8 @@ export namespace Prisma {
       config: Prisma.$UserConfigPayload<ExtArgs> | null
       creditBalance: Prisma.$CreditBalancePayload<ExtArgs> | null
       creditTransactions: Prisma.$CreditTransactionPayload<ExtArgs>[]
+      referredBy: Prisma.$UserPayload<ExtArgs> | null
+      referrals: Prisma.$UserPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -2696,6 +2739,8 @@ export namespace Prisma {
       banReason: string | null
       createdAt: Date
       updatedAt: Date
+      referralCode: string | null
+      referredById: string | null
     }, ExtArgs["result"]["user"]>
     composites: {}
   }
@@ -3097,6 +3142,8 @@ export namespace Prisma {
     config<T extends User$configArgs<ExtArgs> = {}>(args?: Subset<T, User$configArgs<ExtArgs>>): Prisma__UserConfigClient<$Result.GetResult<Prisma.$UserConfigPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     creditBalance<T extends User$creditBalanceArgs<ExtArgs> = {}>(args?: Subset<T, User$creditBalanceArgs<ExtArgs>>): Prisma__CreditBalanceClient<$Result.GetResult<Prisma.$CreditBalancePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     creditTransactions<T extends User$creditTransactionsArgs<ExtArgs> = {}>(args?: Subset<T, User$creditTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CreditTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    referredBy<T extends User$referredByArgs<ExtArgs> = {}>(args?: Subset<T, User$referredByArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    referrals<T extends User$referralsArgs<ExtArgs> = {}>(args?: Subset<T, User$referralsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3140,6 +3187,8 @@ export namespace Prisma {
     readonly banReason: FieldRef<"User", 'String'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
+    readonly referralCode: FieldRef<"User", 'String'>
+    readonly referredById: FieldRef<"User", 'String'>
   }
     
 
@@ -3394,6 +3443,10 @@ export namespace Prisma {
      */
     data: UserCreateManyInput | UserCreateManyInput[]
     skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserIncludeCreateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -3464,6 +3517,10 @@ export namespace Prisma {
      * Limit how many Users to update.
      */
     limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserIncludeUpdateManyAndReturn<ExtArgs> | null
   }
 
   /**
@@ -3688,6 +3745,49 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: CreditTransactionScalarFieldEnum | CreditTransactionScalarFieldEnum[]
+  }
+
+  /**
+   * User.referredBy
+   */
+  export type User$referredByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+  }
+
+  /**
+   * User.referrals
+   */
+  export type User$referralsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the User
+     */
+    select?: UserSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the User
+     */
+    omit?: UserOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: UserInclude<ExtArgs> | null
+    where?: UserWhereInput
+    orderBy?: UserOrderByWithRelationInput | UserOrderByWithRelationInput[]
+    cursor?: UserWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: UserScalarFieldEnum | UserScalarFieldEnum[]
   }
 
   /**
@@ -5935,12 +6035,18 @@ export namespace Prisma {
 
   export type GenerationJobAvgAggregateOutputType = {
     count: number | null
+    archiveSize: number | null
+    pollAttempts: number | null
+    progress: number | null
     creditsCost: number | null
     costCents: number | null
   }
 
   export type GenerationJobSumAggregateOutputType = {
     count: number | null
+    archiveSize: number | null
+    pollAttempts: number | null
+    progress: number | null
     creditsCost: number | null
     costCents: number | null
   }
@@ -5954,6 +6060,18 @@ export namespace Prisma {
     status: string | null
     error: string | null
     resultUrl: string | null
+    provider: string | null
+    providerModel: string | null
+    externalId: string | null
+    externalGetUrl: string | null
+    externalStatus: string | null
+    archiveKey: string | null
+    archiveMimeType: string | null
+    archiveSize: number | null
+    lastPolledAt: Date | null
+    nextPollAt: Date | null
+    pollAttempts: number | null
+    progress: number | null
     quotaRefunded: boolean | null
     creditsCost: number | null
     costCents: number | null
@@ -5972,6 +6090,18 @@ export namespace Prisma {
     status: string | null
     error: string | null
     resultUrl: string | null
+    provider: string | null
+    providerModel: string | null
+    externalId: string | null
+    externalGetUrl: string | null
+    externalStatus: string | null
+    archiveKey: string | null
+    archiveMimeType: string | null
+    archiveSize: number | null
+    lastPolledAt: Date | null
+    nextPollAt: Date | null
+    pollAttempts: number | null
+    progress: number | null
     quotaRefunded: boolean | null
     creditsCost: number | null
     costCents: number | null
@@ -5991,6 +6121,19 @@ export namespace Prisma {
     error: number
     metadata: number
     resultUrl: number
+    provider: number
+    providerModel: number
+    externalId: number
+    externalGetUrl: number
+    externalStatus: number
+    resultData: number
+    archiveKey: number
+    archiveMimeType: number
+    archiveSize: number
+    lastPolledAt: number
+    nextPollAt: number
+    pollAttempts: number
+    progress: number
     quotaRefunded: number
     creditsCost: number
     costCents: number
@@ -6004,12 +6147,18 @@ export namespace Prisma {
 
   export type GenerationJobAvgAggregateInputType = {
     count?: true
+    archiveSize?: true
+    pollAttempts?: true
+    progress?: true
     creditsCost?: true
     costCents?: true
   }
 
   export type GenerationJobSumAggregateInputType = {
     count?: true
+    archiveSize?: true
+    pollAttempts?: true
+    progress?: true
     creditsCost?: true
     costCents?: true
   }
@@ -6023,6 +6172,18 @@ export namespace Prisma {
     status?: true
     error?: true
     resultUrl?: true
+    provider?: true
+    providerModel?: true
+    externalId?: true
+    externalGetUrl?: true
+    externalStatus?: true
+    archiveKey?: true
+    archiveMimeType?: true
+    archiveSize?: true
+    lastPolledAt?: true
+    nextPollAt?: true
+    pollAttempts?: true
+    progress?: true
     quotaRefunded?: true
     creditsCost?: true
     costCents?: true
@@ -6041,6 +6202,18 @@ export namespace Prisma {
     status?: true
     error?: true
     resultUrl?: true
+    provider?: true
+    providerModel?: true
+    externalId?: true
+    externalGetUrl?: true
+    externalStatus?: true
+    archiveKey?: true
+    archiveMimeType?: true
+    archiveSize?: true
+    lastPolledAt?: true
+    nextPollAt?: true
+    pollAttempts?: true
+    progress?: true
     quotaRefunded?: true
     creditsCost?: true
     costCents?: true
@@ -6060,6 +6233,19 @@ export namespace Prisma {
     error?: true
     metadata?: true
     resultUrl?: true
+    provider?: true
+    providerModel?: true
+    externalId?: true
+    externalGetUrl?: true
+    externalStatus?: true
+    resultData?: true
+    archiveKey?: true
+    archiveMimeType?: true
+    archiveSize?: true
+    lastPolledAt?: true
+    nextPollAt?: true
+    pollAttempts?: true
+    progress?: true
     quotaRefunded?: true
     creditsCost?: true
     costCents?: true
@@ -6166,6 +6352,19 @@ export namespace Prisma {
     error: string | null
     metadata: JsonValue | null
     resultUrl: string | null
+    provider: string | null
+    providerModel: string | null
+    externalId: string | null
+    externalGetUrl: string | null
+    externalStatus: string | null
+    resultData: JsonValue | null
+    archiveKey: string | null
+    archiveMimeType: string | null
+    archiveSize: number | null
+    lastPolledAt: Date | null
+    nextPollAt: Date | null
+    pollAttempts: number
+    progress: number | null
     quotaRefunded: boolean
     creditsCost: number
     costCents: number | null
@@ -6204,6 +6403,19 @@ export namespace Prisma {
     error?: boolean
     metadata?: boolean
     resultUrl?: boolean
+    provider?: boolean
+    providerModel?: boolean
+    externalId?: boolean
+    externalGetUrl?: boolean
+    externalStatus?: boolean
+    resultData?: boolean
+    archiveKey?: boolean
+    archiveMimeType?: boolean
+    archiveSize?: boolean
+    lastPolledAt?: boolean
+    nextPollAt?: boolean
+    pollAttempts?: boolean
+    progress?: boolean
     quotaRefunded?: boolean
     creditsCost?: boolean
     costCents?: boolean
@@ -6224,6 +6436,19 @@ export namespace Prisma {
     error?: boolean
     metadata?: boolean
     resultUrl?: boolean
+    provider?: boolean
+    providerModel?: boolean
+    externalId?: boolean
+    externalGetUrl?: boolean
+    externalStatus?: boolean
+    resultData?: boolean
+    archiveKey?: boolean
+    archiveMimeType?: boolean
+    archiveSize?: boolean
+    lastPolledAt?: boolean
+    nextPollAt?: boolean
+    pollAttempts?: boolean
+    progress?: boolean
     quotaRefunded?: boolean
     creditsCost?: boolean
     costCents?: boolean
@@ -6244,6 +6469,19 @@ export namespace Prisma {
     error?: boolean
     metadata?: boolean
     resultUrl?: boolean
+    provider?: boolean
+    providerModel?: boolean
+    externalId?: boolean
+    externalGetUrl?: boolean
+    externalStatus?: boolean
+    resultData?: boolean
+    archiveKey?: boolean
+    archiveMimeType?: boolean
+    archiveSize?: boolean
+    lastPolledAt?: boolean
+    nextPollAt?: boolean
+    pollAttempts?: boolean
+    progress?: boolean
     quotaRefunded?: boolean
     creditsCost?: boolean
     costCents?: boolean
@@ -6264,6 +6502,19 @@ export namespace Prisma {
     error?: boolean
     metadata?: boolean
     resultUrl?: boolean
+    provider?: boolean
+    providerModel?: boolean
+    externalId?: boolean
+    externalGetUrl?: boolean
+    externalStatus?: boolean
+    resultData?: boolean
+    archiveKey?: boolean
+    archiveMimeType?: boolean
+    archiveSize?: boolean
+    lastPolledAt?: boolean
+    nextPollAt?: boolean
+    pollAttempts?: boolean
+    progress?: boolean
     quotaRefunded?: boolean
     creditsCost?: boolean
     costCents?: boolean
@@ -6273,7 +6524,7 @@ export namespace Prisma {
     updatedAt?: boolean
   }
 
-  export type GenerationJobOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "requestKey" | "kind" | "count" | "status" | "error" | "metadata" | "resultUrl" | "quotaRefunded" | "creditsCost" | "costCents" | "startedAt" | "finishedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["generationJob"]>
+  export type GenerationJobOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "requestKey" | "kind" | "count" | "status" | "error" | "metadata" | "resultUrl" | "provider" | "providerModel" | "externalId" | "externalGetUrl" | "externalStatus" | "resultData" | "archiveKey" | "archiveMimeType" | "archiveSize" | "lastPolledAt" | "nextPollAt" | "pollAttempts" | "progress" | "quotaRefunded" | "creditsCost" | "costCents" | "startedAt" | "finishedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["generationJob"]>
   export type GenerationJobInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     user?: boolean | UserDefaultArgs<ExtArgs>
   }
@@ -6299,6 +6550,19 @@ export namespace Prisma {
       error: string | null
       metadata: Prisma.JsonValue | null
       resultUrl: string | null
+      provider: string | null
+      providerModel: string | null
+      externalId: string | null
+      externalGetUrl: string | null
+      externalStatus: string | null
+      resultData: Prisma.JsonValue | null
+      archiveKey: string | null
+      archiveMimeType: string | null
+      archiveSize: number | null
+      lastPolledAt: Date | null
+      nextPollAt: Date | null
+      pollAttempts: number
+      progress: number | null
       quotaRefunded: boolean
       creditsCost: number
       costCents: number | null
@@ -6739,6 +7003,19 @@ export namespace Prisma {
     readonly error: FieldRef<"GenerationJob", 'String'>
     readonly metadata: FieldRef<"GenerationJob", 'Json'>
     readonly resultUrl: FieldRef<"GenerationJob", 'String'>
+    readonly provider: FieldRef<"GenerationJob", 'String'>
+    readonly providerModel: FieldRef<"GenerationJob", 'String'>
+    readonly externalId: FieldRef<"GenerationJob", 'String'>
+    readonly externalGetUrl: FieldRef<"GenerationJob", 'String'>
+    readonly externalStatus: FieldRef<"GenerationJob", 'String'>
+    readonly resultData: FieldRef<"GenerationJob", 'Json'>
+    readonly archiveKey: FieldRef<"GenerationJob", 'String'>
+    readonly archiveMimeType: FieldRef<"GenerationJob", 'String'>
+    readonly archiveSize: FieldRef<"GenerationJob", 'Int'>
+    readonly lastPolledAt: FieldRef<"GenerationJob", 'DateTime'>
+    readonly nextPollAt: FieldRef<"GenerationJob", 'DateTime'>
+    readonly pollAttempts: FieldRef<"GenerationJob", 'Int'>
+    readonly progress: FieldRef<"GenerationJob", 'Int'>
     readonly quotaRefunded: FieldRef<"GenerationJob", 'Boolean'>
     readonly creditsCost: FieldRef<"GenerationJob", 'Int'>
     readonly costCents: FieldRef<"GenerationJob", 'Int'>
@@ -20358,7 +20635,9 @@ export namespace Prisma {
     bannedAt: 'bannedAt',
     banReason: 'banReason',
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    referralCode: 'referralCode',
+    referredById: 'referredById'
   };
 
   export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
@@ -20400,6 +20679,19 @@ export namespace Prisma {
     error: 'error',
     metadata: 'metadata',
     resultUrl: 'resultUrl',
+    provider: 'provider',
+    providerModel: 'providerModel',
+    externalId: 'externalId',
+    externalGetUrl: 'externalGetUrl',
+    externalStatus: 'externalStatus',
+    resultData: 'resultData',
+    archiveKey: 'archiveKey',
+    archiveMimeType: 'archiveMimeType',
+    archiveSize: 'archiveSize',
+    lastPolledAt: 'lastPolledAt',
+    nextPollAt: 'nextPollAt',
+    pollAttempts: 'pollAttempts',
+    progress: 'progress',
     quotaRefunded: 'quotaRefunded',
     creditsCost: 'creditsCost',
     costCents: 'costCents',
@@ -20732,6 +21024,8 @@ export namespace Prisma {
     banReason?: StringNullableFilter<"User"> | string | null
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
+    referralCode?: StringNullableFilter<"User"> | string | null
+    referredById?: StringNullableFilter<"User"> | string | null
     orders?: OrderListRelationFilter
     usageRecords?: UsageRecordListRelationFilter
     generationJobs?: GenerationJobListRelationFilter
@@ -20739,6 +21033,8 @@ export namespace Prisma {
     config?: XOR<UserConfigNullableScalarRelationFilter, UserConfigWhereInput> | null
     creditBalance?: XOR<CreditBalanceNullableScalarRelationFilter, CreditBalanceWhereInput> | null
     creditTransactions?: CreditTransactionListRelationFilter
+    referredBy?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    referrals?: UserListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -20756,6 +21052,8 @@ export namespace Prisma {
     banReason?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    referralCode?: SortOrderInput | SortOrder
+    referredById?: SortOrderInput | SortOrder
     orders?: OrderOrderByRelationAggregateInput
     usageRecords?: UsageRecordOrderByRelationAggregateInput
     generationJobs?: GenerationJobOrderByRelationAggregateInput
@@ -20763,12 +21061,15 @@ export namespace Prisma {
     config?: UserConfigOrderByWithRelationInput
     creditBalance?: CreditBalanceOrderByWithRelationInput
     creditTransactions?: CreditTransactionOrderByRelationAggregateInput
+    referredBy?: UserOrderByWithRelationInput
+    referrals?: UserOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
     id?: string
     email?: string
     githubId?: string
+    referralCode?: string
     AND?: UserWhereInput | UserWhereInput[]
     OR?: UserWhereInput[]
     NOT?: UserWhereInput | UserWhereInput[]
@@ -20783,6 +21084,7 @@ export namespace Prisma {
     banReason?: StringNullableFilter<"User"> | string | null
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
+    referredById?: StringNullableFilter<"User"> | string | null
     orders?: OrderListRelationFilter
     usageRecords?: UsageRecordListRelationFilter
     generationJobs?: GenerationJobListRelationFilter
@@ -20790,7 +21092,9 @@ export namespace Prisma {
     config?: XOR<UserConfigNullableScalarRelationFilter, UserConfigWhereInput> | null
     creditBalance?: XOR<CreditBalanceNullableScalarRelationFilter, CreditBalanceWhereInput> | null
     creditTransactions?: CreditTransactionListRelationFilter
-  }, "id" | "email" | "githubId">
+    referredBy?: XOR<UserNullableScalarRelationFilter, UserWhereInput> | null
+    referrals?: UserListRelationFilter
+  }, "id" | "email" | "githubId" | "referralCode">
 
   export type UserOrderByWithAggregationInput = {
     id?: SortOrder
@@ -20807,6 +21111,8 @@ export namespace Prisma {
     banReason?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    referralCode?: SortOrderInput | SortOrder
+    referredById?: SortOrderInput | SortOrder
     _count?: UserCountOrderByAggregateInput
     _max?: UserMaxOrderByAggregateInput
     _min?: UserMinOrderByAggregateInput
@@ -20830,6 +21136,8 @@ export namespace Prisma {
     banReason?: StringNullableWithAggregatesFilter<"User"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
+    referralCode?: StringNullableWithAggregatesFilter<"User"> | string | null
+    referredById?: StringNullableWithAggregatesFilter<"User"> | string | null
   }
 
   export type UserConfigWhereInput = {
@@ -20978,6 +21286,19 @@ export namespace Prisma {
     error?: StringNullableFilter<"GenerationJob"> | string | null
     metadata?: JsonNullableFilter<"GenerationJob">
     resultUrl?: StringNullableFilter<"GenerationJob"> | string | null
+    provider?: StringNullableFilter<"GenerationJob"> | string | null
+    providerModel?: StringNullableFilter<"GenerationJob"> | string | null
+    externalId?: StringNullableFilter<"GenerationJob"> | string | null
+    externalGetUrl?: StringNullableFilter<"GenerationJob"> | string | null
+    externalStatus?: StringNullableFilter<"GenerationJob"> | string | null
+    resultData?: JsonNullableFilter<"GenerationJob">
+    archiveKey?: StringNullableFilter<"GenerationJob"> | string | null
+    archiveMimeType?: StringNullableFilter<"GenerationJob"> | string | null
+    archiveSize?: IntNullableFilter<"GenerationJob"> | number | null
+    lastPolledAt?: DateTimeNullableFilter<"GenerationJob"> | Date | string | null
+    nextPollAt?: DateTimeNullableFilter<"GenerationJob"> | Date | string | null
+    pollAttempts?: IntFilter<"GenerationJob"> | number
+    progress?: IntNullableFilter<"GenerationJob"> | number | null
     quotaRefunded?: BoolFilter<"GenerationJob"> | boolean
     creditsCost?: IntFilter<"GenerationJob"> | number
     costCents?: IntNullableFilter<"GenerationJob"> | number | null
@@ -20998,6 +21319,19 @@ export namespace Prisma {
     error?: SortOrderInput | SortOrder
     metadata?: SortOrderInput | SortOrder
     resultUrl?: SortOrderInput | SortOrder
+    provider?: SortOrderInput | SortOrder
+    providerModel?: SortOrderInput | SortOrder
+    externalId?: SortOrderInput | SortOrder
+    externalGetUrl?: SortOrderInput | SortOrder
+    externalStatus?: SortOrderInput | SortOrder
+    resultData?: SortOrderInput | SortOrder
+    archiveKey?: SortOrderInput | SortOrder
+    archiveMimeType?: SortOrderInput | SortOrder
+    archiveSize?: SortOrderInput | SortOrder
+    lastPolledAt?: SortOrderInput | SortOrder
+    nextPollAt?: SortOrderInput | SortOrder
+    pollAttempts?: SortOrder
+    progress?: SortOrderInput | SortOrder
     quotaRefunded?: SortOrder
     creditsCost?: SortOrder
     costCents?: SortOrderInput | SortOrder
@@ -21011,6 +21345,7 @@ export namespace Prisma {
   export type GenerationJobWhereUniqueInput = Prisma.AtLeast<{
     id?: string
     requestKey?: string
+    provider_externalId?: GenerationJobProviderExternalIdCompoundUniqueInput
     AND?: GenerationJobWhereInput | GenerationJobWhereInput[]
     OR?: GenerationJobWhereInput[]
     NOT?: GenerationJobWhereInput | GenerationJobWhereInput[]
@@ -21021,6 +21356,19 @@ export namespace Prisma {
     error?: StringNullableFilter<"GenerationJob"> | string | null
     metadata?: JsonNullableFilter<"GenerationJob">
     resultUrl?: StringNullableFilter<"GenerationJob"> | string | null
+    provider?: StringNullableFilter<"GenerationJob"> | string | null
+    providerModel?: StringNullableFilter<"GenerationJob"> | string | null
+    externalId?: StringNullableFilter<"GenerationJob"> | string | null
+    externalGetUrl?: StringNullableFilter<"GenerationJob"> | string | null
+    externalStatus?: StringNullableFilter<"GenerationJob"> | string | null
+    resultData?: JsonNullableFilter<"GenerationJob">
+    archiveKey?: StringNullableFilter<"GenerationJob"> | string | null
+    archiveMimeType?: StringNullableFilter<"GenerationJob"> | string | null
+    archiveSize?: IntNullableFilter<"GenerationJob"> | number | null
+    lastPolledAt?: DateTimeNullableFilter<"GenerationJob"> | Date | string | null
+    nextPollAt?: DateTimeNullableFilter<"GenerationJob"> | Date | string | null
+    pollAttempts?: IntFilter<"GenerationJob"> | number
+    progress?: IntNullableFilter<"GenerationJob"> | number | null
     quotaRefunded?: BoolFilter<"GenerationJob"> | boolean
     creditsCost?: IntFilter<"GenerationJob"> | number
     costCents?: IntNullableFilter<"GenerationJob"> | number | null
@@ -21029,7 +21377,7 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"GenerationJob"> | Date | string
     updatedAt?: DateTimeFilter<"GenerationJob"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
-  }, "id" | "requestKey">
+  }, "id" | "requestKey" | "provider_externalId">
 
   export type GenerationJobOrderByWithAggregationInput = {
     id?: SortOrder
@@ -21041,6 +21389,19 @@ export namespace Prisma {
     error?: SortOrderInput | SortOrder
     metadata?: SortOrderInput | SortOrder
     resultUrl?: SortOrderInput | SortOrder
+    provider?: SortOrderInput | SortOrder
+    providerModel?: SortOrderInput | SortOrder
+    externalId?: SortOrderInput | SortOrder
+    externalGetUrl?: SortOrderInput | SortOrder
+    externalStatus?: SortOrderInput | SortOrder
+    resultData?: SortOrderInput | SortOrder
+    archiveKey?: SortOrderInput | SortOrder
+    archiveMimeType?: SortOrderInput | SortOrder
+    archiveSize?: SortOrderInput | SortOrder
+    lastPolledAt?: SortOrderInput | SortOrder
+    nextPollAt?: SortOrderInput | SortOrder
+    pollAttempts?: SortOrder
+    progress?: SortOrderInput | SortOrder
     quotaRefunded?: SortOrder
     creditsCost?: SortOrder
     costCents?: SortOrderInput | SortOrder
@@ -21068,6 +21429,19 @@ export namespace Prisma {
     error?: StringNullableWithAggregatesFilter<"GenerationJob"> | string | null
     metadata?: JsonNullableWithAggregatesFilter<"GenerationJob">
     resultUrl?: StringNullableWithAggregatesFilter<"GenerationJob"> | string | null
+    provider?: StringNullableWithAggregatesFilter<"GenerationJob"> | string | null
+    providerModel?: StringNullableWithAggregatesFilter<"GenerationJob"> | string | null
+    externalId?: StringNullableWithAggregatesFilter<"GenerationJob"> | string | null
+    externalGetUrl?: StringNullableWithAggregatesFilter<"GenerationJob"> | string | null
+    externalStatus?: StringNullableWithAggregatesFilter<"GenerationJob"> | string | null
+    resultData?: JsonNullableWithAggregatesFilter<"GenerationJob">
+    archiveKey?: StringNullableWithAggregatesFilter<"GenerationJob"> | string | null
+    archiveMimeType?: StringNullableWithAggregatesFilter<"GenerationJob"> | string | null
+    archiveSize?: IntNullableWithAggregatesFilter<"GenerationJob"> | number | null
+    lastPolledAt?: DateTimeNullableWithAggregatesFilter<"GenerationJob"> | Date | string | null
+    nextPollAt?: DateTimeNullableWithAggregatesFilter<"GenerationJob"> | Date | string | null
+    pollAttempts?: IntWithAggregatesFilter<"GenerationJob"> | number
+    progress?: IntNullableWithAggregatesFilter<"GenerationJob"> | number | null
     quotaRefunded?: BoolWithAggregatesFilter<"GenerationJob"> | boolean
     creditsCost?: IntWithAggregatesFilter<"GenerationJob"> | number
     costCents?: IntNullableWithAggregatesFilter<"GenerationJob"> | number | null
@@ -21237,6 +21611,7 @@ export namespace Prisma {
 
   export type CreditTransactionWhereUniqueInput = Prisma.AtLeast<{
     id?: string
+    userId_type_refType_refId?: CreditTransactionUserIdTypeRefTypeRefIdCompoundUniqueInput
     AND?: CreditTransactionWhereInput | CreditTransactionWhereInput[]
     OR?: CreditTransactionWhereInput[]
     NOT?: CreditTransactionWhereInput | CreditTransactionWhereInput[]
@@ -21249,7 +21624,7 @@ export namespace Prisma {
     note?: StringNullableFilter<"CreditTransaction"> | string | null
     createdAt?: DateTimeFilter<"CreditTransaction"> | Date | string
     user?: XOR<UserScalarRelationFilter, UserWhereInput>
-  }, "id">
+  }, "id" | "userId_type_refType_refId">
 
   export type CreditTransactionOrderByWithAggregationInput = {
     id?: SortOrder
@@ -21942,6 +22317,7 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
     orders?: OrderCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
@@ -21949,6 +22325,8 @@ export namespace Prisma {
     config?: UserConfigCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionCreateNestedManyWithoutUserInput
+    referredBy?: UserCreateNestedOneWithoutReferralsInput
+    referrals?: UserCreateNestedManyWithoutReferredByInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -21966,6 +22344,8 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
+    referredById?: string | null
     orders?: OrderUncheckedCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordUncheckedCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
@@ -21973,6 +22353,7 @@ export namespace Prisma {
     config?: UserConfigUncheckedCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceUncheckedCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionUncheckedCreateNestedManyWithoutUserInput
+    referrals?: UserUncheckedCreateNestedManyWithoutReferredByInput
   }
 
   export type UserUpdateInput = {
@@ -21990,6 +22371,7 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
@@ -21997,6 +22379,8 @@ export namespace Prisma {
     config?: UserConfigUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUpdateManyWithoutUserNestedInput
+    referredBy?: UserUpdateOneWithoutReferralsNestedInput
+    referrals?: UserUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -22014,6 +22398,8 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    referredById?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUncheckedUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
@@ -22021,6 +22407,7 @@ export namespace Prisma {
     config?: UserConfigUncheckedUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUncheckedUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUncheckedUpdateManyWithoutUserNestedInput
+    referrals?: UserUncheckedUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -22038,6 +22425,8 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
+    referredById?: string | null
   }
 
   export type UserUpdateManyMutationInput = {
@@ -22055,6 +22444,7 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type UserUncheckedUpdateManyInput = {
@@ -22072,6 +22462,8 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    referredById?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type UserConfigCreateInput = {
@@ -22221,6 +22613,19 @@ export namespace Prisma {
     error?: string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: string | null
+    provider?: string | null
+    providerModel?: string | null
+    externalId?: string | null
+    externalGetUrl?: string | null
+    externalStatus?: string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: string | null
+    archiveMimeType?: string | null
+    archiveSize?: number | null
+    lastPolledAt?: Date | string | null
+    nextPollAt?: Date | string | null
+    pollAttempts?: number
+    progress?: number | null
     quotaRefunded?: boolean
     creditsCost?: number
     costCents?: number | null
@@ -22241,6 +22646,19 @@ export namespace Prisma {
     error?: string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: string | null
+    provider?: string | null
+    providerModel?: string | null
+    externalId?: string | null
+    externalGetUrl?: string | null
+    externalStatus?: string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: string | null
+    archiveMimeType?: string | null
+    archiveSize?: number | null
+    lastPolledAt?: Date | string | null
+    nextPollAt?: Date | string | null
+    pollAttempts?: number
+    progress?: number | null
     quotaRefunded?: boolean
     creditsCost?: number
     costCents?: number | null
@@ -22259,6 +22677,19 @@ export namespace Prisma {
     error?: NullableStringFieldUpdateOperationsInput | string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    provider?: NullableStringFieldUpdateOperationsInput | string | null
+    providerModel?: NullableStringFieldUpdateOperationsInput | string | null
+    externalId?: NullableStringFieldUpdateOperationsInput | string | null
+    externalGetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    externalStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveMimeType?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveSize?: NullableIntFieldUpdateOperationsInput | number | null
+    lastPolledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextPollAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    pollAttempts?: IntFieldUpdateOperationsInput | number
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
     quotaRefunded?: BoolFieldUpdateOperationsInput | boolean
     creditsCost?: IntFieldUpdateOperationsInput | number
     costCents?: NullableIntFieldUpdateOperationsInput | number | null
@@ -22279,6 +22710,19 @@ export namespace Prisma {
     error?: NullableStringFieldUpdateOperationsInput | string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    provider?: NullableStringFieldUpdateOperationsInput | string | null
+    providerModel?: NullableStringFieldUpdateOperationsInput | string | null
+    externalId?: NullableStringFieldUpdateOperationsInput | string | null
+    externalGetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    externalStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveMimeType?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveSize?: NullableIntFieldUpdateOperationsInput | number | null
+    lastPolledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextPollAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    pollAttempts?: IntFieldUpdateOperationsInput | number
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
     quotaRefunded?: BoolFieldUpdateOperationsInput | boolean
     creditsCost?: IntFieldUpdateOperationsInput | number
     costCents?: NullableIntFieldUpdateOperationsInput | number | null
@@ -22298,6 +22742,19 @@ export namespace Prisma {
     error?: string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: string | null
+    provider?: string | null
+    providerModel?: string | null
+    externalId?: string | null
+    externalGetUrl?: string | null
+    externalStatus?: string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: string | null
+    archiveMimeType?: string | null
+    archiveSize?: number | null
+    lastPolledAt?: Date | string | null
+    nextPollAt?: Date | string | null
+    pollAttempts?: number
+    progress?: number | null
     quotaRefunded?: boolean
     creditsCost?: number
     costCents?: number | null
@@ -22316,6 +22773,19 @@ export namespace Prisma {
     error?: NullableStringFieldUpdateOperationsInput | string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    provider?: NullableStringFieldUpdateOperationsInput | string | null
+    providerModel?: NullableStringFieldUpdateOperationsInput | string | null
+    externalId?: NullableStringFieldUpdateOperationsInput | string | null
+    externalGetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    externalStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveMimeType?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveSize?: NullableIntFieldUpdateOperationsInput | number | null
+    lastPolledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextPollAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    pollAttempts?: IntFieldUpdateOperationsInput | number
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
     quotaRefunded?: BoolFieldUpdateOperationsInput | boolean
     creditsCost?: IntFieldUpdateOperationsInput | number
     costCents?: NullableIntFieldUpdateOperationsInput | number | null
@@ -22335,6 +22805,19 @@ export namespace Prisma {
     error?: NullableStringFieldUpdateOperationsInput | string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    provider?: NullableStringFieldUpdateOperationsInput | string | null
+    providerModel?: NullableStringFieldUpdateOperationsInput | string | null
+    externalId?: NullableStringFieldUpdateOperationsInput | string | null
+    externalGetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    externalStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveMimeType?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveSize?: NullableIntFieldUpdateOperationsInput | number | null
+    lastPolledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextPollAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    pollAttempts?: IntFieldUpdateOperationsInput | number
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
     quotaRefunded?: BoolFieldUpdateOperationsInput | boolean
     creditsCost?: IntFieldUpdateOperationsInput | number
     costCents?: NullableIntFieldUpdateOperationsInput | number | null
@@ -23369,6 +23852,17 @@ export namespace Prisma {
     none?: CreditTransactionWhereInput
   }
 
+  export type UserNullableScalarRelationFilter = {
+    is?: UserWhereInput | null
+    isNot?: UserWhereInput | null
+  }
+
+  export type UserListRelationFilter = {
+    every?: UserWhereInput
+    some?: UserWhereInput
+    none?: UserWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
@@ -23394,6 +23888,10 @@ export namespace Prisma {
     _count?: SortOrder
   }
 
+  export type UserOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
   export type UserCountOrderByAggregateInput = {
     id?: SortOrder
     email?: SortOrder
@@ -23409,6 +23907,8 @@ export namespace Prisma {
     banReason?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    referralCode?: SortOrder
+    referredById?: SortOrder
   }
 
   export type UserMaxOrderByAggregateInput = {
@@ -23426,6 +23926,8 @@ export namespace Prisma {
     banReason?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    referralCode?: SortOrder
+    referredById?: SortOrder
   }
 
   export type UserMinOrderByAggregateInput = {
@@ -23443,6 +23945,8 @@ export namespace Prisma {
     banReason?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    referralCode?: SortOrder
+    referredById?: SortOrder
   }
 
   export type StringWithAggregatesFilter<$PrismaModel = never> = {
@@ -23719,6 +24223,11 @@ export namespace Prisma {
     not?: NestedBoolFilter<$PrismaModel> | boolean
   }
 
+  export type GenerationJobProviderExternalIdCompoundUniqueInput = {
+    provider: string
+    externalId: string
+  }
+
   export type GenerationJobCountOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
@@ -23729,6 +24238,19 @@ export namespace Prisma {
     error?: SortOrder
     metadata?: SortOrder
     resultUrl?: SortOrder
+    provider?: SortOrder
+    providerModel?: SortOrder
+    externalId?: SortOrder
+    externalGetUrl?: SortOrder
+    externalStatus?: SortOrder
+    resultData?: SortOrder
+    archiveKey?: SortOrder
+    archiveMimeType?: SortOrder
+    archiveSize?: SortOrder
+    lastPolledAt?: SortOrder
+    nextPollAt?: SortOrder
+    pollAttempts?: SortOrder
+    progress?: SortOrder
     quotaRefunded?: SortOrder
     creditsCost?: SortOrder
     costCents?: SortOrder
@@ -23740,6 +24262,9 @@ export namespace Prisma {
 
   export type GenerationJobAvgOrderByAggregateInput = {
     count?: SortOrder
+    archiveSize?: SortOrder
+    pollAttempts?: SortOrder
+    progress?: SortOrder
     creditsCost?: SortOrder
     costCents?: SortOrder
   }
@@ -23753,6 +24278,18 @@ export namespace Prisma {
     status?: SortOrder
     error?: SortOrder
     resultUrl?: SortOrder
+    provider?: SortOrder
+    providerModel?: SortOrder
+    externalId?: SortOrder
+    externalGetUrl?: SortOrder
+    externalStatus?: SortOrder
+    archiveKey?: SortOrder
+    archiveMimeType?: SortOrder
+    archiveSize?: SortOrder
+    lastPolledAt?: SortOrder
+    nextPollAt?: SortOrder
+    pollAttempts?: SortOrder
+    progress?: SortOrder
     quotaRefunded?: SortOrder
     creditsCost?: SortOrder
     costCents?: SortOrder
@@ -23771,6 +24308,18 @@ export namespace Prisma {
     status?: SortOrder
     error?: SortOrder
     resultUrl?: SortOrder
+    provider?: SortOrder
+    providerModel?: SortOrder
+    externalId?: SortOrder
+    externalGetUrl?: SortOrder
+    externalStatus?: SortOrder
+    archiveKey?: SortOrder
+    archiveMimeType?: SortOrder
+    archiveSize?: SortOrder
+    lastPolledAt?: SortOrder
+    nextPollAt?: SortOrder
+    pollAttempts?: SortOrder
+    progress?: SortOrder
     quotaRefunded?: SortOrder
     creditsCost?: SortOrder
     costCents?: SortOrder
@@ -23782,6 +24331,9 @@ export namespace Prisma {
 
   export type GenerationJobSumOrderByAggregateInput = {
     count?: SortOrder
+    archiveSize?: SortOrder
+    pollAttempts?: SortOrder
+    progress?: SortOrder
     creditsCost?: SortOrder
     costCents?: SortOrder
   }
@@ -23897,6 +24449,13 @@ export namespace Prisma {
 
   export type CreditBalanceSumOrderByAggregateInput = {
     balance?: SortOrder
+  }
+
+  export type CreditTransactionUserIdTypeRefTypeRefIdCompoundUniqueInput = {
+    userId: string
+    type: string
+    refType: string
+    refId: string
   }
 
   export type CreditTransactionCountOrderByAggregateInput = {
@@ -24048,11 +24607,6 @@ export namespace Prisma {
     eventType?: SortOrder
     providerEventId?: SortOrder
     createdAt?: SortOrder
-  }
-
-  export type UserNullableScalarRelationFilter = {
-    is?: UserWhereInput | null
-    isNot?: UserWhereInput | null
   }
 
   export type AdminAuditLogCountOrderByAggregateInput = {
@@ -24361,6 +24915,19 @@ export namespace Prisma {
     connect?: CreditTransactionWhereUniqueInput | CreditTransactionWhereUniqueInput[]
   }
 
+  export type UserCreateNestedOneWithoutReferralsInput = {
+    create?: XOR<UserCreateWithoutReferralsInput, UserUncheckedCreateWithoutReferralsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutReferralsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserCreateNestedManyWithoutReferredByInput = {
+    create?: XOR<UserCreateWithoutReferredByInput, UserUncheckedCreateWithoutReferredByInput> | UserCreateWithoutReferredByInput[] | UserUncheckedCreateWithoutReferredByInput[]
+    connectOrCreate?: UserCreateOrConnectWithoutReferredByInput | UserCreateOrConnectWithoutReferredByInput[]
+    createMany?: UserCreateManyReferredByInputEnvelope
+    connect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+  }
+
   export type OrderUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<OrderCreateWithoutUserInput, OrderUncheckedCreateWithoutUserInput> | OrderCreateWithoutUserInput[] | OrderUncheckedCreateWithoutUserInput[]
     connectOrCreate?: OrderCreateOrConnectWithoutUserInput | OrderCreateOrConnectWithoutUserInput[]
@@ -24406,6 +24973,13 @@ export namespace Prisma {
     connectOrCreate?: CreditTransactionCreateOrConnectWithoutUserInput | CreditTransactionCreateOrConnectWithoutUserInput[]
     createMany?: CreditTransactionCreateManyUserInputEnvelope
     connect?: CreditTransactionWhereUniqueInput | CreditTransactionWhereUniqueInput[]
+  }
+
+  export type UserUncheckedCreateNestedManyWithoutReferredByInput = {
+    create?: XOR<UserCreateWithoutReferredByInput, UserUncheckedCreateWithoutReferredByInput> | UserCreateWithoutReferredByInput[] | UserUncheckedCreateWithoutReferredByInput[]
+    connectOrCreate?: UserCreateOrConnectWithoutReferredByInput | UserCreateOrConnectWithoutReferredByInput[]
+    createMany?: UserCreateManyReferredByInputEnvelope
+    connect?: UserWhereUniqueInput | UserWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -24514,6 +25088,30 @@ export namespace Prisma {
     deleteMany?: CreditTransactionScalarWhereInput | CreditTransactionScalarWhereInput[]
   }
 
+  export type UserUpdateOneWithoutReferralsNestedInput = {
+    create?: XOR<UserCreateWithoutReferralsInput, UserUncheckedCreateWithoutReferralsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutReferralsInput
+    upsert?: UserUpsertWithoutReferralsInput
+    disconnect?: UserWhereInput | boolean
+    delete?: UserWhereInput | boolean
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutReferralsInput, UserUpdateWithoutReferralsInput>, UserUncheckedUpdateWithoutReferralsInput>
+  }
+
+  export type UserUpdateManyWithoutReferredByNestedInput = {
+    create?: XOR<UserCreateWithoutReferredByInput, UserUncheckedCreateWithoutReferredByInput> | UserCreateWithoutReferredByInput[] | UserUncheckedCreateWithoutReferredByInput[]
+    connectOrCreate?: UserCreateOrConnectWithoutReferredByInput | UserCreateOrConnectWithoutReferredByInput[]
+    upsert?: UserUpsertWithWhereUniqueWithoutReferredByInput | UserUpsertWithWhereUniqueWithoutReferredByInput[]
+    createMany?: UserCreateManyReferredByInputEnvelope
+    set?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    disconnect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    delete?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    connect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    update?: UserUpdateWithWhereUniqueWithoutReferredByInput | UserUpdateWithWhereUniqueWithoutReferredByInput[]
+    updateMany?: UserUpdateManyWithWhereWithoutReferredByInput | UserUpdateManyWithWhereWithoutReferredByInput[]
+    deleteMany?: UserScalarWhereInput | UserScalarWhereInput[]
+  }
+
   export type OrderUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<OrderCreateWithoutUserInput, OrderUncheckedCreateWithoutUserInput> | OrderCreateWithoutUserInput[] | OrderUncheckedCreateWithoutUserInput[]
     connectOrCreate?: OrderCreateOrConnectWithoutUserInput | OrderCreateOrConnectWithoutUserInput[]
@@ -24602,6 +25200,20 @@ export namespace Prisma {
     update?: CreditTransactionUpdateWithWhereUniqueWithoutUserInput | CreditTransactionUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: CreditTransactionUpdateManyWithWhereWithoutUserInput | CreditTransactionUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: CreditTransactionScalarWhereInput | CreditTransactionScalarWhereInput[]
+  }
+
+  export type UserUncheckedUpdateManyWithoutReferredByNestedInput = {
+    create?: XOR<UserCreateWithoutReferredByInput, UserUncheckedCreateWithoutReferredByInput> | UserCreateWithoutReferredByInput[] | UserUncheckedCreateWithoutReferredByInput[]
+    connectOrCreate?: UserCreateOrConnectWithoutReferredByInput | UserCreateOrConnectWithoutReferredByInput[]
+    upsert?: UserUpsertWithWhereUniqueWithoutReferredByInput | UserUpsertWithWhereUniqueWithoutReferredByInput[]
+    createMany?: UserCreateManyReferredByInputEnvelope
+    set?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    disconnect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    delete?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    connect?: UserWhereUniqueInput | UserWhereUniqueInput[]
+    update?: UserUpdateWithWhereUniqueWithoutReferredByInput | UserUpdateWithWhereUniqueWithoutReferredByInput[]
+    updateMany?: UserUpdateManyWithWhereWithoutReferredByInput | UserUpdateManyWithWhereWithoutReferredByInput[]
+    deleteMany?: UserScalarWhereInput | UserScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutConfigInput = {
@@ -25179,6 +25791,19 @@ export namespace Prisma {
     error?: string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: string | null
+    provider?: string | null
+    providerModel?: string | null
+    externalId?: string | null
+    externalGetUrl?: string | null
+    externalStatus?: string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: string | null
+    archiveMimeType?: string | null
+    archiveSize?: number | null
+    lastPolledAt?: Date | string | null
+    nextPollAt?: Date | string | null
+    pollAttempts?: number
+    progress?: number | null
     quotaRefunded?: boolean
     creditsCost?: number
     costCents?: number | null
@@ -25197,6 +25822,19 @@ export namespace Prisma {
     error?: string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: string | null
+    provider?: string | null
+    providerModel?: string | null
+    externalId?: string | null
+    externalGetUrl?: string | null
+    externalStatus?: string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: string | null
+    archiveMimeType?: string | null
+    archiveSize?: number | null
+    lastPolledAt?: Date | string | null
+    nextPollAt?: Date | string | null
+    pollAttempts?: number
+    progress?: number | null
     quotaRefunded?: boolean
     creditsCost?: number
     costCents?: number | null
@@ -25312,6 +25950,125 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type UserCreateWithoutReferralsInput = {
+    id?: string
+    email: string
+    name?: string
+    password?: string | null
+    phone?: string | null
+    emailVerified?: Date | string | null
+    phoneVerified?: Date | string | null
+    avatarUrl?: string | null
+    githubId?: string | null
+    role?: string
+    bannedAt?: Date | string | null
+    banReason?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    referralCode?: string | null
+    orders?: OrderCreateNestedManyWithoutUserInput
+    usageRecords?: UsageRecordCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
+    auditLogs?: AdminAuditLogCreateNestedManyWithoutActorInput
+    config?: UserConfigCreateNestedOneWithoutUserInput
+    creditBalance?: CreditBalanceCreateNestedOneWithoutUserInput
+    creditTransactions?: CreditTransactionCreateNestedManyWithoutUserInput
+    referredBy?: UserCreateNestedOneWithoutReferralsInput
+  }
+
+  export type UserUncheckedCreateWithoutReferralsInput = {
+    id?: string
+    email: string
+    name?: string
+    password?: string | null
+    phone?: string | null
+    emailVerified?: Date | string | null
+    phoneVerified?: Date | string | null
+    avatarUrl?: string | null
+    githubId?: string | null
+    role?: string
+    bannedAt?: Date | string | null
+    banReason?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    referralCode?: string | null
+    referredById?: string | null
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    usageRecords?: UsageRecordUncheckedCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
+    auditLogs?: AdminAuditLogUncheckedCreateNestedManyWithoutActorInput
+    config?: UserConfigUncheckedCreateNestedOneWithoutUserInput
+    creditBalance?: CreditBalanceUncheckedCreateNestedOneWithoutUserInput
+    creditTransactions?: CreditTransactionUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutReferralsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutReferralsInput, UserUncheckedCreateWithoutReferralsInput>
+  }
+
+  export type UserCreateWithoutReferredByInput = {
+    id?: string
+    email: string
+    name?: string
+    password?: string | null
+    phone?: string | null
+    emailVerified?: Date | string | null
+    phoneVerified?: Date | string | null
+    avatarUrl?: string | null
+    githubId?: string | null
+    role?: string
+    bannedAt?: Date | string | null
+    banReason?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    referralCode?: string | null
+    orders?: OrderCreateNestedManyWithoutUserInput
+    usageRecords?: UsageRecordCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
+    auditLogs?: AdminAuditLogCreateNestedManyWithoutActorInput
+    config?: UserConfigCreateNestedOneWithoutUserInput
+    creditBalance?: CreditBalanceCreateNestedOneWithoutUserInput
+    creditTransactions?: CreditTransactionCreateNestedManyWithoutUserInput
+    referrals?: UserCreateNestedManyWithoutReferredByInput
+  }
+
+  export type UserUncheckedCreateWithoutReferredByInput = {
+    id?: string
+    email: string
+    name?: string
+    password?: string | null
+    phone?: string | null
+    emailVerified?: Date | string | null
+    phoneVerified?: Date | string | null
+    avatarUrl?: string | null
+    githubId?: string | null
+    role?: string
+    bannedAt?: Date | string | null
+    banReason?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    referralCode?: string | null
+    orders?: OrderUncheckedCreateNestedManyWithoutUserInput
+    usageRecords?: UsageRecordUncheckedCreateNestedManyWithoutUserInput
+    generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
+    auditLogs?: AdminAuditLogUncheckedCreateNestedManyWithoutActorInput
+    config?: UserConfigUncheckedCreateNestedOneWithoutUserInput
+    creditBalance?: CreditBalanceUncheckedCreateNestedOneWithoutUserInput
+    creditTransactions?: CreditTransactionUncheckedCreateNestedManyWithoutUserInput
+    referrals?: UserUncheckedCreateNestedManyWithoutReferredByInput
+  }
+
+  export type UserCreateOrConnectWithoutReferredByInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutReferredByInput, UserUncheckedCreateWithoutReferredByInput>
+  }
+
+  export type UserCreateManyReferredByInputEnvelope = {
+    data: UserCreateManyReferredByInput | UserCreateManyReferredByInput[]
+    skipDuplicates?: boolean
+  }
+
   export type OrderUpsertWithWhereUniqueWithoutUserInput = {
     where: OrderWhereUniqueInput
     update: XOR<OrderUpdateWithoutUserInput, OrderUncheckedUpdateWithoutUserInput>
@@ -25408,6 +26165,19 @@ export namespace Prisma {
     error?: StringNullableFilter<"GenerationJob"> | string | null
     metadata?: JsonNullableFilter<"GenerationJob">
     resultUrl?: StringNullableFilter<"GenerationJob"> | string | null
+    provider?: StringNullableFilter<"GenerationJob"> | string | null
+    providerModel?: StringNullableFilter<"GenerationJob"> | string | null
+    externalId?: StringNullableFilter<"GenerationJob"> | string | null
+    externalGetUrl?: StringNullableFilter<"GenerationJob"> | string | null
+    externalStatus?: StringNullableFilter<"GenerationJob"> | string | null
+    resultData?: JsonNullableFilter<"GenerationJob">
+    archiveKey?: StringNullableFilter<"GenerationJob"> | string | null
+    archiveMimeType?: StringNullableFilter<"GenerationJob"> | string | null
+    archiveSize?: IntNullableFilter<"GenerationJob"> | number | null
+    lastPolledAt?: DateTimeNullableFilter<"GenerationJob"> | Date | string | null
+    nextPollAt?: DateTimeNullableFilter<"GenerationJob"> | Date | string | null
+    pollAttempts?: IntFilter<"GenerationJob"> | number
+    progress?: IntNullableFilter<"GenerationJob"> | number | null
     quotaRefunded?: BoolFilter<"GenerationJob"> | boolean
     creditsCost?: IntFilter<"GenerationJob"> | number
     costCents?: IntNullableFilter<"GenerationJob"> | number | null
@@ -25525,6 +26295,107 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"CreditTransaction"> | Date | string
   }
 
+  export type UserUpsertWithoutReferralsInput = {
+    update: XOR<UserUpdateWithoutReferralsInput, UserUncheckedUpdateWithoutReferralsInput>
+    create: XOR<UserCreateWithoutReferralsInput, UserUncheckedCreateWithoutReferralsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutReferralsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutReferralsInput, UserUncheckedUpdateWithoutReferralsInput>
+  }
+
+  export type UserUpdateWithoutReferralsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    bannedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    banReason?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    usageRecords?: UsageRecordUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
+    auditLogs?: AdminAuditLogUpdateManyWithoutActorNestedInput
+    config?: UserConfigUpdateOneWithoutUserNestedInput
+    creditBalance?: CreditBalanceUpdateOneWithoutUserNestedInput
+    creditTransactions?: CreditTransactionUpdateManyWithoutUserNestedInput
+    referredBy?: UserUpdateOneWithoutReferralsNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutReferralsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    bannedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    banReason?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    referredById?: NullableStringFieldUpdateOperationsInput | string | null
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    usageRecords?: UsageRecordUncheckedUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
+    auditLogs?: AdminAuditLogUncheckedUpdateManyWithoutActorNestedInput
+    config?: UserConfigUncheckedUpdateOneWithoutUserNestedInput
+    creditBalance?: CreditBalanceUncheckedUpdateOneWithoutUserNestedInput
+    creditTransactions?: CreditTransactionUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUpsertWithWhereUniqueWithoutReferredByInput = {
+    where: UserWhereUniqueInput
+    update: XOR<UserUpdateWithoutReferredByInput, UserUncheckedUpdateWithoutReferredByInput>
+    create: XOR<UserCreateWithoutReferredByInput, UserUncheckedCreateWithoutReferredByInput>
+  }
+
+  export type UserUpdateWithWhereUniqueWithoutReferredByInput = {
+    where: UserWhereUniqueInput
+    data: XOR<UserUpdateWithoutReferredByInput, UserUncheckedUpdateWithoutReferredByInput>
+  }
+
+  export type UserUpdateManyWithWhereWithoutReferredByInput = {
+    where: UserScalarWhereInput
+    data: XOR<UserUpdateManyMutationInput, UserUncheckedUpdateManyWithoutReferredByInput>
+  }
+
+  export type UserScalarWhereInput = {
+    AND?: UserScalarWhereInput | UserScalarWhereInput[]
+    OR?: UserScalarWhereInput[]
+    NOT?: UserScalarWhereInput | UserScalarWhereInput[]
+    id?: StringFilter<"User"> | string
+    email?: StringFilter<"User"> | string
+    name?: StringFilter<"User"> | string
+    password?: StringNullableFilter<"User"> | string | null
+    phone?: StringNullableFilter<"User"> | string | null
+    emailVerified?: DateTimeNullableFilter<"User"> | Date | string | null
+    phoneVerified?: DateTimeNullableFilter<"User"> | Date | string | null
+    avatarUrl?: StringNullableFilter<"User"> | string | null
+    githubId?: StringNullableFilter<"User"> | string | null
+    role?: StringFilter<"User"> | string
+    bannedAt?: DateTimeNullableFilter<"User"> | Date | string | null
+    banReason?: StringNullableFilter<"User"> | string | null
+    createdAt?: DateTimeFilter<"User"> | Date | string
+    updatedAt?: DateTimeFilter<"User"> | Date | string
+    referralCode?: StringNullableFilter<"User"> | string | null
+    referredById?: StringNullableFilter<"User"> | string | null
+  }
+
   export type UserCreateWithoutConfigInput = {
     id?: string
     email: string
@@ -25540,12 +26411,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
     orders?: OrderCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogCreateNestedManyWithoutActorInput
     creditBalance?: CreditBalanceCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionCreateNestedManyWithoutUserInput
+    referredBy?: UserCreateNestedOneWithoutReferralsInput
+    referrals?: UserCreateNestedManyWithoutReferredByInput
   }
 
   export type UserUncheckedCreateWithoutConfigInput = {
@@ -25563,12 +26437,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
+    referredById?: string | null
     orders?: OrderUncheckedCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordUncheckedCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogUncheckedCreateNestedManyWithoutActorInput
     creditBalance?: CreditBalanceUncheckedCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionUncheckedCreateNestedManyWithoutUserInput
+    referrals?: UserUncheckedCreateNestedManyWithoutReferredByInput
   }
 
   export type UserCreateOrConnectWithoutConfigInput = {
@@ -25602,12 +26479,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUpdateManyWithoutActorNestedInput
     creditBalance?: CreditBalanceUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUpdateManyWithoutUserNestedInput
+    referredBy?: UserUpdateOneWithoutReferralsNestedInput
+    referrals?: UserUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserUncheckedUpdateWithoutConfigInput = {
@@ -25625,12 +26505,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    referredById?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUncheckedUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUncheckedUpdateManyWithoutActorNestedInput
     creditBalance?: CreditBalanceUncheckedUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUncheckedUpdateManyWithoutUserNestedInput
+    referrals?: UserUncheckedUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserCreateWithoutUsageRecordsInput = {
@@ -25648,12 +26531,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
     orders?: OrderCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogCreateNestedManyWithoutActorInput
     config?: UserConfigCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionCreateNestedManyWithoutUserInput
+    referredBy?: UserCreateNestedOneWithoutReferralsInput
+    referrals?: UserCreateNestedManyWithoutReferredByInput
   }
 
   export type UserUncheckedCreateWithoutUsageRecordsInput = {
@@ -25671,12 +26557,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
+    referredById?: string | null
     orders?: OrderUncheckedCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogUncheckedCreateNestedManyWithoutActorInput
     config?: UserConfigUncheckedCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceUncheckedCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionUncheckedCreateNestedManyWithoutUserInput
+    referrals?: UserUncheckedCreateNestedManyWithoutReferredByInput
   }
 
   export type UserCreateOrConnectWithoutUsageRecordsInput = {
@@ -25710,12 +26599,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUpdateManyWithoutActorNestedInput
     config?: UserConfigUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUpdateManyWithoutUserNestedInput
+    referredBy?: UserUpdateOneWithoutReferralsNestedInput
+    referrals?: UserUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserUncheckedUpdateWithoutUsageRecordsInput = {
@@ -25733,12 +26625,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    referredById?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUncheckedUpdateManyWithoutActorNestedInput
     config?: UserConfigUncheckedUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUncheckedUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUncheckedUpdateManyWithoutUserNestedInput
+    referrals?: UserUncheckedUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserCreateWithoutGenerationJobsInput = {
@@ -25756,12 +26651,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
     orders?: OrderCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogCreateNestedManyWithoutActorInput
     config?: UserConfigCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionCreateNestedManyWithoutUserInput
+    referredBy?: UserCreateNestedOneWithoutReferralsInput
+    referrals?: UserCreateNestedManyWithoutReferredByInput
   }
 
   export type UserUncheckedCreateWithoutGenerationJobsInput = {
@@ -25779,12 +26677,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
+    referredById?: string | null
     orders?: OrderUncheckedCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordUncheckedCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogUncheckedCreateNestedManyWithoutActorInput
     config?: UserConfigUncheckedCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceUncheckedCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionUncheckedCreateNestedManyWithoutUserInput
+    referrals?: UserUncheckedCreateNestedManyWithoutReferredByInput
   }
 
   export type UserCreateOrConnectWithoutGenerationJobsInput = {
@@ -25818,12 +26719,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUpdateManyWithoutActorNestedInput
     config?: UserConfigUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUpdateManyWithoutUserNestedInput
+    referredBy?: UserUpdateOneWithoutReferralsNestedInput
+    referrals?: UserUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserUncheckedUpdateWithoutGenerationJobsInput = {
@@ -25841,12 +26745,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    referredById?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUncheckedUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUncheckedUpdateManyWithoutActorNestedInput
     config?: UserConfigUncheckedUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUncheckedUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUncheckedUpdateManyWithoutUserNestedInput
+    referrals?: UserUncheckedUpdateManyWithoutReferredByNestedInput
   }
 
   export type OrderCreateWithoutPackageInput = {
@@ -25924,12 +26831,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
     orders?: OrderCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogCreateNestedManyWithoutActorInput
     config?: UserConfigCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionCreateNestedManyWithoutUserInput
+    referredBy?: UserCreateNestedOneWithoutReferralsInput
+    referrals?: UserCreateNestedManyWithoutReferredByInput
   }
 
   export type UserUncheckedCreateWithoutCreditBalanceInput = {
@@ -25947,12 +26857,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
+    referredById?: string | null
     orders?: OrderUncheckedCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordUncheckedCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogUncheckedCreateNestedManyWithoutActorInput
     config?: UserConfigUncheckedCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionUncheckedCreateNestedManyWithoutUserInput
+    referrals?: UserUncheckedCreateNestedManyWithoutReferredByInput
   }
 
   export type UserCreateOrConnectWithoutCreditBalanceInput = {
@@ -25986,12 +26899,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUpdateManyWithoutActorNestedInput
     config?: UserConfigUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUpdateManyWithoutUserNestedInput
+    referredBy?: UserUpdateOneWithoutReferralsNestedInput
+    referrals?: UserUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreditBalanceInput = {
@@ -26009,12 +26925,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    referredById?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUncheckedUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUncheckedUpdateManyWithoutActorNestedInput
     config?: UserConfigUncheckedUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUncheckedUpdateManyWithoutUserNestedInput
+    referrals?: UserUncheckedUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserCreateWithoutCreditTransactionsInput = {
@@ -26032,12 +26951,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
     orders?: OrderCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogCreateNestedManyWithoutActorInput
     config?: UserConfigCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceCreateNestedOneWithoutUserInput
+    referredBy?: UserCreateNestedOneWithoutReferralsInput
+    referrals?: UserCreateNestedManyWithoutReferredByInput
   }
 
   export type UserUncheckedCreateWithoutCreditTransactionsInput = {
@@ -26055,12 +26977,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
+    referredById?: string | null
     orders?: OrderUncheckedCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordUncheckedCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogUncheckedCreateNestedManyWithoutActorInput
     config?: UserConfigUncheckedCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceUncheckedCreateNestedOneWithoutUserInput
+    referrals?: UserUncheckedCreateNestedManyWithoutReferredByInput
   }
 
   export type UserCreateOrConnectWithoutCreditTransactionsInput = {
@@ -26094,12 +27019,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUpdateManyWithoutActorNestedInput
     config?: UserConfigUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUpdateOneWithoutUserNestedInput
+    referredBy?: UserUpdateOneWithoutReferralsNestedInput
+    referrals?: UserUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCreditTransactionsInput = {
@@ -26117,12 +27045,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    referredById?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUncheckedUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUncheckedUpdateManyWithoutActorNestedInput
     config?: UserConfigUncheckedUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUncheckedUpdateOneWithoutUserNestedInput
+    referrals?: UserUncheckedUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserCreateWithoutOrdersInput = {
@@ -26140,12 +27071,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
     usageRecords?: UsageRecordCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogCreateNestedManyWithoutActorInput
     config?: UserConfigCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionCreateNestedManyWithoutUserInput
+    referredBy?: UserCreateNestedOneWithoutReferralsInput
+    referrals?: UserCreateNestedManyWithoutReferredByInput
   }
 
   export type UserUncheckedCreateWithoutOrdersInput = {
@@ -26163,12 +27097,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
+    referredById?: string | null
     usageRecords?: UsageRecordUncheckedCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
     auditLogs?: AdminAuditLogUncheckedCreateNestedManyWithoutActorInput
     config?: UserConfigUncheckedCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceUncheckedCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionUncheckedCreateNestedManyWithoutUserInput
+    referrals?: UserUncheckedCreateNestedManyWithoutReferredByInput
   }
 
   export type UserCreateOrConnectWithoutOrdersInput = {
@@ -26259,12 +27196,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
     usageRecords?: UsageRecordUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUpdateManyWithoutActorNestedInput
     config?: UserConfigUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUpdateManyWithoutUserNestedInput
+    referredBy?: UserUpdateOneWithoutReferralsNestedInput
+    referrals?: UserUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserUncheckedUpdateWithoutOrdersInput = {
@@ -26282,12 +27222,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    referredById?: NullableStringFieldUpdateOperationsInput | string | null
     usageRecords?: UsageRecordUncheckedUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
     auditLogs?: AdminAuditLogUncheckedUpdateManyWithoutActorNestedInput
     config?: UserConfigUncheckedUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUncheckedUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUncheckedUpdateManyWithoutUserNestedInput
+    referrals?: UserUncheckedUpdateManyWithoutReferredByNestedInput
   }
 
   export type CreditPackageUpsertWithoutOrdersInput = {
@@ -26453,12 +27396,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
     orders?: OrderCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobCreateNestedManyWithoutUserInput
     config?: UserConfigCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionCreateNestedManyWithoutUserInput
+    referredBy?: UserCreateNestedOneWithoutReferralsInput
+    referrals?: UserCreateNestedManyWithoutReferredByInput
   }
 
   export type UserUncheckedCreateWithoutAuditLogsInput = {
@@ -26476,12 +27422,15 @@ export namespace Prisma {
     banReason?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
+    referralCode?: string | null
+    referredById?: string | null
     orders?: OrderUncheckedCreateNestedManyWithoutUserInput
     usageRecords?: UsageRecordUncheckedCreateNestedManyWithoutUserInput
     generationJobs?: GenerationJobUncheckedCreateNestedManyWithoutUserInput
     config?: UserConfigUncheckedCreateNestedOneWithoutUserInput
     creditBalance?: CreditBalanceUncheckedCreateNestedOneWithoutUserInput
     creditTransactions?: CreditTransactionUncheckedCreateNestedManyWithoutUserInput
+    referrals?: UserUncheckedCreateNestedManyWithoutReferredByInput
   }
 
   export type UserCreateOrConnectWithoutAuditLogsInput = {
@@ -26515,12 +27464,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
     config?: UserConfigUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUpdateManyWithoutUserNestedInput
+    referredBy?: UserUpdateOneWithoutReferralsNestedInput
+    referrals?: UserUpdateManyWithoutReferredByNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAuditLogsInput = {
@@ -26538,12 +27490,15 @@ export namespace Prisma {
     banReason?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    referredById?: NullableStringFieldUpdateOperationsInput | string | null
     orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
     usageRecords?: UsageRecordUncheckedUpdateManyWithoutUserNestedInput
     generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
     config?: UserConfigUncheckedUpdateOneWithoutUserNestedInput
     creditBalance?: CreditBalanceUncheckedUpdateOneWithoutUserNestedInput
     creditTransactions?: CreditTransactionUncheckedUpdateManyWithoutUserNestedInput
+    referrals?: UserUncheckedUpdateManyWithoutReferredByNestedInput
   }
 
   export type OrderCreateManyUserInput = {
@@ -26582,6 +27537,19 @@ export namespace Prisma {
     error?: string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: string | null
+    provider?: string | null
+    providerModel?: string | null
+    externalId?: string | null
+    externalGetUrl?: string | null
+    externalStatus?: string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: string | null
+    archiveMimeType?: string | null
+    archiveSize?: number | null
+    lastPolledAt?: Date | string | null
+    nextPollAt?: Date | string | null
+    pollAttempts?: number
+    progress?: number | null
     quotaRefunded?: boolean
     creditsCost?: number
     costCents?: number | null
@@ -26609,6 +27577,24 @@ export namespace Prisma {
     refId?: string | null
     note?: string | null
     createdAt?: Date | string
+  }
+
+  export type UserCreateManyReferredByInput = {
+    id?: string
+    email: string
+    name?: string
+    password?: string | null
+    phone?: string | null
+    emailVerified?: Date | string | null
+    phoneVerified?: Date | string | null
+    avatarUrl?: string | null
+    githubId?: string | null
+    role?: string
+    bannedAt?: Date | string | null
+    banReason?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    referralCode?: string | null
   }
 
   export type OrderUpdateWithoutUserInput = {
@@ -26703,6 +27689,19 @@ export namespace Prisma {
     error?: NullableStringFieldUpdateOperationsInput | string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    provider?: NullableStringFieldUpdateOperationsInput | string | null
+    providerModel?: NullableStringFieldUpdateOperationsInput | string | null
+    externalId?: NullableStringFieldUpdateOperationsInput | string | null
+    externalGetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    externalStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveMimeType?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveSize?: NullableIntFieldUpdateOperationsInput | number | null
+    lastPolledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextPollAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    pollAttempts?: IntFieldUpdateOperationsInput | number
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
     quotaRefunded?: BoolFieldUpdateOperationsInput | boolean
     creditsCost?: IntFieldUpdateOperationsInput | number
     costCents?: NullableIntFieldUpdateOperationsInput | number | null
@@ -26721,6 +27720,19 @@ export namespace Prisma {
     error?: NullableStringFieldUpdateOperationsInput | string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    provider?: NullableStringFieldUpdateOperationsInput | string | null
+    providerModel?: NullableStringFieldUpdateOperationsInput | string | null
+    externalId?: NullableStringFieldUpdateOperationsInput | string | null
+    externalGetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    externalStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveMimeType?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveSize?: NullableIntFieldUpdateOperationsInput | number | null
+    lastPolledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextPollAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    pollAttempts?: IntFieldUpdateOperationsInput | number
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
     quotaRefunded?: BoolFieldUpdateOperationsInput | boolean
     creditsCost?: IntFieldUpdateOperationsInput | number
     costCents?: NullableIntFieldUpdateOperationsInput | number | null
@@ -26739,6 +27751,19 @@ export namespace Prisma {
     error?: NullableStringFieldUpdateOperationsInput | string | null
     metadata?: NullableJsonNullValueInput | InputJsonValue
     resultUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    provider?: NullableStringFieldUpdateOperationsInput | string | null
+    providerModel?: NullableStringFieldUpdateOperationsInput | string | null
+    externalId?: NullableStringFieldUpdateOperationsInput | string | null
+    externalGetUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    externalStatus?: NullableStringFieldUpdateOperationsInput | string | null
+    resultData?: NullableJsonNullValueInput | InputJsonValue
+    archiveKey?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveMimeType?: NullableStringFieldUpdateOperationsInput | string | null
+    archiveSize?: NullableIntFieldUpdateOperationsInput | number | null
+    lastPolledAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    nextPollAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    pollAttempts?: IntFieldUpdateOperationsInput | number
+    progress?: NullableIntFieldUpdateOperationsInput | number | null
     quotaRefunded?: BoolFieldUpdateOperationsInput | boolean
     creditsCost?: IntFieldUpdateOperationsInput | number
     costCents?: NullableIntFieldUpdateOperationsInput | number | null
@@ -26806,6 +27831,76 @@ export namespace Prisma {
     refId?: NullableStringFieldUpdateOperationsInput | string | null
     note?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type UserUpdateWithoutReferredByInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    bannedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    banReason?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    orders?: OrderUpdateManyWithoutUserNestedInput
+    usageRecords?: UsageRecordUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUpdateManyWithoutUserNestedInput
+    auditLogs?: AdminAuditLogUpdateManyWithoutActorNestedInput
+    config?: UserConfigUpdateOneWithoutUserNestedInput
+    creditBalance?: CreditBalanceUpdateOneWithoutUserNestedInput
+    creditTransactions?: CreditTransactionUpdateManyWithoutUserNestedInput
+    referrals?: UserUpdateManyWithoutReferredByNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutReferredByInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    bannedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    banReason?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
+    orders?: OrderUncheckedUpdateManyWithoutUserNestedInput
+    usageRecords?: UsageRecordUncheckedUpdateManyWithoutUserNestedInput
+    generationJobs?: GenerationJobUncheckedUpdateManyWithoutUserNestedInput
+    auditLogs?: AdminAuditLogUncheckedUpdateManyWithoutActorNestedInput
+    config?: UserConfigUncheckedUpdateOneWithoutUserNestedInput
+    creditBalance?: CreditBalanceUncheckedUpdateOneWithoutUserNestedInput
+    creditTransactions?: CreditTransactionUncheckedUpdateManyWithoutUserNestedInput
+    referrals?: UserUncheckedUpdateManyWithoutReferredByNestedInput
+  }
+
+  export type UserUncheckedUpdateManyWithoutReferredByInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    email?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    password?: NullableStringFieldUpdateOperationsInput | string | null
+    phone?: NullableStringFieldUpdateOperationsInput | string | null
+    emailVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    phoneVerified?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    avatarUrl?: NullableStringFieldUpdateOperationsInput | string | null
+    githubId?: NullableStringFieldUpdateOperationsInput | string | null
+    role?: StringFieldUpdateOperationsInput | string
+    bannedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    banReason?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    referralCode?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type OrderCreateManyPackageInput = {

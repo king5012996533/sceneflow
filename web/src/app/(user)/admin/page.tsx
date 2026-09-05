@@ -14,6 +14,7 @@ import CredentialsTab from "./credentials-tab";
 import CreditsTab from "./credits-tab";
 import CostsTab from "./costs-tab";
 import OperationConfigTab from "./operation-config-tab";
+import ReferralsTab from "./referrals-tab";
 
 type Overview = {
     users: number;
@@ -449,6 +450,11 @@ export default function AdminPage() {
                                 key: "operation-config",
                                 label: "运营配置",
                                 children: <OperationConfigTab />,
+                            },
+                            {
+                                key: "referrals",
+                                label: "邀请返利",
+                                children: <ReferralsTab />,
                             },
                             {
                                 key: "costs",

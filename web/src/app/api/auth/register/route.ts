@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { applyPrivateNoStore, hashPassword, setAuthCookie, signToken } from "@/lib/auth";
 import { prisma } from "@/lib/ic-prisma";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { generateReferralCode, resolveReferralCode } from "@/lib/referral";
 
 const PHONE_REGEX = /^1\d{10}$/;
 
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     try {
         if (!prisma) return applyPrivateNoStore(NextResponse.json({ error: "数据库不可用" }, { status: 503 }));
 
-        const { email, password, name, verificationToken } = await req.json();
+        const { email, password, name, verificationToken, refCode } = await req.json();
 
         const ip = getClientIp(req);
         const allowed = await checkRateLimit(`auth:register:${ip}`, { windowMs: 60_000, maxRequests: 3 });
@@ -50,16 +51,35 @@ export async function POST(req: NextRequest) {
         if (existing) return applyPrivateNoStore(NextResponse.json({ error: isPhoneRegister ? "该手机号已注册" : "该邮箱已注册" }, { status: 409 }));
 
         const hashed = password ? await hashPassword(password) : null;
-        const user = await prisma.user.create({
-            data: {
-                email: userEmail,
-                password: hashed,
-                name: name || (isPhoneRegister && PHONE_REGEX.test(payload.target) ? payload.target.slice(-4) : userEmail.split("@")[0]),
-                emailVerified: payload.method === "email" ? new Date() : undefined,
-                phoneVerified: payload.method === "phone" ? new Date() : undefined,
-                phone: payload.method === "phone" ? payload.target : undefined,
-            },
-        });
+        // 老带新：有效邀请码在注册时一次性绑定归属（终身不变）；无效/封禁邀请码静默忽略，不阻断注册
+        let referredById: string | undefined;
+        if (typeof refCode === "string" && refCode.trim()) {
+            const inviter = await resolveReferralCode(prisma, refCode);
+            if (inviter) referredById = inviter.id;
+        }
+        let user = null;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            try {
+                user = await prisma.user.create({
+                    data: {
+                        email: userEmail,
+                        password: hashed,
+                        name: name || (isPhoneRegister && PHONE_REGEX.test(payload.target) ? payload.target.slice(-4) : userEmail.split("@")[0]),
+                        emailVerified: payload.method === "email" ? new Date() : undefined,
+                        phoneVerified: payload.method === "phone" ? new Date() : undefined,
+                        phone: payload.method === "phone" ? payload.target : undefined,
+                        referralCode: generateReferralCode(),
+                        referredById,
+                    },
+                });
+                break;
+            } catch (err: any) {
+                // 仅邀请码撞唯一时换码重试；邮箱冲突等直接抛出
+                if (err?.code === "P2002" && String(err?.meta?.target || "").includes("referralCode") && attempt < 4) continue;
+                throw err;
+            }
+        }
+        if (!user) return applyPrivateNoStore(NextResponse.json({ error: "注册失败" }, { status: 500 }));
 
         const token = signToken({ userId: user.id, email: user.email });
         const response = NextResponse.json({
@@ -69,10 +89,7 @@ export async function POST(req: NextRequest) {
     } catch (err: any) {
         console.error("Register error:", err?.message, err?.code);
         const dbErrorCode = typeof err?.code === "string" && /^P10\d{2}$/.test(err.code);
-        const dbErrorMessage =
-            /connection (terminated|reset|refused|closed|timeout)|can't reach database|database server timeout|timed?\s*out/i.test(
-                String(err?.message || ""),
-            );
+        const dbErrorMessage = /connection (terminated|reset|refused|closed|timeout)|can't reach database|database server timeout|timed?\s*out/i.test(String(err?.message || ""));
         if (dbErrorCode || dbErrorMessage) {
             return applyPrivateNoStore(NextResponse.json({ error: "数据库连接超时，请稍后再试" }, { status: 503 }));
         }
