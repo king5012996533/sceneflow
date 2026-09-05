@@ -479,8 +479,8 @@ async function createGenvideoVideoTask(config: AiConfig, model: string, prompt: 
         mode: genvideoModeForDuration(durationSeconds),
         durationSeconds,
     };
-    const ratio = normalizeGenvideoRatio(config.size);
-    if (ratio) payload.ratio = ratio;
+    // ratio 是上游必填参数（缺失会 400 INVALID_TASK_PARAMETERS），size 为 auto/空时给默认 16:9
+    payload.ratio = normalizeGenvideoRatio(config.size) ?? "16:9";
     const images = await genvideoReferenceImages(references);
     if (images.length) payload.images = images;
     try {

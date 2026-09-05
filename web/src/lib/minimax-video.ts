@@ -22,12 +22,15 @@ export const MINIMAX_REFERENCE_LIMITS = {
 export function isMiniMaxVideoConfig(config: AiConfig | (Pick<AiConfig, "model" | "videoModel" | "baseUrl"> & { apiFormat?: AiConfig["apiFormat"] })) {
     const requestConfig = "channels" in config ? resolveModelRequestConfig(config, config.videoModel || config.model) : config;
     const model = modelOptionName(requestConfig.model || requestConfig.videoModel);
+    // 渠道身份优先于能力标定：GenVideo 渠道绝不能落入 H3 分支（否则后台标定残留/误标为
+    // 「视频（MiniMax H3）」时，genvideo-2.5 的面板会错走 H3 的 768P/2K 档位）
+    if (requestConfig.apiFormat === "genvideo") return false;
     // 供应商格式优先：显式标注为 MiniMax 的渠道按 H3 接口处理
     if (requestConfig.apiFormat === "minimax") return true;
     // 平台能力标定优先：后台显式标定 kind 时以标定为准
     const spec = getPlatformCapability(model);
     if (spec?.kind === "minimax-video") return true;
-    if (spec?.kind === "seedance-video" || spec?.kind === "video") return false;
+    if (spec?.kind === "seedance-video" || spec?.kind === "video" || spec?.kind === "genvideo") return false;
     return isMiniMaxVideoModel(model) || isMiniMaxBaseUrl(requestConfig.baseUrl);
 }
 
