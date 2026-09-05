@@ -6,6 +6,7 @@ import { ChevronRight, CircleAlert, Clapperboard, Image as ImageIcon, Layers, Mu
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
+import { upgradeInsecureMediaUrl } from "@/lib/media-url";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasNodeType, type CanvasNodeData, type Position } from "../types";
@@ -462,9 +463,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                         />
                     </div>
 
-                    {data.type === CanvasNodeType.Text ? (
-                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(to top, ${theme.node.panel}cc, transparent)` }} />
-                    ) : null}
+                    {data.type === CanvasNodeType.Text ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12" style={{ background: `linear-gradient(to top, ${theme.node.panel}cc, transparent)` }} /> : null}
 
                     {nodeStatus && nodeStatus !== "idle" ? (
                         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[3px] overflow-hidden">
@@ -481,15 +480,14 @@ export const CanvasNode = React.memo(function CanvasNode({
                 </div>
 
                 {/* 卡脚：状态点 + 状态文字 / 元信息 */}
-                <div
-                    className="flex h-[29px] shrink-0 items-center justify-between gap-2 border-t px-2.5 font-mono text-[9px] leading-none"
-                    style={{ background: theme.node.panel, borderColor: `${theme.node.stroke}a6`, color: theme.node.muted }}
-                >
+                <div className="flex h-[29px] shrink-0 items-center justify-between gap-2 border-t px-2.5 font-mono text-[9px] leading-none" style={{ background: theme.node.panel, borderColor: `${theme.node.stroke}a6`, color: theme.node.muted }}>
                     <span className="flex min-w-0 items-center gap-1.5">
                         <i className="size-[5px] shrink-0 rounded-full" style={{ background: nodeStatus === "loading" ? activityColor(theme) : nodeStatus === "error" ? theme.type.danger : typeColor }} />
                         <span className="truncate">{statusLabelOf(data, nodeStatus)}</span>
                     </span>
-                    <span className="truncate" style={{ color: theme.node.faint }}>{footMetaOf(data, batchCount)}</span>
+                    <span className="truncate" style={{ color: theme.node.faint }}>
+                        {footMetaOf(data, batchCount)}
+                    </span>
                 </div>
 
                 {showImageInfo && hasImageContent ? <ImageInfoBar node={data} /> : null}
@@ -654,9 +652,17 @@ function ErrorContent({ node, theme, onRetry }: Pick<NodeContentRendererProps, "
                         <CircleAlert className="size-4" strokeWidth={1.5} />
                     </span>
                     <div className="min-w-0 flex-1">
-                        <strong className="block truncate text-[11px] font-semibold" style={{ color: theme.node.text }}>{errorView.title}</strong>
-                        <span className="mt-1 block font-mono text-[9px] leading-[1.4]" style={{ color: theme.node.muted }}>{errorView.hint}</span>
-                        {errorView.requestId ? <div className="mt-0.5 truncate font-mono text-[9px]" style={{ color: theme.node.faint }}>Request id: {errorView.requestId}</div> : null}
+                        <strong className="block truncate text-[11px] font-semibold" style={{ color: theme.node.text }}>
+                            {errorView.title}
+                        </strong>
+                        <span className="mt-1 block font-mono text-[9px] leading-[1.4]" style={{ color: theme.node.muted }}>
+                            {errorView.hint}
+                        </span>
+                        {errorView.requestId ? (
+                            <div className="mt-0.5 truncate font-mono text-[9px]" style={{ color: theme.node.faint }}>
+                                Request id: {errorView.requestId}
+                            </div>
+                        ) : null}
                     </div>
                     <button
                         type="button"
@@ -784,7 +790,9 @@ function EmptyImageContent({ node, theme, isBatchRoot, batchCount, batchExpanded
         <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-[2px] border" style={{ borderColor: `${theme.node.stroke}a6`, background: fieldBg }}>
             <div className="flex flex-col items-center justify-center gap-3" style={{ color: typeColor }}>
                 <ImageIcon className="size-6 opacity-50" strokeWidth={1.5} />
-                <span className="text-[10px] tracking-[0.18em]" style={{ color: theme.node.placeholder }}>{emptyLabel}</span>
+                <span className="text-[10px] tracking-[0.18em]" style={{ color: theme.node.placeholder }}>
+                    {emptyLabel}
+                </span>
             </div>
         </div>
     );
@@ -806,11 +814,13 @@ function VideoNodeContent({ node, theme }: NodeContentRendererProps) {
                 <span className="grid size-[29px] place-items-center rounded-full border" style={{ borderColor: typeColor, color: typeColor }}>
                     <Play className="size-3 translate-x-px" fill="currentColor" strokeWidth={0} />
                 </span>
-                <span className="text-[10px] tracking-[0.18em]" style={{ color: theme.node.placeholder }}>空视频节点</span>
+                <span className="text-[10px] tracking-[0.18em]" style={{ color: theme.node.placeholder }}>
+                    空视频节点
+                </span>
             </div>
         );
     }
-    return <video src={node.metadata.content} controls className="h-full w-full rounded-[2px] border bg-black object-contain" style={{ borderColor: `${theme.node.stroke}a6` }} data-canvas-no-zoom />;
+    return <video src={upgradeInsecureMediaUrl(node.metadata.content)} controls className="h-full w-full rounded-[2px] border bg-black object-contain" style={{ borderColor: `${theme.node.stroke}a6` }} data-canvas-no-zoom />;
 }
 
 function AudioNodeContent({ node, theme }: NodeContentRendererProps) {

@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { FileText, Image as ImageIcon, Music2, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
+import { upgradeInsecureMediaUrl } from "@/lib/media-url";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { CanvasResourceReference } from "../utils/canvas-resource-references";
 
@@ -187,9 +188,7 @@ export function CanvasPromptChipInput({ value, references, onChange, onSubmit, c
                 }}
                 onBlur={() => window.setTimeout(closeMention, 120)}
             />
-            {mention && candidates.length ? (
-                <MentionMenu rect={mention.rect} references={candidates} activeIndex={Math.min(activeIndex, candidates.length - 1)} theme={theme} onSelect={insertReference} />
-            ) : null}
+            {mention && candidates.length ? <MentionMenu rect={mention.rect} references={candidates} activeIndex={Math.min(activeIndex, candidates.length - 1)} theme={theme} onSelect={insertReference} /> : null}
             {imagePreview ? (
                 <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60" onClick={() => setImagePreview(null)}>
                     <img src={imagePreview} alt="预览" className="max-h-[80vh] max-w-[80vh] rounded-lg object-contain" />
@@ -199,7 +198,19 @@ export function CanvasPromptChipInput({ value, references, onChange, onSubmit, c
     );
 }
 
-function MentionMenu({ rect, references, activeIndex, theme, onSelect }: { rect: DOMRect | null; references: CanvasResourceReference[]; activeIndex: number; theme: (typeof canvasThemes)[keyof typeof canvasThemes]; onSelect: (reference: CanvasResourceReference) => void }) {
+function MentionMenu({
+    rect,
+    references,
+    activeIndex,
+    theme,
+    onSelect,
+}: {
+    rect: DOMRect | null;
+    references: CanvasResourceReference[];
+    activeIndex: number;
+    theme: (typeof canvasThemes)[keyof typeof canvasThemes];
+    onSelect: (reference: CanvasResourceReference) => void;
+}) {
     const selectedRef = useRef(false);
     const activeItemRef = useRef<HTMLButtonElement | null>(null);
 
@@ -264,7 +275,7 @@ function MentionMenu({ rect, references, activeIndex, theme, onSelect }: { rect:
 
 function ReferencePreview({ reference }: { reference: CanvasResourceReference }) {
     if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-9 rounded-md object-cover" />;
-    if (reference.kind === "video" && reference.previewUrl) return <video src={reference.previewUrl} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
+    if (reference.kind === "video" && reference.previewUrl) return <video src={upgradeInsecureMediaUrl(reference.previewUrl)} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
     const Icon = reference.kind === "audio" ? Music2 : reference.kind === "video" ? Video : reference.kind === "image" ? ImageIcon : FileText;
     return (
         <span className="grid size-9 shrink-0 place-items-center rounded-md bg-black/10">

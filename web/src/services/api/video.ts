@@ -6,6 +6,7 @@ import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/fil
 import { imageToDataUrl } from "@/services/image-storage";
 import { boolConfig, buildSeedancePromptText, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceVideoReferenceError, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
 import { normalizeMiniMaxResolution } from "@/lib/minimax-video";
+import { upgradeInsecureMediaUrl } from "@/lib/media-url";
 import { GENVIDEO_REFERENCE_LIMITS, genvideoModeForDuration, isGenvideoVideoConfig, normalizeGenvideoDuration, normalizeGenvideoRatio } from "@/lib/genvideo";
 import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import { apiPath } from "@/lib/app-paths";
@@ -1032,8 +1033,11 @@ async function resolveSeedanceAudioUrl(audio: ReferenceAudio) {
 }
 
 async function videoResultFromUrl(url: string, options?: RequestOptions): Promise<VideoGenerationResult> {
+    // 上游可能返回 http:// 直链（GenVideo/字节系 TOS）：https 页面下 mixed content 会被拦、
+    // CSP media-src 只放行 https；统一升级后再下载/落库，下载失败回退的直链也是 https
+    const mediaUrl = upgradeInsecureMediaUrl(url);
     try {
-        const response = await axios.get<Blob>(url, {
+        const response = await axios.get<Blob>(mediaUrl, {
             responseType: "blob",
             signal: options?.signal,
             // 下载视频 blob 限时 15s：墙内/无 CORS 时快速失败回退 URL 直链播放（video 标签不要求 CORS），
@@ -1044,7 +1048,7 @@ async function videoResultFromUrl(url: string, options?: RequestOptions): Promis
         return { blob: response.data };
     } catch (error) {
         if (axios.isCancel(error) || options?.signal?.aborted) throw error;
-        return { url, mimeType: "video/mp4" };
+        return { url: mediaUrl, mimeType: "video/mp4" };
     }
 }
 
