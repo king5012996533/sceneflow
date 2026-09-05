@@ -65,7 +65,17 @@ export type MiniMaxVideoCapabilitySpec = {
     watermark: boolean;
 };
 
-export type ModelCapabilitySpec = ImageCapabilitySpec | SeedanceVideoCapabilitySpec | GenericVideoCapabilitySpec | MiniMaxVideoCapabilitySpec;
+// ---------- 视频 · GenVideo（ai-genvideo.com：mode 2.0/2.5） ----------
+export type GenVideoRatio = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
+export type GenVideoDuration = 5 | 10 | 15 | 30;
+
+export type GenVideoVideoCapabilitySpec = {
+    kind: "genvideo";
+    ratios: GenVideoRatio[];
+    durations: GenVideoDuration[];
+};
+
+export type ModelCapabilitySpec = ImageCapabilitySpec | SeedanceVideoCapabilitySpec | GenericVideoCapabilitySpec | MiniMaxVideoCapabilitySpec | GenVideoVideoCapabilitySpec;
 export type ModelCapabilityKind = ModelCapabilitySpec["kind"];
 /** ProviderCredential.capabilities 的存储形状：模型名 → 能力标定 */
 export type CredentialCapabilities = Record<string, ModelCapabilitySpec>;
@@ -74,7 +84,8 @@ export const IMAGE_KIND = "image";
 export const GENERIC_VIDEO_KIND = "video";
 export const SEEDANCE_VIDEO_KIND = "seedance-video";
 export const MINIMAX_VIDEO_KIND = "minimax-video";
-export const MODEL_KINDS: readonly ModelCapabilityKind[] = [IMAGE_KIND, GENERIC_VIDEO_KIND, SEEDANCE_VIDEO_KIND, MINIMAX_VIDEO_KIND];
+export const GENVIDEO_VIDEO_KIND = "genvideo";
+export const MODEL_KINDS: readonly ModelCapabilityKind[] = [IMAGE_KIND, GENERIC_VIDEO_KIND, SEEDANCE_VIDEO_KIND, MINIMAX_VIDEO_KIND, GENVIDEO_VIDEO_KIND];
 
 // ---------- 选项清单（后台编辑器 & 面板过滤共用） ----------
 
@@ -174,6 +185,22 @@ export const MINIMAX_DURATION_OPTIONS: ReadonlyArray<{ value: MiniMaxDuration; l
     { value: 15, label: "15s" },
 ];
 
+export const GENVIDEO_RATIO_OPTIONS: ReadonlyArray<{ value: GenVideoRatio; label: string }> = [
+    { value: "16:9", label: "横屏" },
+    { value: "9:16", label: "竖屏" },
+    { value: "1:1", label: "方形" },
+    { value: "4:3", label: "标准横屏" },
+    { value: "3:4", label: "标准竖屏" },
+    { value: "21:9", label: "宽银幕" },
+];
+
+export const GENVIDEO_DURATION_OPTIONS: ReadonlyArray<{ value: GenVideoDuration; label: string }> = [
+    { value: 5, label: "5s" },
+    { value: 10, label: "10s" },
+    { value: 15, label: "15s" },
+    { value: 30, label: "30s（2.5 模式）" },
+];
+
 export const IMAGE_MAX_COUNT_LIMIT = 15;
 
 // ---------- 内置默认能力（模型名命中时后台预填 / 前端兜底参考） ----------
@@ -210,6 +237,12 @@ export const DEFAULT_MINIMAX_VIDEO_CAPABILITY: MiniMaxVideoCapabilitySpec = {
     watermark: false,
 };
 
+export const DEFAULT_GENVIDEO_VIDEO_CAPABILITY: GenVideoVideoCapabilitySpec = {
+    kind: "genvideo",
+    ratios: GENVIDEO_RATIO_OPTIONS.map((item) => item.value),
+    durations: GENVIDEO_DURATION_OPTIONS.map((item) => item.value),
+};
+
 /**
  * 按模型名推断能力类型（与前端 use-config-store 的模型名启发式保持一致）。
  * 仅用于「预填默认」和「编辑默认选择」，推断不到时返回 null（文本/音频等暂不标定）。
@@ -219,6 +252,8 @@ export function inferModelKindByName(model: string): ModelCapabilityKind | null 
     const isAudio = value.includes("audio") || value.includes("tts") || value.includes("speech") || value.includes("voice") || value.includes("music") || value.includes("sound");
     // MiniMax H3（海螺三代）：分辨率 768P / 2K，单独能力类型；优先于通用视频分类
     if (value.includes("minimax") || value === "h3" || value.includes("h3-video") || value.includes("hailuo-h3")) return MINIMAX_VIDEO_KIND;
+    // GenVideo（ai-genvideo.com）：模型名含 "genvideo"，必须先于通用 video 关键词判断
+    if (value.includes("genvideo")) return GENVIDEO_VIDEO_KIND;
     const isVideo = value.includes("seedance") || value.includes("video") || value.includes("sora") || value.includes("veo") || value.includes("kling") || value.includes("wan") || value.includes("hailuo");
     if (isVideo) return value.includes("seedance") ? SEEDANCE_VIDEO_KIND : GENERIC_VIDEO_KIND;
     const isImage =
@@ -252,6 +287,9 @@ export function defaultCapabilityForModel(model: string): ModelCapabilitySpec | 
     if (kind === MINIMAX_VIDEO_KIND) {
         return { kind, resolutions: [...DEFAULT_MINIMAX_VIDEO_CAPABILITY.resolutions], ratios: [...DEFAULT_MINIMAX_VIDEO_CAPABILITY.ratios], durations: [...DEFAULT_MINIMAX_VIDEO_CAPABILITY.durations], audio: true, watermark: false };
     }
+    if (kind === GENVIDEO_VIDEO_KIND) {
+        return { kind, ratios: [...DEFAULT_GENVIDEO_VIDEO_CAPABILITY.ratios], durations: [...DEFAULT_GENVIDEO_VIDEO_CAPABILITY.durations] };
+    }
     return null;
 }
 
@@ -268,6 +306,8 @@ const VIDEO_SECONDS_VALUES: readonly VideoSeconds[] = [6, 10, 12, 16, 20];
 const MINIMAX_RESOLUTION_VALUES: readonly MiniMaxResolution[] = ["768P", "2K"];
 const MINIMAX_RATIO_VALUES: readonly MiniMaxRatio[] = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"];
 const MINIMAX_DURATION_VALUES: readonly MiniMaxDuration[] = [4, 5, 6, 8, 10, 12, 15];
+const GENVIDEO_RATIO_VALUES: readonly GenVideoRatio[] = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"];
+const GENVIDEO_DURATION_VALUES: readonly GenVideoDuration[] = [5, 10, 15, 30];
 
 function pickStrings<T extends string>(input: unknown, allowed: readonly T[]): T[] {
     if (!Array.isArray(input)) return [...allowed];
@@ -324,6 +364,13 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
             durations: pickNumbers(value.durations, MINIMAX_DURATION_VALUES),
             audio: value.audio !== false,
             watermark: value.watermark === true,
+        };
+    }
+    if (kind === GENVIDEO_VIDEO_KIND) {
+        return {
+            kind,
+            ratios: pickStrings(value.ratios, GENVIDEO_RATIO_VALUES),
+            durations: pickNumbers(value.durations, GENVIDEO_DURATION_VALUES),
         };
     }
     return {

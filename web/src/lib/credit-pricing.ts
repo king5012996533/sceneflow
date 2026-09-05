@@ -84,6 +84,8 @@ export function getGenerationCreditsCost(kind: GenerationKind, metadata?: Genera
                 if (configured.videoCredits !== undefined) return Math.max(0, Math.floor(configured.videoCredits));
             }
             if (defaults?.videoCredits !== undefined) return Math.max(0, Math.floor(defaults.videoCredits));
+            // GenVideo（ai-genvideo.com）：上游约 5 积分/条（2.0 / 2.5 同价），正式定价在后台逐模型配置
+            if (model.includes("genvideo")) return 20;
             // MiniMax H3（秘塔）：768P ≈ ¥0.19/秒、2K ≈ ¥0.29/秒；15 秒 2K 约 ¥4.35
             if (model.includes("minimax") || model.includes("h3")) return isHighQuality(metadata) ? 40 : 20;
             if (model.includes("seedance") || model.includes("doubao")) return isHighQuality(metadata) ? 30 : 15;
@@ -115,6 +117,7 @@ export function estimateGenerationCostCents(kind: GenerationKind, metadata?: Gen
             return 10;
         }
         case "video": {
+            if (model.includes("genvideo")) return 30;
             if (model.includes("seedance") || model.includes("doubao")) return isHighQuality(metadata) ? 80 : 40;
             if (model.includes("replicate")) return 100;
             if (model.includes("minimax") || model.includes("h3")) return isHighQuality(metadata) ? 70 : 40;

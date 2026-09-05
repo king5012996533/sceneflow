@@ -12,6 +12,7 @@ export const PROVIDER_PRESETS = [
     { label: "MiniMax", value: "minimax" },
     { label: "Seedance / 火山", value: "seedance" },
     { label: "Aigccc / Seedance 2.0 网关", value: "aigccc" },
+    { label: "GenVideo / ai-genvideo.com", value: "genvideo" },
     { label: "Replicate", value: "replicate" },
     { label: "Gemini", value: "gemini" },
     { label: "DeepSeek", value: "deepseek" },
@@ -41,6 +42,7 @@ const MODELS_PLACEHOLDER: Record<string, string> = {
     minimax: "如：MiniMax-H3, gpt-image-1",
     seedance: "如：seedance-2.0-pro, seedance-2.0-max",
     aigccc: "如：seedance-2.0-pro, seedance-2.0-max",
+    genvideo: "如：genvideo-2.0, genvideo-2.5（模型名仅作展示绑定，可自定义，需含 genvideo 或与能力标定配套）",
     gemini: "如：gemini-2.5-flash-image",
 };
 const MODELS_PLACEHOLDER_DEFAULT = "如：gpt-image-1, dall-e-3";
@@ -48,6 +50,7 @@ const MODELS_PLACEHOLDER_DEFAULT = "如：gpt-image-1, dall-e-3";
 /** Base URL 占位符：按供应商提示常见端点（MiniMax 走秘塔中转时用 metaso.cn） */
 const BASE_URL_PLACEHOLDER: Record<string, string> = {
     minimax: "如：https://metaso.cn/api/minimax 或 https://api.minimaxi.com/v1",
+    genvideo: "如：https://ai-genvideo.com/v1（填到 /v1 为止，接口路径自动拼接）",
 };
 
 export function parseModelList(models: string): string[] {

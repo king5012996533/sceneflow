@@ -7,7 +7,7 @@ import { nanoid } from "nanoid";
 import { scopedStorageKey } from "@/lib/user-data-scope";
 import type { PlatformCatalogModel } from "@/stores/platform-catalog-store";
 
-export type ApiCallFormat = "openai" | "gemini" | "replicate" | "minimax" | "aigccc";
+export type ApiCallFormat = "openai" | "gemini" | "replicate" | "minimax" | "aigccc" | "genvideo";
 
 export type ModelChannel = {
     id: string;
@@ -222,7 +222,7 @@ export function filterModelsByCapability(models: string[], capability?: ModelCap
 export function classifyCatalogModel(item: PlatformCatalogModel): ModelCapability {
     const kind = item.capabilities?.kind;
     if (kind === "image") return "image";
-    if (kind === "seedance-video" || kind === "video" || kind === "minimax-video") return "video";
+    if (kind === "seedance-video" || kind === "video" || kind === "minimax-video" || kind === "genvideo") return "video";
     const name = modelOptionName(item.model);
     if (isVideoModelName(name)) return "video";
     if (isImageModelName(name)) return "image";
@@ -514,7 +514,7 @@ export function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
 }
 
 function normalizeApiFormat(apiFormat: unknown): ApiCallFormat {
-    if (apiFormat === "gemini" || apiFormat === "replicate" || apiFormat === "minimax" || apiFormat === "aigccc") return apiFormat;
+    if (apiFormat === "gemini" || apiFormat === "replicate" || apiFormat === "minimax" || apiFormat === "aigccc" || apiFormat === "genvideo") return apiFormat;
     return "openai";
 }
 
@@ -525,6 +525,7 @@ export function inferApiFormatFromBaseUrl(baseUrl: string): ApiCallFormat | null
     if (value.includes("api.minimaxi.com")) return "minimax";
     if (value.includes("metaso.cn/api/minimax") || value.includes("metaso.cn")) return "minimax";
     if (value.includes("aigccc666.com")) return "aigccc";
+    if (value.includes("ai-genvideo.com")) return "genvideo";
     return null;
 }
 
@@ -537,6 +538,7 @@ export function inferProviderHint(apiFormat: ApiCallFormat, baseUrl: string): st
     if (apiFormat === "replicate") return "replicate";
     if (apiFormat === "minimax") return "minimax";
     if (apiFormat === "aigccc") return "aigccc";
+    if (apiFormat === "genvideo") return "genvideo";
     const value = baseUrl.trim().toLowerCase();
     if (value.includes("ark.cn-beijing.volces.com") || value.includes("/api/plan/v3")) return "seedance";
     if (value.includes("api.deepseek.com")) return "deepseek";

@@ -66,7 +66,11 @@ async function runVideoGeneration(instruction: StudioInstruction, onUpdate: (upd
  * 页面刷新后可用同一个 task 恢复轮询（消息里持久化了 task）。
  */
 export async function pollVideoTask(task: GuardedVideoGenerationTask, config: AiConfig, startedAt: number, onUpdate: (update: StudioMessageUpdate) => void): Promise<void> {
-    for (let attempt = 0; attempt < 120; attempt += 1) {
+    // GenVideo / MiniMax 生成较慢（GenVideo 上游建议首次轮询就等 5 分钟），走长轮询通道（10s × 240 ≈ 40 分钟）
+    const isSlowProvider = task.provider === "genvideo" || task.provider === "minimax";
+    const delayMs = isSlowProvider ? 10000 : task.provider === "seedance" ? 5000 : 2500;
+    const attempts = isSlowProvider ? 240 : 120;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
         const state = await pollGeneratedVideoTask(config, task);
         if (state.status === "completed") {
             const stored = await persistGeneratedVideo(state.result);
@@ -85,8 +89,8 @@ export async function pollVideoTask(task: GuardedVideoGenerationTask, config: Ai
             return;
         }
         if (state.status === "failed") throw new Error(state.error);
-        if (attempt === 119) throw new Error("视频生成超时，请稍后重试");
-        await sleep(task.provider === "seedance" ? 5000 : 2500);
+        if (attempt === attempts - 1) throw new Error("视频生成超时，请稍后重试");
+        await sleep(delayMs);
     }
 }
 

@@ -63,7 +63,7 @@ export function isSeedanceVideoConfig(config: AiConfig | (Pick<AiConfig, "model"
     // 供应商格式优先：显式标注为 Replicate / MiniMax / Aigccc 的渠道一律按各自 API 格式处理，
     // 不再套用按模型名的 seedance 启发式——否则 Replicate 上的 bytedance/seedance-* 等模型
     // 会被误发到火山 /contents/generations/tasks 路径（上游 404 resource not found）。
-    if (requestConfig.apiFormat === "replicate" || requestConfig.apiFormat === "minimax" || requestConfig.apiFormat === "aigccc") return false;
+    if (requestConfig.apiFormat === "replicate" || requestConfig.apiFormat === "minimax" || requestConfig.apiFormat === "aigccc" || requestConfig.apiFormat === "genvideo") return false;
     // 平台能力标定优先：后台显式标定 kind 时以标定为准（覆盖按模型名的启发式路由）
     const spec = getPlatformCapability(model);
     if (spec?.kind === "seedance-video") return true;

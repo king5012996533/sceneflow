@@ -3,10 +3,14 @@
 import { Button, Checkbox, InputNumber, Radio, Switch } from "antd";
 
 import {
+    DEFAULT_GENVIDEO_VIDEO_CAPABILITY,
     DEFAULT_GENERIC_VIDEO_CAPABILITY,
     DEFAULT_IMAGE_CAPABILITY,
     DEFAULT_MINIMAX_VIDEO_CAPABILITY,
     DEFAULT_SEEDANCE_VIDEO_CAPABILITY,
+    GENVIDEO_DURATION_OPTIONS,
+    GENVIDEO_RATIO_OPTIONS,
+    GENVIDEO_VIDEO_KIND,
     GENERIC_VIDEO_KIND,
     IMAGE_ASPECT_OPTIONS,
     IMAGE_KIND,
@@ -31,6 +35,9 @@ import {
     type MiniMaxRatio,
     type MiniMaxResolution,
     type MiniMaxVideoCapabilitySpec,
+    type GenVideoDuration,
+    type GenVideoRatio,
+    type GenVideoVideoCapabilitySpec,
     type ModelCapabilityKind,
     type ModelCapabilitySpec,
     type SeedanceDuration,
@@ -54,6 +61,7 @@ const KIND_OPTIONS = [
     { value: GENERIC_VIDEO_KIND, label: "视频（通用）" },
     { value: SEEDANCE_VIDEO_KIND, label: "视频（Seedance）" },
     { value: MINIMAX_VIDEO_KIND, label: "视频（MiniMax H3）" },
+    { value: GENVIDEO_VIDEO_KIND, label: "视频（GenVideo）" },
 ];
 
 /** 单个模型的参数能力编辑器：类型 + 勾选清单。空清单 = 全部支持（前端按内置默认展示）。 */
@@ -63,6 +71,7 @@ export function ModelCapabilityFields({ model, spec, onChange }: ModelCapability
         if (kind === IMAGE_KIND) onChange({ ...DEFAULT_IMAGE_CAPABILITY });
         else if (kind === SEEDANCE_VIDEO_KIND) onChange({ ...DEFAULT_SEEDANCE_VIDEO_CAPABILITY });
         else if (kind === MINIMAX_VIDEO_KIND) onChange({ ...DEFAULT_MINIMAX_VIDEO_CAPABILITY });
+        else if (kind === GENVIDEO_VIDEO_KIND) onChange({ ...DEFAULT_GENVIDEO_VIDEO_CAPABILITY });
         else onChange({ ...DEFAULT_GENERIC_VIDEO_CAPABILITY });
     };
     const reset = () => {
@@ -81,6 +90,7 @@ export function ModelCapabilityFields({ model, spec, onChange }: ModelCapability
             {spec.kind === IMAGE_KIND ? <ImageFields spec={spec} onChange={onChange} /> : null}
             {spec.kind === SEEDANCE_VIDEO_KIND ? <SeedanceFields spec={spec} onChange={onChange} /> : null}
             {spec.kind === MINIMAX_VIDEO_KIND ? <MiniMaxFields spec={spec} onChange={onChange} /> : null}
+            {spec.kind === GENVIDEO_VIDEO_KIND ? <GenVideoFields spec={spec} onChange={onChange} /> : null}
             {spec.kind === GENERIC_VIDEO_KIND ? <GenericVideoFields spec={spec} onChange={onChange} /> : null}
         </div>
     );
@@ -162,6 +172,21 @@ function MiniMaxFields({ spec, onChange }: { spec: MiniMaxVideoCapabilitySpec; o
                     <Switch size="small" checked={spec.watermark} onChange={(checked) => onChange({ ...spec, watermark: checked })} />
                     添加水印
                 </label>
+            </div>
+        </div>
+    );
+}
+
+function GenVideoFields({ spec, onChange }: { spec: GenVideoVideoCapabilitySpec; onChange: (next: ModelCapabilitySpec) => void }) {
+    return (
+        <div className="space-y-2.5">
+            <div>
+                <FieldLabel>画面比例</FieldLabel>
+                <Checkbox.Group className="grid grid-cols-3 gap-x-3 gap-y-1" options={[...GENVIDEO_RATIO_OPTIONS]} value={spec.ratios} onChange={(values) => onChange({ ...spec, ratios: values as GenVideoRatio[] })} />
+            </div>
+            <div>
+                <FieldLabel>时长（5/10/15s 为 2.0 模式；30s 为 2.5 模式）</FieldLabel>
+                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...GENVIDEO_DURATION_OPTIONS]} value={spec.durations} onChange={(values) => onChange({ ...spec, durations: values as GenVideoDuration[] })} />
             </div>
         </div>
     );

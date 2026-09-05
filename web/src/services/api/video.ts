@@ -6,6 +6,7 @@ import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/fil
 import { imageToDataUrl } from "@/services/image-storage";
 import { boolConfig, buildSeedancePromptText, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceVideoReferenceError, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
 import { normalizeMiniMaxResolution } from "@/lib/minimax-video";
+import { GENVIDEO_REFERENCE_LIMITS, genvideoModeForDuration, isGenvideoVideoConfig, normalizeGenvideoDuration, normalizeGenvideoRatio } from "@/lib/genvideo";
 import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -36,7 +37,7 @@ const REPLICATE_VIDEO_IMAGE_MAX_BYTES = 900 * 1024;
 const REPLICATE_VIDEO_IMAGE_MAX_SIDE = 1280;
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
-export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate" | "minimax" | "aigccc"; model: string; result?: VideoGenerationResult };
+export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate" | "minimax" | "aigccc" | "genvideo"; model: string; result?: VideoGenerationResult };
 export type VideoGenerationTaskState = { status: "pending" } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
 function aiApiUrl(config: AiConfig, path: string) {
@@ -67,6 +68,7 @@ const POLL_ATTEMPTS: Record<VideoGenerationTask["provider"], number> = {
     seedance: 240, // 5s × 240 ≈ 20 分钟
     aigccc: 240, // 5s × 240 ≈ 20 分钟
     minimax: 180, // 10s × 180 ≈ 30 分钟
+    genvideo: 240, // 10s × 240 ≈ 40 分钟（GenVideo 2.5 模式 30s 长视频更慢；上游 2h 自动超时且全额退款）
     replicate: 480, // 1.5s × 480 ≈ 12 分钟
 };
 // 状态接口瞬时抖动（5xx、429 限流、网络瞬断）不应立刻判死任务：任务已在上游受理，通常仍在生成并计费
@@ -115,6 +117,7 @@ function videoPollDelayMs(provider: VideoGenerationTask["provider"]) {
         case "replicate":
             return 1500;
         case "minimax":
+        case "genvideo":
             return 10000;
         default:
             return 2500;
@@ -161,6 +164,10 @@ export async function createVideoGenerationTask(
     if (requestConfig.apiFormat === "minimax") {
         return createMiniMaxVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
+    if (requestConfig.apiFormat === "genvideo" || isGenvideoVideoConfig(requestConfig)) {
+        // GenVideo（ai-genvideo.com）先于 seedance 启发式：模型名含 "video" 也不能落进通用/Seedance 分支
+        return createGenvideoVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
+    }
     if (isSeedanceVideoConfig(requestConfig)) {
         return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
@@ -177,6 +184,7 @@ export async function pollVideoGenerationTask(config: AiConfig, task: VideoGener
     if (task.provider === "seedance") return pollSeedanceTask(requestConfig, task, options);
     if (task.provider === "replicate") return pollReplicateVideoTask(requestConfig, task, options);
     if (task.provider === "minimax") return pollMiniMaxVideoTask(requestConfig, task, options);
+    if (task.provider === "genvideo") return pollGenvideoVideoTask(requestConfig, task, options);
     return pollOpenAIVideoTask(requestConfig, task, options);
 }
 
@@ -408,6 +416,87 @@ async function pollMiniMaxVideoTask(config: AiConfig, task: VideoGenerationTask,
         return { status: "pending" };
     } catch (error) {
         throw new Error(readAxiosError(error, "MiniMax 任务查询失败"));
+    }
+}
+
+// ---------- GenVideo（ai-genvideo.com：POST /v1/videos/generations + GET /v1/tasks/{id}）----------
+
+type GenVideoTaskPayload = { id?: string; status?: string; outputUrl?: string | null; error?: string | null; points?: number };
+
+function genvideoApiUrl(config: AiConfig, path: string) {
+    // 与 minimaxApiUrl 同策略：容忍后台填 / 不填 /v1 的 baseUrl，路径统一自带 /v1 前缀
+    let base = config.baseUrl.trim().replace(/\/+$/, "");
+    if (base.toLowerCase().endsWith("/v1")) base = base.slice(0, -3);
+    return `${base}/v1${path}`;
+}
+
+/** GenVideo 只接受公网 http/https 图片 URL（实测 data:/blob: 会被上游「素材 URL 不合法」拒绝） */
+function genvideoReferenceImages(references: ReferenceImage[]): Array<{ url: string }> {
+    return references.slice(0, GENVIDEO_REFERENCE_LIMITS.images).map((image) => {
+        if (image.url && isPublicMediaUrl(image.url)) return { url: image.url };
+        throw new Error("GenVideo 参考图必须是公网可访问的 http/https 图片链接（暂不支持本地上传的图片），请改用 Seedance / MiniMax 模型，或换成公网图片 URL");
+    });
+}
+
+function readGenvideoError(error: unknown, fallback: string) {
+    const message = error instanceof Error ? error.message : String(error);
+    // 上游错误体形如 {code, message}；proxyFetch 已透传 message，这里只补充管理员视角的提示
+    if (/积分不足/i.test(message)) return "GenVideo 渠道积分不足，任务未创建（不扣平台积分），请联系管理员给上游账户充值";
+    return readAxiosError(error, fallback);
+}
+
+async function createGenvideoVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+    if (videoReferences.length || audioReferences.length) {
+        throw new Error("GenVideo 视频接口暂不支持参考视频/参考音频，请移除相关参考素材或改用 Seedance 模型");
+    }
+    const durationSeconds = normalizeGenvideoDuration(config.videoSeconds);
+    const payload: Record<string, unknown> = {
+        prompt,
+        mode: genvideoModeForDuration(durationSeconds),
+        durationSeconds,
+    };
+    const ratio = normalizeGenvideoRatio(config.size);
+    if (ratio) payload.ratio = ratio;
+    const images = genvideoReferenceImages(references);
+    if (images.length) payload.images = images;
+    try {
+        const data = await proxyFetch<GenVideoTaskPayload>({
+            url: genvideoApiUrl(config, "/videos/generations"),
+            method: "POST",
+            headers: aiHeaders(config, "application/json"),
+            body: payload,
+        });
+        // 上游 id 是长整型（JSON 以字符串返回），必须保持字符串避免精度丢失
+        const id = String(data?.id || "");
+        if (!id) throw new Error("GenVideo 接口没有返回任务 ID");
+        return { id, provider: "genvideo", model };
+    } catch (error) {
+        throw new Error(readGenvideoError(error, "GenVideo 任务创建失败"));
+    }
+}
+
+async function pollGenvideoVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
+    try {
+        const data = await proxyFetch<GenVideoTaskPayload>({
+            url: genvideoApiUrl(config, `/tasks/${encodeURIComponent(task.id)}`),
+            method: "GET",
+            headers: aiHeaders(config),
+        });
+        const status = String(data?.status || "").toLowerCase();
+        if (status === "succeeded") {
+            const url = data?.outputUrl;
+            if (!url) return { status: "failed", error: "GenVideo 任务成功但没有返回视频 URL" };
+            return { status: "completed", result: await videoResultFromUrl(url, options) };
+        }
+        if (status === "failed" || status === "timeout" || status === "cancelled") {
+            const reason = (data?.error || "").trim();
+            const note = status === "timeout" ? "上游生成超时，渠道积分将自动全额退款" : "GenVideo 视频生成失败";
+            return { status: "failed", error: reason ? `${reason}（${note}）` : note };
+        }
+        // pending / processing 及未知状态一律视为进行中
+        return { status: "pending" };
+    } catch (error) {
+        throw new Error(readGenvideoError(error, "GenVideo 任务查询失败"));
     }
 }
 
@@ -843,7 +932,7 @@ function seedanceApiUrl(config: AiConfig, taskId?: string) {
     // 防呆：该路径是火山 Seedance 的任务接口（/contents/generations/tasks），
     // 只有 seedance / 火山类渠道能走到；Replicate / MiniMax / Aigccc 凭证若被误路由到此处
     // 上游会 404，这里直接抛出明确错误，避免把请求打到不存在的路径。
-    if (config.apiFormat === "replicate" || config.apiFormat === "minimax" || config.apiFormat === "aigccc") {
+    if (config.apiFormat === "replicate" || config.apiFormat === "minimax" || config.apiFormat === "aigccc" || config.apiFormat === "genvideo") {
         throw new Error(`视频渠道 ${config.apiFormat} 不应使用 Seedance 任务接口，请检查模型与凭证的绑定`);
     }
     const base = config.baseUrl.trim().replace(/\/+$/, "");
