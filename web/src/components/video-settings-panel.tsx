@@ -419,7 +419,7 @@ function GenVideoSettingsPanel({ config, onConfigChange, theme, showTitle, class
                             </OptionPill>
                         ))}
                     </div>
-                    <div className="text-[11px] leading-4 opacity-55">5/10/15 秒走 2.0 模式；30 秒为 2.5 模式，生成更慢。参考图需公网图片链接。</div>
+                    <div className="text-[11px] leading-4 opacity-55">5/10/15 秒走 2.0 模式；30 秒为 2.5 模式，生成更慢。支持上传参考图（最多 10 张，平台自动中转）。</div>
                 </SettingGroup>
             </div>
         </ImageSettingsTheme>

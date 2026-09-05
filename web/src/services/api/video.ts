@@ -8,6 +8,7 @@ import { boolConfig, buildSeedancePromptText, isSeedanceVideoConfig, normalizeSe
 import { normalizeMiniMaxResolution } from "@/lib/minimax-video";
 import { GENVIDEO_REFERENCE_LIMITS, genvideoModeForDuration, isGenvideoVideoConfig, normalizeGenvideoDuration, normalizeGenvideoRatio } from "@/lib/genvideo";
 import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
+import { apiPath } from "@/lib/app-paths";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
@@ -430,12 +431,35 @@ function genvideoApiUrl(config: AiConfig, path: string) {
     return `${base}/v1${path}`;
 }
 
-/** GenVideo 只接受公网 http/https 图片 URL（实测 data:/blob: 会被上游「素材 URL 不合法」拒绝） */
-function genvideoReferenceImages(references: ReferenceImage[]): Array<{ url: string }> {
-    return references.slice(0, GENVIDEO_REFERENCE_LIMITS.images).map((image) => {
-        if (image.url && isPublicMediaUrl(image.url)) return { url: image.url };
-        throw new Error("GenVideo 参考图必须是公网可访问的 http/https 图片链接（暂不支持本地上传的图片），请改用 Seedance / MiniMax 模型，或换成公网图片 URL");
+/** GenVideo 只接受公网 http/https 图片 URL（实测 data:/blob: 会被上游「素材 URL 不合法」拒绝）。
+ *  本地图片先经平台中转上传（/api/media/upload → 服务器磁盘 → 公网 /api/media/{id}），换公网链接后再提交；
+ *  同一次会话内相同图片复用已上传的链接，避免重试时重复上传。 */
+const genvideoUploadCache = new Map<string, string>();
+
+async function uploadGenvideoReferenceImage(image: ReferenceImage): Promise<string> {
+    if (image.url && isPublicMediaUrl(image.url)) return image.url;
+    const dataUrl = await imageToDataUrl(image);
+    if (!dataUrl) throw new Error("参考图读取失败，请换一张图片或重新上传");
+    const cached = genvideoUploadCache.get(dataUrl);
+    if (cached) return cached;
+    const response = await fetch(apiPath("/api/media/upload"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dataUrl }),
+        credentials: "include",
     });
+    const data = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
+    if (!response.ok || !data?.url) throw new Error(data?.error || `参考图中转上传失败（${response.status}）`);
+    genvideoUploadCache.set(dataUrl, data.url);
+    return data.url;
+}
+
+async function genvideoReferenceImages(references: ReferenceImage[]): Promise<Array<{ url: string }>> {
+    const images: Array<{ url: string }> = [];
+    for (const image of references.slice(0, GENVIDEO_REFERENCE_LIMITS.images)) {
+        images.push({ url: await uploadGenvideoReferenceImage(image) });
+    }
+    return images;
 }
 
 function readGenvideoError(error: unknown, fallback: string) {
@@ -457,7 +481,7 @@ async function createGenvideoVideoTask(config: AiConfig, model: string, prompt: 
     };
     const ratio = normalizeGenvideoRatio(config.size);
     if (ratio) payload.ratio = ratio;
-    const images = genvideoReferenceImages(references);
+    const images = await genvideoReferenceImages(references);
     if (images.length) payload.images = images;
     try {
         const data = await proxyFetch<GenVideoTaskPayload>({
