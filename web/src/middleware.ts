@@ -75,6 +75,12 @@ export function middleware(request: NextRequest) {
         return alias ? rewritten(request, alias) : NextResponse.next();
     }
 
+    // 中转素材读取公开（GET /api/media/<id>）：上游视频服务（如 GenVideo）不带 Cookie 拉取参考图，
+    // 必须在鉴权前放行。上传（POST /api/media/upload）不走这里，仍由中间件 + 路由自身双重校验。
+    if (path.startsWith("/api/media/") && (request.method === "GET" || request.method === "HEAD")) {
+        return alias ? rewritten(request, alias) : NextResponse.next();
+    }
+
     // 登录后才能访问的页面（产品页）对搜索引擎声明不收录
     const noindex = (res: NextResponse) => {
         res.headers.set("X-Robots-Tag", NOINDEX_HEADER);
