@@ -11,18 +11,6 @@ import type { CanvasAgentOp, CanvasAgentSnapshot } from "../utils/canvas-agent-o
 /** 工具风险档：决定默认是否需要用户确认 */
 export type ToolRisk = "read" | "write" | "generate" | "orchestrate";
 
-/** 需要用户批准的一次工具调用 */
-export type PendingApproval = {
-    requestId: string;
-    toolName: string;
-    args: Record<string, unknown>;
-    risk: ToolRisk;
-    ops?: CanvasAgentOp[];
-};
-
-/** 一次运行的终态 / 中间态 */
-export type RunStatus = "planning" | "running" | "waiting_input" | "completed" | "failed" | "interrupted";
-
 /**
  * 统一工具回执。
  *
@@ -49,17 +37,13 @@ export type ToolResult = {
     error?: string;
 };
 
-/** 引擎事件流：调度层、观测层与 UI 时间线共用同一条流 */
-export type EngineEvent =
-    | { type: "run_started"; runId: string; brief: string }
-    | { type: "stage_started"; runId: string; stageKey: string; agentId: string }
-    | { type: "stage_finished"; runId: string; stageKey: string; ok: boolean; error?: string }
-    | { type: "tool_called"; runId: string; stageKey?: string; name: string; args: Record<string, unknown> }
-    | { type: "tool_result"; runId: string; stageKey?: string; name: string; result: ToolResult }
-    | { type: "ops_applied"; runId: string; ops: CanvasAgentOp[]; createdNodeIds: string[] }
-    | { type: "waiting_input"; runId: string; request: PendingApproval }
-    | { type: "run_finished"; runId: string; status: RunStatus }
-    | { type: "error"; runId: string; message: string };
+/**
+ * 引擎事件流。
+ *
+ * 只保留引擎真正会发出的事件：画布变更与错误。
+ * 运行级的进度不重复走这里——调度层的 RunState 才是它的唯一真相（含落盘与续跑）。
+ */
+export type EngineEvent = { type: "ops_applied"; runId: string; ops: CanvasAgentOp[]; createdNodeIds: string[] } | { type: "error"; runId: string; message: string };
 
 /**
  * 引擎运行上下文：引擎与宿主（浏览器 / 未来服务端）之间的唯一接口。
@@ -86,12 +70,6 @@ export type ToolDefinition = {
     /** 显式要求确认；缺省时按 risk 判定 */
     requiresConfirmation?: boolean;
 };
-
-/** 工具实现签名 */
-export type ToolHandler = (args: Record<string, unknown>, ctx: CanvasEngineContext) => ToolResult | Promise<ToolResult>;
-
-/** 注册表里的完整条目 = 定义 + 实现 */
-export type RegisteredTool = ToolDefinition & { handler: ToolHandler };
 
 /** 按风险档判定是否需要用户确认（除非条目显式覆盖） */
 export function toolNeedsConfirmation(tool: Pick<ToolDefinition, "risk" | "requiresConfirmation">) {

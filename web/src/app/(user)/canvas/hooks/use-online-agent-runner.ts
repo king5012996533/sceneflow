@@ -9,11 +9,14 @@ import { type CanvasAssistantMessage, type CanvasAssistantSession } from "../typ
 import { type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import { shouldExposeCanvasTools, shouldReadCanvasBeforeWrite, shouldRequireToolCall } from "../utils/agent-intent";
 import { allResponseFunctionTools, readOnlyResponseFunctionTools, toolLabel, toolNeedsConfirmation } from "../engine/tools/registry";
+import { tryClaimCanvasRun } from "../engine/scheduler/run-lock";
 import type { ToolResult } from "../engine/types";
 
 const ONLINE_AGENT_MAX_STEPS = 4;
 const ONLINE_AGENT_MAX_TOOL_CALLS_PER_STEP = 8;
 const REQUIRED_TOOL_CHOICE = "required" as const;
+/** 画布写入权标签：在线对话与全自动生产共用一把锁，同一 id 重复加锁视为续跑 */
+const RUN_LOCK_ID = "online";
 
 // 工具清单来自唯一注册表；此处缓存模块级常量，避免每步重建
 const ALL_TOOLS = allResponseFunctionTools();
@@ -153,6 +156,13 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
 
     const runOnlineAgentStep = async (sessionId: string, assistantId: string, history: CanvasAssistantMessage[], userMessage: CanvasAssistantMessage, loop: OnlineLoopContext) => {
         const requestConfig = { ...effectiveConfig, model: effectiveConfig.textModel || effectiveConfig.model };
+        // 画布同一时刻只能被一个运行写：生产流程在跑时不允许在线对话插进去改同一块画布
+        const claim = tryClaimCanvasRun({ id: RUN_LOCK_ID, kind: "online", label: userMessage.text.slice(0, 20) || "画布操作" });
+        if (!claim.ok) {
+            addOnlineLog("画布被占用", { owner: claim.owner.label });
+            appendMessage(sessionId, { id: nanoid(), role: "error", title: "无法开始", text: claim.reason });
+            return;
+        }
         try {
             setIsRunning(true);
             const messages = await buildMessages(snapshotRef.current, history, userMessage);
@@ -229,6 +239,8 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
             addOnlineLog("请求失败", error instanceof Error ? error.message : error);
             appendMessage(sessionId, { id: nanoid(), role: "error", title: "操作失败", text: error instanceof Error ? error.message : "操作失败" });
         } finally {
+            // 整条工具链（含多步续跑）都在这次调用里 await 到底，所以这里是真正的运行结束点
+            claim.release();
             setIsRunning(false);
         }
     };
@@ -255,11 +267,22 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
 
         try {
             setIsRunning(true);
-            const results = executeToolCalls(toolCalls);
-            addOnlineLog("工具执行结果", results);
-            upsertMessage(session.id, { id: messageId, role: "tool", title: "工具执行完成", text: formatToolResultsForChat(results), detail: { ...detail, status: "completed", results } });
-            pendingToolContextRef.current.delete(messageId);
-            await continueAfterResults(session.id, assistantId, messages, toolCalls, results, step);
+            // 用户的确认是一次新链路的起点，同样要重新持有画布写入权
+            const claim = tryClaimCanvasRun({ id: RUN_LOCK_ID, kind: "online", label: summarizeToolCalls(toolCalls) });
+            if (!claim.ok) {
+                addOnlineLog("画布被占用", { owner: claim.owner.label });
+                upsertMessage(session.id, { id: messageId, role: "tool", title: "无法执行", text: claim.reason, detail: { ...detail, status: "failed" } });
+                return;
+            }
+            try {
+                const results = executeToolCalls(toolCalls);
+                addOnlineLog("工具执行结果", results);
+                upsertMessage(session.id, { id: messageId, role: "tool", title: "工具执行完成", text: formatToolResultsForChat(results), detail: { ...detail, status: "completed", results } });
+                pendingToolContextRef.current.delete(messageId);
+                await continueAfterResults(session.id, assistantId, messages, toolCalls, results, step);
+            } finally {
+                claim.release();
+            }
         } catch (error) {
             addOnlineLog("工具续跑失败", error instanceof Error ? error.message : error);
             appendMessage(session.id, { id: nanoid(), role: "error", title: "操作失败", text: error instanceof Error ? error.message : "操作失败" });

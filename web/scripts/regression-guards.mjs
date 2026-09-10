@@ -87,6 +87,26 @@ assertIncludes("src/app/(user)/canvas/engine/tools/schemas.ts", "canvas_memory_r
 assertIncludes("src/app/(user)/canvas/engine/engine.ts", "getMemory", "引擎必须把记忆读写接进工具执行路径（不得回落到 ops 归约，否则无 ops 会被判为失败）。");
 assertIncludes("src/app/(user)/canvas/utils/online-agent-memory.ts", "describeMemoryForPrompt", "在线助手每轮必须注入工程记忆，否则记忆等于没写。");
 assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "injectMemory", "子 Agent 必须注入工程记忆，否则跨阶段角色/风格一致性无从保证。");
+
+// —— 生产调度层：状态机落盘、生成等待、单写者锁 ——
+assertIncludes("src/app/(user)/canvas/engine/scheduler/run-state.ts", "normalizeRunState", "运行状态必须能做脏数据规整，否则刷新页面后无法安全续跑。");
+assertIncludes("src/app/(user)/canvas/engine/scheduler/run-state.ts", "hasDependencyCycle", "计划成环/悬空依赖必须在创建期判死，否则运行期死锁。");
+assertIncludes("src/app/(user)/canvas/engine/scheduler/run-state.ts", "blockableStages", "上游失败必须显式把下游判为跳过，否则 Run 永远不收敛。");
+assertIncludes("src/app/(user)/canvas/engine/scheduler/run-state.ts", "resetRetryableStages", "失败阶段重试必须能重开被连带跳过的下游。");
+assertIncludes("src/app/(user)/canvas/stores/use-canvas-store.ts", "activeRun", "生产运行必须挂在 CanvasProject 上随工程落盘（断点续跑的前提）。");
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "executeRun", "多阶段生产必须由 RunState 状态机驱动，不得再用一次性遍历。");
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "waitForGeneration", "派发过生成的阶段必须等生成落地再放行下游（否则下游拿半成品生产）。");
+assertIncludes("src/app/(user)/canvas/engine/scheduler/run-state.ts", "planRunStep", "调度决策（跳过/中断/暂停/预算/并发）必须收在一个纯函数里，执行器只负责照着做。");
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "planRunStep", "执行器必须消费状态机的调度决策，不得自己另写一套跳过/暂停判断。");
+assertNotExists("src/app/(user)/canvas/utils/canvas-agent-orchestrator-types.ts", "计划/进度已合并进 engine/scheduler/run-state.ts，旧的 orchestrator-types 不得回归（会重新出现计划与进度两份真相）。");
+assertIncludes("src/app/(user)/canvas/engine/scheduler/run-lock.ts", "tryClaimCanvasRun", "画布必须同时只被一个运行写入（在线对话与全自动生产共用一把锁）。");
+assertNotMatches("src/app/(user)/canvas/engine/scheduler/run-lock.ts", /depth/, "画布锁不得做成可重入：同 id 重复启动必须被拒（否则会并发写同一块画布）。");
+assertIncludes("src/app/(user)/canvas/hooks/use-online-agent-runner.ts", "tryClaimCanvasRun", "在线对话运行必须声明画布写入权，否则会与生产流程交叉改写同一块画布。");
+assertIncludes("src/app/(user)/canvas/components/canvas-local-agent-panel.tsx", "tryClaimCanvasRun", "本地 Agent 是另一位写入者，写画布前必须取写入权。");
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "stageAbort", "阶段超时/中断必须真的打断在飞的模型请求，不能只是不再等待（否则请求还会继续写画布）。");
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "生成超时未完成", "生成没落地不得当作阶段成功放行下游（下游会拿半成品生产）。");
+assertIncludes("src/app/(user)/canvas/components/canvas-orchestrator-panel.tsx", "abortRef.current?.abort()", "面板卸载必须中断在飞的运行，否则循环会在用户看不见的地方继续写画布。");
+assertIncludes("src/app/(user)/canvas/components/canvas-run-timeline.tsx", "runProgress", "生产运行必须把阶段进度摊开给用户看（跑到哪、谁失败、能否继续）。");
 assertIncludes("src/app/(user)/canvas/utils/online-agent-tool-ops.ts", "workflowStageReferenceKeys", "workflow cards must keep stage dependency references.");
 assertIncludes("src/app/(user)/canvas/utils/online-agent-tool-ops.ts", "withNodeReferenceTokens", "workflow prompts must include @node references for upstream assets.");
 assertIncludes("src/app/(user)/canvas/utils/online-agent-memory.ts", "safeMessageText", "the online agent must stringify message content safely.");

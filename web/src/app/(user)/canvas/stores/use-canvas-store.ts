@@ -6,6 +6,7 @@ import { localForageStorage } from "@/lib/localforage-storage";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import type { CanvasAssistantSession, CanvasConnection, CanvasNodeData, ViewportTransform } from "../types";
 import type { CanvasProjectMemory } from "../engine/memory/project-memory";
+import type { RunState } from "../engine/scheduler/run-state";
 
 export type CanvasProject = {
     id: string;
@@ -24,6 +25,11 @@ export type CanvasProject = {
      * 随工程一起本地落盘并同步到服务端；老工程没有该字段时按空记忆处理。
      */
     memory?: CanvasProjectMemory;
+    /**
+     * 进行中的生产运行（调度层）：阶段状态、依赖、重试次数、上游产出。
+     * 和记忆一样随工程落盘，所以关掉页面再回来能接着跑，而不是从头再烧一遍。
+     */
+    activeRun?: RunState;
 };
 
 type CanvasStore = {
@@ -35,7 +41,7 @@ type CanvasStore = {
     renameProject: (id: string, title: string) => void;
     deleteProjects: (ids: string[]) => void;
     replaceProjects: (projects: CanvasProject[]) => void;
-    updateProject: (id: string, patch: Partial<Pick<CanvasProject, "nodes" | "connections" | "chatSessions" | "activeChatId" | "backgroundMode" | "showImageInfo" | "viewport" | "memory">>) => void;
+    updateProject: (id: string, patch: Partial<Pick<CanvasProject, "nodes" | "connections" | "chatSessions" | "activeChatId" | "backgroundMode" | "showImageInfo" | "viewport" | "memory" | "activeRun">>) => void;
 };
 
 const initialViewport: ViewportTransform = { x: 0, y: 0, k: 1 };
@@ -111,6 +117,9 @@ export const useCanvasStore = create<CanvasStore>()(
                     backgroundMode: source.backgroundMode || "lines",
                     showImageInfo: source.showImageInfo || false,
                     viewport: source.viewport || initialViewport,
+                    // 记忆与运行态也要跟着搬家：从云端恢复/导入压缩包回来的工程应当能接着跑
+                    memory: source.memory,
+                    activeRun: source.activeRun,
                 };
                 set((state) => ({ projects: [project, ...state.projects] }));
                 return project.id;

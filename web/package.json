@@ -16,6 +16,7 @@
         "typecheck": "tsc --noEmit",
         "guard": "node scripts/regression-guards.mjs",
         "test:memory": "node scripts/memory-unit-tests.mjs",
+        "test:scheduler": "node scripts/run-state-unit-tests.mjs && node scripts/run-control-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

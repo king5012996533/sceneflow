@@ -28,6 +28,7 @@ import { parseToolArguments } from "../utils/online-agent-tool-ops";
 import { useOnlineAgentRunner, type OnlineExecutedToolCall } from "../hooks/use-online-agent-runner";
 import { createCanvasEngine, type CanvasEngine } from "../engine/engine";
 import { isEmptyMemory, mergeMemory, normalizeMemory, summarizeMemory, type CanvasProjectMemory, type MemoryPatch } from "../engine/memory/project-memory";
+import type { RunState } from "../engine/scheduler/run-state";
 import { buildAssistantReferences, buildToolAgentMessages } from "../utils/online-agent-memory";
 
 export const CANVAS_AGENT_PANEL_MOTION_MS = 500;
@@ -46,6 +47,9 @@ type CanvasAssistantPanelProps = {
     /** 工程记忆（记忆层）：跨会话的工程事实 */
     memory: CanvasProjectMemory;
     onMemoryChange: (memory: CanvasProjectMemory) => void;
+    /** 生产运行（调度层）：多阶段生产的断点续跑状态 */
+    run: RunState | null;
+    onRunChange: (run: RunState | null) => void;
     canUndoOps: boolean;
     onUndoOps: () => CanvasAgentSnapshot | null;
     onPasteImage: (file: File) => void;
@@ -67,6 +71,8 @@ export function CanvasAssistantPanel({
     onApplyOps,
     memory,
     onMemoryChange,
+    run,
+    onRunChange,
     canUndoOps,
     onUndoOps,
     onPasteImage,
@@ -230,11 +236,15 @@ export function CanvasAssistantPanel({
      */
     const engineHostRef = useRef({ onApplyOps, addOnlineLog, onMemoryChange });
     engineHostRef.current = { onApplyOps, addOnlineLog, onMemoryChange };
-    // 记忆与快照同样用 ref 镜像：引擎只创建一次，但每次都读到最新值
+    // 记忆、快照、运行 id 都用 ref 镜像：引擎只创建一次，但每次都读到最新值
     const memoryRef = useRef<CanvasProjectMemory>(normalizeMemory(memory));
     useEffect(() => {
         memoryRef.current = normalizeMemory(memory);
     }, [memory]);
+    const runRef = useRef(run);
+    useEffect(() => {
+        runRef.current = run;
+    }, [run]);
     const engine = useMemo<CanvasEngine>(
         () =>
             createCanvasEngine({
@@ -247,6 +257,7 @@ export function CanvasAssistantPanel({
                 emit: (event) => {
                     if (event.type === "error") engineHostRef.current.addOnlineLog("引擎错误", event.message);
                 },
+                getRunId: () => runRef.current?.id ?? "manual",
                 getConfig: () => effectiveConfigRef.current,
                 getMemory: () => memoryRef.current,
                 applyMemory: (patch: MemoryPatch) => {
@@ -502,7 +513,7 @@ export function CanvasAssistantPanel({
                 {agentMode === "local" ? (
                     <CanvasLocalAgentPanel embedded snapshot={snapshot} canUndoOps={canUndoOps} onApplyOps={onApplyOps} onUndoOps={onUndoOps} autoConnect={autoConnectLocal} />
                 ) : agentMode === "orchestrator" ? (
-                    <CanvasOrchestratorPanel config={effectiveConfig} engine={engine} getMemory={() => memoryRef.current} />
+                    <CanvasOrchestratorPanel config={effectiveConfig} engine={engine} getMemory={() => memoryRef.current} run={run} onRunChange={onRunChange} />
                 ) : agentMode === "automation" ? (
                     <CanvasAutomationAgentPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} />
                 ) : (

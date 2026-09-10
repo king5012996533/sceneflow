@@ -44,6 +44,7 @@ import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
 import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
 import { useCanvasStore } from "../stores/use-canvas-store";
 import { normalizeMemory, type CanvasProjectMemory } from "../engine/memory/project-memory";
+import { normalizeRunState, type RunState } from "../engine/scheduler/run-state";
 import { applyCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import { canvasGenerationErrorToast, formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
 import { buildCanvasResourceReferences, buildNodeMentionReferences } from "../utils/canvas-resource-references";
@@ -797,6 +798,14 @@ function InfiniteCanvasPage() {
     const handleProjectMemoryChange = useCallback(
         (next: CanvasProjectMemory) => {
             updateProject(projectId, { memory: next });
+        },
+        [projectId, updateProject],
+    );
+    // 生产运行（调度层）：与记忆同样随工程落盘，刷新后可断点续跑
+    const projectRun = useMemo(() => normalizeRunState(currentProject?.activeRun), [currentProject?.activeRun]);
+    const handleProjectRunChange = useCallback(
+        (next: RunState | null) => {
+            updateProject(projectId, { activeRun: next ?? undefined });
         },
         [projectId, updateProject],
     );
@@ -1913,6 +1922,8 @@ function InfiniteCanvasPage() {
                     onApplyOps={applyAgentOps}
                     memory={projectMemory}
                     onMemoryChange={handleProjectMemoryChange}
+                    run={projectRun}
+                    onRunChange={handleProjectRunChange}
                     canUndoOps={Boolean(agentUndoSnapshot)}
                     onUndoOps={undoAgentOps}
                     onPasteImage={pasteAssistantImage}

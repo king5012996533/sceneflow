@@ -4,10 +4,10 @@ import { requestGeneratedToolResponse, type AiTextMessage, type ResponseInputMes
 import type { ToolResult } from "../engine/types";
 import { resolveToolDefinitions, toResponseFunctionTools } from "../engine/tools/registry";
 import { describeMemoryForPrompt, type CanvasProjectMemory } from "../engine/memory/project-memory";
-import type { SubAgentDef, SubAgentTask, SubAgentResult, ProductionPlan } from "./canvas-agent-orchestrator-types";
-import { hasCircularDependency, topSortStages, ORCHESTRATOR_CONSTANTS } from "./canvas-agent-orchestrator-types";
-import type { CanvasAgentOp, CanvasAgentSnapshot } from "./canvas-agent-ops";
-import { SUB_AGENTS } from "./canvas-agent-registry";
+import { collectUpstream, hasDependencyCycle, isRunSettled, markStageAborted, markStageFinished, markStageRunning, markStageSkipped, planRunStep, setRunPhase, type RunState, type StageOutcome, type StageState } from "../engine/scheduler/run-state";
+import { DEFAULT_GENERATION_TIMEOUT_MS, describeGenerationWait, waitForGeneration } from "../engine/scheduler/generation-wait";
+import type { CanvasAgentSnapshot } from "./canvas-agent-ops";
+import { getSubAgent, ORCHESTRATOR_CONSTANTS, type SubAgentDef } from "./canvas-agent-registry";
 
 export type ExecutorContext = {
     abortSignal: AbortSignal;
@@ -18,7 +18,7 @@ export type ExecutorContext = {
      * 执行器不得再次提交，否则会重复建节点。
      */
     onToolCall: (name: string, args: Record<string, unknown>) => ToolResult;
-    /** 读取当前画布快照（工具执行后就地取最新状态） */
+    /** 读取当前画布快照（工具执行后就地取最新状态，也用于等待生成落地） */
     getSnapshot: () => CanvasAgentSnapshot;
     /** 读取工程记忆：子 Agent 起步就知道本工程已确认的长期事实 */
     getMemory: () => CanvasProjectMemory;
@@ -32,7 +32,28 @@ export type ExecutorProgress = {
     toolCalls: number;
 };
 
-type StepToolResult = { id: string; ok: boolean; message: string; ops: CanvasAgentOp[]; createdNodeIds: string[] };
+/** 调度层每推进一步都会通过它把新状态交回宿主落盘 */
+export type RunHooks = {
+    onRunChange: (run: RunState) => void;
+    /** 返回 true 时在阶段边界暂停（当前批次跑完即停，不做半途截断） */
+    shouldPause?: () => boolean;
+    onProgress?: (progress: ExecutorProgress) => void;
+};
+
+/** 阶段执行结果：除了要落进 RunState 的结论，还带回本阶段派发出去的生成节点 */
+type StageExecution = {
+    outcome: StageOutcome;
+    generationNodeIds: string[];
+};
+
+/** 上游注入给子 Agent 的上下文（任务书 + 上游产出 + 派生上下文） */
+type StageInput = {
+    brief: string;
+    upstreamNodeIds: string[];
+    derivedContext: Record<string, string>;
+};
+
+type StepToolResult = { id: string; ok: boolean; message: string; createdNodeIds: string[] };
 
 /** 单个工具回执提取：优先用引擎给出的 createdNodeIds，缺失时从 ops 兜底推导 */
 function extractCreatedNodeIds(result: ToolResult): string[] {
@@ -43,10 +64,18 @@ function extractCreatedNodeIds(result: ToolResult): string[] {
         .filter(Boolean) as string[];
 }
 
-export async function executeSubAgent(def: SubAgentDef, task: SubAgentTask, context: ExecutorContext, config: AiConfig, onProgress?: (progress: ExecutorProgress) => void): Promise<SubAgentResult> {
+/** 从工具回执里挑出真正派发了生成的节点：这些节点要等生成落地才能放行下游 */
+function extractGenerationNodeIds(result: ToolResult): string[] {
+    return (result.ops || []).filter((op) => op.type === "run_generation" && Boolean(op.nodeId)).map((op) => (op as { nodeId: string }).nodeId);
+}
+
+/**
+ * 执行单个子 Agent 阶段。
+ * 返回 StageOutcome（可直接交给 markStageFinished）与它派发的生成节点。
+ */
+async function executeSubAgent(def: SubAgentDef, stage: StageState, input: StageInput, context: ExecutorContext, config: AiConfig, onProgress?: (progress: ExecutorProgress) => void): Promise<StageExecution> {
     const createdNodeIds: string[] = [];
-    const allOps: CanvasAgentOp[] = [];
-    const derivedContext: Record<string, string> = {};
+    const generationNodeIds: string[] = [];
     let tokensUsed = 0;
     let stepsUsed = 0;
 
@@ -58,34 +87,35 @@ export async function executeSubAgent(def: SubAgentDef, task: SubAgentTask, cont
     const preferred = def.preferredModel ? modelOptionName(def.preferredModel) : "";
     const subAgentModel = (preferred && textModelNames.includes(preferred) ? preferred : "") || config.textModel || config.model;
 
-    const finish = (patch: Partial<SubAgentResult> & { ok: boolean; summary: string }): SubAgentResult => ({
-        agentId: def.id,
-        stageKey: task.stageKey,
-        createdNodeIds,
-        metadata: {},
-        derivedContext,
-        ops: allOps,
-        tokensUsed,
-        stepsUsed,
-        ...patch,
+    /** 收尾：把累计用量与产出节点一并带上，调用方只需要看 ok/summary */
+    const finish = (patch: { ok: boolean; summary: string; error?: string; derivedContext?: Record<string, string> }): StageExecution => ({
+        outcome: { ...patch, createdNodeIds: [...createdNodeIds], tokensUsed, stepsUsed },
+        generationNodeIds: [...new Set(generationNodeIds)],
     });
 
-    const run = async (): Promise<SubAgentResult> => {
+    // 单阶段中断信号：用户的「中断」与阶段超时都要能打断正在飞的模型请求，
+    // 否则点了中断要等这一轮请求自己返回才停得下来。
+    const stageAbort = new AbortController();
+    const abortStage = () => stageAbort.abort();
+    if (context.abortSignal.aborted) stageAbort.abort();
+    else context.abortSignal.addEventListener("abort", abortStage);
+
+    const run = async (): Promise<StageExecution> => {
         try {
             // 开局就把工程记忆与画布现状交给子 Agent，避免它既不知道工程设定、也不知道画布内容就盲目建节点
-            let currentMessages = injectMemory(buildSubAgentMessages(def, task), context.getMemory());
+            let currentMessages = injectMemory(buildSubAgentMessages(def, input), context.getMemory());
             currentMessages = injectCanvasState(currentMessages, context.getSnapshot());
             const tools = toResponseFunctionTools(resolveToolDefinitions(def.toolNames));
 
             let hasMore = true;
             while (hasMore && stepsUsed < def.maxSteps) {
-                if (context.abortSignal.aborted) {
+                if (stageAbort.signal.aborted) {
                     log("被用户中断");
                     return finish({ ok: false, error: "执行被用户中断", summary: "" });
                 }
                 if (tokensUsed >= ORCHESTRATOR_CONSTANTS.MAX_TOKENS_PER_AGENT) {
                     log("达到单 Agent token 预算上限");
-                    return finish({ ok: true, summary: `达到 token 预算上限（${tokensUsed}），提前结束。` });
+                    return finish({ ok: true, summary: `达到 token 预算上限（${tokensUsed}），提前结束。已建 ${createdNodeIds.length} 个节点。` });
                 }
 
                 stepsUsed++;
@@ -97,8 +127,9 @@ export async function executeSubAgent(def: SubAgentDef, task: SubAgentTask, cont
                     tools,
                     toolChoice: tools.length ? "auto" : undefined,
                     onDelta: (text) => {
-                        if (text.trim()) onProgress?.({ agentId: def.id, stageKey: task.stageKey, step: stepsUsed, text, toolCalls: 0 });
+                        if (text.trim()) onProgress?.({ agentId: def.id, stageKey: stage.stageKey, step: stepsUsed, text, toolCalls: 0 });
                     },
+                    options: { signal: stageAbort.signal },
                 });
 
                 tokensUsed += estimateTokens(result.content) + estimateToolTokens(result.toolCalls);
@@ -106,15 +137,17 @@ export async function executeSubAgent(def: SubAgentDef, task: SubAgentTask, cont
 
                 if (!result.toolCalls.length) {
                     hasMore = false;
-                    const summary = result.content || "完成";
-                    return finish({ ok: true, summary, metadata: parseMetadata(summary) });
+                    return finish({ ok: true, summary: result.content || `已建 ${createdNodeIds.length} 个节点。` });
                 }
 
-                const toolResults = executeToolSequence(result.toolCalls, context);
-                for (const tr of toolResults) {
-                    allOps.push(...tr.ops);
-                    if (tr.createdNodeIds.length) createdNodeIds.push(...tr.createdNodeIds);
+                // 工具执行前再看一眼：被中断后不许再往画布上写
+                if (stageAbort.signal.aborted) {
+                    log("被用户中断，停止后续工具执行");
+                    return finish({ ok: false, error: "执行被用户中断", summary: "" });
                 }
+                const toolResults = executeToolSequence(result.toolCalls, stageAbort.signal, context);
+                for (const tr of toolResults) createdNodeIds.push(...tr.createdNodeIds);
+                for (const tr of toolResults) generationNodeIds.push(...tr.generationNodeIds);
 
                 const nextMessages: ResponseInputMessage[] = [...currentMessages] as ResponseInputMessage[];
                 for (const tc of result.toolCalls) {
@@ -145,197 +178,174 @@ export async function executeSubAgent(def: SubAgentDef, task: SubAgentTask, cont
         }
     };
 
-    // 超时保护：def.timeoutMs 此前定义了却从未生效
+    // 超时保护：到点必须掐断循环内的请求，否则超时只是「不再等」，它还会继续往画布上写
+    const timeoutMs = def.timeoutMs || ORCHESTRATOR_CONSTANTS.DEFAULT_AGENT_TIMEOUT_MS;
     const timedOut = Symbol("timeout");
     const runPromise = run();
     const timeoutPromise = new Promise<typeof timedOut>((resolve) => {
-        const timer = setTimeout(() => resolve(timedOut), def.timeoutMs || ORCHESTRATOR_CONSTANTS.DEFAULT_AGENT_TIMEOUT_MS);
-        const clear = () => clearTimeout(timer);
-        // 执行结束时清理定时器，避免泄漏（失败分支也要清理，且不产生未处理的 rejection）
+        const timer = setTimeout(() => {
+            abortStage();
+            resolve(timedOut);
+        }, timeoutMs);
+        const clear = () => {
+            clearTimeout(timer);
+            context.abortSignal.removeEventListener("abort", abortStage);
+        };
+        // 执行结束时清理定时器与监听，避免泄漏（失败分支也要清理，且不产生未处理的 rejection）
         void runPromise.then(clear, clear);
     });
 
     const outcome = await Promise.race([runPromise, timeoutPromise]);
     if (outcome === timedOut) {
-        log(`执行超时（${def.timeoutMs}ms）`);
-        return finish({ ok: false, error: `子 Agent 执行超时（${def.timeoutMs}ms）`, summary: "" });
+        log(`执行超时（${timeoutMs}ms）`);
+        return finish({ ok: false, error: `子 Agent 执行超时（${timeoutMs}ms）`, summary: "" });
     }
-
-    // 汇总派生上下文：让下游阶段能直接看到上游产出的节点
-    const summary = outcome.ok ? `产出节点 ${createdNodeIds.length} 个：${createdNodeIds.join(", ") || "无"}` : `失败：${outcome.error || "未知错误"}`;
-    derivedContext[task.stageKey] = summary;
-    return { ...outcome, derivedContext: { ...outcome.derivedContext, ...derivedContext } };
+    return outcome;
 }
 
-export async function executeProductionPlan(plan: ProductionPlan, context: ExecutorContext, config: AiConfig, onProgress?: (progress: ExecutorProgress) => void): Promise<ProductionPlan> {
-    if (hasCircularDependency(plan.stages)) {
-        context.onLog("计划存在循环依赖，已终止");
-        return { ...plan, status: "failed", completedAt: Date.now() };
+/**
+ * 按 RunState 驱动一次多阶段生产。
+ *
+ * 调度规则（全部落在 run-state 的纯函数里，这里只负责编排与落盘）：
+ *  - 每一轮挑选依赖已终结的 pending 阶段，最多 MAX_CONCURRENT_AGENTS 个并发；
+ *  - 上游有失败/跳过的阶段显式判为跳过，否则整个 Run 永远等不到终结；
+ *  - 派发过生成的阶段必须等生成落地（成功/失败）再放行下游；
+ *  - 暂停在阶段边界生效，中断在阶段内生效（abortSignal）；
+ *  - 每推进一步都通过 onRunChange 交回宿主落盘，刷新页面可断点续跑。
+ */
+export async function executeRun(run: RunState, context: ExecutorContext, config: AiConfig, hooks: RunHooks): Promise<RunState> {
+    let state = run;
+    // 步数预算按运行累计：续跑时要算上已经花掉的步数，否则「全局预算」形同虚设
+    let totalSteps = state.stages.reduce((sum, stage) => sum + (stage.stepsUsed || 0), 0);
+    const commit = (next: RunState) => {
+        state = next;
+        hooks.onRunChange(next);
+    };
+
+    const interrupted = (error: string): StageExecution => ({ outcome: { ok: false, error, summary: "", createdNodeIds: [], tokensUsed: 0, stepsUsed: 0 }, generationNodeIds: [] });
+
+    const runStage = async (stage: StageState): Promise<StageExecution> => {
+        const def = getSubAgent(stage.agentId);
+        if (!def) return interrupted(`子 Agent ${stage.agentId} 未注册`);
+        if (context.abortSignal.aborted) return interrupted("执行被中断");
+
+        const upstream = collectUpstream(state, stage.stageKey);
+        const executed = await executeSubAgent(def, stage, { brief: stage.brief, ...upstream }, context, config, hooks.onProgress);
+
+        // 生成了图/视频的阶段，必须等它们落地：下游拿着没画出来的图去生成，产出必然是废的
+        const generationIds = executed.generationNodeIds;
+        if (!generationIds.length || !executed.outcome.ok) return executed;
+
+        context.onLog(`阶段 ${stage.stageKey} 等待 ${generationIds.length} 个生成落地`, generationIds);
+        // 轮询每 2.5 秒一次，日志只在有进展时记一条，否则日志页会被等待刷屏
+        let lastDone = -1;
+        const waited = await waitForGeneration(generationIds, {
+            getStatuses: () => nodeStatuses(context.getSnapshot(), generationIds),
+            signal: context.abortSignal,
+            onTick: (snapshot) => {
+                if (!snapshot.pending.length || snapshot.succeeded.length === lastDone) return;
+                lastDone = snapshot.succeeded.length;
+                context.onLog(`生成进行中：${snapshot.succeeded.length}/${generationIds.length} 完成`);
+            },
+        });
+        const note = describeGenerationWait(waited);
+        context.onLog(`阶段 ${stage.stageKey} 生成结果`, note);
+
+        if (waited.aborted) return { ...executed, outcome: { ...executed.outcome, ok: false, error: "等待生成时被用户中断" } };
+        // 生成没落地就不放行下游：明确失败的、以及超时仍在跑的，都算这个阶段没完成。
+        // 宁可停下来让用户决定要不要重试，也不要让下游拿着半成品继续烧钱。
+        if (waited.failed.length) return { ...executed, outcome: { ...executed.outcome, ok: false, error: `生成失败：${waited.failed.join(", ")}` } };
+        if (waited.timedOut && waited.pending.length) return { ...executed, outcome: { ...executed.outcome, ok: false, error: `生成超时未完成：${waited.pending.join(", ")}（已等待 ${Math.round(DEFAULT_GENERATION_TIMEOUT_MS / 60000)} 分钟）` } };
+        return { ...executed, outcome: { ...executed.outcome, summary: `${executed.outcome.summary}（${note}）` } };
+    };
+
+    if (hasDependencyCycle(state.stages)) {
+        context.onLog("计划存在循环依赖或悬空依赖，已终止");
+        commit(setRunPhase(state, "failed"));
+        return state;
     }
+    if (!isRunSettled(state)) commit(setRunPhase(state, "running"));
 
-    const levels = topSortStages(plan.stages);
-    const results: Record<string, SubAgentResult> = {};
-    let totalTokens = 0;
-    let totalSteps = 0;
-
-    for (let levelIndex = 0; levelIndex < levels.length; levelIndex++) {
-        const level = levels[levelIndex];
-        context.onLog(
-            `执行层级 ${levelIndex + 1}/${levels.length}`,
-            level.map((s) => s.stageKey),
-        );
-
-        if (context.abortSignal.aborted) {
-            return { ...plan, status: "interrupted", results, completedAt: Date.now(), currentStageIndex: plan.stages.length };
-        }
-        // 全局步数预算：此前 MAX_TOTAL_STEPS 定义了却从未生效
-        if (totalSteps >= ORCHESTRATOR_CONSTANTS.MAX_TOTAL_STEPS) {
-            context.onLog("达到全局步数预算上限，停止后续阶段");
+    for (;;) {
+        // 每一步该做什么由状态机的纯函数决定，这里只负责照着做并把结果落盘
+        const step = planRunStep(state, {
+            aborted: context.abortSignal.aborted,
+            paused: hooks.shouldPause?.() ?? false,
+            maxConcurrent: ORCHESTRATOR_CONSTANTS.MAX_CONCURRENT_AGENTS,
+            totalSteps,
+            maxTotalSteps: ORCHESTRATOR_CONSTANTS.MAX_TOTAL_STEPS,
+        });
+        if (step.kind === "done") break;
+        if (step.kind === "halt") {
+            context.onLog(step.reason);
+            commit(setRunPhase(state, step.phase));
             break;
         }
+        if (step.kind === "skip") {
+            for (const target of step.targets) {
+                context.onLog(`阶段 ${target.stageKey} 已跳过`, target.reason);
+                commit(markStageSkipped(state, target.stageKey, target.reason));
+            }
+            continue;
+        }
 
-        const runnable: SubAgentTask[] = [];
-        for (const stage of level) {
-            // 上游失败则下游跳过（此前失败只打日志，下游照跑）
-            const failedDeps = stage.dependencies.filter((dep) => results[dep] && !results[dep].ok);
-            const missingDeps = stage.dependencies.filter((dep) => !results[dep]);
-            if (failedDeps.length || missingDeps.length) {
-                const reason = failedDeps.length ? `上游阶段失败：${failedDeps.join(", ")}` : `上游阶段未执行：${missingDeps.join(", ")}`;
-                context.onLog(`阶段 ${stage.stageKey} 已跳过`, reason);
-                results[stage.stageKey] = {
-                    agentId: stage.agentId,
-                    stageKey: stage.stageKey,
-                    ok: false,
-                    error: reason,
-                    summary: "",
-                    createdNodeIds: [],
-                    metadata: {},
-                    derivedContext: {},
-                    ops: [],
-                    tokensUsed: 0,
-                    stepsUsed: 0,
-                };
+        const batch = step.stages;
+        for (const stage of batch) commit(markStageRunning(state, stage.stageKey));
+        context.onLog(
+            `本轮执行 ${batch.length} 个阶段`,
+            batch.map((stage) => `${stage.stageKey}<${stage.agentId}>`),
+        );
+
+        // 并发执行本批阶段，结果按顺序落盘（保证同一份计划每次调度结果一致）
+        const executions = await Promise.all(batch.map((stage) => runStage(stage)));
+        for (let index = 0; index < batch.length; index++) {
+            const stage = batch[index];
+            const execution = executions[index];
+            totalSteps += execution.outcome.stepsUsed ?? 0;
+            // 被中断而没跑完的阶段放回待跑：记成失败会让下游全部被跳过，「继续」就补不回来了
+            if (context.abortSignal.aborted && !execution.outcome.ok) {
+                context.onLog(`阶段 ${stage.stageKey} 被中断，已放回待跑`);
+                commit(markStageAborted(state, stage.stageKey));
                 continue;
             }
-            runnable.push(enrichWithUpstream(stage, results));
-        }
-
-        const concurrency = Math.min(ORCHESTRATOR_CONSTANTS.MAX_CONCURRENT_AGENTS, runnable.length || 1);
-        for (let batch = 0; batch < runnable.length; batch += concurrency) {
-            const batchStages = runnable.slice(batch, batch + concurrency);
-            const batchResults = await Promise.allSettled(
-                batchStages.map((stage) => {
-                    const def = findAgent(stage.agentId);
-                    if (!def) {
-                        return Promise.resolve({
-                            agentId: stage.agentId,
-                            stageKey: stage.stageKey,
-                            ok: false,
-                            error: `子 Agent ${stage.agentId} 未注册`,
-                            summary: "",
-                            createdNodeIds: [],
-                            metadata: {},
-                            derivedContext: {},
-                            ops: [],
-                            tokensUsed: 0,
-                            stepsUsed: 0,
-                        } as SubAgentResult);
-                    }
-                    if (context.abortSignal.aborted) {
-                        return Promise.resolve({
-                            agentId: stage.agentId,
-                            stageKey: stage.stageKey,
-                            ok: false,
-                            error: "执行被中断",
-                            summary: "",
-                            createdNodeIds: [],
-                            metadata: {},
-                            derivedContext: {},
-                            ops: [],
-                            tokensUsed: 0,
-                            stepsUsed: 0,
-                        } as SubAgentResult);
-                    }
-                    return executeSubAgent(def, stage, context, config, onProgress);
-                }),
-            );
-
-            for (let i = 0; i < batchStages.length; i++) {
-                const stage = batchStages[i];
-                const settled = batchResults[i];
-                if (settled.status === "fulfilled") {
-                    results[stage.stageKey] = settled.value;
-                    totalTokens += settled.value.tokensUsed;
-                    totalSteps += settled.value.stepsUsed;
-                } else {
-                    results[stage.stageKey] = {
-                        agentId: stage.agentId,
-                        stageKey: stage.stageKey,
-                        ok: false,
-                        error: settled.reason?.message || "未知错误",
-                        summary: "",
-                        createdNodeIds: [],
-                        metadata: {},
-                        derivedContext: {},
-                        ops: [],
-                        tokensUsed: 0,
-                        stepsUsed: 0,
-                    };
-                }
-            }
+            context.onLog(`阶段 ${stage.stageKey} ${execution.outcome.ok ? "完成" : "失败"}`, execution.outcome.summary || execution.outcome.error);
+            commit(markStageFinished(state, stage.stageKey, execution.outcome));
         }
     }
 
-    const allFailed = plan.stages.length > 0 && plan.stages.every((s) => !results[s.stageKey]?.ok);
-    return {
-        ...plan,
-        status: allFailed ? "failed" : "completed",
-        results,
-        currentStageIndex: plan.stages.length,
-        completedAt: Date.now(),
-    };
+    return state;
 }
 
-/** 把上游阶段的产出节点与派生上下文注入当前阶段 —— 修复「上下游不串」的第三处断裂 */
-function enrichWithUpstream(stage: SubAgentTask, results: Record<string, SubAgentResult>): SubAgentTask {
-    const upstreamNodeIds: string[] = [];
-    const derivedContext: Record<string, string> = { ...(stage.input.derivedContext || {}) };
-    for (const dep of stage.dependencies) {
-        const upstream = results[dep];
-        if (!upstream) continue;
-        upstreamNodeIds.push(...upstream.createdNodeIds);
-        Object.assign(derivedContext, upstream.derivedContext);
+/** 画布节点状态表：只取本次关心的节点，避免整图搬运 */
+function nodeStatuses(snapshot: CanvasAgentSnapshot, nodeIds: string[]): Record<string, string | undefined> {
+    const wanted = new Set(nodeIds);
+    const statuses: Record<string, string | undefined> = {};
+    for (const node of snapshot.nodes) {
+        if (wanted.has(node.id)) statuses[node.id] = node.metadata?.status;
     }
-    return {
-        ...stage,
-        input: {
-            ...stage.input,
-            upstreamNodeIds: [...new Set([...(stage.input.upstreamNodeIds || []), ...upstreamNodeIds])],
-            derivedContext,
-        },
-    };
+    return statuses;
 }
 
-function buildSubAgentMessages(def: SubAgentDef, task: SubAgentTask): ResponseInputMessage[] {
+function buildSubAgentMessages(def: SubAgentDef, input: StageInput): ResponseInputMessage[] {
     const messages: ResponseInputMessage[] = [{ role: "system", content: def.persona.prompt }];
-    if (task.input.upstreamNodeIds?.length) {
-        messages.push({ role: "system", content: `上游参考节点 ID（可直接作为 referenceNodeIds 使用）：${task.input.upstreamNodeIds.join(", ")}` });
+    if (input.upstreamNodeIds.length) {
+        messages.push({ role: "system", content: `上游参考节点 ID（可直接作为 referenceNodeIds 使用）：${input.upstreamNodeIds.join(", ")}` });
     }
-    if (task.input.derivedContext && Object.keys(task.input.derivedContext).length) {
-        const ctxLines = Object.entries(task.input.derivedContext)
+    if (Object.keys(input.derivedContext).length) {
+        const ctxLines = Object.entries(input.derivedContext)
             .map(([k, v]) => `${k}: ${v}`)
             .join("\n");
         messages.push({ role: "system", content: `上游派生上下文：\n${ctxLines}` });
     }
-    messages.push({ role: "user", content: task.input.brief });
+    messages.push({ role: "user", content: input.brief });
     return messages;
 }
 
-function executeToolSequence(toolCalls: ResponseToolCall[], context: ExecutorContext): StepToolResult[] {
-    const results: StepToolResult[] = [];
+function executeToolSequence(toolCalls: ResponseToolCall[], signal: AbortSignal, context: ExecutorContext): Array<StepToolResult & { generationNodeIds: string[] }> {
+    const results: Array<StepToolResult & { generationNodeIds: string[] }> = [];
     for (const tc of toolCalls) {
-        if (context.abortSignal.aborted) {
-            results.push({ id: tc.id, ok: false, message: "执行被中断", ops: [], createdNodeIds: [] });
+        if (signal.aborted) {
+            results.push({ id: tc.id, ok: false, message: "执行被中断", createdNodeIds: [], generationNodeIds: [] });
             continue;
         }
         try {
@@ -346,11 +356,11 @@ function executeToolSequence(toolCalls: ResponseToolCall[], context: ExecutorCon
                 ok: result.ok,
                 // 给模型看 observation（含执行后画布规模），失败时看 message（失败原因）
                 message: result.ok ? result.observation || result.message : result.message,
-                ops: result.ops || [],
                 createdNodeIds: extractCreatedNodeIds(result),
+                generationNodeIds: extractGenerationNodeIds(result),
             });
         } catch (error) {
-            results.push({ id: tc.id, ok: false, message: error instanceof Error ? error.message : "工具执行失败", ops: [], createdNodeIds: [] });
+            results.push({ id: tc.id, ok: false, message: error instanceof Error ? error.message : "工具执行失败", createdNodeIds: [], generationNodeIds: [] });
         }
     }
     return results;
@@ -385,25 +395,10 @@ function parseToolArgs(args: string): Record<string, unknown> {
     }
 }
 
-function parseMetadata(content: string): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    if (!content) return result;
-    const lines = content.split("\n").filter(Boolean);
-    for (const line of lines) {
-        const match = line.match(/^[-*]\s*(.+?)[：:]\s*(.+)$/);
-        if (match) result[match[1].trim()] = match[2].trim();
-    }
-    return result;
-}
-
 function estimateTokens(text: string): number {
     return Math.ceil((text?.length || 0) / 4);
 }
 
 function estimateToolTokens(toolCalls: ResponseToolCall[]): number {
     return toolCalls.reduce((sum, tc) => sum + (tc.function.name?.length || 0) + (tc.function.arguments?.length || 0), 0) / 4;
-}
-
-function findAgent(id: string): SubAgentDef | undefined {
-    return SUB_AGENTS.find((a) => a.id === id);
 }

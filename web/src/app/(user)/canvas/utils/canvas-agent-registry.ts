@@ -1,4 +1,40 @@
-import type { SubAgentDef } from "./canvas-agent-orchestrator-types";
+/**
+ * 子 Agent 注册表。
+ *
+ * 这里是「有哪些子 Agent、各自能用什么工具、各自的产出契约是什么」的唯一出处。
+ * 计划与进度的数据结构在 engine/scheduler/run-state.ts，本文件只描述能力。
+ */
+
+/** 子 Agent 的人格设定（原先寄生在已删除的 agent-lab 模块里） */
+export type SubAgentPersona = {
+    id: string;
+    name: string;
+    description: string;
+    prompt: string;
+};
+
+export type SubAgentDef = {
+    id: string;
+    name: string;
+    persona: SubAgentPersona;
+    toolNames: string[];
+    outputContract: {
+        nodeTypes: string[];
+        metadataKeys: string[];
+        summaryFields: string[];
+    };
+    preferredModel?: string;
+    maxSteps: number;
+    timeoutMs: number;
+};
+
+/** 全自动生产的预算与并发上限：跑得动、停得住、烧得起 */
+export const ORCHESTRATOR_CONSTANTS = {
+    MAX_CONCURRENT_AGENTS: 3,
+    MAX_TOTAL_STEPS: 40,
+    MAX_TOKENS_PER_AGENT: 32000,
+    DEFAULT_AGENT_TIMEOUT_MS: 120_000,
+};
 
 /**
  * 每个子 Agent 可见的工具组。

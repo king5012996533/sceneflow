@@ -31,7 +31,7 @@ export type CanvasEngineHost = CanvasEngineContext & {
     getMemory: () => CanvasProjectMemory;
     /** 增量写入工程记忆，返回写入后的记忆 */
     applyMemory: (patch: MemoryPatch) => CanvasProjectMemory;
-    /** 可选：当前运行 ID，用于事件流 */
+    /** 当前运行 ID：引擎事件用它关联到调度层的 RunState（手工操作时为 manual） */
     getRunId?: () => string;
 };
 
@@ -46,7 +46,7 @@ export type CanvasEngine = {
 };
 
 export function createCanvasEngine(host: CanvasEngineHost): CanvasEngine {
-    const currentRunId = () => host.getRunId?.() ?? "engine";
+    const currentRunId = () => host.getRunId?.() ?? "manual";
 
     const applyOps = (ops: CanvasAgentOp[]): ApplyOpsResult => {
         const before = host.getSnapshot();

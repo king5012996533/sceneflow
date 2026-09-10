@@ -13,6 +13,7 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { useCanvasAgentStore, type AgentAttachment, type AgentChatItem, type AgentEventLog, type AgentPanelTab, type AgentPendingToolCall, type AgentThreadSummary } from "../stores/use-canvas-agent-store";
 import { summarizeCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
+import { tryClaimCanvasRun } from "../engine/scheduler/run-lock";
 import { AgentChatComposer, AgentChatMessage, AgentPanelTabs, AgentPendingToolCard, AgentWorkingMessage, type CanvasAgentChatAttachment } from "./canvas-agent-chat-ui";
 
 const PANEL_MOTION_SECONDS = 0.5;
@@ -256,7 +257,20 @@ export function CanvasLocalAgentPanel({ snapshot, canUndoOps, collapsed, embedde
         await runToolCall(endpoint, token, payload);
     };
 
+    /**
+     * 本地 Agent 是画布的另一位写入者：写之前先取一次写入权。
+     * 取不到就把冲突原因回给本地 Agent（它才知道这次没写成），而不是悄悄跳过。
+     * 只圈住这一次写：写入本身是同步的，锁在写完之后立刻释放。
+     */
     const runToolCall = async (endpoint: string, token: string, payload: AgentPendingToolCall) => {
+        const claim = payload.name === "canvas_apply_ops" ? tryClaimCanvasRun({ id: clientIdRef.current || "local-agent", kind: "local", label: "本地 Codex" }) : null;
+        if (claim && !claim.ok) {
+            setAgentState({ activity: "画布被占用", waiting: false });
+            addEventLog("画布被占用", { reason: claim.reason });
+            addMessage({ role: "error", title: "画布被占用", text: claim.reason });
+            await postToolResult(endpoint, token, clientIdRef.current, { requestId: payload.requestId, error: claim.reason });
+            return;
+        }
         try {
             const input: { ops?: CanvasAgentOp[] } = payload.input || {};
             setAgentState({ activity: payload.name === "canvas_apply_ops" ? "执行画布操作" : "读取画布", waiting: true });
@@ -272,6 +286,8 @@ export function CanvasLocalAgentPanel({ snapshot, canUndoOps, collapsed, embedde
             setAgentState({ activity: "工具失败", waiting: false });
             addMessage({ role: "tool", title: "工具失败", text: message, detail: payload });
             await postToolResult(endpoint, token, clientIdRef.current, { requestId: payload.requestId, error: message });
+        } finally {
+            if (claim?.ok) claim.release();
         }
     };
 
