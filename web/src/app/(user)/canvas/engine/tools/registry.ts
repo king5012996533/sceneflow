@@ -34,7 +34,9 @@ const TOOL_POLICIES: Record<string, ToolPolicy> = {
     canvas_get_state: { risk: "read", label: "读取画布" },
     canvas_get_selection: { risk: "read", label: "读取选区" },
     canvas_export_snapshot: { risk: "read", label: "导出画布快照" },
-    canvas_plan_workflow: { risk: "read", label: "规划生产流程" },
+
+    // ---- 编排：只产出计划、不改画布，但仍跟随全局确认开关（历史上即如此）----
+    canvas_plan_workflow: { risk: "orchestrate", label: "规划生产流程" },
 
     // ---- 生成：一律确认（消耗额度）----
     canvas_generate_text: { risk: "generate", requiresConfirmation: true, label: "生成文本" },
