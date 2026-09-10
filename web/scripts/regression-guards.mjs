@@ -59,9 +59,24 @@ assertIncludes("prisma/schema.prisma", "model GenerationJob", "generation lifecy
 assertNoAppDirectGenerationApiImports();
 
 assertIncludes("src/app/(user)/canvas/utils/canvas-agent-ops.ts", 'type: "run_pipeline"', "the canvas agent must keep an executable pipeline operation.");
-assertIncludes("src/app/(user)/canvas/utils/online-agent-tools.ts", "canvas_run_pipeline", "the online creation agent must expose pipeline execution.");
-assertIncludes("src/app/(user)/canvas/utils/online-agent-tools.ts", "canvas_continue_video", "the creation agent must expose tail-frame continuation.");
-assertIncludes("src/app/(user)/canvas/utils/online-agent-tools.ts", "MANGA_PRODUCTION_SKILL", "the creation agent must keep the manga production skill constraints.");
+assertIncludes("src/app/(user)/canvas/engine/tools/schemas.ts", "canvas_run_pipeline", "the creation agent must expose pipeline execution.");
+assertIncludes("src/app/(user)/canvas/engine/tools/schemas.ts", "canvas_continue_video", "the creation agent must expose tail-frame continuation.");
+assertIncludes("src/app/(user)/canvas/utils/agent-prompt.ts", "MANGA_PRODUCTION_SKILL", "the creation agent must keep the manga production skill constraints.");
+
+// —— 画布 Agent 执行层（一次到位重构）：工具注册表唯一来源 + 多阶段数据链不得退化 ——
+assertIncludes("src/app/(user)/canvas/engine/tools/registry.ts", "TOOL_POLICIES", "工具风险档/确认策略必须在唯一注册表登记，不得再散落在各处。");
+assertIncludes("src/app/(user)/canvas/engine/types.ts", "createdNodeIds", "工具回执契约必须携带 createdNodeIds（下游引用上游产出的唯一依据）。");
+assertIncludes("src/app/(user)/canvas/engine/engine.ts", "createdNodeIds", "引擎必须按前后快照差集回填 createdNodeIds。");
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "upstreamNodeIds", "子 Agent 必须接收上游阶段产出的节点 ID，否则多阶段生产断链。");
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "derivedContext", "子 Agent 必须接收上游派生上下文。");
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "context.getSnapshot()", "执行器必须读取引擎快照；ops 由引擎提交，执行器不得重复提交。");
+assertNotMatches("src/app/(user)/canvas/utils/canvas-agent-executor.ts", /onApplyOps\s*:\s*\(ops\)/, "执行器不得再持有自己的画布提交路径（会造成双重提交/重复建节点）。");
+assertIncludes("src/app/(user)/canvas/hooks/use-online-agent-runner.ts", "toolNeedsConfirmation", "工具确认策略必须查注册表。");
+assertNotMatches("src/app/(user)/canvas/hooks/use-online-agent-runner.ts", /ALWAYS_CONFIRM_TOOLS|AUTO_RUN_CAPABLE_TOOLS|toolCallLabel\(/, "runner 不得再维护重复的工具确认名单与英文标签表。");
+assertIncludes("src/app/(user)/canvas/components/canvas-orchestrator-panel.tsx", '{ value: "log", label: "日志"', "编排面板日志页签的值必须与渲染分支一致（曾因 history/log 不一致导致点了没反应）。");
+assertNotExists("src/app/(user)/canvas/utils/online-agent-tools.ts", "工具定义已迁到 engine/tools/schemas.ts，旧的 online-agent-tools.ts 不得回归。");
+assertNotExists("src/app/(user)/canvas/components/canvas-creative-agent-panel.tsx", "死面板已删除：canvas-creative-agent-panel 不得回归。");
+assertNotExists("src/app/(user)/agent-lab/page.tsx", "agent-lab 演示页已删除，不得回归。");
 assertIncludes("src/app/(user)/canvas/utils/online-agent-tool-ops.ts", "workflowStageReferenceKeys", "workflow cards must keep stage dependency references.");
 assertIncludes("src/app/(user)/canvas/utils/online-agent-tool-ops.ts", "withNodeReferenceTokens", "workflow prompts must include @node references for upstream assets.");
 assertIncludes("src/app/(user)/canvas/utils/online-agent-memory.ts", "safeMessageText", "the online agent must stringify message content safely.");
@@ -125,14 +140,14 @@ assertNotMatches("src/stores/use-config-store.ts", /grok-imagine-video/, "config
 
 // —— 后台可配置积分定价（图片每张 / 视频每秒）——
 assertIncludes("prisma/schema.prisma", "pricing", "ProviderCredential 必须支持逐模型积分定价（pricing Json）。");
-assertIncludes("src/lib/credit-pricing.ts", "videoCreditsPerSecond", "定价表必须支持视频每秒扣积分。");
-assertIncludes("src/lib/credit-pricing.ts", "effectiveVideoSeconds", "视频计费必须按实际时长换算（-1/自动按 6 秒）。");
+assertIncludes("src/lib/credit-pricing.ts", "videoCreditsStandard", "定价表必须支持视频分档计价（标准/高清，按条计费，与上游结算口径一致）。");
+assertIncludes("src/lib/credit-pricing.ts", "isHighQuality", "视频高清档必须只按 vquality 判定（读 metadata.quality 会让 768P 误按高清扣费）。");
 assertIncludes("src/lib/credential-store.server.ts", "resolveConfiguredPricing", "服务端必须能按模型解析后台逐模型定价。");
 assertIncludes("src/lib/generation/generation-jobs.server.ts", "resolveConfiguredPricing", "扣费必须接入后台逐模型定价（未配置退回内置草案）。");
 assertIncludes("src/app/api/admin/credentials/route.ts", "sanitizePricing", "后台定价落库前必须清洗。");
 assertIncludes("src/app/api/platform/catalog/route.ts", "pricing", "平台目录必须下发逐模型定价（供前端预检/成本展示）。");
 assertIncludes("src/stores/platform-catalog-store.ts", "getPlatformPricing", "客户端必须能按模型取后台定价。");
-assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "videoCreditsPerSecond", "后台必须提供逐模型定价编辑器。");
+assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "videoCreditsStandard", "后台必须提供逐模型定价编辑器（含视频分档）。");
 assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", "pickPricing", "后台表单必须提供 pickPricing。");
 
 // —— Aigccc / Seedance 2.0 网关接入 ——
