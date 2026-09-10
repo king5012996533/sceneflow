@@ -212,6 +212,17 @@ assertIncludes("src/services/api/video.ts", 'apiFormat === "aigccc"', "视频服
 assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", 'value: "aigccc"', "后台凭证表单必须提供 Aigccc 预设。");
 assertIncludes("src/app/(user)/admin/credential-capability-editor.tsx", "supportsCapability", "能力编辑器必须阻止未知模型名被默认标成图片能力（文本模型误开开关会跑到图片列表，画布 Agent 选不到）。");
 
+// —— 上游流内错误必须原样上报（2026-09-10 线上事故）——
+// 中转站用「HTTP 200 + 流内 error 事件」报错（过载/限流/渠道不可用）。
+// 只解析 choices 会把错误静默丢掉，画布 Agent 最终只回一句「模型没有返回内容」，
+// 用户看不到真实原因（实测 ggwk 中转 gpt-5.6-terra 过载就是这个报文）。
+assertIncludes("src/services/api/image.ts", "responseErrorMessage(chunk)", "chat-completions 流必须识别流内 error 事件，否则退化成假空回复。");
+assertIncludes("src/services/api/image.ts", "if (streamError) {", "识别到流内错误后必须抛出，不能继续当作正常空回复。");
+assertIncludes("src/services/api/image.ts", "withUpstreamHint", "上游过载/限流错误必须给用户中文可读提示。");
+
+assertIncludes("src/services/api/image.ts", "if (tools.length) return await requestChatCompletionResponse(", "带 tools 的轮次必须走非流式：线上（ggwk 中转）流式 + tools 实测 48~122s 且经常在约 78s 网关超时后回 overloaded，非流式稳定 3.3s。");
+assertIncludes("src/services/api/image.ts", "toChatCompletionBody", "流式与非流式必须共用同一份 Chat Completions 请求体转换。");
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

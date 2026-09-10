@@ -330,6 +330,29 @@ function readAxiosError(error: unknown, fallback: string) {
     return error instanceof Error ? error.message : fallback;
 }
 
+/**
+ * 上游「过载 / 限流 / 暂时不可用」这类错误对用户来说只意味着一件事：稍后重试。
+ * 原文保留在提示里，方便排查渠道问题。
+ */
+function withUpstreamHint(message: string) {
+    if (!message) return message;
+    if (/overload|too many requests|rate limit|busy|temporarily unavailable|service unavailable|繁忙|过载|稍后重试/i.test(message)) {
+        return `上游模型服务繁忙，请稍后重试（${message}）`;
+    }
+    return message;
+}
+
+/**
+ * 思维链在流里以 [REASONING]…[/REASONING] 包裹；展示与回传前统一剥离。
+ * 用 [\s\S] 而不是 .，否则带换行的思维链会漏掉标记，把 [REASONING] 原样显示给用户。
+ */
+function stripReasoning(text: string) {
+    return text
+        .replace(/\[REASONING\][\s\S]*?\[\/REASONING\]/g, "")
+        .replace(/\[REASONING\][\s\S]*$/g, "")
+        .trim();
+}
+
 function readStatusError(status: number | undefined, fallback: string) {
     if (status === 401 || status === 403) return "鉴权失败，请检查 API Key 或模型权限";
     if (status === 429) return "请求被限流或额度不足，请稍后重试";
@@ -605,7 +628,11 @@ function consumeResponseStreamText(state: ResponseStreamState, text: string, onD
     }
 }
 
-async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
+/**
+ * Responses API 风格的请求体 → Chat Completions 请求体（不含 stream 开关）。
+ * 流式与非流式两条路共用同一份转换，避免两边字段漂移。
+ */
+function toChatCompletionBody(config: AiConfig, body: Record<string, unknown>) {
     // 将 Responses API 的 input 格式转为 Chat Completions 的 messages 格式
     const input = body.input;
     const messages: any[] = [];
@@ -656,7 +683,6 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
     const chatBody: Record<string, unknown> = {
         model: body.model,
         messages,
-        stream: true,
     };
     // 转换 tools 格式：Responses API → Chat Completions 格式
     if (Array.isArray(body.tools)) {
@@ -670,7 +696,11 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
             },
         }));
     }
+    return chatBody;
+}
 
+async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
+    const chatBody = { ...toChatCompletionBody(config, body), stream: true };
     // 平台 Key 化后所有上游 egress 走代理：流式对话由代理透传 + 服务端注入 Key
     const response = await proxyFetchStream({
         url: aiApiUrl(config, "/chat/completions"),
@@ -696,8 +726,13 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
     let buffer = "";
     let fullText = "";
     let toolCalls: ToolResponseResult["toolCalls"] = [];
+    // 中转站/上游常用「HTTP 200 + 流内 error 事件」报错（过载、限流、渠道不可用）。
+    // 只解析 choices 的话这些错误会被静默丢掉，最终变成一句莫名其妙的「模型没有返回内容」，
+    // 用户既看不到真实原因，也没法判断该重试还是该改配置。
+    let streamError = "";
+    let strayPayload = "";
 
-    for (;;) {
+stream: for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -706,11 +741,20 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
 
         for (const line of lines) {
             const trimmed = line.trim();
-            if (!trimmed.startsWith("data: ")) continue;
+            if (!trimmed.startsWith("data: ")) {
+                // 少数上游直接回 JSON 而不是 SSE：先攒着，确认没有正文后再解析错误
+                if (trimmed.startsWith("{")) strayPayload = (strayPayload + trimmed).slice(0, 4000);
+                continue;
+            }
             const jsonStr = trimmed.slice(6);
             if (jsonStr === "[DONE]") continue;
             try {
                 const chunk = JSON.parse(jsonStr);
+                const failure = responseErrorMessage(chunk);
+                if (failure) {
+                    streamError = failure;
+                    break stream;
+                }
                 const delta = chunk.choices?.[0]?.delta;
                 if (delta?.reasoning_content) {
                     if (!fullText) onDelta?.("\n");
@@ -719,8 +763,7 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
                 if (delta?.content) {
                     fullText += delta.content;
                     // onDelta 显示的文本要去掉 [REASONING] 标记
-                    const displayText = fullText.replace(/\[REASONING\].*?\[\/REASONING\]/g, "").trim();
-                    onDelta?.(displayText || " ");
+                    onDelta?.(stripReasoning(fullText) || " ");
                 }
                 if (delta?.tool_calls) {
                     for (const tc of delta.tool_calls) {
@@ -737,7 +780,18 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
         }
     }
 
-    return { content: fullText.replace(/\[REASONING\].*?\[\/REASONING\]/g, "").trim(), toolCalls };
+    if (streamError) {
+        // 已经拿到错误，不必再读完整条流
+        await reader.cancel().catch(() => undefined);
+        throw new Error(withUpstreamHint(streamError));
+    }
+    // 有些上游不按 SSE 回，直接给一段 JSON；正文为空时再解析它，把错误认出来
+    if (!fullText && !toolCalls.length) {
+        const failure = responseErrorMessage(jsonValue((strayPayload + buffer.trim()).slice(0, 4000)));
+        if (failure) throw new Error(withUpstreamHint(failure));
+    }
+
+    return { content: stripReasoning(fullText), toolCalls };
 }
 
 function toGeminiBody(config: AiConfig, messages: ResponseInputMessage[], extra?: Record<string, unknown>) {
@@ -813,6 +867,45 @@ function toGeminiToolOptions(tools: ResponseFunctionTool[], toolChoice: ToolChoi
     return {
         tools: [{ functionDeclarations }],
         toolConfig: { functionCallingConfig },
+    };
+}
+
+type ChatCompletionPayload = {
+    choices?: Array<{
+        message?: {
+            content?: string | null;
+            tool_calls?: Array<{ id?: string; function?: { name?: string; arguments?: string } }>;
+        };
+    }>;
+};
+
+/**
+ * 非流式 chat/completions —— 带 tools 的轮次走这条路。
+ *
+ * 线上实测（ggwk 中转 + gpt-5.6-terra，同样的 messages/tools）：
+ *   流式   48~122s 才回，且经常在中转网关超时后返回
+ *          {"error":{"message":"Our servers are currently overloaded..."}}（约 78s，HTTP 仍是 200）；
+ *   非流式 3.3s 正常返回 tool_calls。
+ * 画布 Agent 的 system prompt + 全部工具 schema 比探针大得多，流式几乎必然撞上那个网关超时，
+ * 于是在画布上表现为「模型没有返回内容，请换一种说法再试」。
+ * 代价是工具轮的正文不再逐字流式显示，换来的是这轮能真的出结果。
+ */
+async function requestChatCompletionResponse(config: AiConfig, body: Record<string, unknown>): Promise<ToolResponseResult> {
+    const payload = await proxyFetch<ChatCompletionPayload>({
+        url: aiApiUrl(config, "/chat/completions"),
+        method: "POST",
+        headers: aiHeaders(config, "application/json"),
+        body: toChatCompletionBody(config, body),
+    });
+    const failure = responseErrorMessage(payload);
+    if (failure) throw new Error(withUpstreamHint(failure));
+    const message = payload.choices?.[0]?.message;
+    if (!message) throw new Error("上游没有返回任何候选结果，请稍后重试。");
+    return {
+        content: stripReasoning(typeof message.content === "string" ? message.content : ""),
+        toolCalls: (message.tool_calls || [])
+            .filter((call) => call.function?.name)
+            .map((call, index) => ({ id: call.id || `call_${call.function?.name}_${index}`, type: "function" as const, function: { name: call.function?.name || "", arguments: call.function?.arguments || "{}" } })),
     };
 }
 
@@ -1079,7 +1172,7 @@ export async function requestToolResponse(config: AiConfig, messages: ResponseIn
         if (requestConfig.apiFormat === "gemini") {
             return await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, tools.length ? toGeminiToolOptions(tools, toolChoice) : undefined), onDelta, options);
         }
-        return await requestStreamingResponse(requestConfig, {
+        const requestBody = {
             model: requestConfig.model,
             input: toResponseInput(withSystemMessage(requestConfig, messages)),
             ...(tools.length
@@ -1089,7 +1182,10 @@ export async function requestToolResponse(config: AiConfig, messages: ResponseIn
                       parallel_tool_calls: false,
                   }
                 : {}),
-        }, onDelta, options);
+        };
+        // 带 tools 的轮次走非流式：见 requestChatCompletionResponse 的实测注释
+        if (tools.length) return await requestChatCompletionResponse(requestConfig, requestBody);
+        return await requestStreamingResponse(requestConfig, requestBody, onDelta, options);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
     }

@@ -232,8 +232,10 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
                 }
             }
 
-            if (!result.content.trim()) throw new Error("模型没有返回内容，请换一种说法再试。");
-            upsertMessage(sessionId, { id: assistantId, role: "assistant", text: result.content || streamed || "没有返回内容。" });
+            // 到这一步说明上游回的是 200、却既没有文本也没有工具调用。
+            // 这不是问法的问题，让用户「换个说法」只会把人带偏，所以直接说清真实情况。
+            if (!result.content.trim()) throw new Error("模型这次没有返回任何内容（上游多半是过载或超时），稍后重试即可。");
+            upsertMessage(sessionId, { id: assistantId, role: "assistant", text: result.content.trim() });
             addOnlineLog(`Agent Loop ${loop.step} 结束`, { reply: result.content });
         } catch (error) {
             addOnlineLog("请求失败", error instanceof Error ? error.message : error);
