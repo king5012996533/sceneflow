@@ -81,8 +81,12 @@ export const DEFAULT_GENERATION_POLL_MS = 2500;
 export const DEFAULT_GENERATION_START_GRACE_MS = 30_000;
 
 export type WaitForGenerationOptions = {
-    /** 读取节点当前状态（缺省视为未完成） */
-    getStatuses: () => Record<string, string | undefined>;
+    /**
+     * 读取节点状态。入参是本轮实际要等的**全部**节点 id（含 getWatchedIds 追加进来的）。
+     * 实现方必须按传入的 id 取值，不要只映射派发时的那批——被追加的节点读不到状态时
+     * 会被当成「未完成」，等待就永远结算不了，只能等到超时（2026-09-10 线上实测踩过）。
+     */
+    getStatuses: (nodeIds: string[]) => Record<string, string | undefined>;
     /**
      * 额外的等待对象（可随轮询增长）。
      * 有些生成模式在派发当刻就把配置节点标成成功，真正还在跑的是它新建出来的媒体节点；
@@ -115,8 +119,10 @@ export async function waitForGeneration(nodeIds: string[], options: WaitForGener
     let started = false;
 
     for (;;) {
-        const statuses = options.getStatuses();
+        // 先定下本轮要等的节点，再按这份清单取状态：两处必须用同一个集合，
+        // 否则追加进来的节点状态读成 undefined，会被当成永远没完成。
         const watched = options.getWatchedIds ? [...new Set([...nodeIds, ...options.getWatchedIds()])] : nodeIds;
+        const statuses = options.getStatuses(watched);
         const snapshot = classifyGenerationNodes(watched, statuses);
         // 一旦观察到过生成状态就一直算已启动，避免中途的瞬时态把它翻回去
         if (!started && watched.some((nodeId) => hasEnteredGeneration(statuses[nodeId]))) started = true;

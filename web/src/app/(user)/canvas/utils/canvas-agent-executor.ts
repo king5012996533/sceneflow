@@ -240,7 +240,7 @@ export async function executeRun(run: RunState, context: ExecutorContext, config
         // 轮询每 2.5 秒一次，日志只在有进展时记一条，否则日志页会被等待刷屏
         let lastDone = -1;
         const waited = await waitForGeneration(generationIds, {
-            getStatuses: () => nodeStatuses(context.getSnapshot(), generationIds),
+            getStatuses: (watchedIds) => nodeStatusesOf(context.getSnapshot().nodes, watchedIds),
             signal: context.abortSignal,
             onTick: (snapshot) => {
                 if (!snapshot.pending.length || snapshot.succeeded.length === lastDone) return;
@@ -316,11 +316,6 @@ export async function executeRun(run: RunState, context: ExecutorContext, config
     }
 
     return state;
-}
-
-/** 画布节点状态表：只取本次关心的节点，避免整图搬运（与在线对话共用同一实现） */
-function nodeStatuses(snapshot: CanvasAgentSnapshot, nodeIds: string[]): Record<string, string | undefined> {
-    return nodeStatusesOf(snapshot.nodes, nodeIds);
 }
 
 function buildSubAgentMessages(def: SubAgentDef, input: StageInput): ResponseInputMessage[] {

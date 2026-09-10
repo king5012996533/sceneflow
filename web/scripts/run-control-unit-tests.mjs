@@ -103,16 +103,14 @@ await check("等待生成：一直停在空闲 = 没启动，不空等满超时"
 });
 
 await check("等待生成：派发后才出现的媒体节点也要等（配置节点秒成功 != 做完）", async () => {
-    const statuses = { config: "idle" };
+    // 派发当刻的真实形态：配置节点立刻被标成功，同一次写节点里新建的视频节点还在渲染
+    const statuses = { config: "success", video: "loading" };
     let ticks = 0;
     const result = await waitForGeneration(["config"], {
-        getStatuses: () => {
+        getStatuses: (ids) => {
             ticks += 1;
-            // 第一拍：派发发生，配置节点当刻就被标成成功，真正的视频节点还在渲染
-            if (ticks === 1) Object.assign(statuses, { config: "success", video: "loading" });
-            // 第三拍：视频渲染完成
             if (ticks >= 3) statuses.video = "success";
-            return { ...statuses };
+            return Object.fromEntries(ids.map((id) => [id, statuses[id]]));
         },
         getWatchedIds: () => Object.keys(statuses),
         pollMs: 2,
@@ -122,6 +120,27 @@ await check("等待生成：派发后才出现的媒体节点也要等（配置�
     assert.strictEqual(ticks >= 3, true, "必须等到视频节点真正落地才返回");
     assert.ok(result.succeeded.includes("video"), "派发后新建的媒体节点要纳入等待与结果上报");
     assert.deepStrictEqual(result.pending, []);
+});
+
+await check("等待生成：状态查询必须覆盖全部等待对象（否则永远等不到结算）", async () => {
+    const statuses = { config: "success", video: "loading" };
+    let ticks = 0;
+    const queries = [];
+    const result = await waitForGeneration(["config"], {
+        getStatuses: (ids) => {
+            ticks += 1;
+            queries.push(Array.isArray(ids) ? ids.join(",") : String(ids));
+            if (ticks >= 3) statuses.video = "success";
+            return Object.fromEntries(ids.map((id) => [id, statuses[id]]));
+        },
+        getWatchedIds: () => Object.keys(statuses),
+        pollMs: 2,
+        timeoutMs: 500,
+    });
+    assert.deepStrictEqual(queries[0], "config,video", "状态查询必须带上被追加的等待对象，否则新节点状态读成 undefined、永远等不到结算");
+    assert.strictEqual(result.timedOut, false, "线上实测过：状态集合与等待集合不一致会导致只能等到超时");
+    assert.deepStrictEqual(result.pending, []);
+    assert.deepStrictEqual(result.succeeded, ["config", "video"]);
 });
 
 await check("等待生成：只要观察到过生成状态，就不再按「没启动」判死", async () => {

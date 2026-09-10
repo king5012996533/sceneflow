@@ -238,6 +238,11 @@ assertIncludes("src/app/(user)/canvas/hooks/use-online-agent-runner.ts", "waitFo
 assertIncludes("src/app/(user)/canvas/hooks/use-online-agent-runner.ts", "本次新产出节点", "生成落地后必须把新产出节点 id 交给模型，否则它无法引用产出继续下一步（图生视频等）。");
 assertIncludes("src/app/(user)/canvas/engine/scheduler/generation-wait.ts", "dispatchedGenerationNodeIds", "「哪些工具回执派发了生成」必须收在一个纯函数里，避免对话层与生产层判定漂移。");
 assertIncludes("src/app/(user)/canvas/engine/scheduler/generation-wait.ts", "没有真正启动", "生成没真正启动（节点一直空闲）必须单独识别，否则会把界面和下游卡满 8 分钟超时。");
+// 2026-09-10 线上实测事故：等待集合里追加了「派发后新建的媒体节点」，但状态查询只映射了派发时的节点 id，
+// 新节点状态读成 undefined 被当成未完成 —— 结果永远结算不了，只能干等 8 分钟超时（画布上图片其实早就绪）。
+assertIncludes("src/app/(user)/canvas/engine/scheduler/generation-wait.ts", "options.getStatuses(watched)", "状态查询必须按本轮全部等待对象取值，否则追加进来的节点永远读不到状态。");
+assertNotMatches("src/app/(user)/canvas/engine/scheduler/generation-wait.ts", /options\.getStatuses\(\)/, "禁止用空参调用状态读取器：等待集合与状态集合必须是同一个。");
+assertIncludes("src/app/(user)/canvas/hooks/use-online-agent-runner.ts", "getStatuses: (watchedIds)", "在线对话的状态读取必须消费传入的等待对象清单。");
 assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "dispatchedGenerationNodeIds", "生产执行器必须复用同一份派发判定，不得保留私有实现。");
 assertIncludes("src/app/(user)/canvas/utils/agent-prompt.ts", "autoRun=true", "用户要成品时必须把生成跑起来（生成类工具 / autoRun），不能停在两张待点确认的卡片上。");
 assertNotMatches("src/app/(user)/canvas/utils/agent-prompt.ts", /除非用户明确要求立即生成，否则只创建可确认流程卡/, "旧的「一律只建卡」规范会让生成永远停在用户手点，不得回归。");

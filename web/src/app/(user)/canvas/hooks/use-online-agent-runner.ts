@@ -91,7 +91,8 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
         addOnlineLog("等待生成落地", { nodeIds });
 
         const waited = await waitForGeneration(nodeIds, {
-            getStatuses: () => nodeStatusesOf(snapshotRef.current.nodes, nodeIds),
+            // 必须按传入的 id 取状态：等待集合里还有「派发之后才出现的媒体节点」
+            getStatuses: (watchedIds) => nodeStatusesOf(snapshotRef.current.nodes, watchedIds),
             // 视频/音频模式在派发当刻就把配置节点标成成功，真正在跑的是新建的媒体节点：
             // 这些「派发之后才出现的节点」必须一起等，否则会把还在渲染的视频当成做完了。
             getWatchedIds: () => snapshotRef.current.nodes.filter((node) => !beforeIds.has(node.id)).map((node) => node.id),
