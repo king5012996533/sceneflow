@@ -19,7 +19,6 @@ const EXACT_ALIASES: Record<string, string> = {
     "/canvas/prompts": "/prompts",
     "/canvas/billing": "/billing",
     "/canvas/assets": "/assets",
-    "/canvas/agent-lab": "/agent-lab",
     "/canvas/admin": "/admin",
     "/canvas/webdav-proxy": "/webdav-proxy",
     "/canvas/sitemap.xml": "/sitemap.xml",

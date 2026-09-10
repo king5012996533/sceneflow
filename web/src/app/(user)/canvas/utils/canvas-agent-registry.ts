@@ -333,21 +333,4 @@ export const ORCHESTRATOR_TOOL_DEFINITIONS = [
             },
         },
     },
-    {
-        type: "function" as const,
-        function: {
-            name: "merge_production_result",
-            description: "所有子 Agent 执行完成后，合并结果，连接所有节点成完整管线，输出生产报告。",
-            parameters: {
-                type: "object" as const,
-                properties: {
-                    summary: { type: "string", description: "生产完成摘要" },
-                    connectAllNodes: { type: "boolean", description: "是否自动连接所有节点成流水线" },
-                    archiveAssets: { type: "boolean", description: "是否触发资产入库" },
-                },
-                required: ["summary"],
-                additionalProperties: false,
-            },
-        },
-    },
 ];

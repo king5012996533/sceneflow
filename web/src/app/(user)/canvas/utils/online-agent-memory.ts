@@ -2,7 +2,7 @@ import { type ResponseInputMessage } from "@/lib/generation/generation-request";
 import { imageToDataUrl } from "@/services/image-storage";
 import { CanvasNodeType, type CanvasAssistantMessage, type CanvasAssistantReference, type CanvasNodeData } from "../types";
 import { type CanvasAgentSnapshot } from "./canvas-agent-ops";
-import { ONLINE_AGENT_PROMPT } from "./online-agent-tools";
+import { CANVAS_AGENT_PROMPT } from "./agent-prompt";
 
 export function buildAssistantReferences(nodes: CanvasNodeData[], selectedNodeIds: Set<string>) {
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
@@ -23,10 +23,12 @@ export async function buildToolAgentMessages(snapshot: CanvasAgentSnapshot, hist
         "如果只是聊天、咨询、写剧情或写提示词，请直接回答；只有需要操作画布时才调用工具。",
         "如果要操作已有节点、选中节点、参考图、连线关系、重跑、续写、图生视频或删除修改，先读取画布状态或选区，拿到真实节点 id 后再执行。",
         `用户需求：${safeMessageText(userMessage.text)}`,
-    ].filter(Boolean).join("\n\n");
+    ]
+        .filter(Boolean)
+        .join("\n\n");
 
     return [
-        { role: "system", content: ONLINE_AGENT_PROMPT },
+        { role: "system", content: CANVAS_AGENT_PROMPT },
         ...history
             .filter((message): message is CanvasAssistantMessage & { role: "user" | "assistant" | "system" } => message.role === "user" || message.role === "assistant" || message.role === "system")
             .filter((message) => !isPollutedAgentMessage(message.text))
@@ -67,9 +69,7 @@ function buildCanvasAgentMemory(snapshot: CanvasAgentSnapshot, refs: CanvasAssis
     const selectedIds = new Set(snapshot.selectedNodeIds);
     const selectedNodes = snapshot.nodes.filter((node) => selectedIds.has(node.id));
     const refIds = new Set(refs.map((item) => item.id));
-    const recentNodes = snapshot.nodes
-        .filter((node) => !selectedIds.has(node.id) && !refIds.has(node.id))
-        .slice(-10);
+    const recentNodes = snapshot.nodes.filter((node) => !selectedIds.has(node.id) && !refIds.has(node.id)).slice(-10);
     const connectionText = snapshot.connections
         .slice(-16)
         .map((connection) => `${connection.fromNodeId} -> ${connection.toNodeId}`)
@@ -91,7 +91,9 @@ function buildCanvasAgentMemory(snapshot: CanvasAgentSnapshot, refs: CanvasAssis
         recentNodes.length ? `画布近期节点：\n${recentNodes.map(describeNodeForAgent).join("\n")}` : "",
         connectionText ? `现有连线：\n${connectionText}` : "",
         toolText ? `最近工具结果：\n${toolText}` : "",
-    ].filter(Boolean).join("\n\n");
+    ]
+        .filter(Boolean)
+        .join("\n\n");
 }
 
 function describeNodeForAgent(node: CanvasNodeData) {

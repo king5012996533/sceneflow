@@ -23,9 +23,10 @@ import { CanvasOrchestratorPanel } from "./canvas-orchestrator-panel";
 import { OnlineAgentLogView, type OnlineAgentLog } from "./online-agent-log-view";
 import { CanvasNodeType, type CanvasAssistantMessage, type CanvasAssistantReference, type CanvasAssistantSession, type CanvasNodeData } from "../types";
 import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
-import { summarizeCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
-import { buildWorkflowPlan, compactSnapshot, describeCanvasSnapshot, explainNoop, onlineToolToOps, parseToolArguments, snapshotSignature, workflowPlanMessage } from "../utils/online-agent-tool-ops";
-import { useOnlineAgentRunner, type OnlineExecutedToolCall, type OnlineToolResult } from "../hooks/use-online-agent-runner";
+import { type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
+import { parseToolArguments } from "../utils/online-agent-tool-ops";
+import { useOnlineAgentRunner, type OnlineExecutedToolCall } from "../hooks/use-online-agent-runner";
+import { createCanvasEngine, type CanvasEngine } from "../engine/engine";
 import { buildAssistantReferences, buildToolAgentMessages } from "../utils/online-agent-memory";
 
 export const CANVAS_AGENT_PANEL_MOTION_MS = 500;
@@ -51,7 +52,24 @@ type CanvasAssistantPanelProps = {
     onCollapse: () => void;
 };
 
-export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, sessions, activeSessionId, onSelectNodeIds, onSessionsChange, onApplyOps, canUndoOps, onUndoOps, onPasteImage, agentMode, onAgentModeChange, autoConnectLocal, closing, onCollapse }: CanvasAssistantPanelProps) {
+export function CanvasAssistantPanel({
+    nodes,
+    selectedNodeIds,
+    snapshot,
+    sessions,
+    activeSessionId,
+    onSelectNodeIds,
+    onSessionsChange,
+    onApplyOps,
+    canUndoOps,
+    onUndoOps,
+    onPasteImage,
+    agentMode,
+    onAgentModeChange,
+    autoConnectLocal,
+    closing,
+    onCollapse,
+}: CanvasAssistantPanelProps) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const { message } = App.useApp();
     const user = useUserStore((state) => state.user);
@@ -199,46 +217,35 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
         void runOnlineAgentStep(session.id, assistantId, session.messages, userMessage, { step: 1 });
     };
 
-    const executeOps = (ops: CanvasAgentOp[]) => {
-        const beforeSnapshot = snapshotRef.current;
-        const before = snapshotSignature(beforeSnapshot);
-        const next = onApplyOps(ops);
-        snapshotRef.current = next;
-        const ranGeneration = ops.some((op) => op.type === "run_generation" && Boolean(op.nodeId));
-        const changed = before !== snapshotSignature(next) || ranGeneration;
-        const noopReason = changed ? "" : explainNoop(ops, beforeSnapshot);
-        return { changed, ops, ranGeneration, noopReason, before: JSON.parse(before), after: JSON.parse(snapshotSignature(next)) };
-    };
+    /**
+     * 画布引擎：工具执行、画布归约与生成派发的唯一入口。
+     * online 与 orchestrator 两种模式共用同一个实例，行为与回执语义完全一致。
+     * 宿主能力全部通过 ref 读取最新值，因此引擎只需创建一次。
+     */
+    const engineHostRef = useRef({ onApplyOps, addOnlineLog });
+    engineHostRef.current = { onApplyOps, addOnlineLog };
+    const engine = useMemo<CanvasEngine>(
+        () =>
+            createCanvasEngine({
+                getSnapshot: () => snapshotRef.current,
+                applyOps: (ops) => {
+                    const next = engineHostRef.current.onApplyOps(ops);
+                    snapshotRef.current = next;
+                    return next;
+                },
+                emit: (event) => {
+                    if (event.type === "error") engineHostRef.current.addOnlineLog("引擎错误", event.message);
+                },
+                getConfig: () => effectiveConfigRef.current,
+            }),
+        [],
+    );
 
-    const executeOnlineTool = (name: string, args: Record<string, unknown>): OnlineToolResult => {
-        const current = snapshotRef.current;
-        try {
-            if (name === "canvas_get_state") return { ok: true, message: describeCanvasSnapshot(current), data: compactSnapshot(current) };
-            if (name === "canvas_export_snapshot") return { ok: true, message: describeCanvasSnapshot(current), data: compactSnapshot(current) };
-            if (name === "canvas_get_selection") {
-                const ids = new Set(current.selectedNodeIds || []);
-                return { ok: true, message: `当前选中 ${ids.size} 个节点。`, data: { nodes: compactSnapshot({ ...current, nodes: current.nodes.filter((node) => ids.has(node.id)) }).nodes } };
-            }
-            if (name === "canvas_plan_workflow") {
-                const plan = buildWorkflowPlan(args, current);
-                return { ok: true, message: workflowPlanMessage(plan), data: plan };
-            }
-            const ops = onlineToolToOps(name, args, current, effectiveConfigRef.current);
-            const result = executeOps(ops);
-            return { ok: result.changed, message: result.changed ? summarizeCanvasAgentOps(ops) || "画布操作已执行。" : result.noopReason, data: result };
-        } catch (error) {
-            return { ok: false, message: error instanceof Error ? error.message : "工具执行失败" };
-        }
-    };
-
-    const executeOnlineToolCall = (toolCall: ResponseToolCall): OnlineExecutedToolCall => {
-        try {
-            const result = executeOnlineTool(toolCall.function.name, parseToolArguments(toolCall.function.arguments));
-            return { toolCallId: toolCall.id, name: toolCall.function.name, result };
-        } catch (error) {
-            return { toolCallId: toolCall.id, name: toolCall.function.name, result: { ok: false, message: error instanceof Error ? error.message : "工具参数错误" } };
-        }
-    };
+    const executeOnlineToolCall = (toolCall: ResponseToolCall): OnlineExecutedToolCall => ({
+        toolCallId: toolCall.id,
+        name: toolCall.function.name,
+        result: engine.executeTool(toolCall.function.name, parseToolArguments(toolCall.function.arguments)),
+    });
 
     const { runOnlineAgentStep, approveOnlineTool, rejectOnlineTool } = useOnlineAgentRunner({
         effectiveConfig,
@@ -300,7 +307,15 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                     <>
                         {view === "history" ? (
                             <Tooltip title="删除全部">
-                                <Button type="text" shape="circle" className="!h-8 !w-8 !min-w-8" style={iconButtonStyle} icon={<X className="size-4" />} disabled={!historySessions.length} onClick={() => setDeleteChatIds(historySessions.map((session) => session.id))} />
+                                <Button
+                                    type="text"
+                                    shape="circle"
+                                    className="!h-8 !w-8 !min-w-8"
+                                    style={iconButtonStyle}
+                                    icon={<X className="size-4" />}
+                                    disabled={!historySessions.length}
+                                    onClick={() => setDeleteChatIds(historySessions.map((session) => session.id))}
+                                />
                             </Tooltip>
                         ) : null}
                         <Tooltip title="新对话">
@@ -336,7 +351,12 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                             onDelete={(id) => setDeleteChatIds([id])}
                         />
                     ) : view === "log" ? (
-                        <OnlineAgentLogView logs={onlineLogs} theme={theme} context={{ model: activeModel, running: isRunning, confirmTools, messages: messages.length, nodes: snapshot.nodes.length, connections: snapshot.connections.length }} onClear={() => setOnlineLogs([])} />
+                        <OnlineAgentLogView
+                            logs={onlineLogs}
+                            theme={theme}
+                            context={{ model: activeModel, running: isRunning, confirmTools, messages: messages.length, nodes: snapshot.nodes.length, connections: snapshot.connections.length }}
+                            onClear={() => setOnlineLogs([])}
+                        />
                     ) : messages.length ? (
                         <>
                             {messages.map((message) => (
@@ -461,16 +481,9 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
                     </div>
                 </header>
                 {agentMode === "local" ? (
-                    <CanvasLocalAgentPanel
-                        embedded
-                        snapshot={snapshot}
-                        canUndoOps={canUndoOps}
-                        onApplyOps={onApplyOps}
-                        onUndoOps={onUndoOps}
-                        autoConnect={autoConnectLocal}
-                    />
+                    <CanvasLocalAgentPanel embedded snapshot={snapshot} canUndoOps={canUndoOps} onApplyOps={onApplyOps} onUndoOps={onUndoOps} autoConnect={autoConnectLocal} />
                 ) : agentMode === "orchestrator" ? (
-                    <CanvasOrchestratorPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} onToolCall={executeOnlineTool} />
+                    <CanvasOrchestratorPanel config={effectiveConfig} engine={engine} />
                 ) : agentMode === "automation" ? (
                     <CanvasAutomationAgentPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} />
                 ) : (
@@ -481,17 +494,7 @@ export function CanvasAssistantPanel({ nodes, selectedNodeIds, snapshot, session
     );
 }
 
-function AssistantHistory({
-    sessions,
-    activeSession,
-    onOpen,
-    onDelete,
-}: {
-    sessions: CanvasAssistantSession[];
-    activeSession: CanvasAssistantSession | null;
-    onOpen: (id: string) => void;
-    onDelete: (id: string) => void;
-}) {
+function AssistantHistory({ sessions, activeSession, onOpen, onDelete }: { sessions: CanvasAssistantSession[]; activeSession: CanvasAssistantSession | null; onOpen: (id: string) => void; onDelete: (id: string) => void }) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
 
     return (
@@ -504,7 +507,11 @@ function AssistantHistory({
                     <div className="flex items-center gap-2">
                         <div className="min-w-0 flex-1">
                             <div className="flex min-w-0 items-center gap-1.5">
-                                {session.id === activeSession?.id ? <span className="shrink-0 text-[10px] font-medium" style={{ color: theme.node.text }}>当前</span> : null}
+                                {session.id === activeSession?.id ? (
+                                    <span className="shrink-0 text-[10px] font-medium" style={{ color: theme.node.text }}>
+                                        当前
+                                    </span>
+                                ) : null}
                                 <div className="truncate text-sm font-medium leading-5">{session.title}</div>
                             </div>
                             <div className="truncate text-[11px] leading-4 opacity-65">{sessionPreview(session)}</div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "antd";
-import { ArrowUp, Bot, History, LoaderCircle, Plus, X } from "lucide-react";
+import { Bot } from "lucide-react";
 import { nanoid } from "nanoid";
 
 import { useConfigStore, type AiConfig } from "@/stores/use-config-store";
@@ -14,11 +14,10 @@ import { requestGeneratedToolResponse, type ResponseInputMessage, type ResponseT
 import { AgentChatComposer, AgentChatMessage, AgentPanelTabs, AgentWorkingMessage } from "./canvas-agent-chat-ui";
 import { AgentTextModelPicker } from "./canvas-agent-model-picker";
 import type { CanvasAgentChatMessage } from "./canvas-agent-chat-ui";
-import type { CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
-import type { CanvasAgentOp } from "../utils/canvas-agent-ops";
 import type { ProductionPlan } from "../utils/canvas-agent-orchestrator-types";
-import { ORCHESTRATOR_TOOL_DEFINITIONS, SUB_AGENTS } from "../utils/canvas-agent-registry";
+import { ORCHESTRATOR_TOOL_DEFINITIONS } from "../utils/canvas-agent-registry";
 import { executeProductionPlan, type ExecutorContext, type ExecutorProgress } from "../utils/canvas-agent-executor";
+import type { CanvasEngine } from "../engine/engine";
 
 type OrchestratorMessage = {
     id: string;
@@ -30,13 +29,12 @@ type OrchestratorMessage = {
 type OrchestratorLog = { id: string; time: string; title: string; data?: unknown };
 
 type CanvasOrchestratorPanelProps = {
-    snapshot: CanvasAgentSnapshot;
     config: AiConfig;
-    onApplyOps: (ops: CanvasAgentOp[]) => CanvasAgentSnapshot;
-    onToolCall: (name: string, args: Record<string, unknown>) => { ok: boolean; message: string; ops?: CanvasAgentOp[] };
+    /** 画布引擎：子 Agent 的读写与生成派发全部经它统一执行 */
+    engine: CanvasEngine;
 };
 
-export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCall }: CanvasOrchestratorPanelProps) {
+export function CanvasOrchestratorPanel({ config, engine }: CanvasOrchestratorPanelProps) {
     const themeName = useThemeStore((state) => state.theme);
     const themeObj = canvasThemes[themeName];
     const user = useUserStore((state) => state.user);
@@ -46,18 +44,19 @@ export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCa
     const [prompt, setPrompt] = useState("");
     const [running, setRunning] = useState(false);
     const [plan, setPlan] = useState<ProductionPlan | null>(null);
-    const [activeTab, setActiveTab] = useState<"chat" | "log" | "history">("chat");
+    const [activeTab, setActiveTab] = useState<"chat" | "log">("chat");
     const [logs, setLogs] = useState<OrchestratorLog[]>([]);
     const [abortController, setAbortController] = useState<AbortController | null>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const appendMessage = (msg: OrchestratorMessage) => setMessages((prev) => [...prev, msg]);
-    const updateLastMessage = (text: string) => setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        if (!last || last.role === "user") return [...prev, { id: nanoid(), role: "assistant", text }];
-        return prev.map((m, i) => i === prev.length - 1 ? { ...m, text } : m);
-    });
+    const updateLastMessage = (text: string) =>
+        setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (!last || last.role === "user") return [...prev, { id: nanoid(), role: "assistant", text }];
+            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, text } : m));
+        });
     const addLog = (title: string, data?: unknown) => setLogs((prev) => [{ id: nanoid(), time: new Date().toLocaleTimeString(), title, data }, ...prev].slice(0, 80));
 
     useEffect(() => {
@@ -104,8 +103,8 @@ export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCa
             const executorContext: ExecutorContext = {
                 abortSignal: ac.signal,
                 onLog: (title, data) => addLog(title, data),
-                onToolCall: (name, args) => onToolCall(name, args),
-                onApplyOps: (ops) => onApplyOps(ops),
+                onToolCall: (name, args) => engine.executeTool(name, args),
+                getSnapshot: () => engine.getSnapshot(),
             };
 
             appendMessage({ id: nanoid(), role: "progress", text: `开始执行 ${productionPlan.stages.length} 个阶段...` });
@@ -120,7 +119,10 @@ export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCa
                 appendMessage({ id: nanoid(), role: "assistant", text: "生产已被中断。" });
                 addLog("执行中断");
             } else if (finalPlan.status === "failed") {
-                const errors = Object.entries(finalPlan.results).filter(([, r]) => !r.ok).map(([k, r]) => `${k}: ${r.error}`).join("\n");
+                const errors = Object.entries(finalPlan.results)
+                    .filter(([, r]) => !r.ok)
+                    .map(([k, r]) => `${k}: ${r.error}`)
+                    .join("\n");
                 appendMessage({ id: nanoid(), role: "error", text: `生产执行失败：\n${errors}` });
                 addLog("执行失败", errors);
             } else {
@@ -138,12 +140,16 @@ export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCa
         }
     };
 
-    const chatMessages: CanvasAgentChatMessage[] = useMemo(() => messages.map((m) => ({
-        id: m.id,
-        role: m.role === "progress" ? "system" : m.role as "user" | "assistant" | "system" | "tool" | "error",
-        text: m.text,
-        detail: m.detail,
-    })), [messages]);
+    const chatMessages: CanvasAgentChatMessage[] = useMemo(
+        () =>
+            messages.map((m) => ({
+                id: m.id,
+                role: m.role === "progress" ? "system" : (m.role as "user" | "assistant" | "system" | "tool" | "error"),
+                text: m.text,
+                detail: m.detail,
+            })),
+        [messages],
+    );
 
     return (
         <div className="flex h-full flex-col">
@@ -152,12 +158,14 @@ export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCa
                 theme={themeObj}
                 items={[
                     { value: "chat", label: "对话" },
-                    { value: "history", label: "记录", count: logs.length },
+                    { value: "log", label: "日志", count: logs.length },
                 ]}
                 onChange={setActiveTab}
                 right={
                     running ? (
-                        <Button size="small" danger onClick={abort}>中断</Button>
+                        <Button size="small" danger onClick={abort}>
+                            中断
+                        </Button>
                     ) : null
                 }
             />
@@ -176,9 +184,7 @@ export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCa
                     <div className="flex h-full flex-col items-center justify-center px-4 text-center">
                         <Bot className="mb-3 size-10 opacity-30" />
                         <div className="text-sm font-medium">全自动生产模式</div>
-                        <div className="mt-1 text-xs opacity-50">
-                            输入一个片段或需求，AI 会自动拆解任务、依次执行各生产阶段。
-                        </div>
+                        <div className="mt-1 text-xs opacity-50">输入一个片段或需求，AI 会自动拆解任务、依次执行各生产阶段。</div>
                         <div className="mt-4 space-y-1 text-left text-xs opacity-40">
                             <div>• "一个雨夜剑客觉醒的故事，15 秒"</div>
                             <div>• "帮我做一个古风女主的角色设定和三视图"</div>
@@ -211,12 +217,7 @@ export function CanvasOrchestratorPanel({ snapshot, config, onApplyOps, onToolCa
     );
 }
 
-async function createProductionPlan(
-    brief: string,
-    config: AiConfig,
-    signal: AbortSignal,
-    onDelta: (text: string) => void,
-): Promise<{ ok: boolean; plan?: ProductionPlan; error?: string }> {
+async function createProductionPlan(brief: string, config: AiConfig, signal: AbortSignal, onDelta: (text: string) => void): Promise<{ ok: boolean; plan?: ProductionPlan; error?: string }> {
     try {
         const messages: ResponseInputMessage[] = [
             {

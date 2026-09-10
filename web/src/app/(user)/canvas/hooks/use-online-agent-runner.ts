@@ -7,13 +7,20 @@ import { type AiConfig } from "@/stores/use-config-store";
 import { requestGeneratedToolResponse, type ResponseInputMessage, type ResponseToolCall } from "@/lib/generation/generation-request";
 import { type CanvasAssistantMessage, type CanvasAssistantSession } from "../types";
 import { type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
-import { CANVAS_TOOL_INTENT_PATTERN, CHAT_ONLY_INTENT_PATTERN, ONLINE_AGENT_TOOLS, ONLINE_READ_TOOLS } from "../utils/online-agent-tools";
+import { shouldExposeCanvasTools, shouldReadCanvasBeforeWrite, shouldRequireToolCall } from "../utils/agent-intent";
+import { allResponseFunctionTools, readOnlyResponseFunctionTools, toolLabel, toolNeedsConfirmation } from "../engine/tools/registry";
+import type { ToolResult } from "../engine/types";
 
 const ONLINE_AGENT_MAX_STEPS = 4;
 const ONLINE_AGENT_MAX_TOOL_CALLS_PER_STEP = 8;
 const REQUIRED_TOOL_CHOICE = "required" as const;
 
-export type OnlineToolResult = { ok: true; message: string; data?: unknown } | { ok: false; message: string };
+// 工具清单来自唯一注册表；此处缓存模块级常量，避免每步重建
+const ALL_TOOLS = allResponseFunctionTools();
+const READ_ONLY_TOOLS = readOnlyResponseFunctionTools();
+
+/** 工具回执统一用引擎的 ToolResult（含 ops / createdNodeIds / observation） */
+export type OnlineToolResult = ToolResult;
 export type OnlineExecutedToolCall = { toolCallId: string; name: string; result: OnlineToolResult };
 export type PendingOnlineToolContext = { messages: ResponseInputMessage[]; toolCalls: ResponseToolCall[]; assistantId: string; step: number };
 
@@ -96,11 +103,7 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
             return;
         }
 
-        const nextMessages: ResponseInputMessage[] = [
-            ...messages,
-            ...toolCalls.map(toolCallToResponseInput),
-            ...toolResults.map((item) => ({ role: "tool" as const, tool_call_id: item.toolCallId, content: JSON.stringify(item.result) })),
-        ];
+        const nextMessages: ResponseInputMessage[] = [...messages, ...toolCalls.map(toolCallToResponseInput), ...toolResults.map((item) => ({ role: "tool" as const, tool_call_id: item.toolCallId, content: JSON.stringify(item.result) }))];
 
         if (step >= ONLINE_AGENT_MAX_STEPS) {
             upsertMessage(sessionId, { id: assistantId, role: "assistant", text: formatToolResultsForChat(toolResults) || "工具已执行。" });
@@ -113,7 +116,7 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
         const next = await requestGeneratedToolResponse({
             config: { ...requestConfig, systemPrompt: "" },
             messages: nextMessages,
-            tools: ONLINE_AGENT_TOOLS,
+            tools: ALL_TOOLS,
             toolChoice: "auto",
             onDelta: (text) => {
                 streamed = text;
@@ -122,7 +125,7 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
         });
         addOnlineLog(`Agent Tool Loop ${step + 1} 回复`, next);
         if (next.toolCalls.length) {
-            const needsConfirm = next.toolCalls.some((call) => toolCallNeedsConfirmation(call, confirmTools));
+            const needsConfirm = callsNeedConfirmation(next.toolCalls, confirmTools);
             if (needsConfirm) {
                 upsertMessage(sessionId, { id: assistantId, role: "assistant", text: next.content || streamed || "准备执行工具，等待确认。" });
                 appendPendingToolMessage(sessionId, assistantId, nextMessages, next.toolCalls, step + 1);
@@ -153,8 +156,8 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
         try {
             setIsRunning(true);
             const messages = await buildMessages(snapshotRef.current, history, userMessage);
-            const toolsForTurn = shouldExposeCanvasTools(userMessage.text) ? ONLINE_AGENT_TOOLS : [];
-            const readOnlyTools = ONLINE_AGENT_TOOLS.filter((tool) => ONLINE_READ_TOOLS.has(tool.function.name));
+            const toolsForTurn = shouldExposeCanvasTools(userMessage.text) ? ALL_TOOLS : [];
+            const readOnlyTools = READ_ONLY_TOOLS;
             const shouldReadFirst = toolsForTurn.length > 0 && shouldRequireToolCall(userMessage.text) && shouldReadCanvasBeforeWrite(userMessage.text);
             const effectiveTools = shouldReadFirst ? readOnlyTools : toolsForTurn.length ? toolsForTurn : readOnlyTools.length ? readOnlyTools : [];
             const requireToolCall = effectiveTools.length > 0 && shouldRequireToolCall(userMessage.text);
@@ -175,7 +178,7 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
             addOnlineLog("模型工具回复", result);
 
             if (result.toolCalls.length) {
-                const needsConfirm = result.toolCalls.some((call) => toolCallNeedsConfirmation(call, confirmTools));
+                const needsConfirm = callsNeedConfirmation(result.toolCalls, confirmTools);
                 if (needsConfirm) {
                     upsertMessage(sessionId, { id: assistantId, role: "assistant", text: result.content || streamed || "准备执行工具，等待确认。" });
                     appendPendingToolMessage(sessionId, assistantId, messages, result.toolCalls, loop.step);
@@ -189,7 +192,11 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
 
             if (loop.step < ONLINE_AGENT_MAX_STEPS && requireToolCall) {
                 addOnlineLog("模型未调用工具，重试", { step: loop.step });
-                const retryMessages = [...messages, { role: "assistant" as const, content: result.content || streamed || "" }, { role: "user" as const, content: "以上回复没有调用任何画布工具。用户明确要求操作画布，请调用对应的工具来执行操作，不要只回复文本。涉及已有节点、选中节点、参考图或连接关系时，先调用 canvas_get_state 或 canvas_get_selection。" }];
+                const retryMessages = [
+                    ...messages,
+                    { role: "assistant" as const, content: result.content || streamed || "" },
+                    { role: "user" as const, content: "以上回复没有调用任何画布工具。用户明确要求操作画布，请调用对应的工具来执行操作，不要只回复文本。涉及已有节点、选中节点、参考图或连接关系时，先调用 canvas_get_state 或 canvas_get_selection。" },
+                ];
                 let retryStreamed = "";
                 const retryResult = await requestGeneratedToolResponse({
                     config: { ...requestConfig, systemPrompt: "" },
@@ -203,7 +210,7 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
                 });
                 addOnlineLog("重试结果", retryResult);
                 if (retryResult.toolCalls.length) {
-                    const needsConfirm = retryResult.toolCalls.some((call) => toolCallNeedsConfirmation(call, confirmTools));
+                    const needsConfirm = callsNeedConfirmation(retryResult.toolCalls, confirmTools);
                     if (needsConfirm) {
                         upsertMessage(sessionId, { id: assistantId, role: "assistant", text: retryResult.content || retryStreamed || "准备执行工具，等待确认。" });
                         appendPendingToolMessage(sessionId, assistantId, retryMessages, retryResult.toolCalls, loop.step + 1);
@@ -295,40 +302,12 @@ function isResponseToolCall(value: unknown): value is ResponseToolCall {
 }
 
 function summarizeToolCalls(calls: ResponseToolCall[]) {
-    return calls.map((call) => toolCallLabel(call.function.name)).join("; ") || "tool call";
+    return calls.map((call) => toolLabel(call.function.name)).join("; ") || "tool call";
 }
 
-function toolCallLabel(name: string) {
-    if (name === "canvas_apply_ops") return "apply canvas ops";
-    if (name === "canvas_get_state") return "read canvas";
-    if (name === "canvas_get_selection") return "read selection";
-    if (name === "canvas_export_snapshot") return "export snapshot";
-    if (name === "canvas_plan_workflow") return "plan workflow";
-    if (name === "canvas_create_workflow_cards") return "create workflow cards";
-    if (name === "canvas_analyze_reference_image") return "analyze reference image";
-    if (name === "canvas_create_reverse_prompt_flow") return "create reverse prompt flow";
-    if (name === "canvas_create_node") return "create node";
-    if (name === "canvas_create_text_node") return "create text node";
-    if (name === "canvas_create_text_nodes") return "create text nodes";
-    if (name === "canvas_create_config_node") return "create config node";
-    if (name === "canvas_create_image_prompt_flow") return "create image prompt flow";
-    if (name === "canvas_create_generation_flow") return "create generation flow";
-    if (name === "canvas_generate_text") return "generate text";
-    if (name === "canvas_generate_image") return "generate image";
-    if (name === "canvas_generate_video") return "generate video";
-    if (name === "canvas_generate_audio") return "generate audio";
-    if (name === "canvas_update_node") return "update node";
-    if (name === "canvas_update_node_text") return "update text";
-    if (name === "canvas_move_nodes") return "move nodes";
-    if (name === "canvas_resize_node") return "resize node";
-    if (name === "canvas_delete_nodes") return "delete nodes";
-    if (name === "canvas_connect_nodes") return "connect nodes";
-    if (name === "canvas_select_nodes") return "select nodes";
-    if (name === "canvas_set_viewport") return "set viewport";
-    if (name === "canvas_run_generation") return "run generation";
-    if (name === "canvas_run_pipeline") return "run pipeline";
-    if (name === "canvas_continue_video") return "continue video";
-    return name;
+/** 确认策略统一走注册表：读不确认、生成/删除类强制确认、autoRun 能力工具按参数判定、其余跟随全局开关 */
+function callsNeedConfirmation(calls: ResponseToolCall[], confirmTools: boolean) {
+    return calls.some((call) => toolNeedsConfirmation(call.function.name, parseToolArguments(call.function.arguments), confirmTools));
 }
 
 function formatToolResultsForChat(results: OnlineExecutedToolCall[]) {
@@ -367,47 +346,4 @@ function parseToolArguments(value: string) {
     } catch {
         return {};
     }
-}
-
-function shouldExposeCanvasTools(text: unknown) {
-    if (typeof text !== "string") return false;
-    const value = text.trim();
-    if (!value) return false;
-    if (CHAT_ONLY_INTENT_PATTERN.test(value) && !CANVAS_TOOL_INTENT_PATTERN.test(value)) return false;
-    return true;
-}
-
-function shouldRequireToolCall(text: string) {
-    return /(创建|新建|放到画布|落到画布|生成节点|执行|运行|重跑|重新生成|立即生成|删除|移动|修改|更新|连线|连接|开始|生成图片|生成视频|生成音频|图生视频|续写|尾帧|读取画布|当前画布|操作画布|整理成工作流|帮我生成|生成一张|生成一段|出一张|做一张|画一张|反推|倒推|提取提示词|生成提示词)/.test(text);
-}
-
-function shouldReadCanvasBeforeWrite(text: string) {
-    return /(这个|这张|当前|选中|基于|参考|参考图|图片|连接|连线|删除|修改|更新|移动|重跑|重新生成|续写|尾帧|图生视频|工作流|流程|已有|上一个|下一个|反推|倒推|提取提示词)/.test(text);
-}
-
-const ALWAYS_CONFIRM_TOOLS = new Set([
-    "canvas_delete_nodes",
-    "canvas_generate_text",
-    "canvas_generate_image",
-    "canvas_generate_video",
-    "canvas_generate_audio",
-    "canvas_run_generation",
-    "canvas_run_pipeline",
-    "canvas_continue_video",
-    "canvas_apply_ops",
-]);
-
-const AUTO_RUN_CAPABLE_TOOLS = new Set([
-    "canvas_create_config_node",
-    "canvas_create_image_prompt_flow",
-    "canvas_create_generation_flow",
-    "canvas_create_reverse_prompt_flow",
-]);
-
-function toolCallNeedsConfirmation(call: ResponseToolCall, confirmTools: boolean) {
-    const name = call.function.name;
-    if (ONLINE_READ_TOOLS.has(name)) return false;
-    if (ALWAYS_CONFIRM_TOOLS.has(name)) return true;
-    if (AUTO_RUN_CAPABLE_TOOLS.has(name) && parseToolArguments(call.function.arguments).autoRun === true) return true;
-    return confirmTools;
 }

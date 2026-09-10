@@ -1,13 +1,17 @@
-import type { AgentLabPersona } from "@/lib/agent-lab/types";
-import type { AiConfig } from "@/stores/use-config-store";
 import type { CanvasAgentOp, CanvasAgentSnapshot } from "./canvas-agent-ops";
 
-export type OrchestratorMode = "auto" | "semi-auto" | "manual";
+/** 子 Agent 的人格设定（原先寄生在已删除的 agent-lab 模块里） */
+export type SubAgentPersona = {
+    id: string;
+    name: string;
+    description: string;
+    prompt: string;
+};
 
 export type SubAgentDef = {
     id: string;
     name: string;
-    persona: AgentLabPersona;
+    persona: SubAgentPersona;
     toolNames: string[];
     outputContract: {
         nodeTypes: string[];
@@ -58,47 +62,12 @@ export type ProductionPlan = {
     snapshot?: CanvasAgentSnapshot;
 };
 
-export type OrchestratorState = {
-    plan: ProductionPlan | null;
-    mode: OrchestratorMode;
-    running: boolean;
-    paused: boolean;
-    totalTokensUsed: number;
-    aborted: boolean;
-};
-
 export const ORCHESTRATOR_CONSTANTS = {
     MAX_CONCURRENT_AGENTS: 3,
     MAX_TOTAL_STEPS: 40,
     MAX_TOKENS_PER_AGENT: 32000,
     DEFAULT_AGENT_TIMEOUT_MS: 120_000,
-    DEFAULT_AGENT_MAX_STEPS: 8,
-    PLAN_STAGES: [
-        "analyze",
-        "character-source",
-        "character",
-        "turnaround",
-        "scene",
-        "style",
-        "storyboard",
-        "keyframe",
-        "video",
-        "asset-archive",
-    ] as const,
 };
-
-export function createEmptyPlan(brief: string, intent: string): ProductionPlan {
-    return {
-        id: `plan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        intent,
-        brief,
-        stages: [],
-        status: "planning",
-        results: {},
-        currentStageIndex: 0,
-        startedAt: Date.now(),
-    };
-}
 
 export function hasCircularDependency(stages: SubAgentTask[]): boolean {
     const visited = new Set<string>();
