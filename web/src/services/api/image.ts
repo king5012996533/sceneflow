@@ -516,9 +516,25 @@ function toResponseInput(messages: ResponseInputMessage[]): ResponseInputItem[] 
     });
 }
 
+/**
+ * 内容块 → Responses 风格（input_text / input_image）。
+ * 两种形态都要接得住：本应用内部用 Chat 风格（text / image_url.url），
+ * 而已经转过一次的内容是 Responses 风格（input_text / input_image，image_url 是字符串）。
+ * 原来只认前一种，遇到后一种会直接读 undefined.url 抛错，或在没有图时把文本块当图片块。
+ */
 function toResponseContent(content: ResponseMessageContent): string | ResponseInputContent[] {
     if (!Array.isArray(content)) return String(content || "");
-    return content.map((item) => (item.type === "text" ? { type: "input_text" as const, text: item.text } : { type: "input_image" as const, image_url: item.image_url.url }));
+    const parts = content.flatMap((raw): ResponseInputContent[] => {
+        if (typeof raw === "string") return raw ? [{ type: "input_text", text: raw }] : [];
+        // 已经转过一次的内容是 Responses 风格，类型上不属于 Chat 风格的内容块 union，这里按记录读字段
+        const item = raw as unknown as Record<string, unknown>;
+        const imageUrl = typeof item.image_url === "string" ? item.image_url : isRecord(item.image_url) ? stringValue(item.image_url.url) : "";
+        if (imageUrl && (item.type === "input_image" || item.type === "image_url")) return [{ type: "input_image", image_url: imageUrl }];
+        const text = stringValue(item.text) || stringValue(item.input_text);
+        return text ? [{ type: "input_text", text }] : [];
+    });
+    if (!parts.some((part) => part.type === "input_image")) return parts.map((part) => (part.type === "input_text" ? part.text : "")).join("\n");
+    return parts;
 }
 
 function toResponseTool(tool: ResponseFunctionTool): ResponseApiToolDefinition {
@@ -628,6 +644,30 @@ function consumeResponseStreamText(state: ResponseStreamState, text: string, onD
     }
 }
 
+type ChatCompletionContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+
+/**
+ * 内容块转换：Responses 风格（input_text / input_image）与 Chat 风格（text / image_url）都认，统一成 Chat Completions 形态。
+ *
+ * 原来这里直接 `String(msg.content)`：画布 Agent 每条用户消息都是内容块数组（正文 + 选中节点的参考图），
+ * 于是模型收到的是 "[object Object],[object Object]"——用户被回一句「我没收到你的要求」，参考图也从来没真正传上去。
+ * 纯文本内容仍返回字符串，保持兼容与最小请求体。
+ */
+function toChatCompletionContent(content: unknown): string | ChatCompletionContentPart[] {
+    if (typeof content === "string") return content;
+    if (!Array.isArray(content)) return content == null ? "" : String(content);
+    const parts = content.flatMap((item): ChatCompletionContentPart[] => {
+        if (typeof item === "string") return item ? [{ type: "text", text: item }] : [];
+        if (!isRecord(item)) return [];
+        const imageUrl = typeof item.image_url === "string" ? item.image_url : isRecord(item.image_url) ? stringValue(item.image_url.url) : "";
+        if (imageUrl && (item.type === "input_image" || item.type === "image_url")) return [{ type: "image_url", image_url: { url: imageUrl } }];
+        const text = stringValue(item.text) || stringValue(item.input_text);
+        return text ? [{ type: "text", text }] : [];
+    });
+    if (!parts.some((part) => part.type === "image_url")) return parts.map((part) => (part.type === "text" ? part.text : "")).join("\n");
+    return parts;
+}
+
 /**
  * Responses API 风格的请求体 → Chat Completions 请求体（不含 stream 开关）。
  * 流式与非流式两条路共用同一份转换，避免两边字段漂移。
@@ -674,7 +714,7 @@ function toChatCompletionBody(config: AiConfig, body: Record<string, unknown>) {
                 messages.push(assistantMsg);
             } else if (msg.role === "system" || msg.role === "user") {
                 flushToolCalls();
-                messages.push({ role: msg.role, content: String(msg.content || "") });
+                messages.push({ role: msg.role, content: toChatCompletionContent(msg.content) });
             }
         }
         flushToolCalls();

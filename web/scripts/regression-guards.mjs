@@ -223,6 +223,13 @@ assertIncludes("src/services/api/image.ts", "withUpstreamHint", "上游过载/�
 assertIncludes("src/services/api/image.ts", "if (tools.length) return await requestChatCompletionResponse(", "带 tools 的轮次必须走非流式：线上（ggwk 中转）流式 + tools 实测 48~122s 且经常在约 78s 网关超时后回 overloaded，非流式稳定 3.3s。");
 assertIncludes("src/services/api/image.ts", "toChatCompletionBody", "流式与非流式必须共用同一份 Chat Completions 请求体转换。");
 
+// —— 多模态用户消息不得被 String() 成 "[object Object]"（2026-09-10 线上事故）——
+// 画布 Agent 每条用户消息都是内容块数组（正文 + 选中节点参考图），
+// 转换时直接 String() 会让模型收到 "[object Object]"，只能回「我没收到你的要求」，参考图也从未真正上传。
+assertIncludes("src/services/api/image.ts", "function toChatCompletionContent(", "Chat Completions 请求体必须按内容块转换多模态消息，不能 String()。");
+assertNotMatches("src/services/api/image.ts", /content: String\(msg\.content \|\| ""\)/, "不得再把消息内容直接 String()（数组会变成 [object Object]）。");
+assertIncludes("src/services/api/image.ts", "part.type === \"text\" ? part.text : \"\"", "纯文本内容块必须折叠回字符串，保持最小请求体。");
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);
