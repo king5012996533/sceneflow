@@ -230,6 +230,19 @@ assertIncludes("src/services/api/image.ts", "function toChatCompletionContent(",
 assertNotMatches("src/services/api/image.ts", /content: String\(msg\.content \|\| ""\)/, "不得再把消息内容直接 String()（数组会变成 [object Object]）。");
 assertIncludes("src/services/api/image.ts", "part.type === \"text\" ? part.text : \"\"", "纯文本内容块必须折叠回字符串，保持最小请求体。");
 
+// —— 在线对话的生成闭环（2026-09-10 用户反馈：只出两张卡，生图还得用户自己点）——
+// 提示词派发 + 等待落地 + 把真实产出交回模型，三件事缺一件，链路就断在「已触发生成」上。
+assertIncludes("src/app/(user)/canvas/hooks/use-online-agent-runner.ts", "waitForDispatchedGenerations", "在线对话派发生成后必须等生成落地，否则模型会把「正在生成」当成「已完成」而停下。");
+assertNotMatches("src/app/(user)/canvas/hooks/use-online-agent-runner.ts", /continueAfterResults\(sessionId, assistantId, messages, result\.toolCalls, toolResults, step\)/, "工具回执必须先经过生成等待再交给模型，不能直接续跑。");
+assertIncludes("src/app/(user)/canvas/hooks/use-online-agent-runner.ts", "waitForGeneration", "等待实现必须复用调度层的 waitForGeneration，不要在对话层另写一套轮询。");
+assertIncludes("src/app/(user)/canvas/hooks/use-online-agent-runner.ts", "本次新产出节点", "生成落地后必须把新产出节点 id 交给模型，否则它无法引用产出继续下一步（图生视频等）。");
+assertIncludes("src/app/(user)/canvas/engine/scheduler/generation-wait.ts", "dispatchedGenerationNodeIds", "「哪些工具回执派发了生成」必须收在一个纯函数里，避免对话层与生产层判定漂移。");
+assertIncludes("src/app/(user)/canvas/engine/scheduler/generation-wait.ts", "没有真正启动", "生成没真正启动（节点一直空闲）必须单独识别，否则会把界面和下游卡满 8 分钟超时。");
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "dispatchedGenerationNodeIds", "生产执行器必须复用同一份派发判定，不得保留私有实现。");
+assertIncludes("src/app/(user)/canvas/utils/agent-prompt.ts", "autoRun=true", "用户要成品时必须把生成跑起来（生成类工具 / autoRun），不能停在两张待点确认的卡片上。");
+assertNotMatches("src/app/(user)/canvas/utils/agent-prompt.ts", /除非用户明确要求立即生成，否则只创建可确认流程卡/, "旧的「一律只建卡」规范会让生成永远停在用户手点，不得回归。");
+assertIncludes("src/app/(user)/canvas/utils/agent-prompt.ts", "只有回执是「生成已完成」时", "回执说生成还没落地时不得谎报完成，提示词必须禁止这种说法。");
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

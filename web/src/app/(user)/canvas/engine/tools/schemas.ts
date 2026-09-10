@@ -131,7 +131,7 @@ export const CANVAS_TOOL_SCHEMAS: ResponseFunctionTool[] = [
         },
         ["items"],
     ),
-    toolDefinition("canvas_create_config_node", "创建生成配置节点，可指定 text/image/video/audio 模式和生成参数，可选择立即触发生成。", {
+    toolDefinition("canvas_create_config_node", "创建生成配置节点，可指定 text/image/video/audio 模式和生成参数。autoRun=true 会立即触发生成；用户要的是成品（成图/成片）时必须传 true，只建卡不生成会让用户卡在这一步。", {
         prompt: { type: "string" },
         mode: GENERATION_MODE_SCHEMA,
         title: { type: "string" },
@@ -144,7 +144,7 @@ export const CANVAS_TOOL_SCHEMAS: ResponseFunctionTool[] = [
     }),
     toolDefinition(
         "canvas_create_image_prompt_flow",
-        "创建提示词文本节点和图片生成配置节点，并自动连线，可选择立即触发生图。",
+        "创建提示词文本节点和图片生成配置节点，并自动连线。autoRun=true 会立即触发生图；用户要的是图片成品时必须传 true，否则只会留下两张待点确认的卡片。",
         { prompt: { type: "string" }, x: { type: "number" }, y: { type: "number" }, autoRun: { type: "boolean" }, ...GENERATION_OPTION_PROPERTIES },
         ["prompt"],
     ),

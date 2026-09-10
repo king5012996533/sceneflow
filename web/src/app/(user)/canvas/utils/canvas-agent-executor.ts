@@ -5,7 +5,7 @@ import type { ToolResult } from "../engine/types";
 import { resolveToolDefinitions, toResponseFunctionTools } from "../engine/tools/registry";
 import { describeMemoryForPrompt, type CanvasProjectMemory } from "../engine/memory/project-memory";
 import { collectUpstream, hasDependencyCycle, isRunSettled, markStageAborted, markStageFinished, markStageRunning, markStageSkipped, planRunStep, setRunPhase, type RunState, type StageOutcome, type StageState } from "../engine/scheduler/run-state";
-import { DEFAULT_GENERATION_TIMEOUT_MS, describeGenerationWait, waitForGeneration } from "../engine/scheduler/generation-wait";
+import { DEFAULT_GENERATION_TIMEOUT_MS, describeGenerationWait, dispatchedGenerationNodeIds, nodeStatusesOf, waitForGeneration } from "../engine/scheduler/generation-wait";
 import type { CanvasAgentSnapshot } from "./canvas-agent-ops";
 import { getSubAgent, ORCHESTRATOR_CONSTANTS, type SubAgentDef } from "./canvas-agent-registry";
 
@@ -66,7 +66,7 @@ function extractCreatedNodeIds(result: ToolResult): string[] {
 
 /** 从工具回执里挑出真正派发了生成的节点：这些节点要等生成落地才能放行下游 */
 function extractGenerationNodeIds(result: ToolResult): string[] {
-    return (result.ops || []).filter((op) => op.type === "run_generation" && Boolean(op.nodeId)).map((op) => (op as { nodeId: string }).nodeId);
+    return dispatchedGenerationNodeIds([result]);
 }
 
 /**
@@ -255,6 +255,8 @@ export async function executeRun(run: RunState, context: ExecutorContext, config
         // 生成没落地就不放行下游：明确失败的、以及超时仍在跑的，都算这个阶段没完成。
         // 宁可停下来让用户决定要不要重试，也不要让下游拿着半成品继续烧钱。
         if (waited.failed.length) return { ...executed, outcome: { ...executed.outcome, ok: false, error: `生成失败：${waited.failed.join(", ")}` } };
+        // 节点一直停在空闲 = 生成压根没派出去（没有可用模型等），这不是「慢」，等下去只会白等
+        if (!waited.started && waited.pending.length) return { ...executed, outcome: { ...executed.outcome, ok: false, error: `生成没有启动：${note}。请检查生成模型配置后重试。` } };
         if (waited.timedOut && waited.pending.length) return { ...executed, outcome: { ...executed.outcome, ok: false, error: `生成超时未完成：${waited.pending.join(", ")}（已等待 ${Math.round(DEFAULT_GENERATION_TIMEOUT_MS / 60000)} 分钟）` } };
         return { ...executed, outcome: { ...executed.outcome, summary: `${executed.outcome.summary}（${note}）` } };
     };
@@ -316,14 +318,9 @@ export async function executeRun(run: RunState, context: ExecutorContext, config
     return state;
 }
 
-/** 画布节点状态表：只取本次关心的节点，避免整图搬运 */
+/** 画布节点状态表：只取本次关心的节点，避免整图搬运（与在线对话共用同一实现） */
 function nodeStatuses(snapshot: CanvasAgentSnapshot, nodeIds: string[]): Record<string, string | undefined> {
-    const wanted = new Set(nodeIds);
-    const statuses: Record<string, string | undefined> = {};
-    for (const node of snapshot.nodes) {
-        if (wanted.has(node.id)) statuses[node.id] = node.metadata?.status;
-    }
-    return statuses;
+    return nodeStatusesOf(snapshot.nodes, nodeIds);
 }
 
 function buildSubAgentMessages(def: SubAgentDef, input: StageInput): ResponseInputMessage[] {

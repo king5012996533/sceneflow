@@ -10,6 +10,7 @@ import { type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import { shouldExposeCanvasTools, shouldReadCanvasBeforeWrite, shouldRequireToolCall } from "../utils/agent-intent";
 import { allResponseFunctionTools, readOnlyResponseFunctionTools, toolLabel, toolNeedsConfirmation } from "../engine/tools/registry";
 import { tryClaimCanvasRun } from "../engine/scheduler/run-lock";
+import { describeGenerationWait, dispatchedGenerationNodeIds, nodeStatusesOf, waitForGeneration, type GenerationWaitResult } from "../engine/scheduler/generation-wait";
 import type { ToolResult } from "../engine/types";
 
 const ONLINE_AGENT_MAX_STEPS = 4;
@@ -62,6 +63,70 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
             if (!result.result.ok) stopped = true;
         });
         return results;
+    };
+
+    /**
+     * 派发出去的生成必须等到落地，再把真实结果交回模型。
+     *
+     * 不做这一步的后果很具体：模型只收到「已触发生成」就以为事情办完了，
+     * 于是停止调用工具、把「正在生成」当成「已经生成」回报给用户，用户还得
+     * 自己手点一次生成、再手动接着往下做——闭环断在这里。
+     *
+     * 落地后除了报告成功/失败，还会带上「本次新产出的节点 id」：那是模型
+     * 继续下一步（例如拿新图去生视频）唯一的合法引用依据，靠它自己猜 id 必错。
+     */
+    const waitForDispatchedGenerations = async (sessionId: string, results: OnlineExecutedToolCall[]): Promise<OnlineExecutedToolCall[]> => {
+        const nodeIds = dispatchedGenerationNodeIds(results.map((item) => item.result));
+        if (!nodeIds.length) return results;
+
+        const beforeIds = new Set(snapshotRef.current.nodes.map((node) => node.id));
+        const waitMessageId = nanoid();
+        appendMessage(sessionId, {
+            id: waitMessageId,
+            role: "tool",
+            title: "等待生成落地",
+            text: `已派发 ${nodeIds.length} 个生成，等待结果中…`,
+            detail: { status: "running", nodeIds },
+        });
+        addOnlineLog("等待生成落地", { nodeIds });
+
+        const waited = await waitForGeneration(nodeIds, {
+            getStatuses: () => nodeStatusesOf(snapshotRef.current.nodes, nodeIds),
+            // 视频/音频模式在派发当刻就把配置节点标成成功，真正在跑的是新建的媒体节点：
+            // 这些「派发之后才出现的节点」必须一起等，否则会把还在渲染的视频当成做完了。
+            getWatchedIds: () => snapshotRef.current.nodes.filter((node) => !beforeIds.has(node.id)).map((node) => node.id),
+            onTick: (snapshot) => {
+                if (!snapshot.pending.length) return;
+                const done = snapshot.succeeded.length + snapshot.failed.length;
+                upsertMessage(sessionId, {
+                    id: waitMessageId,
+                    role: "tool",
+                    title: "等待生成落地",
+                    text: `生成中：${done}/${done + snapshot.pending.length} 完成，${snapshot.pending.length} 个进行中…`,
+                    detail: { status: "running", nodeIds },
+                });
+            },
+        });
+
+        const produced = snapshotRef.current.nodes.filter((node) => !beforeIds.has(node.id)).map((node) => ({ id: node.id, type: node.type as string, title: node.title }));
+        const note = describeGenerationWait(waited);
+        const outcome = describeGenerationOutcome(waited, produced);
+
+        upsertMessage(sessionId, {
+            id: waitMessageId,
+            role: "tool",
+            title: waited.failed.length || !waited.started ? "生成未完成" : waited.pending.length ? "生成超时未完成" : "生成已完成",
+            text: outcome,
+            detail: { status: waited.failed.length || !waited.started ? "failed" : waited.pending.length ? "running" : "completed", nodeIds, produced },
+        });
+        addOnlineLog("生成结果", { note, produced });
+
+        return results.map((item) => {
+            // 只有真正派发了生成的工具回执才追加落地结论，其余保持原样
+            if (!dispatchedGenerationNodeIds([item.result]).length) return item;
+            const merged = `${item.result.message}\n${outcome}`;
+            return { ...item, result: { ...item.result, message: merged, observation: item.result.observation ? `${item.result.observation}\n${outcome}` : outcome } };
+        });
     };
 
     const appendPendingToolMessage = (sessionId: string, assistantId: string, messages: ResponseInputMessage[], toolCalls: ResponseToolCall[], step: number) => {
@@ -151,7 +216,9 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
             text: formatToolResultsForChat(toolResults),
             detail: { status: "completed", step, toolCalls: result.toolCalls, results: toolResults },
         });
-        await continueAfterResults(sessionId, assistantId, messages, result.toolCalls, toolResults, step);
+        // 有生成派发就先等它落地：模型必须拿到真实产出才能接着往下做
+        const settledResults = await waitForDispatchedGenerations(sessionId, toolResults);
+        await continueAfterResults(sessionId, assistantId, messages, result.toolCalls, settledResults, step);
     };
 
     const runOnlineAgentStep = async (sessionId: string, assistantId: string, history: CanvasAssistantMessage[], userMessage: CanvasAssistantMessage, loop: OnlineLoopContext) => {
@@ -281,7 +348,9 @@ export function useOnlineAgentRunner({ effectiveConfig, confirmTools, safeSessio
                 addOnlineLog("工具执行结果", results);
                 upsertMessage(session.id, { id: messageId, role: "tool", title: "工具执行完成", text: formatToolResultsForChat(results), detail: { ...detail, status: "completed", results } });
                 pendingToolContextRef.current.delete(messageId);
-                await continueAfterResults(session.id, assistantId, messages, toolCalls, results, step);
+                // 用户确认过的生成同样要等落地：不然「确认」只是把活派出去，闭环还是断的
+                const settledResults = await waitForDispatchedGenerations(session.id, results);
+                await continueAfterResults(session.id, assistantId, messages, toolCalls, settledResults, step);
             } finally {
                 claim.release();
             }
@@ -362,6 +431,21 @@ function formatToolResultsForChat(results: OnlineExecutedToolCall[]) {
 
 function objectDetail(value: unknown) {
     return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+const NODE_TYPE_LABELS: Record<string, string> = { text: "文本", image: "图片", video: "视频", audio: "音频", config: "生成配置" };
+
+/**
+ * 生成落地结论：说清「成了没有 / 产出了哪些节点」。
+ * 产出节点 id 是模型继续下一步的唯一合法引用依据，必须逐字给出真实 id。
+ */
+function describeGenerationOutcome(waited: GenerationWaitResult, produced: Array<{ id: string; type: string; title?: string }>): string {
+    const producedText = produced.length ? `本次新产出节点：${produced.map((node) => `${node.id}（${NODE_TYPE_LABELS[node.type] || node.type}${node.title ? ` ${node.title}` : ""}）`).join("、")}。继续下一步时直接用这些 id 作为参考节点。` : "";
+    if (!waited.started && waited.pending.length) return `生成没有启动：派发的 ${waited.pending.length} 个生成一直停在空闲状态（常见原因：生成模型未配置、额度不足或派发失败），请检查后重试。`;
+    if (waited.failed.length)
+        return `生成失败：${waited.failed.length} 个失败${waited.succeeded.length ? `、${waited.succeeded.length} 个成功` : ""}（失败节点 id：${waited.failed.join("、")}）。可以用 canvas_run_generation 重试，或先调整提示词、模型再重试。${producedText}`;
+    if (waited.pending.length) return `生成超时未完成：仍有 ${waited.pending.length} 个在进行中（已等待到上限），稍后可用 canvas_get_state 复查结果。${producedText}`;
+    return `生成已完成：${produced.length || waited.succeeded.length} 个新产出，画布上已经能看到结果。${producedText}`;
 }
 
 function parseToolArguments(value: string) {
