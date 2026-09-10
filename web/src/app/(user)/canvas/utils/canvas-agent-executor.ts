@@ -3,6 +3,7 @@ import { requestGeneratedToolResponse, type AiTextMessage, type ResponseInputMes
 
 import type { ToolResult } from "../engine/types";
 import { resolveToolDefinitions, toResponseFunctionTools } from "../engine/tools/registry";
+import { describeMemoryForPrompt, type CanvasProjectMemory } from "../engine/memory/project-memory";
 import type { SubAgentDef, SubAgentTask, SubAgentResult, ProductionPlan } from "./canvas-agent-orchestrator-types";
 import { hasCircularDependency, topSortStages, ORCHESTRATOR_CONSTANTS } from "./canvas-agent-orchestrator-types";
 import type { CanvasAgentOp, CanvasAgentSnapshot } from "./canvas-agent-ops";
@@ -19,6 +20,8 @@ export type ExecutorContext = {
     onToolCall: (name: string, args: Record<string, unknown>) => ToolResult;
     /** 读取当前画布快照（工具执行后就地取最新状态） */
     getSnapshot: () => CanvasAgentSnapshot;
+    /** 读取工程记忆：子 Agent 起步就知道本工程已确认的长期事实 */
+    getMemory: () => CanvasProjectMemory;
 };
 
 export type ExecutorProgress = {
@@ -69,8 +72,9 @@ export async function executeSubAgent(def: SubAgentDef, task: SubAgentTask, cont
 
     const run = async (): Promise<SubAgentResult> => {
         try {
-            // 开局就把画布现状交给子 Agent，避免它在不知道画布内容的情况下盲目建节点
-            let currentMessages = injectCanvasState(buildSubAgentMessages(def, task), context.getSnapshot());
+            // 开局就把工程记忆与画布现状交给子 Agent，避免它既不知道工程设定、也不知道画布内容就盲目建节点
+            let currentMessages = injectMemory(buildSubAgentMessages(def, task), context.getMemory());
+            currentMessages = injectCanvasState(currentMessages, context.getSnapshot());
             const tools = toResponseFunctionTools(resolveToolDefinitions(def.toolNames));
 
             let hasMore = true;
@@ -350,6 +354,17 @@ function executeToolSequence(toolCalls: ResponseToolCall[], context: ExecutorCon
         }
     }
     return results;
+}
+
+/** 把工程记忆注入子 Agent 上下文：跨阶段的角色锚点、风格锁、连续性都靠它传递 */
+function injectMemory(messages: ResponseInputMessage[], memory: CanvasProjectMemory): ResponseInputMessage[] {
+    const text = describeMemoryForPrompt(memory);
+    if (!text) return messages;
+    const systemMsg = messages.find((m): m is AiTextMessage => "role" in m && m.role === "system");
+    if (systemMsg && typeof systemMsg.content === "string") {
+        return messages.map((m) => (m === systemMsg ? { ...m, content: `${systemMsg.content}\n\n${text}` } : m));
+    }
+    return [{ role: "system" as const, content: text }, ...messages];
 }
 
 function injectCanvasState(messages: ResponseInputMessage[], snapshot: CanvasAgentSnapshot): ResponseInputMessage[] {

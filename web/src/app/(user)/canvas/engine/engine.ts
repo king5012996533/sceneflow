@@ -2,6 +2,7 @@ import type { AiConfig } from "@/stores/use-config-store";
 
 import { summarizeCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import { buildWorkflowPlan, compactSnapshot, describeCanvasSnapshot, explainNoop, onlineToolToOps, snapshotSignature, workflowPlanMessage } from "../utils/online-agent-tool-ops";
+import { describeMemoryForPrompt, summarizeMemory, type CanvasProjectMemory, type MemoryPatch } from "./memory/project-memory";
 import { getToolDefinition, toolLabel } from "./tools/registry";
 import type { CanvasEngineContext, ToolResult } from "./types";
 
@@ -26,6 +27,10 @@ export type ApplyOpsResult = {
 export type CanvasEngineHost = CanvasEngineContext & {
     /** 读取当前生成配置（比例、模型、时长等由工具参数推导 ops 时使用） */
     getConfig: () => AiConfig;
+    /** 读取本工程的长期记忆 */
+    getMemory: () => CanvasProjectMemory;
+    /** 增量写入工程记忆，返回写入后的记忆 */
+    applyMemory: (patch: MemoryPatch) => CanvasProjectMemory;
     /** 可选：当前运行 ID，用于事件流 */
     getRunId?: () => string;
 };
@@ -96,6 +101,18 @@ export function createCanvasEngine(host: CanvasEngineHost): CanvasEngine {
                 const plan = buildWorkflowPlan(args, snapshot);
                 const message = workflowPlanMessage(plan);
                 return { ok: true, message, observation: message, data: plan };
+            }
+
+            // ---- 记忆层：不改画布、不消耗额度，直接读写工程记忆 ----
+            if (name === "canvas_memory_read") {
+                const memory = host.getMemory();
+                const detail = describeMemoryForPrompt(memory, true);
+                return { ok: true, message: summarizeMemory(memory), observation: detail || "工程记忆为空。", data: { empty: !detail } };
+            }
+            if (name === "canvas_memory_write") {
+                const next = host.applyMemory(args as MemoryPatch);
+                const message = `已写入工程记忆：${summarizeMemory(next)}`;
+                return { ok: true, message, observation: `${message}\n${describeMemoryForPrompt(next, true)}` };
             }
 
             // ---- 写 / 生成类工具：工具名 → 画布操作 → 提交 ----

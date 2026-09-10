@@ -77,6 +77,16 @@ assertIncludes("src/app/(user)/canvas/components/canvas-orchestrator-panel.tsx",
 assertNotExists("src/app/(user)/canvas/utils/online-agent-tools.ts", "工具定义已迁到 engine/tools/schemas.ts，旧的 online-agent-tools.ts 不得回归。");
 assertNotExists("src/app/(user)/canvas/components/canvas-creative-agent-panel.tsx", "死面板已删除：canvas-creative-agent-panel 不得回归。");
 assertNotExists("src/app/(user)/agent-lab/page.tsx", "agent-lab 演示页已删除，不得回归。");
+
+// —— 工程记忆（记忆层）：跨会话事实必须落盘并注入，不得只活在对话里 ——
+assertIncludes("src/app/(user)/canvas/engine/memory/project-memory.ts", "mergeMemory", "工程记忆必须支持增量合并（按 kind+name 去重，不覆盖历史事实）。");
+assertIncludes("src/app/(user)/canvas/engine/memory/project-memory.ts", "normalizeMemory", "工程记忆必须做形状规整，脏数据不得污染提示词。");
+assertIncludes("src/app/(user)/canvas/stores/use-canvas-store.ts", "memory", "工程记忆必须挂在 CanvasProject 上，随工程落盘并同步到服务端。");
+assertIncludes("src/app/(user)/canvas/engine/tools/schemas.ts", "canvas_memory_write", "Agent 必须能把长期事实写入工程记忆。");
+assertIncludes("src/app/(user)/canvas/engine/tools/schemas.ts", "canvas_memory_read", "Agent 必须能读取工程记忆全文。");
+assertIncludes("src/app/(user)/canvas/engine/engine.ts", "getMemory", "引擎必须把记忆读写接进工具执行路径（不得回落到 ops 归约，否则无 ops 会被判为失败）。");
+assertIncludes("src/app/(user)/canvas/utils/online-agent-memory.ts", "describeMemoryForPrompt", "在线助手每轮必须注入工程记忆，否则记忆等于没写。");
+assertIncludes("src/app/(user)/canvas/utils/canvas-agent-executor.ts", "injectMemory", "子 Agent 必须注入工程记忆，否则跨阶段角色/风格一致性无从保证。");
 assertIncludes("src/app/(user)/canvas/utils/online-agent-tool-ops.ts", "workflowStageReferenceKeys", "workflow cards must keep stage dependency references.");
 assertIncludes("src/app/(user)/canvas/utils/online-agent-tool-ops.ts", "withNodeReferenceTokens", "workflow prompts must include @node references for upstream assets.");
 assertIncludes("src/app/(user)/canvas/utils/online-agent-memory.ts", "safeMessageText", "the online agent must stringify message content safely.");

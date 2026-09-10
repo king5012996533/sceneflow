@@ -27,6 +27,7 @@ import { type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-ag
 import { parseToolArguments } from "../utils/online-agent-tool-ops";
 import { useOnlineAgentRunner, type OnlineExecutedToolCall } from "../hooks/use-online-agent-runner";
 import { createCanvasEngine, type CanvasEngine } from "../engine/engine";
+import { isEmptyMemory, mergeMemory, normalizeMemory, summarizeMemory, type CanvasProjectMemory, type MemoryPatch } from "../engine/memory/project-memory";
 import { buildAssistantReferences, buildToolAgentMessages } from "../utils/online-agent-memory";
 
 export const CANVAS_AGENT_PANEL_MOTION_MS = 500;
@@ -42,6 +43,9 @@ type CanvasAssistantPanelProps = {
     onSelectNodeIds: (ids: Set<string>) => void;
     onSessionsChange: (sessions: CanvasAssistantSession[], activeSessionId: string | null) => void;
     onApplyOps: (ops?: CanvasAgentOp[]) => CanvasAgentSnapshot;
+    /** 工程记忆（记忆层）：跨会话的工程事实 */
+    memory: CanvasProjectMemory;
+    onMemoryChange: (memory: CanvasProjectMemory) => void;
     canUndoOps: boolean;
     onUndoOps: () => CanvasAgentSnapshot | null;
     onPasteImage: (file: File) => void;
@@ -61,6 +65,8 @@ export function CanvasAssistantPanel({
     onSelectNodeIds,
     onSessionsChange,
     onApplyOps,
+    memory,
+    onMemoryChange,
     canUndoOps,
     onUndoOps,
     onPasteImage,
@@ -222,8 +228,13 @@ export function CanvasAssistantPanel({
      * online 与 orchestrator 两种模式共用同一个实例，行为与回执语义完全一致。
      * 宿主能力全部通过 ref 读取最新值，因此引擎只需创建一次。
      */
-    const engineHostRef = useRef({ onApplyOps, addOnlineLog });
-    engineHostRef.current = { onApplyOps, addOnlineLog };
+    const engineHostRef = useRef({ onApplyOps, addOnlineLog, onMemoryChange });
+    engineHostRef.current = { onApplyOps, addOnlineLog, onMemoryChange };
+    // 记忆与快照同样用 ref 镜像：引擎只创建一次，但每次都读到最新值
+    const memoryRef = useRef<CanvasProjectMemory>(normalizeMemory(memory));
+    useEffect(() => {
+        memoryRef.current = normalizeMemory(memory);
+    }, [memory]);
     const engine = useMemo<CanvasEngine>(
         () =>
             createCanvasEngine({
@@ -237,6 +248,14 @@ export function CanvasAssistantPanel({
                     if (event.type === "error") engineHostRef.current.addOnlineLog("引擎错误", event.message);
                 },
                 getConfig: () => effectiveConfigRef.current,
+                getMemory: () => memoryRef.current,
+                applyMemory: (patch: MemoryPatch) => {
+                    const next = mergeMemory(memoryRef.current, patch);
+                    // 先更新本地镜像，保证同一轮里连续写入不会丢；再交给工程落盘
+                    memoryRef.current = next;
+                    engineHostRef.current.onMemoryChange(next);
+                    return next;
+                },
             }),
         [],
     );
@@ -256,7 +275,7 @@ export function CanvasAssistantPanel({
         appendMessage,
         upsertMessage,
         addOnlineLog,
-        buildMessages: buildToolAgentMessages,
+        buildMessages: (snapshot, history, userMessage) => buildToolAgentMessages(snapshot, history, userMessage, memoryRef.current),
         executeToolCall: executeOnlineToolCall,
     });
 
@@ -337,7 +356,7 @@ export function CanvasAssistantPanel({
             />
 
             {view === "setup" ? (
-                <OnlineAgentSetupView theme={theme} activeModel={activeModel} />
+                <OnlineAgentSetupView theme={theme} activeModel={activeModel} memory={memory} />
             ) : (
                 <div ref={view === "chat" ? chatScrollRef : undefined} className="thin-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
                     {view === "history" ? (
@@ -483,7 +502,7 @@ export function CanvasAssistantPanel({
                 {agentMode === "local" ? (
                     <CanvasLocalAgentPanel embedded snapshot={snapshot} canUndoOps={canUndoOps} onApplyOps={onApplyOps} onUndoOps={onUndoOps} autoConnect={autoConnectLocal} />
                 ) : agentMode === "orchestrator" ? (
-                    <CanvasOrchestratorPanel config={effectiveConfig} engine={engine} />
+                    <CanvasOrchestratorPanel config={effectiveConfig} engine={engine} getMemory={() => memoryRef.current} />
                 ) : agentMode === "automation" ? (
                     <CanvasAutomationAgentPanel snapshot={snapshot} config={effectiveConfig} onApplyOps={onApplyOps} />
                 ) : (
@@ -537,7 +556,9 @@ function AssistantHistory({ sessions, activeSession, onOpen, onDelete }: { sessi
     );
 }
 
-function OnlineAgentSetupView({ theme, activeModel }: { theme: (typeof canvasThemes)[keyof typeof canvasThemes]; activeModel: string }) {
+function OnlineAgentSetupView({ theme, activeModel, memory }: { theme: (typeof canvasThemes)[keyof typeof canvasThemes]; activeModel: string; memory: CanvasProjectMemory }) {
+    const normalized = normalizeMemory(memory);
+    const empty = isEmptyMemory(normalized);
     return (
         <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
             <div className="space-y-4">
@@ -556,6 +577,38 @@ function OnlineAgentSetupView({ theme, activeModel }: { theme: (typeof canvasThe
                             </div>
                         </div>
                     </div>
+                </div>
+                <div className="rounded-lg border p-3" style={{ borderColor: theme.node.stroke }}>
+                    <div className="text-sm font-medium leading-5">工程记忆</div>
+                    <div className="mt-1 text-xs leading-5" style={{ color: theme.node.muted }}>
+                        {empty ? "这个工程还没有沉淀记忆。Agent 在制作过程中会把角色锚点、风格锁、连续性和关键决策记下来，跨会话复用。" : summarizeMemory(normalized)}
+                    </div>
+                    {normalized.brief ? <div className="mt-2 text-xs leading-5">设定：{normalized.brief}</div> : null}
+                    {normalized.style ? (
+                        <div className="mt-1 text-xs leading-5" style={{ color: theme.node.muted }}>
+                            风格锁：{normalized.style.positive || "—"}
+                            {normalized.style.negative ? ` ／ 负向：${normalized.style.negative}` : ""}
+                        </div>
+                    ) : null}
+                    {normalized.assets.length ? (
+                        <div className="mt-2 space-y-1">
+                            {normalized.assets.map((asset) => (
+                                <div key={`${asset.kind}:${asset.name}`} className="text-xs leading-5">
+                                    <span className="rounded px-1 py-0.5 text-[10px]" style={{ background: theme.node.stroke, color: theme.node.muted }}>
+                                        {asset.kind}
+                                    </span>{" "}
+                                    <span className="font-medium">{asset.name}</span>
+                                    {asset.anchor ? <span style={{ color: theme.node.muted }}>：{asset.anchor}</span> : null}
+                                    {asset.nodeIds.length ? <span style={{ color: theme.node.muted }}>（{asset.nodeIds.length} 个节点）</span> : null}
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
+                    {normalized.continuity.length ? (
+                        <div className="mt-2 text-xs leading-5" style={{ color: theme.node.muted }}>
+                            连续性 {normalized.continuity.length} 条 · 决策 {normalized.decisions.length} 条
+                        </div>
+                    ) : null}
                 </div>
             </div>
         </div>

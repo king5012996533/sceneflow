@@ -15,6 +15,7 @@
         "build:webpack": "next build --webpack",
         "typecheck": "tsc --noEmit",
         "guard": "node scripts/regression-guards.mjs",
+        "test:memory": "node scripts/memory-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

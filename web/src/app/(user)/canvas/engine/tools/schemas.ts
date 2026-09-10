@@ -185,4 +185,36 @@ export const CANVAS_TOOL_SCHEMAS: ResponseFunctionTool[] = [
         ["nodeIds"],
     ),
     toolDefinition("canvas_continue_video", "提取指定视频节点尾帧，并创建已连接的下一镜头视频节点。需要用户确认后执行。", { nodeId: { type: "string" } }, ["nodeId"]),
+    toolDefinition("canvas_memory_read", "读取本工程的长期记忆（工程设定、风格锁、已建立的角色/场景资产及其锚点、连续性约束、既往决策）。开始新阶段、判断角色一致性或延续剧情前先读一次。", {}),
+    toolDefinition(
+        "canvas_memory_write",
+        "把本工程需要长期记住的事实写入工程记忆：工程设定、风格锁、角色/场景资产（含不可变锚点与对应节点 id）、连续性约束、关键决策。只写新增或变化的部分，同名同类型资产生成更新而不是重复。",
+        {
+            brief: { type: "string", description: "工程一句话设定" },
+            style: {
+                type: "object",
+                properties: { positive: { type: "string" }, negative: { type: "string" }, notes: { type: "string" } },
+                additionalProperties: false,
+            },
+            assets: {
+                type: "array",
+                minItems: 1,
+                items: {
+                    type: "object",
+                    properties: {
+                        kind: { type: "string", enum: ["character", "scene", "style", "prop", "keyframe", "video", "other"] },
+                        name: { type: "string", description: "资产名（角色名/场景名等）" },
+                        nodeIds: { type: "array", items: { type: "string" }, description: "该资产在画布上的节点 id" },
+                        anchor: { type: "string", description: "不可变锚点：脸型、发型、服装、空间布局、风格关键词" },
+                        notes: { type: "string" },
+                    },
+                    required: ["kind", "name"],
+                    additionalProperties: false,
+                },
+            },
+            continuity: { type: "array", items: { type: "string" }, description: "连续性约束，如「第 1 集结尾女主左肩受伤」" },
+            decisions: { type: "array", items: { type: "string" }, description: "关键决策，如「统一用 2K 竖屏、Seedance 2.5」" },
+        },
+        [],
+    ),
 ];

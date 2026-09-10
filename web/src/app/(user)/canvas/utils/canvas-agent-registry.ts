@@ -1,11 +1,18 @@
 import type { SubAgentDef } from "./canvas-agent-orchestrator-types";
 
-const ANALYST_TOOLS = [] as const;
-const TEXT_TOOLS = ["canvas_create_text_node", "canvas_create_text_nodes", "canvas_create_config_node"] as const;
-const IMAGE_TOOLS = ["canvas_create_text_node", "canvas_create_text_nodes", "canvas_create_config_node", "canvas_create_image_prompt_flow", "canvas_generate_image", "canvas_connect_nodes"] as const;
-const STORYBOARD_TOOLS = ["canvas_create_text_nodes", "canvas_connect_nodes", "canvas_create_config_node"] as const;
-const KEYFRAME_TOOLS = ["canvas_generate_image", "canvas_create_config_node", "canvas_connect_nodes", "canvas_create_text_node"] as const;
-const VIDEO_TOOLS = ["canvas_generate_video", "canvas_create_config_node", "canvas_connect_nodes", "canvas_continue_video", "canvas_create_text_node"] as const;
+/**
+ * 每个子 Agent 可见的工具组。
+ *
+ * 所有组都带记忆读写：工程记忆（角色锚点、风格锁、连续性、既往决策）是跨阶段共享的
+ * 唯一载体——上游阶段把结论写进去，下游阶段起步就能读到，不必靠把整段对话塞进上下文。
+ */
+const MEMORY_TOOLS = ["canvas_memory_read", "canvas_memory_write"] as const;
+const ANALYST_TOOLS = [...MEMORY_TOOLS] as const;
+const TEXT_TOOLS = ["canvas_create_text_node", "canvas_create_text_nodes", "canvas_create_config_node", ...MEMORY_TOOLS] as const;
+const IMAGE_TOOLS = ["canvas_create_text_node", "canvas_create_text_nodes", "canvas_create_config_node", "canvas_create_image_prompt_flow", "canvas_generate_image", "canvas_connect_nodes", ...MEMORY_TOOLS] as const;
+const STORYBOARD_TOOLS = ["canvas_create_text_nodes", "canvas_connect_nodes", "canvas_create_config_node", ...MEMORY_TOOLS] as const;
+const KEYFRAME_TOOLS = ["canvas_generate_image", "canvas_create_config_node", "canvas_connect_nodes", "canvas_create_text_node", ...MEMORY_TOOLS] as const;
+const VIDEO_TOOLS = ["canvas_generate_video", "canvas_create_config_node", "canvas_connect_nodes", "canvas_continue_video", "canvas_create_text_node", ...MEMORY_TOOLS] as const;
 
 export const SUB_AGENTS: SubAgentDef[] = [
     {

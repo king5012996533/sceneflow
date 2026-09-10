@@ -38,6 +38,10 @@ const TOOL_POLICIES: Record<string, ToolPolicy> = {
     // ---- 编排：只产出计划、不改画布，但仍跟随全局确认开关（历史上即如此）----
     canvas_plan_workflow: { risk: "orchestrate", label: "规划生产流程" },
 
+    // ---- 记忆：读不确认；写入只是记录工程事实，不消耗额度也不改画布，因此不打断用户 ----
+    canvas_memory_read: { risk: "read", label: "读取工程记忆" },
+    canvas_memory_write: { risk: "write", requiresConfirmation: false, label: "写入工程记忆" },
+
     // ---- 生成：一律确认（消耗额度）----
     canvas_generate_text: { risk: "generate", requiresConfirmation: true, label: "生成文本" },
     canvas_generate_image: { risk: "generate", requiresConfirmation: true, label: "生成图片" },
@@ -145,13 +149,14 @@ export function readOnlyResponseFunctionTools(): ResponseFunctionTool[] {
 
 /**
  * 是否需要用户确认。完整复刻原有语义：
- *   读 → 不确认；显式要求确认 → 确认；autoRun 能力且 autoRun=true → 确认；否则跟随全局开关。
+ *   读 → 不确认；显式声明 → 按声明；autoRun 能力且 autoRun=true → 确认；否则跟随全局开关。
  */
 export function toolNeedsConfirmation(name: string, args: Record<string, unknown>, confirmTools: boolean): boolean {
     const def = getToolDefinition(name);
     if (!def) return confirmTools;
     if (def.risk === "read") return false;
-    if (def.requiresConfirmation) return true;
+    // 显式声明优先：true = 强制确认，false = 明确不打断（如只记录工程事实的记忆写入）
+    if (typeof def.requiresConfirmation === "boolean") return def.requiresConfirmation;
     if (TOOL_POLICIES[name]?.autoRunCapable && args.autoRun === true) return true;
     return confirmTools;
 }

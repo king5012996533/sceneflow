@@ -18,6 +18,7 @@ import type { ProductionPlan } from "../utils/canvas-agent-orchestrator-types";
 import { ORCHESTRATOR_TOOL_DEFINITIONS } from "../utils/canvas-agent-registry";
 import { executeProductionPlan, type ExecutorContext, type ExecutorProgress } from "../utils/canvas-agent-executor";
 import type { CanvasEngine } from "../engine/engine";
+import type { CanvasProjectMemory } from "../engine/memory/project-memory";
 
 type OrchestratorMessage = {
     id: string;
@@ -32,9 +33,11 @@ type CanvasOrchestratorPanelProps = {
     config: AiConfig;
     /** 画布引擎：子 Agent 的读写与生成派发全部经它统一执行 */
     engine: CanvasEngine;
+    /** 工程记忆读取器：注入每个子 Agent 的上下文 */
+    getMemory: () => CanvasProjectMemory;
 };
 
-export function CanvasOrchestratorPanel({ config, engine }: CanvasOrchestratorPanelProps) {
+export function CanvasOrchestratorPanel({ config, engine, getMemory }: CanvasOrchestratorPanelProps) {
     const themeName = useThemeStore((state) => state.theme);
     const themeObj = canvasThemes[themeName];
     const user = useUserStore((state) => state.user);
@@ -105,6 +108,7 @@ export function CanvasOrchestratorPanel({ config, engine }: CanvasOrchestratorPa
                 onLog: (title, data) => addLog(title, data),
                 onToolCall: (name, args) => engine.executeTool(name, args),
                 getSnapshot: () => engine.getSnapshot(),
+                getMemory,
             };
 
             appendMessage({ id: nanoid(), role: "progress", text: `开始执行 ${productionPlan.stages.length} 个阶段...` });

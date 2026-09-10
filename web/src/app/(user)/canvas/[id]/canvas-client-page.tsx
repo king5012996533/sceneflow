@@ -43,6 +43,7 @@ import { CanvasUtilityModalsHost } from "../components/canvas-utility-modals-hos
 import { CanvasLocalAgentPanel } from "../components/canvas-local-agent-panel";
 import { useCanvasAgentStore } from "../stores/use-canvas-agent-store";
 import { useCanvasStore } from "../stores/use-canvas-store";
+import { normalizeMemory, type CanvasProjectMemory } from "../engine/memory/project-memory";
 import { applyCanvasAgentOps, type CanvasAgentOp, type CanvasAgentSnapshot } from "../utils/canvas-agent-ops";
 import { canvasGenerationErrorToast, formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
 import { buildCanvasResourceReferences, buildNodeMentionReferences } from "../utils/canvas-resource-references";
@@ -232,7 +233,13 @@ function InfiniteCanvasPage() {
     const nodesRef = useRef(nodes);
     const connectionsRef = useRef(connections);
 
-    const { selectionBox, selectionBoxRef, startSelectionBox, clearSelectionBox, handleGlobalPointerMove: handleSelectionPointerMove } = useCanvasPointerInteractions({
+    const {
+        selectionBox,
+        selectionBoxRef,
+        startSelectionBox,
+        clearSelectionBox,
+        handleGlobalPointerMove: handleSelectionPointerMove,
+    } = useCanvasPointerInteractions({
         screenToCanvas,
         nodesRef,
         selectedNodeIdsRef,
@@ -784,6 +791,14 @@ function InfiniteCanvasPage() {
     const agentSnapshot = useMemo<CanvasAgentSnapshot>(
         () => ({ projectId, title: currentProject?.title || "未命名画布", nodes, connections, selectedNodeIds: Array.from(selectedNodeIds), viewport }),
         [connections, currentProject?.title, nodes, projectId, selectedNodeIds, viewport],
+    );
+    // 工程记忆：随工程一起落盘 + 同步，Agent 的读写都落在这里
+    const projectMemory = useMemo(() => normalizeMemory(currentProject?.memory), [currentProject?.memory]);
+    const handleProjectMemoryChange = useCallback(
+        (next: CanvasProjectMemory) => {
+            updateProject(projectId, { memory: next });
+        },
+        [projectId, updateProject],
     );
     const applyAgentOps = useCallback(
         (ops?: CanvasAgentOp[]) => {
@@ -1896,6 +1911,8 @@ function InfiniteCanvasPage() {
                     onSelectNodeIds={setSelectedNodeIds}
                     onSessionsChange={handleAssistantSessionsChange}
                     onApplyOps={applyAgentOps}
+                    memory={projectMemory}
+                    onMemoryChange={handleProjectMemoryChange}
                     canUndoOps={Boolean(agentUndoSnapshot)}
                     onUndoOps={undoAgentOps}
                     onPasteImage={pasteAssistantImage}

@@ -3,6 +3,7 @@ import { imageToDataUrl } from "@/services/image-storage";
 import { CanvasNodeType, type CanvasAssistantMessage, type CanvasAssistantReference, type CanvasNodeData } from "../types";
 import { type CanvasAgentSnapshot } from "./canvas-agent-ops";
 import { CANVAS_AGENT_PROMPT } from "./agent-prompt";
+import { describeMemoryForPrompt, type CanvasProjectMemory } from "../engine/memory/project-memory";
 
 export function buildAssistantReferences(nodes: CanvasNodeData[], selectedNodeIds: Set<string>) {
     const nodeById = new Map(nodes.map((node) => [node.id, node]));
@@ -13,13 +14,16 @@ export function buildAssistantReferences(nodes: CanvasNodeData[], selectedNodeId
         .filter((item): item is CanvasAssistantReference => Boolean(item));
 }
 
-export async function buildToolAgentMessages(snapshot: CanvasAgentSnapshot, history: CanvasAssistantMessage[], userMessage: CanvasAssistantMessage): Promise<ResponseInputMessage[]> {
+export async function buildToolAgentMessages(snapshot: CanvasAgentSnapshot, history: CanvasAssistantMessage[], userMessage: CanvasAssistantMessage, memory?: CanvasProjectMemory): Promise<ResponseInputMessage[]> {
     const refs = userMessage.references || [];
     const canvasMemory = buildCanvasAgentMemory(snapshot, refs, history);
+    const projectMemory = memory ? describeMemoryForPrompt(memory) : "";
     const contextText = [
         `页面状态：当前在 SceneFlow 画布。节点 ${snapshot.nodes.length} 个，连线 ${snapshot.connections.length} 条，选中 ${snapshot.selectedNodeIds.length} 个节点。`,
+        projectMemory,
         canvasMemory,
         "你必须结合最近对话、当前选区、已有节点和工具执行结果理解用户需求；不要把当前消息当作孤立输入。",
+        projectMemory ? "工程记忆是本工程已确认的长期事实：角色/场景/风格要与它保持一致；出现了值得长期记住的新事实（新角色锚点、风格锁、连续性约束、关键决策）时，用 canvas_memory_write 记录下来。" : "",
         "如果只是聊天、咨询、写剧情或写提示词，请直接回答；只有需要操作画布时才调用工具。",
         "如果要操作已有节点、选中节点、参考图、连线关系、重跑、续写、图生视频或删除修改，先读取画布状态或选区，拿到真实节点 id 后再执行。",
         `用户需求：${safeMessageText(userMessage.text)}`,
