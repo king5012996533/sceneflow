@@ -61,7 +61,7 @@ assertIncludes("prisma/schema.prisma", "model GenerationJob", "generation lifecy
 // 浏览器带本站 Referer 直连一律 403（下载不到、<video> 也放不出来），服务端不带 Referer 请求同一地址才是 200。
 // 铁律：浏览器不得直连第三方素材地址，视频/音频的下载与播放都必须经同源素材代理。
 assertIncludes("src/services/asset-proxy.ts", "assetProxyUrl", "跨域素材必须统一走同源素材代理，不得在浏览器直连第三方 CDN。");
-assertIncludes("src/services/asset-proxy.ts", "export type AssetKind", "素材类型要能从调用方传到代理，体积档位不能只靠上游响应头判断。");
+assertIncludes("src/services/asset-proxy.ts", 'from "@/lib/asset-tier"', "素材类型要能从调用方传到代理，体积档位不能只靠上游响应头判断。");
 assertIncludes("src/services/asset-proxy.ts", "&kind=", "跨域素材地址必须带上类型提示，代理才能选对体积档位。");
 assertIncludes("src/services/api/video.ts", "fetchAssetBlob(mediaUrl, options?.signal, \"video\")", "视频结果必须经素材代理下载，不能在浏览器直连上游直链。");
 assertNotMatches("src/services/api/video.ts", /axios\.get<Blob>\(mediaUrl/, "禁止在浏览器直连上游视频直链（防盗链 CDN 会 403）。");
@@ -70,16 +70,17 @@ assertIncludes("src/services/file-storage.ts", "fetchAssetBlob(input", "参考�
 assertIncludes("src/app/(user)/canvas/components/canvas-node.tsx", 'assetProxyUrl(upgradeInsecureMediaUrl(node.metadata.content), "video")', "视频节点播放上游直链时必须经素材代理，否则防盗链下无法播放。");
 assertIncludes("src/app/(user)/canvas/components/canvas-node.tsx", 'assetProxyUrl(upgradeInsecureMediaUrl(node.metadata.content), "audio")', "音频节点播放上游直链时必须经素材代理，否则防盗链下无法播放。");
 assertIncludes("src/app/(user)/canvas/hooks/use-canvas-video-generation.ts", 'fetchAssetBlob(videoUrl, undefined, "video")', "尾帧提取取回远端视频必须走素材代理（主代理有渠道白名单，CDN 会被拒）。");
-assertIncludes("src/app/api/proxy/asset/route.ts", "MAX_MEDIA_ASSET_BYTES", "音视频素材需要独立的体积上限（图片 25MB，音视频与主代理对齐）。");
-assertIncludes("src/app/api/proxy/asset/route.ts", "pipeThrough", "超过缓冲阈值的素材必须流式透传，整段 Buffer 会把进程顶到 PM2 重启线。");
 // 2026-09-16 第二起线上事故：dola/zjcdn 的成品 mp4 响应头是 binary/octet-stream，只按 content-type 判档
-// 会把 43MB 的视频按图片档（25MB）拒掉 → 413。档位必须综合「调用方 kind + content-type + URL 线索」。
+// 会把 43MB 的视频按图片档（25MB）拒掉 → 413。档位与 MIME 判定收在 lib/asset-tier.ts（配单测 test:asset）。
+assertIncludes("src/lib/asset-tier.ts", "MEDIA_ASSET_LIMIT_BYTES", "音视频素材需要独立的体积上限（图片 25MB，音视频与主代理对齐）。");
+assertIncludes("src/lib/asset-tier.ts", "MEDIA_URL_HINT", "上游 MIME 不可信时要用 URL 线索兜底判断是不是音视频。");
+assertIncludes("src/lib/asset-tier.ts", "mediaContentType", "上游返回 binary/octet-stream 时要补回准确媒体类型，否则 blob 落库成 octet-stream，时长/尺寸元数据丢失。");
+assertNotMatches("src/lib/asset-tier.ts", /return \/\^\(video\|audio\)\/i\.test\(contentType\) \? MEDIA/, "体积档位不得只看上游 content-type（octet-stream 的视频会被误判成图片档）。");
 assertIncludes("src/app/api/proxy/asset/route.ts", 'searchParams.get("kind")', "素材代理必须接受调用方的类型提示。");
-assertIncludes("src/app/api/proxy/asset/route.ts", "MEDIA_URL_HINT", "上游 MIME 不可信时要用 URL 线索兜底判断是不是音视频。");
-assertIncludes("src/app/api/proxy/asset/route.ts", "mediaContentType(", "上游返回 binary/octet-stream 时要补回准确媒体类型，否则 blob 落库成 octet-stream，时长/尺寸元数据丢失。");
-assertNotMatches("src/app/api/proxy/asset/route.ts", /const limit = \/\^\(video\|audio\)/, "体积档位不得只看上游 content-type（octet-stream 的视频会被误判成图片档）。");
+assertIncludes("src/app/api/proxy/asset/route.ts", "assetLimitBytes(", "素材代理的体积上限必须走统一判定，不能就地写死。");
 assertIncludes("src/app/api/proxy/asset/route.ts", 'req.headers.get("range")', "素材代理要转发 Range，<video> 拖动进度不能每次拉整段。");
 assertIncludes("src/app/api/proxy/asset/route.ts", "Content-Range", "分段响应必须回传 Content-Range，否则浏览器会把它当成完整文件。");
+assertIncludes("src/app/api/proxy/asset/route.ts", "pipeThrough", "超过缓冲阈值的素材必须流式透传，整段 Buffer 会把进程顶到 PM2 重启线。");
 
 assertNoAppDirectGenerationApiImports();
 

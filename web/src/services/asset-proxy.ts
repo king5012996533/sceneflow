@@ -1,5 +1,6 @@
 "use client";
 
+import type { AssetKind } from "@/lib/asset-tier";
 import { dataUrlToBlob } from "@/lib/image-utils";
 
 /**
@@ -12,11 +13,12 @@ import { dataUrlToBlob } from "@/lib/image-utils";
 const ASSET_PROXY_PATH = "/canvas/api/proxy/asset";
 
 /**
- * 素材类型：代理端按它选择体积档位。
+ * 素材类型：代理端按它选择体积档位与补全 MIME。
  * 上游 CDN 经常不给对 MIME（字节系 dola/zjcdn 的成品 mp4 返回 binary/octet-stream），
  * 只靠响应头判档会把几十 MB 的视频按图片档（25MB）拒掉——2026-09-16 线上 413 就是这个原因。
+ * 判定规则与单测在 lib/asset-tier.ts。
  */
-export type AssetKind = "image" | "video" | "audio";
+export type { AssetKind };
 
 /** 跨域素材 URL → 同源代理地址；同源 / blob: / data: 原样返回（本来就不需要绕服务端） */
 export function assetProxyUrl(url: string, kind?: AssetKind): string {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { assetLimitBytes, mediaContentType, normalizeAssetKind } from "@/lib/asset-tier";
 import { requireCurrentUser } from "@/lib/current-user";
 import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
 
@@ -6,50 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ASSET_TIMEOUT_MS = 120_000;
-const MAX_ASSET_BYTES = 25 * 1024 * 1024;
-// 音视频成品普遍比图片大：上限与主代理的 blob 透传一致（200MB）。
-// 但超过缓冲阈值就改为流式透传——几十上百 MB 整段 Buffer 进内存会顶到 PM2 的 900M 重启线，
-// 进程一重启 nginx 对所有在途请求裸断 502（主代理早已因此改成流式）。
-const MAX_MEDIA_ASSET_BYTES = 200 * 1024 * 1024;
 const MEDIA_BUFFER_BYTES = 25 * 1024 * 1024;
-
-const ASSET_KINDS = new Set(["image", "video", "audio"]);
-// 上游 CDN 不一定给对 MIME：字节系 dola/zjcdn 的成品 mp4 返回 binary/octet-stream，
-// 只按 content-type 判档会把 43MB 的视频按图片档（25MB）拒掉（线上 413）。
-// 所以档位按「调用方声明的 kind → 上游 content-type → URL 线索」任一命中媒体即按媒体档。
-const MEDIA_URL_HINT = /[?&]mime_type=(?:video|audio)_|\.(?:mp4|m4v|mov|webm|mkv|mp3|m4a|wav|aac|flac|ogg|opus)(?:[?#]|$)/i;
-
-function isMediaAsset(kind: string | null, contentType: string, rawUrl: string) {
-    if (kind === "video" || kind === "audio") return true;
-    if (kind === "image") return false;
-    return /^(video|audio)\//i.test(contentType) || MEDIA_URL_HINT.test(rawUrl);
-}
-
-const MEDIA_TYPE_HINTS: Array<[RegExp, string]> = [
-    [/(?:[?&]mime_type=video_mp4|\.mp4)(?:[?#]|$)/i, "video/mp4"],
-    [/\.m4v(?:[?#]|$)/i, "video/x-m4v"],
-    [/\.mov(?:[?#]|$)/i, "video/quicktime"],
-    [/\.webm(?:[?#]|$)/i, "video/webm"],
-    [/\.mkv(?:[?#]|$)/i, "video/x-matroska"],
-    [/(?:[?&]mime_type=audio_mp3|\.mp3)(?:[?#]|$)/i, "audio/mpeg"],
-    [/\.m4a(?:[?#]|$)/i, "audio/mp4"],
-    [/\.wav(?:[?#]|$)/i, "audio/wav"],
-    [/\.aac(?:[?#]|$)/i, "audio/aac"],
-    [/\.flac(?:[?#]|$)/i, "audio/flac"],
-    [/(?:\.ogg|\.opus)(?:[?#]|$)/i, "audio/ogg"],
-];
-
-/**
- * 上游用通用二进制类型时补一个准确的媒体类型：<video>/<audio> 靠嗅探照样能播，
- * 但 blob.type 会作为文件 MIME 存下来——时长/尺寸元数据与下载扩展名都依赖它（octet-stream 会被当普通文件）。
- */
-function mediaContentType(kind: string | null, contentType: string, rawUrl: string) {
-    if (/^(video|audio)\//i.test(contentType)) return contentType;
-    for (const [pattern, type] of MEDIA_TYPE_HINTS) if (pattern.test(rawUrl)) return type;
-    if (kind === "video") return "video/mp4";
-    if (kind === "audio") return "audio/mpeg";
-    return contentType;
-}
 
 /**
  * 素材（图片/视频）下载代理：浏览器不再直连公网素材 URL，改由服务端下载后同源返回。
@@ -71,8 +29,7 @@ export async function GET(req: NextRequest) {
     const rawUrl = req.nextUrl.searchParams.get("url");
     if (!rawUrl) return NextResponse.json({ error: "缺少 url 参数" }, { status: 400 });
 
-    const kindParam = req.nextUrl.searchParams.get("kind");
-    const kind = kindParam && ASSET_KINDS.has(kindParam) ? kindParam : null;
+    const kind = normalizeAssetKind(req.nextUrl.searchParams.get("kind"));
 
     let target: URL;
     try {
@@ -91,12 +48,13 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: `素材下载失败（上游 ${response.status}）` }, { status: 502 });
         }
         const upstreamType = response.headers.get("content-type") || "application/octet-stream";
-        const contentType = mediaContentType(kind, upstreamType, rawUrl);
+        const descriptor = { kind, contentType: upstreamType, url: rawUrl };
+        const contentType = mediaContentType(descriptor);
         const contentRange = response.headers.get("content-range");
         const contentLength = Number(response.headers.get("content-length") || 0);
         // 206 的 content-length 只是这一段，体积档位要看 Content-Range 里的总长度
         const totalBytes = contentRange ? Number(contentRange.split("/")[1] || 0) : contentLength;
-        const limit = isMediaAsset(kind, upstreamType, rawUrl) ? MAX_MEDIA_ASSET_BYTES : MAX_ASSET_BYTES;
+        const limit = assetLimitBytes(descriptor);
         if (totalBytes > limit) {
             return NextResponse.json({ error: `素材体积超过代理限制（${Math.round(limit / 1024 / 1024)}MB）` }, { status: 413 });
         }
