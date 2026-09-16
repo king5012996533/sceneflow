@@ -7,6 +7,7 @@ import { ChevronRight, CircleAlert, Clapperboard, Image as ImageIcon, Layers, Mu
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
 import { upgradeInsecureMediaUrl } from "@/lib/media-url";
+import { assetProxyUrl } from "@/services/asset-proxy";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasNodeType, type CanvasNodeData, type Position } from "../types";
@@ -820,7 +821,9 @@ function VideoNodeContent({ node, theme }: NodeContentRendererProps) {
             </div>
         );
     }
-    return <video src={upgradeInsecureMediaUrl(node.metadata.content)} controls className="h-full w-full rounded-[2px] border bg-black object-contain" style={{ borderColor: `${theme.node.stroke}a6` }} data-canvas-no-zoom />;
+    // 没有本地 blob 时 content 是上游直链：必须经素材代理播放。
+    // 字节系 CDN 按 Referer 防盗链，浏览器带我们站点的 Referer 直连一律 403（线上事故 2026-09-16）
+    return <video src={assetProxyUrl(upgradeInsecureMediaUrl(node.metadata.content))} controls className="h-full w-full rounded-[2px] border bg-black object-contain" style={{ borderColor: `${theme.node.stroke}a6` }} data-canvas-no-zoom />;
 }
 
 function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
@@ -839,7 +842,7 @@ function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
                 <Music2 className="size-4 shrink-0" />
                 <span className="truncate">{node.title || "音频"}</span>
             </div>
-            <audio src={node.metadata.content} controls className="w-full" data-canvas-no-zoom />
+            <audio src={assetProxyUrl(upgradeInsecureMediaUrl(node.metadata.content))} controls className="w-full" data-canvas-no-zoom />
         </div>
     );
 }

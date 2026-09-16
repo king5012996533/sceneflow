@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { proxyFetch } from "./proxy-client";
+import { assetProxyUrl, fetchAssetBlob } from "@/services/asset-proxy";
 import { dataUrlToFile, getDataUrlByteSize } from "@/lib/image-utils";
 import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
@@ -1034,21 +1035,18 @@ async function resolveSeedanceAudioUrl(audio: ReferenceAudio) {
 
 async function videoResultFromUrl(url: string, options?: RequestOptions): Promise<VideoGenerationResult> {
     // 上游可能返回 http:// 直链（GenVideo/字节系 TOS）：https 页面下 mixed content 会被拦、
-    // CSP media-src 只放行 https；统一升级后再下载/落库，下载失败回退的直链也是 https
+    // CSP media-src 只放行 https；统一升级后再下载/落库，下载失败回退的地址同样已是 https
     const mediaUrl = upgradeInsecureMediaUrl(url);
     try {
-        const response = await axios.get<Blob>(mediaUrl, {
-            responseType: "blob",
-            signal: options?.signal,
-            // 下载视频 blob 限时 15s：墙内/无 CORS 时快速失败回退 URL 直链播放（video 标签不要求 CORS），
-            // 避免「生成已完成但下载挂起」导致前端一直转圈
-            timeout: 15_000,
-        });
-        await assertVideoBlob(response.data);
-        return { blob: response.data };
+        // 必须走服务端素材代理，不能在浏览器直连：字节系 CDN 按 Referer 防盗链，带我们站点的 Referer
+        // 一律 403（线上事故 2026-09-16：视频下载不到、节点回退成直链后 <video> 也放不出来）。
+        const blob = await fetchAssetBlob(mediaUrl, options?.signal);
+        await assertVideoBlob(blob);
+        return { blob };
     } catch (error) {
-        if (axios.isCancel(error) || options?.signal?.aborted) throw error;
-        return { url: mediaUrl, mimeType: "video/mp4" };
+        if (axios.isCancel(error) || options?.signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
+        // 兜底：下载不成时给同源代理地址播放（相对直链更可靠，也绕开防盗链）
+        return { url: assetProxyUrl(mediaUrl), mimeType: "video/mp4" };
     }
 }
 

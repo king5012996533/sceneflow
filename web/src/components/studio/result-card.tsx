@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { saveAs } from "file-saver";
 
 import type { StudioMessage, StudioResult } from "@/lib/studio/types";
+import { assetProxyUrl } from "@/services/asset-proxy";
 
 type ResultCardProps = {
     message: StudioMessage;
@@ -91,7 +92,7 @@ export function ResultCard({ message, onUseAsReference, onSaveToAssets, onRetry,
                 {videos.map((result, index) => (
                     <div key={result.id} className="video-result">
                         <div className="video-stage">
-                            <video src={result.url} controls preload="metadata" />
+                            <video src={assetProxyUrl(result.url)} controls preload="metadata" />
                         </div>
                         <div className="video-meta">
                             <strong>{message.prompt}</strong>

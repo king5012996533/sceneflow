@@ -56,6 +56,20 @@ assertIncludes("src/lib/generation/generation-jobs.server.ts", "pg_advisory_xact
 assertIncludes("src/lib/generation/generation-jobs.server.ts", "quotaRefunded", "failed generation jobs must refund reserved quota.");
 assertIncludes("src/app/api/proxy/route.ts", "requireCurrentUser", "the upstream proxy must reject anonymous callers.");
 assertIncludes("prisma/schema.prisma", "model GenerationJob", "generation lifecycle logs must remain persisted.");
+
+// —— 素材代理（2026-09-16 线上事故）：字节系 CDN（v3-dy-o.zjcdn.com / v16-dola.dola.com）按 Referer 防盗链，
+// 浏览器带本站 Referer 直连一律 403（下载不到、<video> 也放不出来），服务端不带 Referer 请求同一地址才是 200。
+// 铁律：浏览器不得直连第三方素材地址，视频/音频的下载与播放都必须经同源素材代理。
+assertIncludes("src/services/asset-proxy.ts", "assetProxyUrl", "跨域素材必须统一走同源素材代理，不得在浏览器直连第三方 CDN。");
+assertIncludes("src/services/asset-proxy.ts", "fetchAssetBlob", "素材取回必须收在共享实现里，避免各处自己写 fetch。");
+assertIncludes("src/services/api/video.ts", "fetchAssetBlob(mediaUrl", "视频结果必须经素材代理下载，不能在浏览器直连上游直链。");
+assertNotMatches("src/services/api/video.ts", /axios\.get<Blob>\(mediaUrl/, "禁止在浏览器直连上游视频直链（防盗链 CDN 会 403）。");
+assertIncludes("src/services/file-storage.ts", "fetchAssetBlob(input", "参考视频/音频的公网 URL 下载必须走素材代理。");
+assertIncludes("src/app/(user)/canvas/components/canvas-node.tsx", "assetProxyUrl(upgradeInsecureMediaUrl(node.metadata.content))", "视频/音频节点播放上游直链时必须经素材代理，否则防盗链下无法播放。");
+assertIncludes("src/app/(user)/canvas/hooks/use-canvas-video-generation.ts", "fetchAssetBlob(videoUrl)", "尾帧提取取回远端视频必须走素材代理（主代理有渠道白名单，CDN 会被拒）。");
+assertIncludes("src/app/api/proxy/asset/route.ts", "MAX_MEDIA_ASSET_BYTES", "音视频素材需要独立的体积上限（图片 25MB，音视频与主代理对齐）。");
+assertIncludes("src/app/api/proxy/asset/route.ts", "pipeThrough", "超过缓冲阈值的素材必须流式透传，整段 Buffer 会把进程顶到 PM2 重启线。");
+
 assertNoAppDirectGenerationApiImports();
 
 assertIncludes("src/app/(user)/canvas/utils/canvas-agent-ops.ts", 'type: "run_pipeline"', "the canvas agent must keep an executable pipeline operation.");

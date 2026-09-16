@@ -2,10 +2,13 @@
 
 import { nanoid } from "nanoid";
 
-import { dataUrlToBlob } from "@/lib/image-utils";
 import { createScopedLocalForageStore, scopedStorageKey } from "@/lib/user-data-scope";
+import { fetchAssetBlob } from "./asset-proxy";
 
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
+
+/** 服务端素材代理的下载超时；与其 ASSET_TIMEOUT_MS 对齐，见 services/asset-proxy 的说明 */
+const ASSET_FETCH_TIMEOUT_MS = 120_000;
 
 const objectUrls = new Map<string, string>();
 const getStore = () => createScopedLocalForageStore("media_files");
@@ -33,21 +36,18 @@ function removeStorageUsage(bytes: number) {
 
 export async function uploadMediaFile(input: string | Blob, prefix = "file"): Promise<UploadedFile> {
     // dataURL 纯解码（atob），避免 CSP connect-src 无 data: 拦截 fetch(dataUrl)；
-    // 视频/音频公网 URL 下载加 15s 超时，失败快速抛错而非一直挂起
+    // 公网 URL 一律走服务端素材代理（同源）：既不受 CDN 的 Referer 防盗链影响，也没有 CORS 限制。
+    // 客户端超时与服务端素材下载超时对齐（120s），避免服务端还在下、客户端先放弃导致误报失败。
     let blob: Blob;
     if (typeof input === "string") {
-        if (/^data:/i.test(input)) {
-            blob = dataUrlToBlob(input);
-        } else {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 15_000);
-            try {
-                blob = await (await fetch(input, { signal: controller.signal })).blob();
-            } catch (error) {
-                throw new Error(`素材下载失败：${(error as Error).message}`);
-            } finally {
-                clearTimeout(timeout);
-            }
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), ASSET_FETCH_TIMEOUT_MS);
+        try {
+            blob = await fetchAssetBlob(input, controller.signal);
+        } catch (error) {
+            throw new Error(`素材下载失败：${(error as Error).message}`);
+        } finally {
+            clearTimeout(timeout);
         }
     } else {
         blob = input;

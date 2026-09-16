@@ -8,6 +8,7 @@ import { FileText, Image as ImageIcon, Music2, Video } from "lucide-react";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { isImeComposing, isPlainEnterKey } from "@/lib/keyboard-event";
 import { upgradeInsecureMediaUrl } from "@/lib/media-url";
+import { assetProxyUrl } from "@/services/asset-proxy";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { CanvasResourceReference } from "../utils/canvas-resource-references";
 
@@ -335,7 +336,7 @@ function MentionMenu({
 
 function ReferencePreview({ reference }: { reference: CanvasResourceReference }) {
     if (reference.kind === "image" && reference.previewUrl) return <img src={reference.previewUrl} alt="" className="size-9 rounded-md object-cover" />;
-    if (reference.kind === "video" && reference.previewUrl) return <video src={upgradeInsecureMediaUrl(reference.previewUrl)} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
+    if (reference.kind === "video" && reference.previewUrl) return <video src={assetProxyUrl(upgradeInsecureMediaUrl(reference.previewUrl))} className="size-9 rounded-md bg-black object-cover" muted preload="metadata" />;
     const Icon = reference.kind === "audio" ? Music2 : reference.kind === "video" ? Video : reference.kind === "image" ? ImageIcon : FileText;
     return (
         <span className="grid size-9 shrink-0 place-items-center rounded-md bg-black/10">

@@ -5,22 +5,13 @@ import { nanoid } from "nanoid";
 import { requestGeneratedVideo, persistGeneratedVideo } from "@/lib/generation/generation-request";
 import { uploadImage } from "@/services/image-storage";
 import { resolveMediaUrl } from "@/services/file-storage";
-import { proxyFetch } from "@/services/api/proxy-client";
+import { fetchAssetBlob } from "@/services/asset-proxy";
 import type { AiConfig } from "@/stores/use-config-store";
 import { NODE_DEFAULT_SIZE } from "../constants";
 import { CanvasNodeType } from "../types";
 import type { CanvasNodeData, CanvasConnection, CanvasNodeMetadata } from "../types";
 import type { NodeGenerationContext } from "../components/canvas-node-generation";
-import {
-    NODE_STATUS_IDLE,
-    NODE_STATUS_LOADING,
-    NODE_STATUS_SUCCESS,
-    VIDEO_NODE_MAX_WIDTH,
-    VIDEO_NODE_MAX_HEIGHT,
-    videoMetadata,
-    imageMetadata,
-    extractVideoFrame,
-} from "../utils/canvas-utils";
+import { NODE_STATUS_IDLE, NODE_STATUS_LOADING, NODE_STATUS_SUCCESS, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT, videoMetadata, imageMetadata, extractVideoFrame } from "../utils/canvas-utils";
 import { fitNodeSize, nodeSizeFromRatio } from "../utils/canvas-node-size";
 
 type UseCanvasVideoGenerationOptions = {
@@ -36,7 +27,12 @@ type UseCanvasVideoGenerationOptions = {
     setSelectedNodeIds: React.Dispatch<React.SetStateAction<Set<string>>>;
     setSelectedConnectionId: React.Dispatch<React.SetStateAction<string | null>>;
     setDialogNodeId: React.Dispatch<React.SetStateAction<string | null>>;
-    message: { loading: (config: { key: string; content: string; duration: number }) => void; success: (config: { key: string; content: string } | string) => void; error: (config: { key: string; content: string } | string) => void; warning: (msg: string) => void };
+    message: {
+        loading: (config: { key: string; content: string; duration: number }) => void;
+        success: (config: { key: string; content: string } | string) => void;
+        error: (config: { key: string; content: string } | string) => void;
+        warning: (msg: string) => void;
+    };
 };
 
 type GenerateVideoParams = {
@@ -49,21 +45,7 @@ type GenerateVideoParams = {
 };
 
 export function useCanvasVideoGeneration(options: UseCanvasVideoGenerationOptions) {
-    const {
-        nodesRef,
-        connectionsRef,
-        effectiveConfig,
-        continuationPrompt,
-        referenceUrls,
-        startGenerationRequest,
-        finishGenerationRequest,
-        setNodes,
-        setConnections,
-        setSelectedNodeIds,
-        setSelectedConnectionId,
-        setDialogNodeId,
-        message,
-    } = options;
+    const { nodesRef, connectionsRef, effectiveConfig, continuationPrompt, referenceUrls, startGenerationRequest, finishGenerationRequest, setNodes, setConnections, setSelectedNodeIds, setSelectedConnectionId, setDialogNodeId, message } = options;
 
     const generateVideo = useCallback(
         async ({ nodeId, sourceNode, generationConfig, generationContext, effectivePrompt, runController }: GenerateVideoParams) => {
@@ -78,13 +60,34 @@ export function useCanvasVideoGeneration(options: UseCanvasVideoGenerationOption
                 position: isEmptyVideoNode ? sourceNode.position : { x: parent.x + (sourceNode?.width || spec.width) + 96, y: parent.y },
                 width: isEmptyVideoNode ? sourceNode.width : spec.width,
                 height: isEmptyVideoNode ? sourceNode.height : spec.height,
-                metadata: { prompt: effectivePrompt, status: NODE_STATUS_LOADING, model: generationConfig.model, size: generationConfig.size, seconds: generationConfig.videoSeconds, vquality: generationConfig.vquality, generateAudio: generationConfig.videoGenerateAudio, watermark: generationConfig.videoWatermark, references: referenceUrls(generationContext) },
+                metadata: {
+                    prompt: effectivePrompt,
+                    status: NODE_STATUS_LOADING,
+                    model: generationConfig.model,
+                    size: generationConfig.size,
+                    seconds: generationConfig.videoSeconds,
+                    vquality: generationConfig.vquality,
+                    generateAudio: generationConfig.videoGenerateAudio,
+                    watermark: generationConfig.videoWatermark,
+                    references: referenceUrls(generationContext),
+                },
             };
-            setNodes((prev) => (isEmptyVideoNode ? prev.map((node) => (node.id === nodeId ? { ...node, ...videoNode } : node)) : [...prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node)), videoNode]));
+            setNodes((prev) =>
+                isEmptyVideoNode ? prev.map((node) => (node.id === nodeId ? { ...node, ...videoNode } : node)) : [...prev.map((node) => (node.id === nodeId ? { ...node, metadata: { ...node.metadata, status: NODE_STATUS_SUCCESS } } : node)), videoNode],
+            );
             if (!isEmptyVideoNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: videoId }]);
             const controller = await startGenerationRequest(videoId, nodeId, nodeId, runController);
             try {
-                const video = await persistGeneratedVideo(await requestGeneratedVideo({ config: generationConfig, prompt: effectivePrompt, references: generationContext.referenceImages, videoReferences: generationContext.referenceVideos, audioReferences: generationContext.referenceAudios, options: { signal: controller.signal } }));
+                const video = await persistGeneratedVideo(
+                    await requestGeneratedVideo({
+                        config: generationConfig,
+                        prompt: effectivePrompt,
+                        references: generationContext.referenceImages,
+                        videoReferences: generationContext.referenceVideos,
+                        audioReferences: generationContext.referenceAudios,
+                        options: { signal: controller.signal },
+                    }),
+                );
                 const videoSize = fitNodeSize(video.width || spec.width, video.height || spec.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
                 setNodes((prev) =>
                     prev.map((node) =>
@@ -94,7 +97,18 @@ export function useCanvasVideoGeneration(options: UseCanvasVideoGenerationOption
                                   width: videoSize.width,
                                   height: videoSize.height,
                                   position: { x: node.position.x + node.width / 2 - videoSize.width / 2, y: node.position.y + node.height / 2 - videoSize.height / 2 },
-                                  metadata: { ...node.metadata, ...videoMetadata(video), prompt: effectivePrompt, model: generationConfig.model, size: generationConfig.size, seconds: generationConfig.videoSeconds, vquality: generationConfig.vquality, generateAudio: generationConfig.videoGenerateAudio, watermark: generationConfig.videoWatermark, references: referenceUrls(generationContext) },
+                                  metadata: {
+                                      ...node.metadata,
+                                      ...videoMetadata(video),
+                                      prompt: effectivePrompt,
+                                      model: generationConfig.model,
+                                      size: generationConfig.size,
+                                      seconds: generationConfig.videoSeconds,
+                                      vquality: generationConfig.vquality,
+                                      generateAudio: generationConfig.videoGenerateAudio,
+                                      watermark: generationConfig.videoWatermark,
+                                      references: referenceUrls(generationContext),
+                                  },
                               }
                             : node,
                     ),
@@ -125,8 +139,11 @@ export function useCanvasVideoGeneration(options: UseCanvasVideoGenerationOption
             try {
                 let videoUrl = await resolveMediaUrl(node.metadata.storageKey, node.metadata.content);
                 let proxyBlobUrl: string | undefined;
-                if (!node.metadata.storageKey && videoUrl && !videoUrl.startsWith("blob:")) {
-                    const blob = await proxyFetch<Blob>({ url: videoUrl, method: "GET", responseType: "blob" });
+                // 没有本地 blob 时 content 是上游直链（可能是按 Referer 防盗链的字节系 CDN）。
+                // 必须走素材代理取回：主代理只放行已注册渠道，CDN 域名会被白名单拒掉；
+                // 已经是同源地址（含素材代理地址）则直接使用，不必再绕一圈。
+                if (!node.metadata.storageKey && videoUrl && !videoUrl.startsWith("blob:") && !videoUrl.startsWith("/") && !videoUrl.startsWith(window.location.origin)) {
+                    const blob = await fetchAssetBlob(videoUrl);
                     proxyBlobUrl = URL.createObjectURL(blob);
                     videoUrl = proxyBlobUrl;
                 }
