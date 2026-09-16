@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { MEDIA_STORE_DIR, MEDIA_FILE_ID_PATTERN, MEDIA_CONTENT_TYPES } from "@/lib/media-store.server";
+import { MEDIA_STORE_DIR, MEDIA_FILE_ID_PATTERN, MEDIA_CONTENT_TYPES, MEDIA_FILE_TTL_DAYS } from "@/lib/media-store.server";
 
 // 公开读取：上游视频服务（如 GenVideo）会在任务创建后自行拉取该 URL，不带任何 Cookie。
 // 文件名是 32 位随机十六进制 + 白名单扩展名，已严格校验，无法枚举或路径穿越；
-// 中转素材 48 小时后由上传路由惰性清理。
+// 中转素材 7 天后由上传路由惰性清理。
 export async function GET(_req: NextRequest, context: { params: Promise<{ id: string }> }) {
     const { id } = await context.params;
     if (!MEDIA_FILE_ID_PATTERN.test(id)) return NextResponse.json({ error: "素材不存在" }, { status: 404 });
@@ -23,6 +23,6 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
             },
         });
     } catch {
-        return NextResponse.json({ error: "素材不存在或已过期（中转素材 48 小时后自动清理）" }, { status: 404 });
+        return NextResponse.json({ error: `素材不存在或已过期（中转素材 ${MEDIA_FILE_TTL_DAYS} 天后自动清理）` }, { status: 404 });
     }
 }

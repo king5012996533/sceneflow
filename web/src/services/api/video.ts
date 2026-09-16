@@ -435,15 +435,17 @@ function genvideoApiUrl(config: AiConfig, path: string) {
 
 /** GenVideo 只接受公网 http/https 图片 URL（实测 data:/blob: 会被上游「素材 URL 不合法」拒绝）。
  *  本地图片先经平台中转上传（/api/media/upload → 服务器磁盘 → 公网 /api/media/{id}），换公网链接后再提交；
- *  同一次会话内相同图片复用已上传的链接，避免重试时重复上传。 */
-const genvideoUploadCache = new Map<string, string>();
+ *  同一次会话内相同图片复用已上传的链接，避免重试时重复上传。
+ *  缓存带过期时间：中转链接一旦失效（被清理），长期存活的标签页不该一直复用死链接。 */
+const GENVIDEO_UPLOAD_CACHE_TTL_MS = 30 * 60 * 1000;
+const genvideoUploadCache = new Map<string, { url: string; at: number }>();
 
 async function uploadGenvideoReferenceImage(image: ReferenceImage): Promise<string> {
     if (image.url && isPublicMediaUrl(image.url)) return image.url;
     const dataUrl = await imageToDataUrl(image);
     if (!dataUrl) throw new Error("参考图读取失败，请换一张图片或重新上传");
     const cached = genvideoUploadCache.get(dataUrl);
-    if (cached) return cached;
+    if (cached && Date.now() - cached.at < GENVIDEO_UPLOAD_CACHE_TTL_MS) return cached.url;
     const response = await fetch(apiPath("/api/media/upload"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -452,7 +454,7 @@ async function uploadGenvideoReferenceImage(image: ReferenceImage): Promise<stri
     });
     const data = (await response.json().catch(() => null)) as { url?: string; error?: string } | null;
     if (!response.ok || !data?.url) throw new Error(data?.error || `参考图中转上传失败（${response.status}）`);
-    genvideoUploadCache.set(dataUrl, data.url);
+    genvideoUploadCache.set(dataUrl, { url: data.url, at: Date.now() });
     return data.url;
 }
 
