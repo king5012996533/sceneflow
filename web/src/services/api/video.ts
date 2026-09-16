@@ -1040,13 +1040,13 @@ async function videoResultFromUrl(url: string, options?: RequestOptions): Promis
     try {
         // 必须走服务端素材代理，不能在浏览器直连：字节系 CDN 按 Referer 防盗链，带我们站点的 Referer
         // 一律 403（线上事故 2026-09-16：视频下载不到、节点回退成直链后 <video> 也放不出来）。
-        const blob = await fetchAssetBlob(mediaUrl, options?.signal);
+        const blob = await fetchAssetBlob(mediaUrl, options?.signal, "video");
         await assertVideoBlob(blob);
         return { blob };
     } catch (error) {
         if (axios.isCancel(error) || options?.signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
         // 兜底：下载不成时给同源代理地址播放（相对直链更可靠，也绕开防盗链）
-        return { url: assetProxyUrl(mediaUrl), mimeType: "video/mp4" };
+        return { url: assetProxyUrl(mediaUrl, "video"), mimeType: "video/mp4" };
     }
 }
 

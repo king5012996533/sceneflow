@@ -92,7 +92,7 @@ export function ResultCard({ message, onUseAsReference, onSaveToAssets, onRetry,
                 {videos.map((result, index) => (
                     <div key={result.id} className="video-result">
                         <div className="video-stage">
-                            <video src={assetProxyUrl(result.url)} controls preload="metadata" />
+                            <video src={assetProxyUrl(result.url, "video")} controls preload="metadata" />
                         </div>
                         <div className="video-meta">
                             <strong>{message.prompt}</strong>

@@ -3,7 +3,7 @@
 import { nanoid } from "nanoid";
 
 import { createScopedLocalForageStore, scopedStorageKey } from "@/lib/user-data-scope";
-import { fetchAssetBlob } from "./asset-proxy";
+import { fetchAssetBlob, type AssetKind } from "./asset-proxy";
 
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
 
@@ -34,6 +34,13 @@ function removeStorageUsage(bytes: number) {
     } catch {}
 }
 
+function assetKindFromPrefix(prefix: string): AssetKind | undefined {
+    if (prefix.startsWith("video")) return "video";
+    if (prefix.startsWith("audio")) return "audio";
+    if (prefix.startsWith("image")) return "image";
+    return undefined;
+}
+
 export async function uploadMediaFile(input: string | Blob, prefix = "file"): Promise<UploadedFile> {
     // dataURL 纯解码（atob），避免 CSP connect-src 无 data: 拦截 fetch(dataUrl)；
     // 公网 URL 一律走服务端素材代理（同源）：既不受 CDN 的 Referer 防盗链影响，也没有 CORS 限制。
@@ -43,7 +50,9 @@ export async function uploadMediaFile(input: string | Blob, prefix = "file"): Pr
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), ASSET_FETCH_TIMEOUT_MS);
         try {
-            blob = await fetchAssetBlob(input, controller.signal);
+            // 前缀本身带类型（video / audio / video-reference…）：告诉代理按媒体档判体积，
+            // 否则上游把 mp4 标成 binary/octet-stream 时会被按图片档拒掉（线上 413）
+            blob = await fetchAssetBlob(input, controller.signal, assetKindFromPrefix(prefix));
         } catch (error) {
             throw new Error(`素材下载失败：${(error as Error).message}`);
         } finally {

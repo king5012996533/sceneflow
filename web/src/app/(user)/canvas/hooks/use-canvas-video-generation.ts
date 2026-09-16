@@ -143,7 +143,7 @@ export function useCanvasVideoGeneration(options: UseCanvasVideoGenerationOption
                 // 必须走素材代理取回：主代理只放行已注册渠道，CDN 域名会被白名单拒掉；
                 // 已经是同源地址（含素材代理地址）则直接使用，不必再绕一圈。
                 if (!node.metadata.storageKey && videoUrl && !videoUrl.startsWith("blob:") && !videoUrl.startsWith("/") && !videoUrl.startsWith(window.location.origin)) {
-                    const blob = await fetchAssetBlob(videoUrl);
+                    const blob = await fetchAssetBlob(videoUrl, undefined, "video");
                     proxyBlobUrl = URL.createObjectURL(blob);
                     videoUrl = proxyBlobUrl;
                 }

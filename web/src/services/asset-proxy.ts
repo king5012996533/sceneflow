@@ -11,18 +11,25 @@ import { dataUrlToBlob } from "@/lib/image-utils";
  */
 const ASSET_PROXY_PATH = "/canvas/api/proxy/asset";
 
+/**
+ * 素材类型：代理端按它选择体积档位。
+ * 上游 CDN 经常不给对 MIME（字节系 dola/zjcdn 的成品 mp4 返回 binary/octet-stream），
+ * 只靠响应头判档会把几十 MB 的视频按图片档（25MB）拒掉——2026-09-16 线上 413 就是这个原因。
+ */
+export type AssetKind = "image" | "video" | "audio";
+
 /** 跨域素材 URL → 同源代理地址；同源 / blob: / data: 原样返回（本来就不需要绕服务端） */
-export function assetProxyUrl(url: string): string {
+export function assetProxyUrl(url: string, kind?: AssetKind): string {
     if (!url || url.startsWith("/") || url.startsWith("blob:") || url.startsWith("data:")) return url;
     if (typeof window !== "undefined" && url.startsWith(window.location.origin)) return url;
-    return `${ASSET_PROXY_PATH}?url=${encodeURIComponent(url)}`;
+    return `${ASSET_PROXY_PATH}?url=${encodeURIComponent(url)}${kind ? `&kind=${kind}` : ""}`;
 }
 
 // 获取素材 Blob：dataURL 纯解码（atob，不 fetch，避免 CSP connect-src 无 data: 拦截）；
 // http(s) URL 走服务端下载代理，规避 CDN 防盗链 / 无 CORS 头 / 墙内直连境外 CDN 导致的 Failed to fetch
-export async function fetchAssetBlob(input: string, signal?: AbortSignal): Promise<Blob> {
+export async function fetchAssetBlob(input: string, signal?: AbortSignal, kind?: AssetKind): Promise<Blob> {
     if (/^data:/i.test(input)) return dataUrlToBlob(input);
-    const response = await fetch(assetProxyUrl(input), { credentials: "include", signal });
+    const response = await fetch(assetProxyUrl(input, kind), { credentials: "include", signal });
     if (!response.ok) {
         const payload = await response.json().catch(() => null);
         throw new Error(typeof payload?.error === "string" ? payload.error : "素材下载失败");

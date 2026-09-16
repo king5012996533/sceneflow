@@ -49,7 +49,7 @@ export function resetStorageUsage() {
 }
 
 export async function uploadImage(input: string | Blob): Promise<UploadedImage> {
-    const blob = typeof input === "string" ? await fetchAssetBlob(input) : input;
+    const blob = typeof input === "string" ? await fetchAssetBlob(input, undefined, "image") : input;
     const storageKey = `image:${nanoid()}`;
     await getStore().setItem(storageKey, blob);
     addStorageUsage(blob.size);

@@ -823,7 +823,7 @@ function VideoNodeContent({ node, theme }: NodeContentRendererProps) {
     }
     // 没有本地 blob 时 content 是上游直链：必须经素材代理播放。
     // 字节系 CDN 按 Referer 防盗链，浏览器带我们站点的 Referer 直连一律 403（线上事故 2026-09-16）
-    return <video src={assetProxyUrl(upgradeInsecureMediaUrl(node.metadata.content))} controls className="h-full w-full rounded-[2px] border bg-black object-contain" style={{ borderColor: `${theme.node.stroke}a6` }} data-canvas-no-zoom />;
+    return <video src={assetProxyUrl(upgradeInsecureMediaUrl(node.metadata.content), "video")} controls className="h-full w-full rounded-[2px] border bg-black object-contain" style={{ borderColor: `${theme.node.stroke}a6` }} data-canvas-no-zoom />;
 }
 
 function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
@@ -842,7 +842,7 @@ function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
                 <Music2 className="size-4 shrink-0" />
                 <span className="truncate">{node.title || "音频"}</span>
             </div>
-            <audio src={assetProxyUrl(upgradeInsecureMediaUrl(node.metadata.content))} controls className="w-full" data-canvas-no-zoom />
+            <audio src={assetProxyUrl(upgradeInsecureMediaUrl(node.metadata.content), "audio")} controls className="w-full" data-canvas-no-zoom />
         </div>
     );
 }
