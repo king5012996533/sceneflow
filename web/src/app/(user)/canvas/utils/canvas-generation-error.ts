@@ -107,7 +107,7 @@ export function summarizeCanvasGenerationError(message?: string | null): CanvasG
     if (isReferenceMaterialError(text)) {
         return {
             title: "该模型不支持参考视频/音频",
-            hint: "当前视频渠道只接受提示词和参考图。请移除节点上的参考视频/参考音频后重试，或改用支持参考视频/音频的模型（Seedance、MiniMax H3、Aigccc）。",
+            hint: "当前视频模型只接受提示词和参考图。请移除节点上的参考视频/参考音频后重试；若必须用参考视频，需换成支持参考素材的视频模型。",
             requestId,
         };
     }
