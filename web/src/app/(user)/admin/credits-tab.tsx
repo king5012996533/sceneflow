@@ -148,7 +148,7 @@ export default function CreditsTab() {
             title: "备注",
             dataIndex: "note",
             ellipsis: true,
-            render: (value: string | null) => (value ? <span className="text-[#67726b]">{value}</span> : "—"),
+            render: (value: string | null) => (value ? <span className="text-[#726d67]">{value}</span> : "—"),
         },
     ];
 
@@ -156,13 +156,13 @@ export default function CreditsTab() {
         <div className="space-y-4">
             <CreditPackagesAdmin />
 
-            <section className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+            <section className="rounded-2xl border border-[#e2dfdc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                 <div className="mb-4 flex flex-wrap items-center gap-3">
                     <div className="sf-serif flex items-center gap-2 text-[17px] font-semibold">
                         <Wallet className="size-4 text-[#a0713f]" />
                         手动充 / 扣
                     </div>
-                    <span className="text-xs text-[#67726b]">所有调整写入 adjust 流水，可在下方审计</span>
+                    <span className="text-xs text-[#726d67]">所有调整写入 adjust 流水，可在下方审计</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                     <Select
@@ -185,15 +185,15 @@ export default function CreditsTab() {
                 </div>
             </section>
 
-            <section className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+            <section className="rounded-2xl border border-[#e2dfdc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div className="sf-serif flex items-center gap-2 text-[17px] font-semibold">
                         <Coins className="size-4 text-[#a0713f]" />
                         积分流水
                     </div>
                     <div className="flex items-center gap-3 text-sm">
-                        <span className="text-[#67726b]">
-                            全体用户余额合计：<span className="font-semibold text-[#2a3330]">{totalBalance.toLocaleString("zh-CN")} 积分</span>
+                        <span className="text-[#726d67]">
+                            全体用户余额合计：<span className="font-semibold text-[#332f2a]">{totalBalance.toLocaleString("zh-CN")} 积分</span>
                         </span>
                         <Select value={typeFilter} onChange={setTypeFilter} placeholder="全部类型" allowClear options={Object.entries(TYPE_META).map(([value, meta]) => ({ label: meta.label, value }))} className="w-32" />
                     </div>

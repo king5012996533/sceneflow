@@ -34,15 +34,15 @@ export function ShotPackPanel({ node, imageNodes, busy, onClose, onAddShot, onSp
     const sourceOptions = availableImages.map((item) => ({ label: item.title || item.id, value: item.id }));
 
     return (
-        <div className="thin-scrollbar max-h-[620px] overflow-y-auto rounded-2xl border border-[#ded8cd] bg-[#f7f9f5] p-4 text-[#111827] shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="thin-scrollbar max-h-[620px] overflow-y-auto rounded-2xl border border-[#ded8cd] bg-[#f9f7f5] p-4 text-[#1b1814] shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3 border-b border-[#e8dfd1] pb-3">
                 <div>
-                    <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#4f46e5]">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#a0713f]">
                         <Images className="size-3.5" />
                         镜头包
                     </div>
                     <h3 className="mt-2 text-lg font-semibold">把散落镜头整理成一张参考图</h3>
-                    <p className="mt-1 text-xs text-[#6b7280]">支持散图加入，也支持把 GPT 九宫格切成独立镜头。</p>
+                    <p className="mt-1 text-xs text-[#77716b]">支持散图加入，也支持把 GPT 九宫格切成独立镜头。</p>
                 </div>
                 <Button onClick={onClose}>关闭</Button>
             </div>
@@ -72,7 +72,7 @@ export function ShotPackPanel({ node, imageNodes, busy, onClose, onAddShot, onSp
 
             <div className="mt-3 rounded-xl border border-[#e8dfd1] bg-white/80 p-3">
                 <div className="grid grid-cols-2 gap-3">
-                    <label className="text-xs font-medium text-[#4b5563]">
+                    <label className="text-xs font-medium text-[#59534e]">
                         合集布局
                         <Select className="mt-1 w-full" value={pack.layout} options={layoutOptions} onChange={(layout) => onPatchPack({ layout })} />
                     </label>
@@ -91,7 +91,7 @@ export function ShotPackPanel({ node, imageNodes, busy, onClose, onAddShot, onSp
                 {pack.shots.length ? (
                     pack.shots.map((shot, index) => (
                         <div key={shot.id} className="grid grid-cols-[72px_1fr_84px] gap-3 rounded-xl border border-[#e8dfd1] bg-white p-2">
-                            <img src={shot.imageUrl} alt={shot.title} className="h-16 w-[72px] rounded-lg bg-[#f7f9f5] object-cover" />
+                            <img src={shot.imageUrl} alt={shot.title} className="h-16 w-[72px] rounded-lg bg-[#f9f7f5] object-cover" />
                             <div className="min-w-0 space-y-2">
                                 <div className="grid grid-cols-[1fr_80px] gap-2">
                                     <Input value={shot.title} placeholder={`镜头 ${index + 1}`} onChange={(event) => onUpdateShot(shot.id, { title: event.target.value })} />
@@ -113,7 +113,7 @@ export function ShotPackPanel({ node, imageNodes, busy, onClose, onAddShot, onSp
             </div>
 
             <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#e8dfd1] pt-3">
-                <div className="flex items-center gap-2 text-xs text-[#6b7280]">
+                <div className="flex items-center gap-2 text-xs text-[#77716b]">
                     <Scissors className="size-4" />
                     {pack.shots.length} 个镜头。生成后会变成一张可喂给视频模型的合集参考图。
                 </div>

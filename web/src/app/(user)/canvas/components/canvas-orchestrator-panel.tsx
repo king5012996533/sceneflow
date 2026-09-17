@@ -308,7 +308,7 @@ export function CanvasOrchestratorPanel({ config, engine, getMemory, run, onRunC
                 {activeTab === "log" ? (
                     <div className="space-y-1">
                         {logs.map((log) => (
-                            <div key={log.id} className="text-xs" style={{ color: "#746b7a" }}>
+                            <div key={log.id} className="text-xs" style={{ color: "#726d67" }}>
                                 <span className="opacity-50">{log.time}</span> {log.title}
                             </div>
                         ))}

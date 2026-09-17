@@ -26,14 +26,14 @@ export function CreditBalanceBadge({ variant = "default", style }: CreditBalance
                 variant === "canvas"
                     ? "hover:bg-black/5 dark:hover:bg-white/10"
                     : variant === "warm"
-                      ? "border border-[#dde2dc] bg-[#ffffff] text-[#2a3330] shadow-[0_6px_14px_rgba(35,28,20,0.06)] hover:border-[#a0713f] hover:bg-[#f7f9f5]"
-                      : "border border-[#dde2dc] bg-white text-[#1f2937] shadow-[0_6px_14px_rgba(35,28,20,0.06)] hover:border-[#c7d2fe] hover:bg-[#e7ece8] hover:text-[#75827c]",
+                      ? "border border-[#e2dfdc] bg-[#ffffff] text-[#332f2a] shadow-[0_6px_14px_rgba(35,28,20,0.06)] hover:border-[#a0713f] hover:bg-[#f9f7f5]"
+                      : "border border-[#e2dfdc] bg-white text-[#2c2824] shadow-[0_6px_14px_rgba(35,28,20,0.06)] hover:border-[#a0713f]/40 hover:bg-[#eceae7] hover:text-[#817b76]",
             )}
             style={style}
         >
-            <Coins className={cn("size-4", variant === "warm" ? "text-[#a0713f]" : "text-[#75827c]")} />
+            <Coins className={cn("size-4", variant === "warm" ? "text-[#a0713f]" : "text-[#817b76]")} />
             <span className={cn(variant === "warm" && "sf-mono font-bold")}>{loading ? "…" : balance === null ? "—" : balance.toLocaleString("zh-CN")}</span>
-            {variant === "warm" ? <span className="hidden text-xs font-medium text-[#67726b] sm:inline">积分</span> : null}
+            {variant === "warm" ? <span className="hidden text-xs font-medium text-[#726d67] sm:inline">积分</span> : null}
         </Link>
     );
 }

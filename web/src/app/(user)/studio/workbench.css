@@ -1,22 +1,22 @@
 .sf-workbench {
-    --paper: #f4f6f2;
-    --paper-deep: #e9eee9;
+    --paper: #f6f4f2;
+    --paper-deep: #eeece9;
     --surface: #ffffff;
-    --surface-soft: #f7f9f5;
-    --ink: #2a3330;
-    --ink-soft: #3c4742;
-    --muted: #67726b;
-    --line: #dde2dc;
-    --line-strong: #c5cdc6;
-    --accent: #75827c;
-    --accent-deep: #5f6d66;
-    --accent-soft: #e7ece8;
+    --surface-soft: #f9f7f5;
+    --ink: #332f2a;
+    --ink-soft: #47423c;
+    --muted: #726d67;
+    --line: #e2dfdc;
+    --line-strong: #ccc9c6;
+    --accent: #a0713f;
+    --accent-deep: #8a5e33;
+    --accent-soft: #fbf7ef;
     --success: #4e7c5d;
     --success-soft: #e6f0e8;
     --danger: #b0564b;
     --danger-soft: #f6e8e5;
-    --shadow: 0 18px 48px rgba(42, 51, 48, 0.08);
-    --shadow-soft: 0 6px 20px rgba(42, 51, 48, 0.06);
+    --shadow: 0 18px 48px rgba(51, 47, 42, 0.08);
+    --shadow-soft: 0 6px 20px rgba(51, 47, 42, 0.06);
     --radius: 12px;
     --mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", ui-monospace, monospace;
     --serif: Georgia, "Songti SC", "Noto Serif CJK SC", serif;
@@ -904,7 +904,7 @@
     line-height: 1.65;
 }
 .sf-workbench .composer textarea::placeholder {
-    color: #9aa49e;
+    color: #a49f9a;
 }
 .sf-workbench .composer-bottom {
     min-height: 48px;
@@ -947,7 +947,7 @@
 .sf-workbench .mode-button.is-active {
     color: var(--ink);
     background: var(--surface);
-    box-shadow: 0 1px 3px rgba(42, 51, 48, 0.1);
+    box-shadow: 0 1px 3px rgba(51, 47, 42, 0.1);
     font-weight: 650;
 }
 .sf-workbench .asset-actions {
@@ -1016,7 +1016,7 @@
     flex-direction: column;
     border-left: 1px solid var(--line-strong);
     background: var(--surface);
-    box-shadow: -18px 0 48px rgba(42, 51, 48, 0.14);
+    box-shadow: -18px 0 48px rgba(51, 47, 42, 0.14);
     transform: translateX(102%);
     transition: transform 0.24s ease;
 }
@@ -1133,7 +1133,7 @@
 .sf-workbench .segment.is-active {
     color: var(--ink);
     background: var(--surface);
-    box-shadow: 0 1px 3px rgba(42, 51, 48, 0.1);
+    box-shadow: 0 1px 3px rgba(51, 47, 42, 0.1);
     font-weight: 650;
 }
 .sf-workbench .style-scroll {
@@ -1161,7 +1161,7 @@
 }
 .sf-workbench .style-card.is-active {
     border-color: var(--accent);
-    background: #e9eee9;
+    background: #eeece9;
     box-shadow: inset 0 0 0 1px var(--accent);
 }
 .sf-workbench .style-preview {
@@ -1177,7 +1177,7 @@
     background: linear-gradient(135deg, #bf8e71 0%, #e9cab4 48%, #684d43 100%);
 }
 .sf-workbench .style-card:nth-child(4) .style-preview {
-    background: linear-gradient(135deg, #9caa9a 0%, #dce4d5 48%, #53604d 100%);
+    background: linear-gradient(135deg, #a7a29d 0%, #dfdcda 48%, #53604d 100%);
 }
 .sf-workbench .style-card strong {
     font-size: 11px;
@@ -1313,7 +1313,7 @@
         left: 0;
         width: 264px;
         transform: translateX(-100%);
-        box-shadow: 10px 0 28px rgba(42, 51, 48, 0.12);
+        box-shadow: 10px 0 28px rgba(51, 47, 42, 0.12);
     }
     .sf-workbench .session-rail.is-mobile-open {
         transform: translateX(0);
@@ -1627,7 +1627,7 @@
 }
 .sf-workbench .result-card {
     border-radius: 8px;
-    box-shadow: 0 5px 18px rgba(42, 51, 48, 0.07);
+    box-shadow: 0 5px 18px rgba(51, 47, 42, 0.07);
 }
 .sf-workbench .result-media {
     aspect-ratio: 4 / 5;

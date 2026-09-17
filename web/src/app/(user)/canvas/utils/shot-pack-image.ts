@@ -34,10 +34,10 @@ export async function composeShotPackBlob(shots: CanvasShotPackShot[], options: 
 
     ctx.fillStyle = "#f7f4ef";
     ctx.fillRect(0, 0, width, height);
-    ctx.fillStyle = "#111827";
+    ctx.fillStyle = "#1b1814";
     ctx.font = "600 30px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
     ctx.fillText(options.title || "镜头包参考图", PADDING, 46);
-    ctx.fillStyle = "#6b7280";
+    ctx.fillStyle = "#77716b";
     ctx.font = "16px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
     ctx.fillText("按从左到右、从上到下的顺序阅读，用于视频模型理解连续分镜。", PADDING + 230, 45);
 
@@ -89,7 +89,7 @@ function drawCell(ctx: CanvasRenderingContext2D, shot: LoadedShot, index: number
     const imageBox = { x: x + 10, y: y + 10, width: width - 20, height: height - 20 };
     drawContainedImage(ctx, shot.image, imageBox.x, imageBox.y, imageBox.width, imageBox.height);
     if (showIndex) {
-        ctx.fillStyle = "rgba(17, 24, 39, .76)";
+        ctx.fillStyle = "rgba(27, 24, 20, .76)";
         roundFill(ctx, x + 20, y + 20, 74, 34, 17);
         ctx.fillStyle = "#ffffff";
         ctx.font = "600 16px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
@@ -97,10 +97,10 @@ function drawCell(ctx: CanvasRenderingContext2D, shot: LoadedShot, index: number
     }
     if (!showCaption) return;
     const captionY = y + height + 18;
-    ctx.fillStyle = "#111827";
+    ctx.fillStyle = "#1b1814";
     ctx.font = "600 16px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
     ctx.fillText(shot.title || `镜头 ${index + 1}`, x + 18, captionY);
-    ctx.fillStyle = "#4b5563";
+    ctx.fillStyle = "#59534e";
     ctx.font = "14px system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
     wrapText(ctx, [shot.description, shot.camera, shot.duration ? `${shot.duration}s` : ""].filter(Boolean).join(" / "), x + 18, captionY + 24, width - 36, 20, 2);
 }

@@ -147,16 +147,16 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f4f6f2] to-[#e9eee9]">
-            <div className="w-full max-w-sm bg-white rounded-2xl border border-[#dde2dc] shadow-[0_22px_68px_rgba(42,51,48,0.08)] p-8">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f6f4f2] to-[#eeece9]">
+            <div className="w-full max-w-sm bg-white rounded-2xl border border-[#e2dfdc] shadow-[0_22px_68px_rgba(51, 47, 42,0.08)] p-8">
                 <div className="text-center mb-8">
                     <div className="mb-5 flex items-center justify-center gap-2.5">
-                        <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#75827c] text-sm font-bold text-white">S</span>
-                        <span className="text-sm font-bold tracking-[0.06em] text-[#2a3330]">SceneFlow</span>
+                        <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#a0713f] text-sm font-bold text-white">S</span>
+                        <span className="text-sm font-bold tracking-[0.06em] text-[#332f2a]">SceneFlow</span>
                     </div>
                     <h1 className="text-2xl font-semibold tracking-tight text-gray-900">{step === 1 ? "注册账号" : step === 2 ? "输入验证码" : "设置密码"}</h1>
                     <p className="text-sm text-gray-500 mt-2">{step === 1 ? "注册后开始使用 SceneFlow" : step === 2 ? `验证码已发送至 ${target}` : "设置密码完成注册"}</p>
-                    {referralCode ? <div className="mt-3 rounded-lg bg-[#f3f7f2] px-3 py-2 text-xs text-[#4a6455]">已接受好友邀请（{referralCode}），首充享加成</div> : null}
+                    {referralCode ? <div className="mt-3 rounded-lg bg-[#f7f4f2] px-3 py-2 text-xs text-[#4a6455]">已接受好友邀请（{referralCode}），首充享加成</div> : null}
                 </div>
 
                 <div className="space-y-4">

@@ -597,7 +597,7 @@ function footMetaOf(node: CanvasNodeData, batchCount: number) {
 
 function PipelineBadge({ node }: { node: CanvasNodeData }) {
     return (
-        <div className="pointer-events-none absolute left-3 top-[-26px] z-30 max-w-[calc(100%-24px)] rounded-full border border-black/10 bg-white/90 px-2.5 py-1 text-xs font-medium text-[#242529] shadow-sm backdrop-blur">
+        <div className="pointer-events-none absolute left-3 top-[-26px] z-30 max-w-[calc(100%-24px)] rounded-full border border-black/10 bg-white/90 px-2.5 py-1 text-xs font-medium text-[#272522] shadow-sm backdrop-blur">
             <span className="block truncate">{node.metadata?.pipelineLabel}</span>
         </div>
     );

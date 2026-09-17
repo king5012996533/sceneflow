@@ -188,12 +188,12 @@ export default function AssetsPage() {
     };
 
     return (
-        <div className="flex h-full flex-col overflow-hidden bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#eef4ff_100%)] text-[#172033]">
-            <main className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(rgba(79,93,255,.08)_1px,transparent_1px)] px-6 py-8 [background-size:18px_18px]">
+        <div className="flex h-full flex-col overflow-hidden bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#f9f7f5_100%)] text-[#23201c]">
+            <main className="min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(rgba(51,47,42,.09)_1px,transparent_1px)] px-6 py-8 [background-size:18px_18px]">
                 <div className="pb-8">
                     <div className="mx-auto max-w-5xl text-center">
-                        <h1 className="text-2xl font-semibold tracking-tight text-[#172033]">我的素材</h1>
-                        <p className="mt-3 text-sm text-[#67726b]">收藏常用文本、图片和视频资产，按类型、标题和标签快速查找。</p>
+                        <h1 className="text-2xl font-semibold tracking-tight text-[#23201c]">我的素材</h1>
+                        <p className="mt-3 text-sm text-[#726d67]">收藏常用文本、图片和视频资产，按类型、标题和标签快速查找。</p>
                     </div>
 
                     <div className="mx-auto mt-8 w-full max-w-2xl">
@@ -218,7 +218,7 @@ export default function AssetsPage() {
                     <div className="mx-auto mt-6 grid max-w-6xl gap-3 text-left">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="grid gap-2 sm:grid-cols-[56px_minmax(0,1fr)] sm:items-center">
-                                <div className="text-xs font-medium text-[#67726b]">类型</div>
+                                <div className="text-xs font-medium text-[#726d67]">类型</div>
                                 <div className="flex flex-wrap gap-2">
                                     {kindOptions.map((option) => (
                                         <Tag.CheckableTag
@@ -238,21 +238,21 @@ export default function AssetsPage() {
                             <div className="flex flex-wrap gap-4">
                                 <button
                                     type="button"
-                                    className="cursor-pointer text-sm font-medium text-[#75827c] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline"
+                                    className="cursor-pointer text-sm font-medium text-[#817b76] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline"
                                     onClick={() => void exportAllAssets()}
                                 >
                                     导出素材
                                 </button>
                                 <button
                                     type="button"
-                                    className="cursor-pointer text-sm font-medium text-[#75827c] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline"
+                                    className="cursor-pointer text-sm font-medium text-[#817b76] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline"
                                     onClick={() => assetInputRef.current?.click()}
                                 >
                                     导入素材
                                 </button>
                                 <button
                                     type="button"
-                                    className="cursor-pointer text-sm font-medium text-[#75827c] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline"
+                                    className="cursor-pointer text-sm font-medium text-[#817b76] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline"
                                     onClick={openCreate}
                                 >
                                     新增素材
@@ -327,7 +327,7 @@ export default function AssetsPage() {
                             </Form.Item>
                         ) : (
                             <Form.Item label="图片内容" required>
-                                <div className="rounded-lg border border-dashed border-[#cfc8ff] bg-white/60 p-4">
+                                <div className="rounded-lg border border-dashed border-[#cdc9c5] bg-white/60 p-4">
                                     <Button icon={<Upload className="size-4" />} onClick={() => imageInputRef.current?.click()}>
                                         选择图片文件
                                     </Button>
@@ -344,13 +344,13 @@ export default function AssetsPage() {
                             </Form.Item>
                         )}
                     </Form>
-                    <div className="rounded-xl border border-[#dde2dc] bg-[#ffffff] p-4">
+                    <div className="rounded-xl border border-[#e2dfdc] bg-[#ffffff] p-4">
                         <Typography.Text strong>预览</Typography.Text>
-                        <div className="mt-3 overflow-hidden rounded-lg border border-[#dde2dc] bg-white">
+                        <div className="mt-3 overflow-hidden rounded-lg border border-[#e2dfdc] bg-white">
                             {coverUrl || imageDraft?.dataUrl ? (
                                 <img src={coverUrl || imageDraft?.dataUrl} alt="" className="aspect-[4/3] w-full object-cover" />
                             ) : (
-                                <div className="flex aspect-[4/3] items-center justify-center bg-[#f7f9f5] p-5 text-center text-sm text-[#67726b]">{content || "暂无封面"}</div>
+                                <div className="flex aspect-[4/3] items-center justify-center bg-[#f9f7f5] p-5 text-center text-sm text-[#726d67]">{content || "暂无封面"}</div>
                             )}
                             <div className="p-4">
                                 <Typography.Text strong ellipsis className="block">
@@ -417,7 +417,7 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
                     {cover ? (
                         <img src={cover} alt={asset.title} className="aspect-[4/3] w-full object-cover" />
                     ) : (
-                        <div className="flex aspect-[4/3] items-center justify-center bg-[#f7f9f5] p-5 text-center text-sm leading-6 text-[#67726b]">{asset.kind === "text" ? asset.data.content : "暂无封面"}</div>
+                        <div className="flex aspect-[4/3] items-center justify-center bg-[#f9f7f5] p-5 text-center text-sm leading-6 text-[#726d67]">{asset.kind === "text" ? asset.data.content : "暂无封面"}</div>
                     )}
                 </button>
             }
@@ -426,7 +426,7 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
                 <div className="p-4">
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                            <h2 className="line-clamp-1 text-sm font-medium text-[#172033]">{asset.title}</h2>
+                            <h2 className="line-clamp-1 text-sm font-medium text-[#23201c]">{asset.title}</h2>
                             <Typography.Text type="secondary" className="mt-1 block text-xs">
                                 {asset.source || "未标注来源"}
                             </Typography.Text>
@@ -482,7 +482,7 @@ function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | nu
                     {cover ? (
                         <Image src={cover} alt={asset.title} className="rounded-lg" />
                     ) : (
-                        <div className="rounded-lg border border-[#dde2dc] bg-[#ffffff] p-5 text-sm leading-6 text-[#67726b]">{asset.kind === "text" ? asset.data.content : "暂无封面"}</div>
+                        <div className="rounded-lg border border-[#e2dfdc] bg-[#ffffff] p-5 text-sm leading-6 text-[#726d67]">{asset.kind === "text" ? asset.data.content : "暂无封面"}</div>
                     )}
                     <div>
                         <Typography.Title level={4} className="!mb-2">
@@ -495,7 +495,7 @@ function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | nu
                             ))}
                         </Space>
                     </div>
-                    <div className="rounded-lg border border-[#dde2dc] bg-white/70 p-4">
+                    <div className="rounded-lg border border-[#e2dfdc] bg-white/70 p-4">
                         <Typography.Text type="secondary" className="block text-xs">
                             内容
                         </Typography.Text>

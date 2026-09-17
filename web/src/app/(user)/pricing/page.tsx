@@ -45,7 +45,7 @@ export default function PricingPage() {
     }, []);
 
     return (
-        <main className="h-full overflow-y-auto bg-[#f4f6f2] text-[#2a3330]">
+        <main className="h-full overflow-y-auto bg-[#f6f4f2] text-[#332f2a]">
             <div className="mx-auto w-full max-w-[1180px] px-6 md:px-10">
                 {/* 页头 */}
                 <section className="pt-16 pb-10">
@@ -55,37 +55,37 @@ export default function PricingPage() {
                         <br />
                         先把积分<em className="italic text-[#a0713f]">备足</em>。
                     </h1>
-                    <p className="mt-5 max-w-[620px] text-[17px] leading-[1.85] text-[#3c4742]">
+                    <p className="mt-5 max-w-[620px] text-[17px] leading-[1.85] text-[#47423c]">
                         每次生成按 <strong>模型 × 类型 × 档位</strong> 扣积分。充值积分<strong>长期有效</strong>，生成失败<strong>自动原路退回</strong>。当前为内测阶段，扫码付款后由管理员确认入账。
                     </p>
                 </section>
 
                 {/* 余额条 */}
-                <section className="grid grid-cols-1 border-y border-[#2a3330] bg-[#ffffff] md:grid-cols-[5fr_4fr_3fr]">
-                    <div className="border-b border-[#dde2dc] py-6 md:border-b-0 md:py-7 md:pr-8">
-                        <div className="sf-mono text-[10px] uppercase tracking-[0.12em] text-[#67726b]">Credit Balance / 当前余额</div>
+                <section className="grid grid-cols-1 border-y border-[#332f2a] bg-[#ffffff] md:grid-cols-[5fr_4fr_3fr]">
+                    <div className="border-b border-[#e2dfdc] py-6 md:border-b-0 md:py-7 md:pr-8">
+                        <div className="sf-mono text-[10px] uppercase tracking-[0.12em] text-[#726d67]">Credit Balance / 当前余额</div>
                         <div className="mt-2.5 flex items-baseline gap-3">
                             <span className="sf-serif text-[42px] font-medium leading-none">
                                 {balanceLoading ? "…" : balance === null ? "—" : balance.toLocaleString("zh-CN")}
                                 <sup className="ml-1 align-super text-[15px] text-[#a0713f]">CR</sup>
                             </span>
-                            <span className="rounded-full bg-[#e7ece8] px-2.5 py-1 text-[11px] font-semibold text-[#a0713f]">按量付费</span>
+                            <span className="rounded-full bg-[#eceae7] px-2.5 py-1 text-[11px] font-semibold text-[#a0713f]">按量付费</span>
                         </div>
-                        <p className="mt-2.5 text-[13px] text-[#67726b]">余额不足时将暂停生成，请在开始生产前充值。</p>
+                        <p className="mt-2.5 text-[13px] text-[#726d67]">余额不足时将暂停生成，请在开始生产前充值。</p>
                     </div>
-                    <div className="border-b border-[#dde2dc] py-6 md:border-b-0 md:border-l md:py-7 md:px-8">
-                        <div className="sf-mono text-[10px] uppercase tracking-[0.12em] text-[#67726b]">Rate Card / 生成单价示例</div>
-                        <div className="mt-2.5 text-[13px] leading-[1.9] text-[#3c4742]">
+                    <div className="border-b border-[#e2dfdc] py-6 md:border-b-0 md:border-l md:py-7 md:px-8">
+                        <div className="sf-mono text-[10px] uppercase tracking-[0.12em] text-[#726d67]">Rate Card / 生成单价示例</div>
+                        <div className="mt-2.5 text-[13px] leading-[1.9] text-[#47423c]">
                             {rateCard.map((row) => (
                                 <p key={`${row.model}-${row.mode}`}>
-                                    {row.model} {row.mode !== "标准" ? row.mode : ""} {unitWord(row.kind)} <b className="font-semibold text-[#2a3330]">{row.credits} 积分</b>
+                                    {row.model} {row.mode !== "标准" ? row.mode : ""} {unitWord(row.kind)} <b className="font-semibold text-[#332f2a]">{row.credits} 积分</b>
                                 </p>
                             ))}
                         </div>
                     </div>
                     <div className="py-6 md:border-l md:py-7 md:pl-8">
-                        <div className="sf-mono text-[10px] uppercase tracking-[0.12em] text-[#67726b]">Notes / 充值说明</div>
-                        <p className="mt-2.5 text-[13px] leading-[1.9] text-[#3c4742]">
+                        <div className="sf-mono text-[10px] uppercase tracking-[0.12em] text-[#726d67]">Notes / 充值说明</div>
+                        <p className="mt-2.5 text-[13px] leading-[1.9] text-[#47423c]">
                             充值积分<strong>长期有效</strong>，不过期。
                             <br />
                             生成失败 / 取消的任务<strong>原路退回</strong>。
@@ -96,34 +96,34 @@ export default function PricingPage() {
                 <CreditPackagesSection />
 
                 {/* 计费规则 */}
-                <section className="border-y border-[#2a3330] bg-[#ffffff] py-12">
+                <section className="border-y border-[#332f2a] bg-[#ffffff] py-12">
                     <div className="grid gap-10 md:grid-cols-[4fr_8fr]">
                         <div>
                             <p className="sf-mono mb-3 text-[11px] uppercase tracking-[0.14em] text-[#a0713f]">Rate Card</p>
                             <h2 className="sf-serif text-[clamp(28px,3vw,40px)] font-semibold leading-[1.32]">
                                 积分怎么<em className="italic text-[#a0713f]">扣</em>？
                             </h2>
-                            <p className="mt-3 max-w-[34ch] text-sm text-[#67726b]">每次生成开始时先锁定积分，任务失败或取消自动退回，同一任务不会重复扣费。</p>
+                            <p className="mt-3 max-w-[34ch] text-sm text-[#726d67]">每次生成开始时先锁定积分，任务失败或取消自动退回，同一任务不会重复扣费。</p>
                         </div>
                         <div>
-                            <div className="border-t border-[#2a3330]">
-                                <div className="sf-mono grid grid-cols-[7fr_3fr_3fr] gap-3 border-b border-[#dde2dc] py-2.5 text-[10px] uppercase tracking-[0.12em] text-[#67726b]">
+                            <div className="border-t border-[#332f2a]">
+                                <div className="sf-mono grid grid-cols-[7fr_3fr_3fr] gap-3 border-b border-[#e2dfdc] py-2.5 text-[10px] uppercase tracking-[0.12em] text-[#726d67]">
                                     <span>模型</span>
                                     <span>档位</span>
                                     <span className="text-right">单次消耗</span>
                                 </div>
                                 {rateCard.map((row) => (
-                                    <div key={`${row.model}-${row.mode}`} className="grid grid-cols-[7fr_3fr_3fr] gap-3 border-b border-[#dde2dc] py-3.5 text-sm">
+                                    <div key={`${row.model}-${row.mode}`} className="grid grid-cols-[7fr_3fr_3fr] gap-3 border-b border-[#e2dfdc] py-3.5 text-sm">
                                         <span className="font-medium">{row.model}</span>
-                                        <span className="text-[#3c4742]">{row.mode}</span>
+                                        <span className="text-[#47423c]">{row.mode}</span>
                                         <span className="sf-mono text-right text-xs text-[#a0713f]">{row.credits} 积分</span>
                                     </div>
                                 ))}
                             </div>
-                            <p className="mt-4 text-[13px] leading-[1.8] text-[#67726b]">
-                                <b className="font-medium text-[#3c4742]">长期有效：</b>充值积分不过期，可在套餐与画布内持续使用。
+                            <p className="mt-4 text-[13px] leading-[1.8] text-[#726d67]">
+                                <b className="font-medium text-[#47423c]">长期有效：</b>充值积分不过期，可在套餐与画布内持续使用。
                                 <br />
-                                <b className="font-medium text-[#3c4742]">失败退回：</b>生成失败 / 用户取消的任务，锁定积分原路退回余额。
+                                <b className="font-medium text-[#47423c]">失败退回：</b>生成失败 / 用户取消的任务，锁定积分原路退回余额。
                             </p>
                         </div>
                     </div>
@@ -135,12 +135,12 @@ export default function PricingPage() {
                     <h2 className="sf-serif text-[clamp(28px,3vw,40px)] font-semibold leading-[1.3]">
                         三步到账，<em className="italic text-[#a0713f]">人工确认</em>。
                     </h2>
-                    <div className="mt-10 grid grid-cols-1 border-y border-[#2a3330] md:grid-cols-3">
+                    <div className="mt-10 grid grid-cols-1 border-y border-[#332f2a] md:grid-cols-3">
                         {PAY_STEPS.map((step, index) => (
-                            <div key={step.title} className="border-b border-[#dde2dc] py-6 last:border-b-0 md:border-b-0 md:border-r md:border-[#dde2dc] md:px-6 md:py-7 md:first:pl-0 md:last:border-r-0 md:last:pr-0">
+                            <div key={step.title} className="border-b border-[#e2dfdc] py-6 last:border-b-0 md:border-b-0 md:border-r md:border-[#e2dfdc] md:px-6 md:py-7 md:first:pl-0 md:last:border-r-0 md:last:pr-0">
                                 <span className="sf-mono text-[11px] tracking-[0.12em] text-[#a0713f]">STEP 0{index + 1}</span>
                                 <strong className="sf-serif mt-7 block text-[23px] font-medium leading-[1.3]">{step.title}</strong>
-                                <span className="mt-2 block text-[13px] leading-[1.7] text-[#67726b]">{step.desc}</span>
+                                <span className="mt-2 block text-[13px] leading-[1.7] text-[#726d67]">{step.desc}</span>
                             </div>
                         ))}
                     </div>

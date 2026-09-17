@@ -1,6 +1,6 @@
 export default function CutEditorPage() {
     return (
-        <main className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center bg-[#0a0a0f] text-white">
+        <main className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center bg-[#0c0a08] text-white">
             <div className="max-w-md text-center">
                 <div className="mb-6 text-6xl">🎬</div>
                 <h1 className="mb-3 text-xl font-semibold">后期剪辑器</h1>

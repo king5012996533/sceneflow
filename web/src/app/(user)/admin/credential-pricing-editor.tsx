@@ -36,7 +36,7 @@ export function CredentialPricingEditor({ models, value, onChange }: CredentialP
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
     if (!models.length) {
-        return <div className="rounded-lg border border-dashed border-[#dde2dc] px-3 py-4 text-center text-xs text-[#67726b]">先在「绑定模型」里填写模型名（逗号分隔），即可逐模型设置积分定价。</div>;
+        return <div className="rounded-lg border border-dashed border-[#e2dfdc] px-3 py-4 text-center text-xs text-[#726d67]">先在「绑定模型」里填写模型名（逗号分隔），即可逐模型设置积分定价。</div>;
     }
 
     const toggleExpanded = (model: string) => setExpanded((prev) => ({ ...prev, [model]: !prev[model] }));
@@ -69,33 +69,33 @@ export function CredentialPricingEditor({ models, value, onChange }: CredentialP
                 const enabled = Boolean(pricing);
                 const open = Boolean(expanded[model]);
                 return (
-                    <div key={model} className="rounded-lg border border-[#dde2dc] bg-[#f7f9f5]">
+                    <div key={model} className="rounded-lg border border-[#e2dfdc] bg-[#f9f7f5]">
                         <div className="flex items-center justify-between gap-2 px-3 py-2">
                             <button type="button" className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left" onClick={() => toggleExpanded(model)}>
-                                {open ? <ChevronDown className="size-4 shrink-0 text-[#67726b]" /> : <ChevronRight className="size-4 shrink-0 text-[#67726b]" />}
+                                {open ? <ChevronDown className="size-4 shrink-0 text-[#726d67]" /> : <ChevronRight className="size-4 shrink-0 text-[#726d67]" />}
                                 <span className="truncate font-mono text-sm">{model}</span>
-                                {enabled ? <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-600">已定价</span> : <span className="shrink-0 text-[11px] text-[#67726b]">内置草案</span>}
+                                {enabled ? <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-600">已定价</span> : <span className="shrink-0 text-[11px] text-[#726d67]">内置草案</span>}
                             </button>
                             <Switch size="small" checked={enabled} onChange={(checked) => setEnabled(model, checked)} />
                         </div>
                         {open ? (
-                            <div className="border-t border-[#dde2dc] px-3 py-3">
+                            <div className="border-t border-[#e2dfdc] px-3 py-3">
                                 {enabled ? (
                                     <div className="grid grid-cols-2 gap-3">
                                         {PRICING_FIELDS.map((field) => (
                                             <div key={field.key}>
-                                                <div className="mb-1 text-xs text-[#2a3330]">{field.label}</div>
+                                                <div className="mb-1 text-xs text-[#332f2a]">{field.label}</div>
                                                 <InputNumber className="w-full" min={0} precision={0} placeholder="留空 = 内置" value={pricing?.[field.key] ?? null} onChange={(num) => setField(model, field.key, num)} />
-                                                <div className="mt-0.5 text-[11px] text-[#67726b]">{field.hint}</div>
+                                                <div className="mt-0.5 text-[11px] text-[#726d67]">{field.hint}</div>
                                             </div>
                                         ))}
-                                        <div className="col-span-2 rounded-lg border border-[#e4e9e3] bg-white/60 p-2.5">
-                                            <div className="mb-1 text-xs text-[#2a3330]">视频生成（每条，按分辨率分档）</div>
+                                        <div className="col-span-2 rounded-lg border border-[#e9e6e3] bg-white/60 p-2.5">
+                                            <div className="mb-1 text-xs text-[#332f2a]">视频生成（每条，按分辨率分档）</div>
                                             <div className="grid grid-cols-2 gap-3">
                                                 {VIDEO_TIERS.map((tier) => (
                                                     <div key={tier.key}>
                                                         <InputNumber className="w-full" min={0} precision={0} placeholder="留空 = 内置" value={pricing?.[tier.key] ?? null} onChange={(num) => setField(model, tier.key, num)} />
-                                                        <div className="mt-0.5 text-[11px] text-[#67726b]">
+                                                        <div className="mt-0.5 text-[11px] text-[#726d67]">
                                                             {tier.label}：{tier.hint}
                                                         </div>
                                                     </div>
@@ -104,7 +104,7 @@ export function CredentialPricingEditor({ models, value, onChange }: CredentialP
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="text-xs leading-5 text-[#67726b]">未启用：该模型所有生成按「全局默认（运营配置）→ 内置草案」扣积分（图片 1–10、视频每条 15–30、音频 1、文本/工具 0）。打开开关后可按类型设置积分。</div>
+                                    <div className="text-xs leading-5 text-[#726d67]">未启用：该模型所有生成按「全局默认（运营配置）→ 内置草案」扣积分（图片 1–10、视频每条 15–30、音频 1、文本/工具 0）。打开开关后可按类型设置积分。</div>
                                 )}
                             </div>
                         ) : null}

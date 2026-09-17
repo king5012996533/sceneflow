@@ -8,7 +8,7 @@ import { useCanvasStore, type CanvasProject } from "../stores/use-canvas-store";
 import { useCanvasUiStore } from "../stores/use-canvas-ui-store";
 import { exportCanvasProjects } from "../utils/canvas-export";
 
-const NODE_COLORS = ["#a0713f", "#6b6a4a", "#5f7a52", "#2a3330", "#8a5e33", "#67726b"];
+const NODE_COLORS = ["#a0713f", "#6b6a4a", "#5f7a52", "#332f2a", "#8a5e33", "#726d67"];
 const PREVIEW_W = 340;
 const PREVIEW_H = 66;
 
@@ -35,7 +35,7 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
 
     return (
         <article
-            className="group relative flex min-h-44 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[#dde2dc] bg-[#ffffff] shadow-[0_6px_18px_rgba(57,48,34,0.05)] transition-all duration-150 hover:-translate-y-[3px] hover:border-[#a0713f] hover:shadow-[0_18px_44px_rgba(57,48,34,0.12)]"
+            className="group relative flex min-h-44 cursor-pointer flex-col overflow-hidden rounded-2xl border border-[#e2dfdc] bg-[#ffffff] shadow-[0_6px_18px_rgba(57,48,34,0.05)] transition-all duration-150 hover:-translate-y-[3px] hover:border-[#a0713f] hover:shadow-[0_18px_44px_rgba(57,48,34,0.12)]"
             onClick={() => !editing && open()}
         >
             <div className="relative h-[66px] shrink-0 overflow-hidden border-b border-[#eee4d5]">
@@ -62,16 +62,16 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
                         }}
                     >
                         <h2 className="sf-serif truncate text-base font-semibold leading-6 tracking-[0.01em]">{project.title}</h2>
-                        <p className="sf-mono mt-1.5 flex items-center gap-2.5 text-[10.5px] font-semibold tracking-[0.12em] text-[#67726b]">
+                        <p className="sf-mono mt-1.5 flex items-center gap-2.5 text-[10.5px] font-semibold tracking-[0.12em] text-[#726d67]">
                             {String(project.nodes.length).padStart(2, "0")} NODES
-                            <i className="size-[3px] rounded-full bg-[#dde2dc]" />
+                            <i className="size-[3px] rounded-full bg-[#e2dfdc]" />
                             {String(project.connections.length).padStart(2, "0")} LINKS
                         </p>
                     </button>
                 )}
             </div>
             <div className="mt-auto flex items-center justify-between gap-3 px-4 py-2.5" onClick={(event) => event.stopPropagation()}>
-                <p className="sf-mono text-[10.5px] text-[#9aa49e]">更新 {new Date(project.updatedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</p>
+                <p className="sf-mono text-[10.5px] text-[#a49f9a]">更新 {new Date(project.updatedAt).toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</p>
                 <div className={`flex items-center gap-0.5 transition-opacity ${editing ? "" : "opacity-0 group-hover:opacity-100"}`}>
                     {editing ? (
                         <>
@@ -108,7 +108,7 @@ export function CanvasProjectCard({ project }: { project: CanvasProject }) {
 function MiniCanvasPreview({ project }: { project: CanvasProject }) {
     const nodes = project.nodes.slice(0, 6);
     const patternId = `mini-${project.id.replace(/[^a-zA-Z0-9]/g, "")}`;
-    const lineColor = "#dde2dc";
+    const lineColor = "#e2dfdc";
     const positions = nodes.map((node, index) => {
         const width = 28 + (index % 3) * 6;
         const height = 22 + (index % 2) * 4;
@@ -130,7 +130,7 @@ function MiniCanvasPreview({ project }: { project: CanvasProject }) {
                     </pattern>
                 ) : null}
             </defs>
-            {project.backgroundMode !== "blank" ? <rect width={PREVIEW_W} height={PREVIEW_H} fill={`url(#${patternId})`} /> : <rect width={PREVIEW_W} height={PREVIEW_H} fill="#f4f6f2" />}
+            {project.backgroundMode !== "blank" ? <rect width={PREVIEW_W} height={PREVIEW_H} fill={`url(#${patternId})`} /> : <rect width={PREVIEW_W} height={PREVIEW_H} fill="#f6f4f2" />}
             {positions.map((item, index) => {
                 const next = positions[index + 1];
                 if (!next) return null;

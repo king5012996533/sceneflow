@@ -137,27 +137,27 @@ function CanvasPageInner() {
         }
     };
 
-    if (hydrated && (mode === "new" || mode === "recent")) return <main className="flex h-full items-center justify-center bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#eef4ff_100%)] text-sm text-[#746b7a]">正在打开画布...</main>;
+    if (hydrated && (mode === "new" || mode === "recent")) return <main className="flex h-full items-center justify-center bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#f9f7f5_100%)] text-sm text-[#726d67]">正在打开画布...</main>;
 
     if (!user) {
         return (
-            <main className="flex h-full flex-col items-center justify-center bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#eef4ff_100%)] text-[#172033]">
+            <main className="flex h-full flex-col items-center justify-center bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#f9f7f5_100%)] text-[#23201c]">
                 <LoginModal open={true} onClose={() => router.push("/canvas/canvas")} />
-                <p className="text-sm text-[#746b7a]">请先登录后再使用画布</p>
+                <p className="text-sm text-[#726d67]">请先登录后再使用画布</p>
             </main>
         );
     }
 
     return (
         <ConfigProvider theme={sceneflowTheme("sceneflow-workspace")}>
-            <main className="h-full overflow-auto bg-[linear-gradient(160deg,#f9f3e8_0%,#f5ecdd_55%,#f2e9da_100%)] text-[#2a3330]">
+            <main className="h-full overflow-auto bg-[linear-gradient(160deg,#f9f3e8_0%,#f5ecdd_55%,#f2e9da_100%)] text-[#332f2a]">
                 <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-6 py-10">
-                    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[#dde2dc] pb-6">
+                    <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[#e2dfdc] pb-6">
                         <div>
                             <p className="sf-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#a0713f]">Canvas Library · 画布库</p>
                             <h1 className="sf-serif mt-3 text-[32px] font-semibold tracking-tight">无限画布</h1>
-                            <p className="mt-2 text-sm text-[#67726b]">
-                                <span className="sf-mono font-bold text-[#2a3330]">{String(projects.length).padStart(2, "0")}</span> 个项目 · 云端自动同步已开启
+                            <p className="mt-2 text-sm text-[#726d67]">
+                                <span className="sf-mono font-bold text-[#332f2a]">{String(projects.length).padStart(2, "0")}</span> 个项目 · 云端自动同步已开启
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -195,7 +195,7 @@ function CanvasPageInner() {
                     </header>
 
                     {!hydrated ? (
-                        <section className="flex min-h-[360px] items-center justify-center rounded-2xl border border-[#dde2dc] bg-[#ffffff]/80 text-sm text-[#67726b] shadow-[0_20px_70px_rgba(57,48,34,0.07)]">正在加载画布...</section>
+                        <section className="flex min-h-[360px] items-center justify-center rounded-2xl border border-[#e2dfdc] bg-[#ffffff]/80 text-sm text-[#726d67] shadow-[0_20px_70px_rgba(57,48,34,0.07)]">正在加载画布...</section>
                     ) : projects.length ? (
                         <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
                             {projects.map((project) => (
@@ -203,9 +203,9 @@ function CanvasPageInner() {
                             ))}
                         </div>
                     ) : (
-                        <section className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-[#dde2dc] bg-[#ffffff]/80 text-center shadow-[0_24px_80px_rgba(57,48,34,0.08)]">
+                        <section className="flex min-h-[360px] flex-col items-center justify-center rounded-2xl border border-[#e2dfdc] bg-[#ffffff]/80 text-center shadow-[0_24px_80px_rgba(57,48,34,0.08)]">
                             <h2 className="sf-serif text-xl font-semibold">还没有画布</h2>
-                            <p className="mt-3 text-sm text-[#67726b]">新建一个画布后，就可以独立保存节点、连线和画布外观。</p>
+                            <p className="mt-3 text-sm text-[#726d67]">新建一个画布后，就可以独立保存节点、连线和画布外观。</p>
                             <Button type="primary" className="mt-6" icon={<Plus className="size-4" />} onClick={createAndEnter}>
                                 新建画布
                             </Button>

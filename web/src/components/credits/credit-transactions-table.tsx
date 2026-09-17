@@ -91,7 +91,7 @@ export function CreditTransactionsTable({ limit = 20 }: { limit?: number }) {
             title: "备注",
             dataIndex: "note",
             ellipsis: true,
-            render: (value: string | null) => (value ? <span className="text-[#67726b]">{value}</span> : "—"),
+            render: (value: string | null) => (value ? <span className="text-[#726d67]">{value}</span> : "—"),
         },
     ];
 

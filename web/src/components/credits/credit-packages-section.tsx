@@ -80,25 +80,25 @@ export function CreditPackagesSection() {
             className: "sf-pay-modal",
             content: (
                 <div className="space-y-4">
-                    <div className="rounded-2xl border border-[#dde2dc] bg-[#f7f9f5]">
-                        <div className="flex items-center justify-between gap-3 border-b border-dashed border-[#dde2dc] px-4 py-2.5 text-sm">
-                            <span className="text-[#67726b]">应付金额</span>
+                    <div className="rounded-2xl border border-[#e2dfdc] bg-[#f9f7f5]">
+                        <div className="flex items-center justify-between gap-3 border-b border-dashed border-[#e2dfdc] px-4 py-2.5 text-sm">
+                            <span className="text-[#726d67]">应付金额</span>
                             <span className="font-semibold text-[#a0713f]">{formatCny(order.amount ?? 0)}</span>
                         </div>
-                        <div className="flex items-center justify-between gap-3 border-b border-dashed border-[#dde2dc] px-4 py-2.5 text-sm">
-                            <span className="text-[#67726b]">套餐 / 到账</span>
+                        <div className="flex items-center justify-between gap-3 border-b border-dashed border-[#e2dfdc] px-4 py-2.5 text-sm">
+                            <span className="text-[#726d67]">套餐 / 到账</span>
                             <span className="text-right font-medium">
                                 {pkg?.name ?? "积分包"} / {credits.toLocaleString("zh-CN")} 积分
                                 {pkg?.bonusCredits ? <span className="ml-1 text-[#4f8a4f]">（含赠送 {pkg.bonusCredits}）</span> : null}
                             </span>
                         </div>
                         <div className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                            <span className="text-[#67726b]">付款备注</span>
+                            <span className="text-[#726d67]">付款备注</span>
                             <span className="sf-mono text-xs">{order.orderNo}</span>
                         </div>
                     </div>
-                    <img src={paymentQrSrc} alt="收款码" className="mx-auto w-56 rounded-2xl border border-[#dde2dc] bg-white p-2" />
-                    <p className="text-center text-sm leading-6 text-[#67726b]">{tip ?? "付款完成后，把付款截图或备注发给管理员，管理员确认后积分自动到账。"}</p>
+                    <img src={paymentQrSrc} alt="收款码" className="mx-auto w-56 rounded-2xl border border-[#e2dfdc] bg-white p-2" />
+                    <p className="text-center text-sm leading-6 text-[#726d67]">{tip ?? "付款完成后，把付款截图或备注发给管理员，管理员确认后积分自动到账。"}</p>
                 </div>
             ),
         });
@@ -110,14 +110,14 @@ export function CreditPackagesSection() {
     return (
         <section className="py-14">
             <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-                <h2 className="sf-serif text-[clamp(30px,3.4vw,44px)] font-semibold leading-[1.3] text-[#2a3330]">
+                <h2 className="sf-serif text-[clamp(30px,3.4vw,44px)] font-semibold leading-[1.3] text-[#332f2a]">
                     选一个<em className="italic text-[#a0713f]">档位</em>，开始囤积分。
                 </h2>
-                <p className="text-sm text-[#67726b]">价格含赠送积分，越买越划算</p>
+                <p className="text-sm text-[#726d67]">价格含赠送积分，越买越划算</p>
             </div>
 
             {loading ? (
-                <div className="py-10 text-sm text-[#98a2b3]">加载积分包…</div>
+                <div className="py-10 text-sm text-[#a5a19c]">加载积分包…</div>
             ) : packages.length ? (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     {packages.map((pkg, index) => {
@@ -129,32 +129,32 @@ export function CreditPackagesSection() {
                                 className={
                                     "relative flex min-h-[380px] flex-col rounded-[26px] border p-6 transition duration-200 " +
                                     (featured
-                                        ? "border-[#a0713f] bg-[#a0713f] text-[#ffffff] shadow-[0_26px_60px_rgba(117,130,124,0.26)]"
-                                        : "border-[#dde2dc] bg-[#ffffff] hover:-translate-y-1 hover:border-[#a0713f] hover:shadow-[0_22px_56px_rgba(42,51,48,0.14)]")
+                                        ? "border-[#a0713f] bg-[#a0713f] text-[#ffffff] shadow-[0_26px_60px_rgba(129, 123, 118,0.26)]"
+                                        : "border-[#e2dfdc] bg-[#ffffff] hover:-translate-y-1 hover:border-[#a0713f] hover:shadow-[0_22px_56px_rgba(51, 47, 42,0.14)]")
                                 }
                             >
                                 {featured ? (
-                                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-[#2a3330] bg-[#2a3330] px-3 py-1 text-[11px] font-semibold tracking-[0.1em] text-[#ffffff]">最受欢迎</span>
+                                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-[#332f2a] bg-[#332f2a] px-3 py-1 text-[11px] font-semibold tracking-[0.1em] text-[#ffffff]">最受欢迎</span>
                                 ) : (
                                     <div className="h-[13px]" />
                                 )}
-                                <div className={"sf-mono text-[10px] uppercase tracking-[0.14em] " + (featured ? "text-[#e7ece8]/75" : "text-[#67726b]")}>PKG. {String(index + 1).padStart(2, "0")}</div>
+                                <div className={"sf-mono text-[10px] uppercase tracking-[0.14em] " + (featured ? "text-[#eceae7]/75" : "text-[#726d67]")}>PKG. {String(index + 1).padStart(2, "0")}</div>
                                 <h3 className="sf-serif mt-3 text-2xl font-medium leading-[1.3]">{pkg.name}</h3>
                                 <div className="sf-serif mt-5 flex items-baseline gap-2 text-[44px] font-medium leading-none">
                                     {pkg.credits.toLocaleString("zh-CN")}
-                                    <span className={"text-[13px] font-normal " + (featured ? "text-[#e7ece8]/75" : "text-[#67726b]")}>积分</span>
+                                    <span className={"text-[13px] font-normal " + (featured ? "text-[#eceae7]/75" : "text-[#726d67]")}>积分</span>
                                 </div>
                                 {pkg.bonusCredits > 0 ? (
-                                    <span className={"mt-3 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold " + (featured ? "bg-[#ffffff] text-[#a0713f]" : "bg-[#e7efe2] text-[#4f8a4f]")}>
+                                    <span className={"mt-3 inline-flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold " + (featured ? "bg-[#ffffff] text-[#a0713f]" : "bg-[#ebe8e6] text-[#4f8a4f]")}>
                                         ＋赠送 {pkg.bonusCredits.toLocaleString("zh-CN")}
                                     </span>
                                 ) : (
                                     <div className="mt-3 h-[26px]" />
                                 )}
-                                <hr className={"my-5 border-t " + (featured ? "border-[#e7ece8]/50" : "border-[#dde2dc]")} />
+                                <hr className={"my-5 border-t " + (featured ? "border-[#eceae7]/50" : "border-[#e2dfdc]")} />
                                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                     <span className="sf-serif text-2xl font-semibold">{formatCny(pkg.priceCents)}</span>
-                                    <span className={"sf-mono text-[11px] " + (featured ? "text-[#e7ece8]/75" : "text-[#67726b]")}>≈ ¥{perCreditYuan(pkg).toFixed(3)} / 积分</span>
+                                    <span className={"sf-mono text-[11px] " + (featured ? "text-[#eceae7]/75" : "text-[#726d67]")}>≈ ¥{perCreditYuan(pkg).toFixed(3)} / 积分</span>
                                 </div>
                                 <Button
                                     type="default"
@@ -164,19 +164,19 @@ export function CreditPackagesSection() {
                                     className={
                                         "mt-auto h-11 w-full rounded-[10px] text-sm font-medium transition " +
                                         (featured
-                                            ? "!border-[#ffffff] !bg-[#ffffff] !text-[#a0713f] hover:!border-[#e7ece8] hover:!bg-[#e7ece8] hover:!text-[#8a5e33]"
-                                            : "!border-[#2a3330] !bg-transparent !text-[#2a3330] hover:!border-[#2a3330] hover:!bg-[#2a3330] hover:!text-[#ffffff]")
+                                            ? "!border-[#ffffff] !bg-[#ffffff] !text-[#a0713f] hover:!border-[#eceae7] hover:!bg-[#eceae7] hover:!text-[#8a5e33]"
+                                            : "!border-[#332f2a] !bg-transparent !text-[#332f2a] hover:!border-[#332f2a] hover:!bg-[#332f2a] hover:!text-[#ffffff]")
                                     }
                                 >
                                     立即充值
                                 </Button>
-                                <p className={"mt-2.5 text-center text-[11px] " + (featured ? "text-[#e7ece8]/75" : "text-[#67726b]")}>到账 {total.toLocaleString("zh-CN")} 积分</p>
+                                <p className={"mt-2.5 text-center text-[11px] " + (featured ? "text-[#eceae7]/75" : "text-[#726d67]")}>到账 {total.toLocaleString("zh-CN")} 积分</p>
                             </article>
                         );
                     })}
                 </div>
             ) : (
-                <div className="py-10 text-sm text-[#98a2b3]">暂无上架积分包，请联系管理员。</div>
+                <div className="py-10 text-sm text-[#a5a19c]">暂无上架积分包，请联系管理员。</div>
             )}
         </section>
     );

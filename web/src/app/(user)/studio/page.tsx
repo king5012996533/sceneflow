@@ -509,7 +509,7 @@ export default function StudioPage() {
     if (loading) {
         return (
             <ConfigProvider theme={sceneflowTheme("sceneflow-workbench")}>
-                <div className="flex h-full items-center justify-center bg-[#f4f6f2] text-sm text-[#67726b]">加载中…</div>
+                <div className="flex h-full items-center justify-center bg-[#f6f4f2] text-sm text-[#726d67]">加载中…</div>
             </ConfigProvider>
         );
     }

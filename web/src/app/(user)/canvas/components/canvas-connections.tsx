@@ -4,7 +4,7 @@ import { canvasThemes } from "@/lib/canvas-theme";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { CanvasConnection, CanvasNodeData, ConnectionHandle, Position } from "../types";
 
-const selectionBlue = "#2f80ff";
+const selectionAccent = "#a0713f";
 
 export function ConnectionPath({
     connection,
@@ -69,7 +69,7 @@ export function ConnectionPath({
             {/* 流水线动态光流：光点沿连线从源节点流向目标节点（空闲静止，选中/生成时流动） */}
             <path
                 d={pathD}
-                stroke={flowing ? selectionBlue : theme.node.activeStroke}
+                stroke={flowing ? selectionAccent : theme.node.activeStroke}
                 strokeWidth={flowing ? 1 : active ? 0.9 : 0.75}
                 strokeOpacity={flowing ? 1 : active ? 0.9 : 0.18}
                 strokeLinecap="round"
@@ -78,7 +78,7 @@ export function ConnectionPath({
                 style={{
                     pointerEvents: "none",
                     animation: flowing ? "canvas-connection-flow 0.55s linear infinite" : active ? "canvas-connection-flow 0.9s linear infinite" : "none",
-                    filter: flowing ? `drop-shadow(0 0 3px ${selectionBlue}99)` : active ? `drop-shadow(0 0 2px ${selectionBlue}77)` : undefined,
+                    filter: flowing ? `drop-shadow(0 0 3px ${selectionAccent}99)` : active ? `drop-shadow(0 0 2px ${selectionAccent}77)` : undefined,
                 }}
             />
         </g>
@@ -104,7 +104,7 @@ export function ActiveConnectionPath({ node, handle, mouseWorld, target }: { nod
         <g>
             <path d={pathD} stroke={theme.node.activeStroke} strokeWidth="0.75" fill="none" strokeDasharray="5,5" />
             {/* 拖拽连线时的动态光流 */}
-            <path d={pathD} stroke={selectionBlue} strokeWidth="0.75" fill="none" strokeLinecap="round" strokeDasharray="10 16" style={{ animation: "canvas-connection-flow 0.6s linear infinite" }} />
+            <path d={pathD} stroke={selectionAccent} strokeWidth="0.75" fill="none" strokeLinecap="round" strokeDasharray="10 16" style={{ animation: "canvas-connection-flow 0.6s linear infinite" }} />
         </g>
     );
 }

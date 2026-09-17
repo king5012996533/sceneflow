@@ -38,12 +38,12 @@ export default function ReferralsTab() {
         })();
     }, []);
 
-    if (loading) return <div className="py-8 text-center text-sm text-[#67726b]">加载中…</div>;
+    if (loading) return <div className="py-8 text-center text-sm text-[#726d67]">加载中…</div>;
     if (error) return <div className="py-8 text-center text-sm text-red-500">{error}</div>;
 
     return (
         <div className="space-y-4">
-            <section className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+            <section className="rounded-2xl border border-[#e2dfdc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                 <div className="sf-serif mb-4 flex items-center gap-2 text-[17px] font-semibold">
                     <Gift className="size-4 text-[#a0713f]" />
                     邀请排行榜
@@ -51,7 +51,7 @@ export default function ReferralsTab() {
                 {leaderboard.length ? (
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[560px] text-left text-sm">
-                            <thead className="border-b border-[#dde2dc] text-[#67726b]">
+                            <thead className="border-b border-[#e2dfdc] text-[#726d67]">
                                 <tr>
                                     <th className="py-3 font-medium">邀请人</th>
                                     <th className="py-3 font-medium">已邀请</th>
@@ -74,7 +74,7 @@ export default function ReferralsTab() {
                 )}
             </section>
 
-            <section className="rounded-2xl border border-[#dde2dc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
+            <section className="rounded-2xl border border-[#e2dfdc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
                 <div className="sf-serif mb-4 flex items-center gap-2 text-[17px] font-semibold">
                     <Gift className="size-4 text-[#a0713f]" />
                     返利明细
@@ -82,7 +82,7 @@ export default function ReferralsTab() {
                 {recent.length ? (
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[720px] text-left text-sm">
-                            <thead className="border-b border-[#dde2dc] text-[#67726b]">
+                            <thead className="border-b border-[#e2dfdc] text-[#726d67]">
                                 <tr>
                                     <th className="py-3 font-medium">时间</th>
                                     <th className="py-3 font-medium">类型</th>
@@ -95,14 +95,14 @@ export default function ReferralsTab() {
                             <tbody>
                                 {recent.map((row) => (
                                     <tr key={row.id} className="border-b border-[#f1ebe0]">
-                                        <td className="py-3 text-sm text-[#3c4742]">{formatDateTime(row.createdAt)}</td>
+                                        <td className="py-3 text-sm text-[#47423c]">{formatDateTime(row.createdAt)}</td>
                                         <td className="py-3 text-sm">
                                             <Tag>{TYPE_LABELS[row.type] || row.type}</Tag>
                                         </td>
                                         <td className="py-3 text-sm">{row.referrer.name || row.referrer.email}</td>
                                         <td className="py-3 text-sm">{row.referee ? row.referee.name || row.referee.email : "-"}</td>
                                         <td className="py-3 text-sm font-medium text-[#a0713f]">+{row.amount}</td>
-                                        <td className="py-3 font-mono text-xs text-[#67726b]">{row.orderNo}</td>
+                                        <td className="py-3 font-mono text-xs text-[#726d67]">{row.orderNo}</td>
                                     </tr>
                                 ))}
                             </tbody>

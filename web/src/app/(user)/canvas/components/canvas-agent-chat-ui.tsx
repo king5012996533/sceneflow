@@ -94,7 +94,7 @@ function AgentMarkdownTable({ rows, theme }: { rows: string[][]; theme: (typeof 
     return (
         <div className="thin-scrollbar max-w-full overflow-x-auto rounded-xl border" style={{ borderColor: theme.node.stroke }}>
             <table className="min-w-[620px] border-collapse text-left text-xs leading-5">
-                <thead style={{ background: "rgba(79,93,255,.06)" }}>
+                <thead style={{ background: "rgba(51,47,42,.05)" }}>
                     <tr>
                         {head.map((cell, index) => (
                             <th key={index} className="border-b px-3 py-2 font-semibold" style={{ borderColor: theme.node.stroke }}>
