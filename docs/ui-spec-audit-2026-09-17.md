@@ -287,6 +287,51 @@ bg-[linear-gradient(135deg,#fbf7ef_0%,#f7f3ea_48%,#eef4ff_100%)]
 >
 > 修复方式：编辑不增删行 → 按**行号**逐行套用 HEAD 的换行风格还原，行内容照旧。已核对还原后 diff 回到 539 行级别，且改动内容一字未丢。**下次做这类批量替换，先按二进制读、按二进制写，或先读一次保存换行风格。**
 
+## 部署时踩到的第二个坑：构建成功 ≠ 令牌层真的换了
+
+第一次部署看起来完全成功：`git pull` 到 `c598d21`、构建通过、PM2 重启、PM2 列表里 uptime 归零。但**线上算出来的 token 还是旧的**。
+
+### 怎么发现的
+
+用 curl 直接读线上 CSS，看到 `:root{--radius:.75rem;--border:#dde2dc;--ring:#75827c59;--primary:#75827c;--background:#f4f6f2…}`——全是 sage 旧值。而在服务器上 `grep 'primary:#a0713f' .next/static/chunks/*.css` **一个文件都命中不到**。
+
+诡异的是同一个 chunk 里**新旧混杂**：手写 CSS 段（`:root`、`.sceneflow-* .ant-modal-content`、`.ant-btn-primary`）是旧的，而 Tailwind 按类名生成的工具类（`.border-\[\#e2dfdc\]`、`.bg-\[\#e2dfdc\]`）是新的。
+
+而服务器源码是对的：`src/app/globals.css` 里旧值 0 处、新值 12 处；全仓库（排除 `node_modules`/`.next`）搜旧值**一个文件都没有**。旧内容只存在于两处：`.next/cache/turbopack/**/*.sst`（构建缓存，2.2G）和那个已产出的 chunk。
+
+### 根因与修复
+
+Turbopack 的持久化缓存吐回了**过期的 globals.css 编译单元**。修复：
+
+```
+rm -rf /root/infinite-canvas/web/.next/cache     # 只删构建缓存
+bash deploy.sh                                    # 冷构建 + 重启
+```
+
+只删 `cache`（不删整个 `.next`）是为了让运行中的进程不受影响——删完立刻 `curl 127.0.0.1:3003/canvas` 仍是 **200**。
+
+重建后：旧 `primary:#75827c` 在 0 个 chunk 里，新 `primary:#a0713f` 落在 `1hqp-o6q0bfg_.css`，`dde2dc` 0 处 / `e2dfdc` 23 处。
+
+**关键细节**：chunk **文件名变了**（`1b8ixfw2ozn14` → `1hqp-o6q0bfg_`）。这点很重要——这些资源带 `cache-control: public, max-age=31536000, immutable`，如果文件名不变而内容变，已经访问过的浏览器**永远**拿不到新 CSS，且无法远程清除。
+
+### 线上最终校验（真实浏览器读计算样式）
+
+| token                | 线上值      | 是否为暖色  |
+| -------------------- | ----------- | ----------- |
+| `--primary`          | `#a0713f`   | ✅ 铜金     |
+| `--ring`             | `#a0713f59` | ✅ 铜金 35% |
+| `--border`           | `#e2dfdc`   | ✅          |
+| `--background`       | `#f6f4f2`   | ✅          |
+| `--foreground`       | `#332f2a`   | ✅          |
+| `--muted-foreground` | `#726d67`   | ✅          |
+| `--accent`           | `#eceae7`   | ✅          |
+
+页面上实际渲染出的**带绿颜色种类：0**（`/canvas` 落地页、`/canvas/login`、以及带登录态的 `/canvas/canvas` 三个页面均为 0）。
+
+### 教训
+
+对"纯换皮"这种**收益全在 token 层**的改动，**必须校验线上的计算样式**：构建通过 + PM2 重启 ≠ token 真的换了。建议在部署流程末尾固定加一条断言——拉取线上 CSS，确认 `--primary` 等于预期值、且旧值在任何 chunk 里 0 命中。否则这次就会带着"部署成功"的结论交付一个一半还是 sage 的线上环境。
+
 ## 剩余工作（本次明确没做）
 
 | 优先级 | 动作                                            | 现状                                                                                                                            |
