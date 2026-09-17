@@ -19,6 +19,7 @@
         "test:asset": "node scripts/asset-tier-unit-tests.mjs",
         "test:media": "node scripts/media-store-unit-tests.mjs",
         "test:scheduler": "node scripts/run-state-unit-tests.mjs && node scripts/run-control-unit-tests.mjs",
+        "test:error": "node scripts/canvas-error-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

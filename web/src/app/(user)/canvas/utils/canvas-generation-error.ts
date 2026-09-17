@@ -101,6 +101,17 @@ export function summarizeCanvasGenerationError(message?: string | null): CanvasG
         };
     }
 
+    // 必须放在「模型」兜底之前：这类报错的文案里带「模型」二字（如「…改用 Seedance 模型」），
+    // 会被兜底规则吞掉，显示成「模型配置异常」，把用户引去看后台模型配置——而真正的原因是
+    // 当前渠道不接受参考视频/音频。线上这条文案已连续触发 14 次，全部被误判。
+    if (isReferenceMaterialError(text)) {
+        return {
+            title: "该模型不支持参考视频/音频",
+            hint: "当前视频渠道只接受提示词和参考图。请移除节点上的参考视频/参考音频后重试，或改用支持参考视频/音频的模型（Seedance、MiniMax H3、Aigccc）。",
+            requestId,
+        };
+    }
+
     if (lower.includes("model") || text.includes("模型")) {
         return {
             title: "模型配置异常",
@@ -132,6 +143,21 @@ function isCorsError(lower: string) {
 
 function isNetworkError(lower: string) {
     return lower.includes("failed to fetch") || lower.includes("fetch failed") || lower.includes("networkerror") || lower.includes("err_network") || lower.includes("err_failed") || lower.includes("network changed");
+}
+
+/**
+ * 「参考视频/参考音频不被本渠道接受」一类。
+ *
+ * 共同点：句子里点了参考视频/参考音频，并声明该渠道只吃提示词/参考图。
+ * 三种线上文案都要命中：
+ *   - 当前视频接口不支持参考视频或参考音频…
+ *   - GenVideo 视频接口暂不支持参考视频/参考音频…
+ *   - 当前 Replicate 视频模型只支持提示词和参考图，参考视频/音频仅 bytedance/seedance-2.0 支持
+ * 反向不能命中「参考素材本身有问题」的一类（时长超限、不能单独使用、必须是公网 URL），
+ * 它们不含「不支持/只支持/仅…支持」的表述。
+ */
+function isReferenceMaterialError(text: string) {
+    return /参考视频|参考音频/.test(text) && /不支持|只支持|仅支持|仅.{0,24}支持/.test(text);
 }
 
 function isSafetyError(text: string, lower: string) {
