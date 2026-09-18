@@ -228,7 +228,29 @@ export function isEnvelopeFresh(envelope: UpstreamEnvelope | null | undefined, n
 
 export type ResendSkipReason = "not-running" | "has-artifact" | "no-envelope" | "envelope-fresh" | "call-in-flight" | "upstream-task-known" | "channel-not-replayable" | "budget-spent" | "too-early" | "envelope-too-old";
 
+/** 补发已经彻底没戏的跳过原因（信封没了、渠道不让补发、预算用完、信封过期）：这时候才该按失败结账 */
+export const TERMINAL_SKIP_REASONS: ResendSkipReason[] = ["not-running", "has-artifact", "no-envelope", "upstream-task-known", "channel-not-replayable", "budget-spent", "envelope-too-old"];
+
 export type ResendDecision = { resend: true } | { resend: false; reason: ResendSkipReason };
+
+/**
+ * 这条任务**还有没有补发的机会**（不看时间窗口，只看「这条路还通不通」）。
+ *
+ * 与 decideResend 的分工：decideResend 回答「现在这一刻该不该发」（还带时间与新鲜度），
+ * 这个函数回答「这一单还有没有人能把它带回来」。
+ * 结账侧要的是后者 —— 客户端在部署重启后立刻报失败时，进程内的「在飞登记簿」已经空了
+ * （新进程什么都没登记），可服务端手上明明还留着一份可以重放的信封：
+ * 若这时候照旧判失败退款，补发就永远等不到一条 running 的任务（2026-09-18 的教训正是如此：
+ * 客户端那句「失败」跑赢了真相）。所以只要补发还有机会，就先别结账。
+ */
+export function hasResendPending(input: { status: string | null | undefined; hasArtifact: boolean; envelope: UpstreamEnvelope | null | undefined; attempts: number; externalId?: string | null; provider?: string | null; config: ReplayConfig }): boolean {
+    if (input.status !== "running") return false;
+    if (input.hasArtifact) return false;
+    if (input.externalId) return false;
+    if (!isEnvelopeReplayable(input.envelope)) return false;
+    if (!isReplayChannel({ url: input.envelope?.url, provider: input.provider ?? input.envelope?.provider }, input.config)) return false;
+    return input.attempts < input.config.maxAttempts;
+}
 
 /**
  * 这条任务此刻该不该补发。规则全部收在这里，扫描只负责照着执行。

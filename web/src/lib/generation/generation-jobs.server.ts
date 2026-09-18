@@ -6,6 +6,7 @@ import { resolveConfiguredPricing } from "@/lib/credential-store.server";
 import { normalizeGenerationMetadata } from "@/lib/generation/generation-config";
 import { getOperationNumber, getPricingDefaults } from "@/lib/operation-config";
 import { STALE_JOB_MS } from "./generation-stale";
+import { hasKeptArtifact, hasResendPending, readEnvelope, readResendState, resolveReplayConfig } from "./generation-envelope";
 import { isUpstreamCallInFlight, noteClientGaveUp, takeClientGaveUp } from "./upstream-inflight";
 
 // 超时阈值与「超时后怎么关账」的规则收在 generation-stale.ts：懒清扫（本文件）与
@@ -107,7 +108,12 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
     });
 }
 
-export async function finishGenerationJob(userId: string, jobId: string, status: "succeeded" | "failed" | "cancelled", error?: string, resultUrl?: string) {
+/**
+ * 结账。`options.holdForResend` 只由**客户端上报失败**那条路径传 true：
+ * 那种「失败」只是浏览器这侧的观感，服务端手上可能还留着一份能补发的信封（见下方注释）。
+ * 服务端自己看见上游答复之后判的失败（补发/服务端执行/清扫）不传，因为那已经是结论。
+ */
+export async function finishGenerationJob(userId: string, jobId: string, status: "succeeded" | "failed" | "cancelled", error?: string, resultUrl?: string, options?: { holdForResend?: boolean }) {
     if (!prisma) throw new Error("Database unavailable");
 
     return prisma.$transaction(async (tx) => {
@@ -124,9 +130,16 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
         // 钱付了、图丢了、额度还退了。所以这里先不结账，只把「客户端已放弃」记在登记簿上，
         // 谁看见真相谁定论：上游出成品 → 抢救认领成功（积分照收，成品进归档）；
         // 上游确认没成品 → 代理调用结束时代为结账退款（settleDeferredClientFailure）。
-        if (status === "failed" && DEFERRABLE_KINDS.has(job.kind as GenerationKind) && isUpstreamCallInFlight(job.id)) {
+        //
+        // 「还在飞」只是第一种情形。第二种是**补发还有机会**（hasResendPending + 调用方声明这是
+        // 客户端上报的失败）：部署重启之后进程内的在飞登记簿是空的（新进程什么都没登记），
+        // 可服务端手上明明留着一份能重放的信封。这时候客户端那句「失败」如果照旧结账，
+        // 补发就永远等不到一条 running 的任务 —— 阶段 1 那套补发等于白做
+        // （远端进程死了、客户端立刻报失败，正是它要救的场景）。
+        const resendPending = status === "failed" && options?.holdForResend === true && DEFERRABLE_KINDS.has(job.kind as GenerationKind) && !isUpstreamCallInFlight(job.id) && hasResendPendingForJob(job);
+        if (status === "failed" && DEFERRABLE_KINDS.has(job.kind as GenerationKind) && (isUpstreamCallInFlight(job.id) || resendPending)) {
             noteClientGaveUp(job.id, error);
-            console.log(`[generation-settle] 任务 ${job.id} 客户端报失败，但我们的上游调用仍在飞：暂不结账，等上游结果`);
+            console.log(resendPending ? `[generation-settle] 任务 ${job.id} 客户端报失败，但服务端还留着一份可补发的信封：暂不结账，等补发把成品带回来` : `[generation-settle] 任务 ${job.id} 客户端报失败，但我们的上游调用仍在飞：暂不结账，等上游结果`);
             // 刻意不动 error：任务还是 running，客户端看到 running 就知道该等；
             // 而「客户端连接中断」这句话如果落库，等上游真出了图、任务改判成功之后
             // 就会挂成一条自相矛盾的失败说明（记录页会照原样展示）。原因留在日志与内存登记簿里，
@@ -170,13 +183,30 @@ export async function settleDeferredClientFailure(userId: string, jobId: string)
     const reason = takeClientGaveUp(jobId);
     if (!reason) return "none";
 
-    const job = await prisma.generationJob.findFirst({ where: { id: jobId, userId }, select: { id: true, status: true, externalId: true } });
+    const job = await prisma.generationJob.findFirst({ where: { id: jobId, userId } });
     if (!job || job.status !== "running") return "none";
     if (job.externalId) return "kept";
+    // 还留着能补发的信封：这一段交给补发那条路走完（它拿不到成品时自己会结账退款）
+    if (hasResendPendingForJob(job)) return "kept";
 
     await finishGenerationJob(userId, jobId, "failed", reason);
     console.log(`[generation-settle] 任务 ${jobId} 上游调用已结束且未产出成品：按客户端原因结为失败并退款（${reason.slice(0, 60)}）`);
     return "settled";
+}
+
+/** 这条任务还留着「可以重放一次」的信封吗（结账侧用来决定「先别判死」） */
+function hasResendPendingForJob(job: { id: string; status: string; metadata?: unknown; resultData?: unknown; externalId?: string | null; provider?: string | null }): boolean {
+    const config = resolveReplayConfig();
+    if (!config.hosts.length && !config.providers.length) return false;
+    return hasResendPending({
+        status: job.status,
+        hasArtifact: hasKeptArtifact(job.resultData),
+        envelope: readEnvelope(job.metadata),
+        attempts: readResendState(job.metadata).attempts,
+        externalId: job.externalId,
+        provider: job.provider,
+        config,
+    });
 }
 
 /** 读一条任务（供客户端在被暂缓结账后轮询状态：成品到了就照常取图） */

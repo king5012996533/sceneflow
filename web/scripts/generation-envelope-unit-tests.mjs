@@ -25,6 +25,7 @@ import {
     decideResend,
     envelopeKey,
     hasKeptArtifact,
+    hasResendPending,
     hostOf,
     isEnvelopeFresh,
     isEnvelopeReplayable,
@@ -226,6 +227,43 @@ check("补发预算：任务记录里读不出来就是 0 次（宁可多发一�
     assert.deepStrictEqual(readResendState(null), { attempts: 0, lastAt: undefined, lastError: undefined });
     assert.deepStrictEqual(readResendState({ resend: { attempts: 2, lastAt: 123 } }), { attempts: 2, lastAt: 123, lastError: undefined });
     assert.deepStrictEqual(readResendState({ resend: { attempts: -5 } }).attempts, 0);
+});
+
+// —— 「还有补发机会吗」：结账侧靠它决定「先别判死」——
+// 2026-09-18 深夜发现的第二个坑：部署重启后进程内的在飞登记簿是空的，客户端那句「失败」
+// 会立刻把任务结掉 —— 补发就永远等不到一条 running 的任务，阶段 1 等于白做。
+check("还有补发机会：任务在跑 + 没成品 + 信封可重放 + 渠道在名单里 + 预算没用完 → 是", () => {
+    assert.strictEqual(hasResendPending({ status: "running", hasArtifact: false, envelope: envelope(), attempts: 0, config: REPLAY }), true);
+});
+
+check("还有补发机会：已经结账 / 已经有成品 / 信封没了 / 渠道不让补发 / 预算用完 → 否", () => {
+    const base = { status: "running", hasArtifact: false, envelope: envelope(), attempts: 0, config: REPLAY };
+    assert.strictEqual(hasResendPending({ ...base, status: "failed" }), false);
+    assert.strictEqual(hasResendPending({ ...base, hasArtifact: true }), false);
+    assert.strictEqual(hasResendPending({ ...base, envelope: null }), false);
+    assert.strictEqual(hasResendPending({ ...base, config: { hosts: [], providers: [], maxAttempts: 1 } }), false);
+    assert.strictEqual(hasResendPending({ ...base, attempts: 1 }), false);
+    assert.strictEqual(hasResendPending({ ...base, externalId: "task_1" }), false, "手上有上游任务号：该走补取件，不是补发");
+});
+
+check("还有补发机会：与 decideResend 的口径不矛盾 —— 决策说「发」时它必须为真（否则结账侧会先把任务关掉）", () => {
+    const cases = [
+        {},
+        { attempts: 1, config: { ...REPLAY, maxAttempts: 2 } },
+        { config: { ...REPLAY, maxAttempts: 5 }, resendAfterMs: 0 },
+    ];
+    for (const overrides of cases) {
+        if (decide(overrides).resend) {
+            const stillPending = hasResendPending({
+                status: "running",
+                hasArtifact: false,
+                envelope: overrides.envelope ?? envelope(),
+                attempts: overrides.attempts ?? 0,
+                config: overrides.config ?? REPLAY,
+            });
+            assert.strictEqual(stillPending, true, `decideResend 说要发，hasResendPending 却是 false：${JSON.stringify(overrides)}`);
+        }
+    }
 });
 
 // —— 运维开关（默认全关，改一个环境变量即可回滚） ——

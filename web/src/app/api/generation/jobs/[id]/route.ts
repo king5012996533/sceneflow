@@ -37,7 +37,12 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
         if (!["succeeded", "failed", "cancelled"].includes(status)) {
             return NextResponse.json({ error: "无效的任务状态" }, { status: 400 });
         }
-        const job = await finishGenerationJob(user.id, id, status as "succeeded" | "failed" | "cancelled", typeof body.error === "string" ? body.error : undefined, typeof body.resultUrl === "string" ? body.resultUrl : undefined);
+        // holdForResend：这是**浏览器**上报的失败。浏览器说自己失败了，不代表成品没在下游产生
+        // —— 服务端可能还留着一份能补发的信封（阶段 1）。让结账侧先把这一单留着，
+        // 由补发把成品带回来（或者补发也拿不到时再结账退款），客户端会通过轮询看到最终结论。
+        const job = await finishGenerationJob(user.id, id, status as "succeeded" | "failed" | "cancelled", typeof body.error === "string" ? body.error : undefined, typeof body.resultUrl === "string" ? body.resultUrl : undefined, {
+            holdForResend: status === "failed",
+        });
         return NextResponse.json({ job });
     } catch (error) {
         const status = error instanceof GenerationPolicyError ? error.status : 500;

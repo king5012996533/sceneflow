@@ -5,8 +5,8 @@ import { pickSubmittedTaskId } from "@/services/api/image-task";
 import { aspectRetryBody } from "@/services/api/image-ratio";
 import { isEditsEndpointUnsupported } from "@/services/api/image-reference";
 
-import { finishGenerationJob, recordGenerationUpstream } from "./generation-jobs.server";
-import { hasKeptArtifact, decideResend, isEnvelopeReplayable, readEnvelope, readResendState, resolveReplayConfig, type ResendSkipReason, type UpstreamEnvelope } from "./generation-envelope";
+import { finishGenerationJob, recordGenerationUpstream, settleDeferredClientFailure } from "./generation-jobs.server";
+import { TERMINAL_SKIP_REASONS, hasKeptArtifact, decideResend, isEnvelopeReplayable, readEnvelope, readResendState, resolveReplayConfig, type ResendSkipReason, type UpstreamEnvelope } from "./generation-envelope";
 import { dropUpstreamEnvelope, loadUpstreamEnvelope, readEnvelopeBody, recordResendAttempt } from "./generation-spool.server";
 import { salvageGenerationArtifacts } from "./generation-rescue.server";
 import { beginUpstreamCall, isUpstreamCallInFlight } from "./upstream-inflight";
@@ -286,6 +286,11 @@ export async function resendStaleGenerationJobs(input: { limit?: number; now?: n
         });
         if (!decision.resend) {
             result.skipped[decision.reason] = (result.skipped[decision.reason] ?? 0) + 1;
+            // 补发这条路彻底走不通了（信封没了/过期、渠道不让补发、预算用完）：这时候才该让结账侧
+            // 按客户端那句「失败」退款。留着不管的话，这条任务要等到 30 分钟后的清扫才关账。
+            if (TERMINAL_SKIP_REASONS.includes(decision.reason)) {
+                await settleDeferredClientFailure(job.userId, job.id).catch((error) => console.error("[generation-run] 代为结账异常", job.id, error instanceof Error ? error.message : error));
+            }
             continue;
         }
 

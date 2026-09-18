@@ -637,6 +637,15 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(resendRoute.includes('req.headers.get("x-generation-worker-secret")'), "补发接口是内部接口，密钥必须从请求头取（不得放进 URL 查询串）。");
     assert(resendRoute.includes('runtime = "nodejs"'), "补发接口要用 node runtime（要读 spool 目录、要连库）。");
 
+    // 结账侧必须知道「补发还有机会」：部署重启后在飞登记簿是空的，客户端那句「失败」若照旧结账，
+    // 补发就永远等不到一条 running 的任务 —— 阶段 1 等于白做（2026-09-18 深夜实测踩到）。
+    const jobs = read("src/lib/generation/generation-jobs.server.ts");
+    assert(jobs.includes("hasResendPendingForJob(") && jobs.includes("hasResendPending("), "客户端上报失败时，必须确认服务端手上还有没有可补发的信封，有就先别结账。");
+    assert(jobs.includes("holdForResend"), "「先别判死」只适用于客户端上报的失败（服务端自己看见上游答复的失败就是结论，不该再等）。");
+    assertIncludes("src/app/api/generation/jobs/[id]/route.ts", "holdForResend: status === \"failed\"", "客户端上报失败的入口必须声明 holdForResend。");
+    assertIncludes("src/lib/generation/generation-run.server.ts", "settleDeferredClientFailure(", "补发彻底没戏时（信封没了/过期、预算用完）要当场按失败结账，不能等到 30 分钟后的清扫。");
+    assertIncludes("src/lib/generation/generation-run.server.ts", "TERMINAL_SKIP_REASONS", "「哪些跳过原因等于没救了」必须收在纯模块里，不能就地写一串字符串。");
+
     const client = read("src/services/api/proxy-client.ts");
     assert(client.includes("export async function proxyFetchDeferrable") && client.includes("status === 202"), "客户端必须能识别服务端的 202 并转到轮询（老路径与延后路径共用一份响应解析）。");
     const image = read("src/services/api/image.ts");
