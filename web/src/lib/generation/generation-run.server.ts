@@ -115,13 +115,26 @@ async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; so
             signal: AbortSignal.timeout(RUN_TIMEOUT_MS),
         });
     } catch (error) {
+        release();
         console.warn(`[generation-run] 任务 ${job.id} 执行信封失败（网络层）：${error instanceof Error ? error.message : error}`);
         return { kind: "network-error", message: error instanceof Error ? error.message : String(error) };
+    }
+
+    // 登记要一直握到**报文正文读完**为止，不能停在「收到响应头」那一刻。
+    // fetch 在响应头到达时就返回，正文（成品就在正文里）随后才送到：这段空档里登记簿会显示
+    // 「没有人在调」，补发就会对着一条正在收图的任务再发一次请求 —— 上游多收一次钱。
+    // 2026-09-19 线上两次踩到这一点：一次成品被当成重复报文丢掉，一次白付一次。
+    let text = "";
+    try {
+        text = await response.text();
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[generation-run] 任务 ${job.id} 读取上游报文失败（正文没到齐）：${message}`);
+        return { kind: "network-error", message };
     } finally {
         release();
     }
 
-    const text = await response.text().catch(() => "");
     let payload: unknown = text;
     try {
         payload = JSON.parse(text);

@@ -570,6 +570,11 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(rescue.includes("keep-artifact"), "用户取消的任务要「保图不保账」：不得把上游已经画完的图丢掉。");
     assert(rescue.includes("没能留下"), "有成品却保不住的分支必须留痕：取消口子就是静默丢弃藏了几天。");
     assert(rescue.includes('externalStatus: "dropped"'), "丢弃要打标记，日报才能把「有成品却没留下」数出来。");
+    // dropped 的口径只有「上游出了图、这条任务手上一份都没有」。
+    // 任务已经有归档成品时后到的报文只是重复（补发与在跑的服务端调用撞车就会这样），
+    // 拿它打 dropped 会让日报凭空告警 —— 2026-09-19 线上真留下过这样一条成功任务。
+    assert(rescue.includes("hasKeptArtifact(job.resultData)"), "丢成品前必须先分清是「重复到达」还是「真的丢了」：手上已有归档成品时不许打 dropped。");
+    assert(rescue.indexOf("hasKeptArtifact(job.resultData)") < rescue.indexOf('externalStatus: "dropped"'), "重复到达的判断必须发生在打 dropped 之前，否则等于没判。");
 
     const result = read("src/lib/generation/generation-result.server.ts");
     assert(result.includes('status: { in: ["succeeded", "cancelled"] }'), "取消的任务也要能挂上成品，否则归档了记录页也看不到。");
@@ -671,6 +676,13 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     const inflight = read("src/lib/generation/upstream-inflight.ts");
     assert(inflight.includes("globalThis") && /globalScope\[REGISTRY_KEY\]/.test(inflight), "在飞登记簿必须挂在 globalThis 上，否则各路由各一份，补发会与服务端执行撞车。");
     assert(!/^const calls = new Map/m.test(inflight), "在飞登记簿不得是模块级 Map（跨路由不可见）。");
+
+    // 登记的「在飞」要一直握到报文正文读完：fetch 在响应头到达时就返回，正文（成品）随后才到。
+    // 停在响应头那一刻撤登记，补发会以为没人管了而重发一次 —— 上游的成品常常是「先回头、后送身」，
+    // 2026-09-19 线上两次因此多付一次上游（一次成品还被当成重复报文丢掉）。
+    assertNotMatches("src/lib/generation/generation-run.server.ts", /await fetchSafely\([\s\S]{0,900}?\} finally \{\s*release\(\);\s*\}/, "在飞登记不得在「收到响应头」时就撤，必须等报文正文读完。");
+    const runForRelease = read("src/lib/generation/generation-run.server.ts");
+    assert(runForRelease.indexOf("await response.text()") < runForRelease.lastIndexOf("release();"), "读取报文正文必须发生在撤登记之前。");
 }
 
 if (failures.length) {

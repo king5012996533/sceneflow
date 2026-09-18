@@ -2,6 +2,7 @@ import { prisma } from "@/lib/ic-prisma";
 
 import { extractArtifacts, resultSources } from "./generation-result";
 import { archiveResultSources, storeGenerationResults } from "./generation-result.server";
+import { hasKeptArtifact } from "./generation-envelope";
 import { decideRescueAction } from "./generation-recovery";
 import { takeClientGaveUp } from "./upstream-inflight";
 
@@ -41,7 +42,7 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
 
     const job = await prisma.generationJob.findFirst({
         where: { id: input.jobId, userId: input.userId },
-        select: { id: true, kind: true, status: true, finishedAt: true },
+        select: { id: true, kind: true, status: true, finishedAt: true, resultData: true },
     });
     if (!job || !RESCUABLE_KINDS.has(job.kind)) return false;
 
@@ -52,6 +53,15 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
     const action = decideRescueAction({ status: job.status, finishedAt: job.finishedAt });
 
     if (action === "skip") {
+        // 先分清「这份成品是重复到达」还是「真的丢了」。
+        // dropped 标记的口径只有一条：**上游出了图，而这条任务手上一份成品都没有**（日报的
+        // 「有成品却没留下」按它统计，目标值 0）。任务已经有归档成品时，后来这一份只是重复报文
+        // —— 例如补发与在跑的服务端调用撞车（2026-09-19 线上真踩过），后到的那份被判「已结且超窗」。
+        // 这时候打 dropped 会让日报凭空多一次告警，把「重复到达」误报成「又白烧了一次钱」。
+        if (hasKeptArtifact(job.resultData)) {
+            console.log(`[generation-rescue] 任务 ${job.id} 报文里有 ${sources.length} 份成品，但任务已结为 ${job.status} 且手上已有归档成品：这一次是重复到达，丢弃（来源 ${input.source}）`);
+            return false;
+        }
         console.warn(`[generation-rescue] 任务 ${job.id} 报文里有 ${sources.length} 份成品，但任务已结为 ${job.status} 且超出可保留窗口：这一次成品没能留下（来源 ${input.source}）`);
         // 打标记：日报按 externalStatus='dropped' 统计「有成品却没留下」，目标值 0
         await prisma.generationJob.updateMany({ where: { id: job.id, userId: input.userId }, data: { externalStatus: "dropped" } }).catch(() => undefined);
@@ -90,9 +100,7 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
     // —— 保图路径：用户取消，上游停不下来照样出图（见 isCanceledArtifactKeepable）——
     // 不改状态、不再收费（退款已经出手），只把成品留下：钱都付给上游了，扔掉是纯亏。
     console.log(`[generation-rescue] 任务 ${job.id} 已被用户取消，上游仍产出 ${sources.length} 份成品：保图不保账，归档留存（本次不向用户收费）`);
-    await prisma.generationJob
-        .updateMany({ where: { id: job.id, userId: input.userId }, data: { externalStatus: "recovered" } })
-        .catch(() => undefined);
+    await prisma.generationJob.updateMany({ where: { id: job.id, userId: input.userId }, data: { externalStatus: "recovered" } }).catch(() => undefined);
     void archiveResultSources(job.id, sources)
         .then((items) => storeGenerationResults(input.userId, job.id, items))
         .then((items) => {
