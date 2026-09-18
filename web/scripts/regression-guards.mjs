@@ -355,6 +355,7 @@ assertIncludes("src/lib/generation/server-upstream-client.ts", "keepalive: true"
 assertNotMatches("src/lib/generation/server-upstream-client.ts", /throw/, "留痕必须尽力而为，不得把异常抛回生成链路。");
 assertIncludes("src/services/api/image-task.ts", "upstreamProviderFromBaseUrl", "上游渠道标识必须收在纯模块里（配单测），不能就地拼字符串。");
 assertIncludes("src/app/api/generation/jobs/[id]/upstream/route.ts", "isSameOriginRequest", "留痕接口必须校验同源，且只写登录用户名下的任务。");
+assertIncludes("src/app/api/generation/jobs/[id]/upstream/route.ts", "P2002", "同一上游任务号重复记录必须给出可读答复，不能裸 500（GenerationJob 上有 (provider, externalId) 唯一约束，实测踩过）。");
 {
     const jobsServer = read("src/lib/generation/generation-jobs.server.ts");
     const at = jobsServer.indexOf("export async function recordGenerationUpstream(");
