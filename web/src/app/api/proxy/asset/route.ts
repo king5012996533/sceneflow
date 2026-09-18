@@ -10,6 +10,17 @@ const ASSET_TIMEOUT_MS = 120_000;
 const MEDIA_BUFFER_BYTES = 25 * 1024 * 1024;
 
 /**
+ * 素材下载重试次数与退避。
+ *
+ * 中转站 CDN 常解析出多个 IP，其中个别 IP 在境内根本连不通（实测 getapib.org 三个 IP 里
+ * 有一个连接必挂），而每次请求只钉第一个解析结果 → 同一张图时好时坏，表现为「上游已出图
+ * 并计费，前端却拿不回来」。下载是幂等 GET，失败后换一次解析结果再试即可。
+ * 4xx 是上游的明确答复（防盗链、过期），重试没有意义，直接返回。
+ */
+const ASSET_ATTEMPTS = 3;
+const ASSET_RETRY_DELAY_MS = 300;
+
+/**
  * 素材（图片/视频）下载代理：浏览器不再直连公网素材 URL，改由服务端下载后同源返回。
  *
  * 规避四类问题：
@@ -22,6 +33,28 @@ const MEDIA_BUFFER_BYTES = 25 * 1024 * 1024;
  * SSRF 防护与主代理一致：assertAllowedProxyUrl（仅 http/https + 非内网 + DNS 固定解析防重绑定）。
  * 注意：素材下载目标（中转站 CDN 等）不在凭证白名单内，这里只做网络层校验，不注入任何平台 Key。
  */
+/**
+ * 下载素材，失败则换一次解析结果重试（见 ASSET_ATTEMPTS 注释）。
+ * 每次尝试都重新过 assertAllowedProxyUrl/fetchSafely，安全校验一次都不会被绕过。
+ */
+async function fetchAsset(url: string, signal: AbortSignal, range: string | null): Promise<Response> {
+    let lastError: unknown = new Error("素材下载失败");
+    for (let attempt = 1; attempt <= ASSET_ATTEMPTS; attempt++) {
+        try {
+            const response = await fetchSafely(url, { signal, ...(range ? { headers: { Range: range } } : {}) });
+            if (response.status < 500 || attempt === ASSET_ATTEMPTS) return response;
+            lastError = new Error(`上游 ${response.status}`);
+        } catch (error) {
+            lastError = error;
+        }
+        if (signal.aborted) break;
+        // 没有日志时这类失败只能靠猜；留一行，便于日后核对是哪一段网络在抖
+        console.error(`[asset] 第 ${attempt} 次下载失败，换解析结果重试：${lastError instanceof Error ? lastError.message : String(lastError)}`);
+        await new Promise((resolve) => setTimeout(resolve, ASSET_RETRY_DELAY_MS * attempt));
+    }
+    throw lastError;
+}
+
 export async function GET(req: NextRequest) {
     const user = await requireCurrentUser(req);
     if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
@@ -43,7 +76,7 @@ export async function GET(req: NextRequest) {
     try {
         // 转发 Range：<video> 边播边拖进度时只取需要的分段，不必每次把整段几十 MB 拉完
         const range = req.headers.get("range");
-        const response = await fetchSafely(target.toString(), { signal: controller.signal, ...(range ? { headers: { Range: range } } : {}) });
+        const response = await fetchAsset(target.toString(), controller.signal, range);
         if (!response.ok) {
             return NextResponse.json({ error: `素材下载失败（上游 ${response.status}）` }, { status: 502 });
         }

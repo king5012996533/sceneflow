@@ -12,7 +12,9 @@ import ipaddr from "ipaddr.js";
  *       NAT64(64:ff9b)/6to4 内嵌 IPv4、ULA/链路本地/组播/文档前缀）、localhost、认证信息。
  */
 
-type PinnedTarget = { url: URL; ip: string; family: number; proxy: URL | null };
+type PinnedAddress = { address: string; family: number };
+
+type PinnedTarget = { url: URL; addresses: PinnedAddress[]; proxy: URL | null };
 
 /** URL.hostname 对 IPv6 字面量返回 [::1]（带方括号），这里去掉括号与小写化 */
 function bareHostname(hostname: string): string {
@@ -182,19 +184,19 @@ async function resolvePinnedTarget(rawUrl: string): Promise<PinnedTarget> {
     if (isIP(bare) !== 0) {
         // IP 字面量（v4/v6）：不解析 DNS，直接校验字面量
         if (isPrivateAddress(bare)) throw new Error("不允许代理内网或本机地址");
-        return { url: target, ip: bare, family: isIP(bare), proxy };
+        return { url: target, addresses: [{ address: bare, family: isIP(bare) }], proxy };
     }
 
     // 走已配置的出站代理时不做本地 DNS 固定：本地解析在当前网络下就是被污染的那一份，
     // 而连接对象是代理（运维配置），不是目标站点本身。
-    if (proxy) return { url: target, ip: "", family: 0, proxy };
+    if (proxy) return { url: target, addresses: [], proxy };
 
-    // 域名：全量解析并逐一校验，随后把连接钉在首个公网地址上（防 DNS 重绑定）
+    // 域名：全量解析并逐一校验，随后只连接已校验过的公网地址（防 DNS 重绑定）
     const records = await lookup(target.hostname, { all: true, verbatim: true }).catch(() => null);
     if (!records || records.length === 0) throw new Error("目标域名解析失败");
     if (records.some((record) => isPrivateAddress(record.address))) throw new Error("不允许代理内网或本机地址");
 
-    return { url: target, ip: records[0].address, family: records[0].family, proxy };
+    return { url: target, addresses: records.map((record) => ({ address: record.address, family: record.family })), proxy };
 }
 
 /** 校验目标 URL 是否允许代理访问；返回规范化后的 URL（含内网/保留地址/重绑定拦截）。 */
@@ -263,6 +265,32 @@ function pinnedFetch(target: URL, ip: string, family: number, init?: RequestInit
         const req = (isHttps ? httpsRequest : httpRequest)(options, (res) => resolve(toWebResponse(res)));
         finishRequest(req, init, reject);
     });
+}
+
+/**
+ * 多地址回退：DNS 常返回多个地址，其中个别地址在境内根本不可达（实测 getapib.org 三个 IP 里
+ * 有一个连接必挂），过去只钉第一个，于是同一张图「时好时坏」。不带请求体的请求（GET/HEAD）
+ * 是幂等的，逐个地址试到连上为止；带请求体的请求（生成类 POST）无法确认上游是否已收到，
+ * 一律不换址重试，避免重复投递导致重复扣费。
+ * 换址不放宽任何安全约束：候选地址在解析阶段已逐一校验为公网，且始终不做二次 DNS。
+ */
+export function canFallbackToOtherAddresses(addresses: PinnedAddress[], init?: RequestInit): boolean {
+    // 带请求体的请求一律不换址：无法确认上游是否已收到，生成类 POST 重投会重复扣费
+    return addresses.length > 1 && init?.body == null;
+}
+
+async function pinnedFetchAny(target: URL, addresses: PinnedAddress[], init?: RequestInit): Promise<Response> {
+    if (!canFallbackToOtherAddresses(addresses, init)) return pinnedFetch(target, addresses[0].address, addresses[0].family, init);
+
+    let lastError: unknown;
+    for (const candidate of addresses) {
+        try {
+            return await pinnedFetch(target, candidate.address, candidate.family, init);
+        } catch (error) {
+            lastError = error;
+        }
+    }
+    throw lastError instanceof Error ? lastError : new Error("连接失败");
 }
 
 /** CONNECT 响应头最大字节数：本地代理回一个状态行就够，超了说明对面不是代理。 */
@@ -407,8 +435,8 @@ function proxiedFetch(target: URL, proxy: URL, init?: RequestInit): Promise<Resp
 export async function fetchSafely(targetUrl: string, init?: RequestInit, maxRedirects = 5): Promise<Response> {
     let current = targetUrl;
     for (let step = 0; step <= maxRedirects; step++) {
-        const { url, ip, family, proxy } = await resolvePinnedTarget(current);
-        const response = proxy ? await proxiedFetch(url, proxy, init) : await pinnedFetch(url, ip, family, init);
+        const { url, addresses, proxy } = await resolvePinnedTarget(current);
+        const response = proxy ? await proxiedFetch(url, proxy, init) : await pinnedFetchAny(url, addresses, init);
         const status = response.status;
         if (status === 301 || status === 302 || status === 303 || status === 307 || status === 308) {
             const location = response.headers.get("location");

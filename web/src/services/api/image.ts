@@ -8,6 +8,7 @@ import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
 import { proxyFetch, proxyFetchStream } from "./proxy-client";
 import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskId } from "./image-task";
+import { isAspectRejection, parseSupportedRatios, pickSupportedRatio } from "./image-ratio";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
 
 export type AiTextMessage = {
@@ -397,6 +398,20 @@ async function resolveImageSubmission(config: AiConfig, payload: ImageApiRespons
     const taskId = pickSubmittedTaskId(payload);
     if (taskId) return await pollImageTask(config, taskId, options);
     return parseImagePayload(payload);
+}
+
+/**
+ * 上游「只认比例串、不认像素尺寸」时的重投比例（如 apimart 上的 gemini 图像模型）。
+ * 返回 null = 这不是画幅问题，不要重投（内容审核、参数错误等原样抛出）。
+ * 注意：只有被上游拒收的**提交**才会走到这里——那种应答没有建任务、没有计费，重投不会重复扣费。
+ */
+function readAspectRetryRatio(message: string, size: string, requestSize?: string) {
+    if (!isAspectRejection(message)) return null;
+    return pickSupportedRatio(resolveRequestAspect(size, requestSize), parseSupportedRatios(message));
+}
+
+function errorText(error: unknown) {
+    return error instanceof Error ? error.message : String(error ?? "");
 }
 
 /**
@@ -1150,21 +1165,27 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
             throw new Error(readAxiosError(error, "request failed"));
         }
     }
+    const url = aiApiUrl(requestConfig, "/images/generations");
+    const headers = aiHeaders(requestConfig, "application/json");
+    // 画幅默认发像素尺寸（多数通道要的就是它）；只有上游明确说「只认比例串」时才改发比例重投
+    const body = (aspectRatio?: string) => ({
+        model: requestConfig.model,
+        prompt: withSystemPrompt(requestConfig, requestPrompt),
+        n,
+        ...(quality ? { quality } : {}),
+        ...(aspectRatio ? { aspect_ratio: aspectRatio } : requestSize ? { size: requestSize } : {}),
+        ...(isOpenAiApi(requestConfig) ? { response_format: "b64_json" } : {}),
+        ...(isOpenAiApi(requestConfig) ? { output_format: IMAGE_OUTPUT_FORMAT } : {}),
+    });
     try {
-        const payload = await proxyFetch<ImageApiResponse>({
-            url: aiApiUrl(requestConfig, "/images/generations"),
-            method: "POST",
-            headers: aiHeaders(requestConfig, "application/json"),
-            body: {
-                model: requestConfig.model,
-                prompt: withSystemPrompt(requestConfig, requestPrompt),
-                n,
-                ...(quality ? { quality } : {}),
-                ...(requestSize ? { size: requestSize } : {}),
-                ...(isOpenAiApi(requestConfig) ? { response_format: "b64_json" } : {}),
-                ...(isOpenAiApi(requestConfig) ? { output_format: IMAGE_OUTPUT_FORMAT } : {}),
-            },
-        });
+        let payload: ImageApiResponse;
+        try {
+            payload = await proxyFetch<ImageApiResponse>({ url, method: "POST", headers, body: body() });
+        } catch (error) {
+            const aspectRatio = readAspectRetryRatio(errorText(error), config.size, requestSize);
+            if (!aspectRatio) throw error;
+            payload = await proxyFetch<ImageApiResponse>({ url, method: "POST", headers, body: body(aspectRatio) });
+        }
         return await resolveImageSubmission(requestConfig, payload, options);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
@@ -1203,36 +1224,49 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
             throw new Error(readAxiosError(error, "request failed"));
         }
     }
-    const formData = new FormData();
-    formData.set("model", requestConfig.model);
-    formData.set("prompt", withSystemPrompt(requestConfig, requestPrompt));
-    formData.set("n", String(n));
-    if (isOpenAiApi(requestConfig)) {
-        formData.set("response_format", "b64_json");
-        formData.set("output_format", IMAGE_OUTPUT_FORMAT);
-    }
-    if (quality) {
-        formData.set("quality", quality);
-    }
-    if (requestSize) {
-        formData.set("size", requestSize);
-    }
     const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
-    files.forEach((file) => formData.append("image", file));
-    if (mask) formData.set("mask", dataUrlToFile(mask));
-
-    try {
+    // 画幅默认发像素尺寸；上游明确说只认比例串时改发比例重投一次（同 requestGeneration）
+    const submit = (aspectRatio?: string) => {
+        const formData = new FormData();
+        formData.set("model", requestConfig.model);
+        formData.set("prompt", withSystemPrompt(requestConfig, requestPrompt));
+        formData.set("n", String(n));
+        if (isOpenAiApi(requestConfig)) {
+            formData.set("response_format", "b64_json");
+            formData.set("output_format", IMAGE_OUTPUT_FORMAT);
+        }
+        if (quality) {
+            formData.set("quality", quality);
+        }
+        if (aspectRatio) {
+            formData.set("aspect_ratio", aspectRatio);
+        } else if (requestSize) {
+            formData.set("size", requestSize);
+        }
+        files.forEach((file) => formData.append("image", file));
+        if (mask) formData.set("mask", dataUrlToFile(mask));
         formData.set("_proxy_url", aiApiUrl(requestConfig, "/images/edits"));
         formData.set("_proxy_method", "POST");
         formData.set("_proxy_headers", JSON.stringify(aiHeaders(requestConfig)));
-        const response = await fetch("/canvas/api/proxy/form-data", {
+        return fetch("/canvas/api/proxy/form-data", {
             method: "POST",
             body: formData,
             credentials: "include",
             signal: options?.signal,
         });
-        const data = (await response.json().catch(() => null)) as ImageApiResponse | null;
-        if (!response.ok) throw new Error(readImageApiError(data, readStatusError(response.status, "request failed")));
+    };
+
+    try {
+        let response = await submit();
+        let data = (await response.json().catch(() => null)) as ImageApiResponse | null;
+        if (!response.ok) {
+            const message = readImageApiError(data, readStatusError(response.status, "request failed"));
+            const aspectRatio = readAspectRetryRatio(message, config.size, requestSize);
+            if (!aspectRatio) throw new Error(message);
+            response = await submit(aspectRatio);
+            data = (await response.json().catch(() => null)) as ImageApiResponse | null;
+            if (!response.ok) throw new Error(readImageApiError(data, readStatusError(response.status, "request failed")));
+        }
         return await resolveImageSubmission(requestConfig, data || {}, options);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));

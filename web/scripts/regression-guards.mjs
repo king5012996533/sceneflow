@@ -229,6 +229,18 @@ assertIncludes("src/services/api/image.ts", "isSuccessCode", "图片上游成功
 assertNotMatches("src/services/api/image.ts", /payload\.code !== 0/, "不得退回「只认 code===0」的成功码判定（会把 apimart 的成功应答判成失败）。");
 assertIncludes("src/services/api/image.ts", "resolveImageSubmission", "任务制通道必须识别 task_id 并轮询取件，不能只解析一次性应答。");
 assertIncludes("src/services/api/image-task.ts", "parseImageTaskState", "任务取件解析必须收在 image-task 模块里（配单测）。");
+// —— 画幅写法兜底（2026-09-18：apimart 上的 gemini 图像模型只认比例串，不收像素尺寸）——
+// 实测报错：unsupported image aspect ratio "1824:1024", … supported ratios: 16:9, 1:1, …
+// 这类提交被上游直接拒收（未建任务、未计费），所以可以照它列出的比例重投一次。
+assertIncludes("src/services/api/image.ts", "readAspectRetryRatio", "上游以画幅写法拒绝时必须能识别并按它列出的比例重投，否则画布 16:9 预设会秒失败。");
+assertIncludes("src/services/api/image.ts", "isAspectRejection", "只有上游明确说「画幅不支持」才允许重投：内容审核等 400 必须原样抛出，不得盲目重试。");
+assertIncludes("src/services/api/image-ratio.ts", "pickSupportedRatio", "按上游列出的比例挑最接近值必须收在 image-ratio 模块里（配单测）。");
+assertNotMatches("src/services/api/image-ratio.ts", /proxyFetch|fetch\(|axios/, "image-ratio 必须是纯逻辑（不触网），才能在浏览器与 Node 下直接单测。");
+// —— 素材下载重试（2026-09-18：getapib.org 三个 IP 里有一个连不通，DNS 轮转 → 同一张图时好时坏）——
+assertIncludes("src/app/api/proxy/asset/route.ts", "ASSET_ATTEMPTS", "素材下载失败必须换解析结果重试，否则「上游已出图计费、前端却拿不回来」会反复出现。");
+assertIncludes("src/lib/url-safety.ts", "canFallbackToOtherAddresses", "GET 类请求必须在多个已校验地址间回退，否则个别不可达 IP 会让同一张图时好时坏。");
+assertIncludes("src/lib/url-safety.ts", "init?.body == null", "带请求体的请求不得换址重试（重复投递可能重复扣费）。");
+assertIncludes("src/app/api/proxy/asset/route.ts", "fetchSafely(url", "素材下载重试的每次尝试都必须重新过 fetchSafely（安全校验不得被重试绕过）。");
 assertIncludes("src/lib/credential-store.server.ts", "isHostOrSubdomain(targetHost, credHost)", "凭证 host 匹配必须边界匹配（禁止反向后缀，H-1）。");
 assertNotMatches("src/lib/credential-store.server.ts", /endsWith\(`\.\$\{targetHost\}`\)/, "凭证匹配不得允许反向后缀（H-1）。");
 assertIncludes("src/app/api/payments/callback/route.ts", "createHmac", "支付回调必须做 HMAC 签名验证（H-4）。");

@@ -22,6 +22,7 @@
         "test:error": "node scripts/canvas-error-unit-tests.mjs",
         "test:proxy": "node scripts/outbound-proxy-unit-tests.mjs",
         "test:imagetask": "node scripts/image-task-unit-tests.mjs",
+        "test:ratio": "node scripts/image-ratio-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

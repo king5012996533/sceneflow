@@ -15,7 +15,7 @@ import assert from "node:assert";
 import http from "node:http";
 import net from "node:net";
 
-import { assertAllowedProxyUrl, fetchSafely } from "../src/lib/url-safety.ts";
+import { assertAllowedProxyUrl, canFallbackToOtherAddresses, fetchSafely } from "../src/lib/url-safety.ts";
 
 let passed = 0;
 const failures = [];
@@ -242,5 +242,28 @@ proxy.server.close();
 rejectProxy.server.close();
 sniProxy.server.close();
 capture.server.close();
+
+// —— 多地址回退的边界（2026-09-18：getapib.org 三个 IP 里有一个连不通，同一张图时好时坏）——
+// 换址重试只允许用在**不带请求体**的请求上：GET/HEAD 幂等，而生成类 POST 无法确认上游是否已收到，
+// 重投会造成重复扣费。
+const THREE = [
+    { address: "203.0.113.10", family: 4 },
+    { address: "203.0.113.11", family: 4 },
+    { address: "203.0.113.12", family: 4 },
+];
+
+await check("换址回退：多个地址 + 无请求体（GET）才允许换址", () => {
+    assert.strictEqual(canFallbackToOtherAddresses(THREE, undefined), true);
+    assert.strictEqual(canFallbackToOtherAddresses(THREE, { method: "GET" }), true);
+});
+
+await check("换址回退：带请求体的请求（生成类 POST）一律不换址，避免重复扣费", () => {
+    assert.strictEqual(canFallbackToOtherAddresses(THREE, { method: "POST", body: "{}" }), false);
+    assert.strictEqual(canFallbackToOtherAddresses(THREE, { method: "POST", body: new Uint8Array(1) }), false);
+});
+
+await check("换址回退：只有一个地址时没什么可换", () => {
+    assert.strictEqual(canFallbackToOtherAddresses([THREE[0]], undefined), false);
+});
 
 console.log(failures.length === 0 ? `\n全部通过：${passed} 项` : `\n通过 ${passed} 项，失败 ${failures.length} 项：${failures.join("、")}`);
