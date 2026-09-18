@@ -9,7 +9,7 @@ import { finishGenerationJob, recordGenerationUpstream, settleDeferredClientFail
 import { TERMINAL_SKIP_REASONS, hasKeptArtifact, decideResend, isEnvelopeReplayable, readEnvelope, readResendState, resolveReplayConfig, type ResendSkipReason, type UpstreamEnvelope } from "./generation-envelope";
 import { dropUpstreamEnvelope, loadUpstreamEnvelope, readEnvelopeBody, recordResendAttempt } from "./generation-spool.server";
 import { salvageGenerationArtifacts } from "./generation-rescue.server";
-import { beginUpstreamCall, isUpstreamCallInFlight } from "./upstream-inflight";
+import { beginUpstreamCall, inflightJobCount, isUpstreamCallInFlight } from "./upstream-inflight";
 import { authorizeUpstreamRequest } from "./upstream-auth.server";
 
 /**
@@ -301,7 +301,9 @@ export async function resendStaleGenerationJobs(input: { limit?: number; now?: n
         const attempts = readResendState(job.metadata).attempts + 1;
         await recordResendAttempt(job.id, job.userId, { attempts, lastAt: now }).catch(() => undefined);
         if (!envelope) continue;
-        console.log(`[generation-run] 任务 ${job.id} 的上游调用死在半路（第 ${attempts} 次补发）：${envelope.method} ${envelope.url}`);
+        // 补发要花上游的钱，出事时得能一眼看出「当时登记簿里有什么」：
+        // 2026-09-19 那次撞车就是登记簿里的这条调用没被这个路由看见（bundle 各自一份模块）
+        console.log(`[generation-run] 任务 ${job.id} 的上游调用死在半路（第 ${attempts} 次补发）：${envelope.method} ${envelope.url}｜登记簿 inFlight=${isUpstreamCallInFlight(job.id)} 本轮登记数=${inflightJobCount()}`);
         result.resent += 1;
 
         const outcome = await executeStoredEnvelope({ job, envelope, origin: "live" });

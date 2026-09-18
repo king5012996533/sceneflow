@@ -28,7 +28,7 @@ echo ">>> create start.sh..."
 cd .next/standalone
 # standalone 运行的是这一份 .env（start.sh 从当前目录读）：不显式同步的话，
 # 改了 web/.env 却漏了它，运行中的进程仍拿着旧配置 —— 而且从进程外面看不出来。
-cp ../.env ./.env
+cp ../../.env ./.env
 cat > start.sh << 'START'
 #!/bin/bash
 cd /root/infinite-canvas/web/.next/standalone

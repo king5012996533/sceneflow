@@ -664,6 +664,13 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(image.includes("proxyFetchDeferrable<") && image.includes("awaitServerRunImages("), "图片主路径（生成与参考图生图）必须接上服务端执行的那条路。");
     const serverRun = read("src/lib/generation/server-run-client.ts");
     assert(serverRun.includes("AbortError"), "用户在服务端执行期间点取消必须抛 AbortError：否则会被结算成「失败」而不是「取消」。");
+
+    // 在飞登记簿必须挂在 globalThis 上：Next 给每个路由各打一份 bundle，
+    // 模块级 Map 会让「代理路由写、补发路由读」变成两份互不相见的表 ——
+    // 2026-09-19 实测因此对着正在跑的任务又补发了一次，上游多收一次钱。
+    const inflight = read("src/lib/generation/upstream-inflight.ts");
+    assert(inflight.includes("globalThis") && /globalScope\[REGISTRY_KEY\]/.test(inflight), "在飞登记簿必须挂在 globalThis 上，否则各路由各一份，补发会与服务端执行撞车。");
+    assert(!/^const calls = new Map/m.test(inflight), "在飞登记簿不得是模块级 Map（跨路由不可见）。");
 }
 
 if (failures.length) {

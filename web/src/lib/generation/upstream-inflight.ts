@@ -23,7 +23,19 @@ type CallState = {
 /** 放弃原因只用于写进 GenerationJob.error，与结算侧同一上限，避免超长文本 */
 const MAX_REASON_CHARS = 1000;
 
-const calls = new Map<string, CallState>();
+/**
+ * 登记簿挂在 globalThis 上，**不能**用模块级变量。
+ *
+ * Next 的服务端构建会给每个路由各打一份 bundle：同一个模块在「代理路由」与「补发路由」里
+ * 是两个不同的实例，模块级 Map 于是变成两份互不相见的登记簿 —— 代理说「我在调」，
+ * 补发那边读到的是空表。2026-09-19 真机实测踩到：服务端那条调用还在飞（8 秒后才回来），
+ * 00:34:01 的补发扫描却认为没人调，对着同一个任务又发了一次，上游多收了一次钱。
+ * 同一个进程内的所有路由共享 globalThis，挂上去就只有一份。
+ */
+const REGISTRY_KEY = "__sceneflowUpstreamInflight";
+type Registry = Map<string, CallState>;
+const globalScope = globalThis as typeof globalThis & { [REGISTRY_KEY]?: Registry };
+const calls: Registry = (globalScope[REGISTRY_KEY] ??= new Map<string, CallState>());
 
 /**
  * 登记一次上游调用开始，返回「这次调用结束」的释放函数。
@@ -82,6 +94,11 @@ export function takeClientGaveUp(jobId: string): string | undefined {
 /** 登记簿里还有多少条任务（诊断/测试用） */
 export function inflightJobCount(): number {
     return calls.size;
+}
+
+/** 登记簿里的任务号快照（诊断用：从另一个路由读它，就能看出登记簿是不是同一份） */
+export function inflightJobIds(): string[] {
+    return [...calls.keys()];
 }
 
 /** 清空登记簿（测试用；进程内状态，不要在生产路径调用） */
