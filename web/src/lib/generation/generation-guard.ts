@@ -66,7 +66,6 @@ export async function runGuardedGeneration<T>(
     metadata: Record<string, unknown>,
     run: (job: GenerationJob) => Promise<T>,
     recover?: (job: GenerationJob) => Promise<T | undefined>,
-    options?: { signal?: AbortSignal },
 ) {
     const job = await beginClientGeneration(kind, count, metadata);
     try {
@@ -91,7 +90,7 @@ export async function runGuardedGeneration<T>(
         // 连结算请求本身都发不出去（整个断网）时同样要问：那一刻谁也说不清任务死没死，
         // 而服务端手里的成品不会因为浏览器断网就消失，联网恢复后应该照样把图交出来。
         if (recover && status === "failed" && (!settled || settled.status === "running")) {
-            const awaited = await awaitDeferredSettlement(job.id, options?.signal);
+            const awaited = await awaitDeferredSettlement(job.id);
             if (awaited?.status === "succeeded") {
                 const recovered = await recover(awaited).catch((recoverError) => {
                     console.error("[generation] failed to recover delivered result", recoverError);
@@ -115,13 +114,17 @@ const UNREACHABLE_SETTLEMENT_MESSAGE = "网络中断，这次生成的状态还�
 const DEFERRED_WAIT_MS = 5 * 60 * 1000;
 const DEFERRED_POLL_MS = 5_000;
 
-/** 轮询任务状态直到它不再是 running（或超出等待上限、或用户取消） */
-async function awaitDeferredSettlement(jobId: string, signal?: AbortSignal): Promise<GenerationJob | undefined> {
+/**
+ * 轮询任务状态直到它不再是 running（或超出等待上限）。
+ *
+ * 刻意不看调用方的 AbortSignal：那条信号是给「这次生成请求」用的，请求一失败调用方就会把它回收，
+ * 在这里当成「用户取消」会当场把自己的恢复流程掐死（2026-09-18 真实浏览器里只轮询了一次就退出的原因）。
+ * 真正的用户取消不会走到这里 —— 取消是 AbortError，结算状态是 cancelled，本函数只服务 failed。
+ */
+async function awaitDeferredSettlement(jobId: string): Promise<GenerationJob | undefined> {
     const deadline = Date.now() + DEFERRED_WAIT_MS;
     while (Date.now() < deadline) {
-        if (signal?.aborted) return undefined;
         await sleep(DEFERRED_POLL_MS);
-        if (signal?.aborted) return undefined;
         const job = await readGenerationJob(jobId).catch(() => undefined);
         // 读不到（网络抖动）继续等：这条路径本来就是「连接不稳」时的兜底
         if (job && job.status !== "running") return job;
