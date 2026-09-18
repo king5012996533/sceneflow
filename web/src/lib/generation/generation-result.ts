@@ -46,8 +46,11 @@ export function guessMimeType(url: string): string {
 }
 
 /**
- * 归一上报的成品地址：只收 http(s) 直链（data: 形态的成品由浏览器自己带着字节，
- * 不往回传，避免几 MB 的 body 拖着生成流程），去空白、限量、限长。
+ * 归一上报的成品地址：只收 http(s) 直链，去空白、限量、限长。
+ *
+ * data: 形态的成品不从这里走——它不是「没人要」，而是被服务端在代理层直接截下了
+ * （上游报文里的 b64 字节一到代理就被提取归档，见 generation-rescue.server.ts）：
+ * 让浏览器把几 MB 的 base64 再回传一次，既慢又会在长连接上多一个失败点。
  */
 export function normalizeResultUrls(input: unknown): string[] {
     if (!Array.isArray(input)) return [];
@@ -82,4 +85,158 @@ export function mergeResultItems(existing: unknown, incoming: ResultItem[]): Res
 /** 归档成品的取件地址（与 client 端 archivedMediaUrls 同一形状） */
 export function resultMediaPath(jobId: string, index: number) {
     return `/api/generation/jobs/${encodeURIComponent(jobId)}/media/${index}`;
+}
+
+// ---------- 上游报文里的成品提取 ----------
+//
+// 2026-09-18 线上账：7 天 374 条任务判「成功」，其中 370 条手上什么都没有
+// ——因为成品是 base64 内联在上游报文里的（OpenAI 兼容通道 response_format=b64_json），
+// 而客户端上报只收 http(s) 直链，于是「图片在用户浏览器里、服务器上一片空白」。
+// 现在改成服务端在代理层直接看上游的原始报文，把成品就地取出来：不再依赖浏览器活着，
+// 也不再依赖上游愿意给一个可回源的地址。
+
+/** 上游报文里「字节已经在手」的成品 */
+export type InlineArtifact = { base64: string; mimeType: string };
+export type ExtractedArtifacts = { inline: InlineArtifact[]; urls: string[] };
+
+/** 单次提取的成品份数上限（与客户端上报上限同一档） */
+export const MAX_EXTRACTED_ARTIFACTS = 8;
+/** 短于这个长度的 base64 不可能是成品（避免把上游的任务号、哈希当成图片） */
+export const MIN_INLINE_BASE64_CHARS = 512;
+
+/** 归档来源：内联字节直接落盘，远程地址需要再取一次 */
+export type ResultSource = { kind: "url"; url: string } | { kind: "inline"; base64: string; mimeType: string };
+
+/** 归档来源整理：内联在前、远程在后，各自去重限量（顺序即成品下标） */
+export function resultSources(artifacts: ExtractedArtifacts): ResultSource[] {
+    const sources: ResultSource[] = [];
+    for (const artifact of artifacts.inline) sources.push({ kind: "inline", base64: artifact.base64, mimeType: artifact.mimeType });
+    for (const url of artifacts.urls) sources.push({ kind: "url", url });
+    return sources.slice(0, MAX_EXTRACTED_ARTIFACTS);
+}
+
+const BASE64_KEYS = new Set(["b64_json", "b64", "base64", "b64_data", "image_b64"]);
+const INLINE_OBJECT_KEYS = ["inlineData", "inline_data"];
+const URL_KEYS = new Set(["url", "image_url", "img_url", "cdn_url", "fileUri", "file_uri"]);
+const DATA_URL_PATTERN = /^data:((?:image|video|audio)\/[a-z0-9.+-]+);base64,([a-z0-9+/=]+)$/i;
+const BASE64_PATTERN = /^[a-z0-9+/=]+$/i;
+
+/** `data:image/png;base64,xxx` → 原样拆成字节 + MIME（内联成品最脏的一种形态） */
+export function parseInlineDataUrl(value: string): InlineArtifact | null {
+    const trimmed = value.trim();
+    if (!/^data:/i.test(trimmed)) return null;
+    // base64 本体可能有换行（个别通道按 76 列折行）；没空白就不复制，几 MB 的字符串少拷一次是一次
+    const compact = /\s/.test(trimmed) ? trimmed.replace(/\s+/g, "") : trimmed;
+    const matched = DATA_URL_PATTERN.exec(compact);
+    if (!matched) return null;
+    const base64 = matched[2];
+    if (base64.length < MIN_INLINE_BASE64_CHARS) return null;
+    return { base64, mimeType: matched[1].toLowerCase() };
+}
+
+type ArtifactSink = { inline: InlineArtifact[]; urls: Set<string> };
+
+function pushInline(sink: ArtifactSink, value: unknown, mimeType: string) {
+    if (sink.inline.length >= MAX_EXTRACTED_ARTIFACTS) return;
+    if (typeof value !== "string") return;
+    const base64 = /\s/.test(value) ? value.replace(/\s+/g, "") : value;
+    if (base64.length < MIN_INLINE_BASE64_CHARS || !BASE64_PATTERN.test(base64)) return;
+    if (sink.inline.some((item) => item.base64 === base64)) return;
+    sink.inline.push({ base64, mimeType: (mimeType || "image/png").toLowerCase() });
+}
+
+function pushUrl(sink: ArtifactSink, value: unknown) {
+    if (typeof value !== "string") return;
+    const url = value.trim();
+    if (url.length > MAX_RESULT_URL_LENGTH || !/^https?:\/\//i.test(url)) return;
+    if (sink.urls.size >= MAX_EXTRACTED_ARTIFACTS) return;
+    sink.urls.add(url);
+}
+
+/** 已知字段名下的字符串（`inlineData: {data, mimeType}` 这种嵌套对象用） */
+function pickText(record: Record<string, unknown>, keys: string[]): string {
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    return "";
+}
+
+/** 收集嵌套结构里的字符串（`result.images[].url` 可能是字符串也可能是数组） */
+function collectStrings(value: unknown, depth = 0): string[] {
+    if (depth > 3) return [];
+    if (typeof value === "string") return [value];
+    if (Array.isArray(value)) return value.flatMap((item) => collectStrings(item, depth + 1));
+    if (value && typeof value === "object") return Object.values(value as Record<string, unknown>).flatMap((item) => collectStrings(item, depth + 1));
+    return [];
+}
+
+function walkArtifacts(value: unknown, sink: ArtifactSink, depth: number) {
+    if (depth > 6) return;
+    if (Array.isArray(value)) {
+        for (const item of value) walkArtifacts(item, sink, depth + 1);
+        return;
+    }
+    if (!value || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+
+    // Gemini 系：content.parts[].inlineData / inline_data
+    for (const key of INLINE_OBJECT_KEYS) {
+        const nested = record[key];
+        if (!nested || typeof nested !== "object" || Array.isArray(nested)) continue;
+        const inner = nested as Record<string, unknown>;
+        pushInline(sink, pickText(inner, ["data", "b64_json", "base64"]), pickText(inner, ["mimeType", "mime_type", "content_type"]));
+    }
+
+    for (const [key, raw] of Object.entries(record)) {
+        const lower = key.toLowerCase();
+        if (typeof raw === "string") {
+            // data: URL 先判：`{url: "data:image/png;base64,..."}` 这种形态很常见，别当成远程地址丢掉
+            const fromDataUrl = parseInlineDataUrl(raw);
+            if (fromDataUrl) pushInline(sink, fromDataUrl.base64, fromDataUrl.mimeType);
+            else if (BASE64_KEYS.has(lower)) pushInline(sink, raw, "");
+            else if (URL_KEYS.has(key)) pushUrl(sink, raw);
+            continue;
+        }
+        if (BASE64_KEYS.has(lower)) {
+            for (const text of collectStrings(raw)) pushInline(sink, text, "");
+            continue;
+        }
+        if (URL_KEYS.has(key)) {
+            for (const text of collectStrings(raw)) pushUrl(sink, text);
+            continue;
+        }
+        walkArtifacts(raw, sink, depth + 1);
+    }
+}
+
+/**
+ * 从上游原始报文里提取成品（不认识的结构一律忽略，宁可漏认也不能乱认）。
+ * 只认已知字段名，不做无差别全文搜索——请求里带过来的参考图、提示词都可能被回显。
+ */
+export function extractArtifacts(payload: unknown): ExtractedArtifacts {
+    const sink: ArtifactSink = { inline: [], urls: new Set() };
+    walkArtifacts(payload, sink, 0);
+    return { inline: sink.inline.slice(0, MAX_EXTRACTED_ARTIFACTS), urls: [...sink.urls].slice(0, MAX_EXTRACTED_ARTIFACTS) };
+}
+
+/** 成品字节的真实类型（按文件头判定）：声明的 MIME 不可信，落盘前必须自己对一遍 */
+export function detectMediaMime(bytes: Uint8Array): string {
+    const startsWith = (offset: number, text: string) => {
+        for (let index = 0; index < text.length; index += 1) {
+            if (bytes[offset + index] !== text.charCodeAt(index)) return false;
+        }
+        return true;
+    };
+    if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+    if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+    if (bytes.length >= 6 && startsWith(0, "GIF8")) return "image/gif";
+    if (bytes.length >= 12 && startsWith(0, "RIFF") && startsWith(8, "WEBP")) return "image/webp";
+    if (bytes.length >= 12 && startsWith(0, "RIFF") && startsWith(8, "WAVE")) return "audio/wav";
+    if (bytes.length >= 12 && startsWith(4, "ftyp")) {
+        return startsWith(8, "qt") ? "video/quicktime" : "video/mp4";
+    }
+    if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) return "video/webm";
+    if (bytes.length >= 3 && startsWith(0, "ID3")) return "audio/mpeg";
+    return "";
 }

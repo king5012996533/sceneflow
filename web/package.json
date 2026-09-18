@@ -29,6 +29,8 @@
         "test:result": "node scripts/generation-result-unit-tests.mjs",
         "test:recovery": "node scripts/generation-recovery-unit-tests.mjs",
         "test:retention": "node scripts/generation-media-retention-unit-tests.mjs",
+        "test:upstream": "node scripts/upstream-error-unit-tests.mjs",
+        "test:artifact": "node scripts/generation-artifact-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

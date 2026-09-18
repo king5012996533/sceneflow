@@ -10,6 +10,11 @@ export interface ProxyRequestOptions {
     /** 原始文件上传：本地文件 base64 编码后的内容（代理服务端会解码成二进制转发，如 Replicate Files API） */
     bodyBase64?: string;
     responseType?: "json" | "blob";
+    /**
+     * 本次调用属于哪条生成任务（服务端据此把上游产出的成品就地归档）。
+     * 内联成品（b64）与任务制取件都必须带上：成品落在服务端，就不再看这个标签页的生死。
+     */
+    jobId?: string;
 }
 
 export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Promise<T> {

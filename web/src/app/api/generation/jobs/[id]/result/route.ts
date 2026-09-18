@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { isSameOriginRequest } from "@/lib/auth";
 import { requireCurrentUser } from "@/lib/current-user";
-import { isArchivedResultItem, mergeResultItems, normalizeResultUrls, resultMediaPath, type ResultItem } from "@/lib/generation/generation-result";
-import { archiveGenerationResults } from "@/lib/generation/generation-result.server";
+import { isArchivedResultItem, normalizeResultUrls, type ResultItem } from "@/lib/generation/generation-result";
+import { archiveGenerationResults, storeGenerationResults } from "@/lib/generation/generation-result.server";
 import { prisma } from "@/lib/ic-prisma";
 
 export const runtime = "nodejs";
@@ -37,7 +37,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         return NextResponse.json({ ok: false, archived: 0, reason: "任务已结算" });
     }
 
-    let existingData: unknown = job.resultData;
     if (job.status === "running") {
         const claimed = await prisma.generationJob.updateMany({
             where: { id: job.id, status: "running" },
@@ -51,20 +50,15 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         });
         if (!claimed.count) {
             // 并发结算抢在前面：它若把任务关成失败/取消，退款已经出手，这里不再翻案
-            const current = await prisma.generationJob.findFirst({ where: { id: job.id, userId: user.id }, select: { status: true, resultData: true } });
+            const current = await prisma.generationJob.findFirst({ where: { id: job.id, userId: user.id }, select: { status: true } });
             if (current?.status !== "succeeded") return NextResponse.json({ ok: false, archived: 0, reason: "任务已结算" });
-            existingData = current.resultData;
         }
     }
 
     try {
         const items = await archiveGenerationResults(job.id, urls);
-        const merged = mergeResultItems(existingData, items);
+        const merged = await storeGenerationResults(user.id, job.id, items);
         const archived = merged.filter(isArchivedResultItem).length;
-        await prisma.generationJob.updateMany({
-            where: { id: job.id, userId: user.id, status: "succeeded" },
-            data: { resultData: { items: merged }, resultUrl: isArchivedResultItem(merged[0]) ? resultMediaPath(job.id, 0) : urls[0] },
-        });
         console.log(`[generation-result] 任务 ${job.id} 成品已归档 ${archived}/${urls.length}`);
         return NextResponse.json({ ok: true, archived, total: urls.length });
     } catch (error) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
 import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
 import { isCredentialTargetAllowed, platformAuthHeaders, resolvePlatformCredential } from "@/lib/credential-store.server";
+import { salvageGenerationArtifacts } from "@/lib/generation/generation-rescue.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,6 +50,8 @@ export async function POST(req: NextRequest) {
             bodyBase64?: unknown;
             responseType?: unknown;
             stream?: unknown;
+            /** 本次上游调用属于哪条生成任务：有值且上游确实产出了成品时，服务端就地抢救归档 */
+            jobId?: unknown;
         };
 
         const target = await assertAllowedProxyUrl(String(envelope.url || ""));
@@ -163,6 +166,15 @@ export async function POST(req: NextRequest) {
                 const snippet = typeof data === "object" && data !== null ? JSON.stringify(data).slice(0, 400) : String(data).slice(0, 400);
                 const masked = safeHeaders.authorization ? safeHeaders.authorization.replace(/^Bearer\s+/i, "").replace(/^(.{6}).*(.{4})$/, "$1****$2") : "none";
                 console.error(`[proxy] 上游 ${response.status} ${method} ${target} key=${masked}: ${snippet}`);
+            }
+            // 上游产出即抢救：成品每个字节都经过这里，就地留给服务端，
+            // 之后用户标签页死没死、上游直链过没过期，都不再影响交付（见 generation-rescue.server.ts）
+            if (response.ok && typeof envelope.jobId === "string" && envelope.jobId) {
+                try {
+                    await salvageGenerationArtifacts({ userId: user.id, jobId: envelope.jobId, payload: data, source: `proxy ${method} ${target.pathname}` });
+                } catch (error) {
+                    console.error("[generation-rescue] 抢救异常", error instanceof Error ? error.message : error);
+                }
             }
             return NextResponse.json(data, { status: response.status });
         } finally {

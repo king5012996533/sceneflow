@@ -8,6 +8,7 @@ import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
 import { proxyFetch, proxyFetchStream } from "./proxy-client";
 import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskId, upstreamProviderFromBaseUrl } from "./image-task";
+import { composeUpstreamFailure, describeEnvelopeFailure, describeHttpStatus, describeNetworkFailure } from "@/lib/generation/upstream-error";
 import { isAspectRejection, parseSupportedRatios, pickSupportedRatio } from "./image-ratio";
 import { buildReferenceGenerationBody, isEditsEndpointUnsupported, normalizeReferenceDataUrl } from "./image-reference";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
@@ -268,7 +269,7 @@ function pickString(record: Record<string, unknown>, keys: string[]) {
 function parseImagePayload(payload: ImageApiResponse) {
     // 成功码统一判定：apimart 用 code:200 表示成功（旧代码只认 code===0，会把成功判成「请求失败」）
     if (!isSuccessCode(payload.code)) {
-        throw new Error(envelopeMessage(payload) || payload.msg || "请求失败");
+        throw new Error(composeUpstreamFailure([envelopeMessage(payload) || payload.msg, describeEnvelopeFailure(payload.code, describePayloadShape(payload))]));
     }
     const candidates: unknown[] = [];
     if (Array.isArray(payload.data)) {
@@ -325,14 +326,30 @@ function describePayloadShape(payload: unknown): string {
     return `顶层{${top}}`;
 }
 
+/** 上游信封里的说明文案：error 可能是字符串，也可能是 {message}（各家不统一） */
+function envelopeFailureMessage(responseData?: { error?: { message?: string } | string; msg?: string }) {
+    if (!responseData) return "";
+    if (typeof responseData.error === "string") return responseData.error;
+    return responseData.error?.message || "";
+}
+
+/**
+ * 失败原因必须留下可查的线索：HTTP 状态、上游信封说明、网络错误码与目标主机。
+ * 只剩「请求失败」四个字时，就没法判断「上游到底出图没有」（出了就该去补取件、把成品和这笔额度要回来）。
+ */
 function readAxiosError(error: unknown, fallback: string) {
     if (axios.isCancel(error)) return "请求已取消";
-    if (axios.isAxiosError<{ error?: { message?: string }; msg?: string; code?: number }>(error)) {
+    if (axios.isAxiosError<{ error?: { message?: string } | string; msg?: string; code?: number }>(error)) {
         const responseData = error.response?.data;
-        return responseData?.msg || responseData?.error?.message || readStatusError(error.response?.status, fallback);
+        const status = error.response?.status;
+        return composeUpstreamFailure(
+            [responseData?.msg || envelopeFailureMessage(responseData), status ? readStatusError(status, fallback) : "", describeNetworkFailure(error)],
+            fallback,
+        );
     }
     if (error instanceof DOMException && error.name === "AbortError") return "请求已取消";
-    return error instanceof Error ? error.message : fallback;
+    if (error instanceof Error) return composeUpstreamFailure([error.message, describeNetworkFailure(error)], fallback);
+    return composeUpstreamFailure([describeNetworkFailure(error)], fallback);
 }
 
 /**
@@ -369,7 +386,7 @@ function sleep(ms: number, signal?: AbortSignal) {
 }
 
 /** 轮询任务直到出图 / 失败 / 超时。 */
-async function pollImageTask(config: AiConfig, taskId: string, options?: RequestOptions) {
+async function pollImageTask(config: AiConfig, taskId: string, options?: RequestOptions, serverJobId?: string) {
     const deadline = Date.now() + IMAGE_TASK_TIMEOUT_MS;
     for (;;) {
         if (options?.signal?.aborted) throw new Error("请求已取消");
@@ -383,6 +400,7 @@ async function pollImageTask(config: AiConfig, taskId: string, options?: Request
             url: aiApiUrl(config, `/tasks/${encodeURIComponent(taskId)}`),
             method: "GET",
             headers: aiHeaders(config),
+            jobId: serverJobId,
         });
         const state = parseImageTaskState(payload);
         if (state.status === "completed") {
@@ -408,7 +426,7 @@ async function resolveImageSubmission(config: AiConfig, payload: ImageApiRespons
             externalId: taskId,
             externalGetUrl: aiApiUrl(config, `/tasks/${encodeURIComponent(taskId)}`),
         });
-        return await reportThenReturn(serverJobId, await pollImageTask(config, taskId, options));
+        return await reportThenReturn(serverJobId, await pollImageTask(config, taskId, options, serverJobId));
     }
     return await reportThenReturn(serverJobId, parseImagePayload(payload));
 }
@@ -449,9 +467,8 @@ function stripReasoning(text: string) {
 }
 
 function readStatusError(status: number | undefined, fallback: string) {
-    if (status === 401 || status === 403) return "鉴权失败，请检查 API Key 或模型权限";
-    if (status === 429) return "请求被限流或额度不足，请稍后重试";
-    return status ? `${fallback}：${status}` : fallback;
+    // 状态码语义统一在 lib/generation/upstream-error.ts（含 408/413/5xx 与兜底带码文案）
+    return describeHttpStatus(status, fallback);
 }
 
 function readImageApiError(payload: ImageApiResponse | null, fallback: string) {
@@ -674,7 +691,7 @@ function stringValue(value: unknown) {
 }
 
 function validateResponsePayload(payload: ResponseApiPayload) {
-    if (!isSuccessCode(payload.code)) throw new Error(envelopeMessage(payload) || payload.msg || "请求失败");
+    if (!isSuccessCode(payload.code)) throw new Error(composeUpstreamFailure([envelopeMessage(payload) || payload.msg, describeEnvelopeFailure(payload.code, describePayloadShape(payload))]));
     if (payload.error?.message) throw new Error(payload.error.message);
 }
 
@@ -1118,15 +1135,15 @@ function parseGeminiToolResponse(payload: GeminiPayload): ToolResponseResult {
     return { content, toolCalls };
 }
 
-async function requestGeminiImages(config: AiConfig, prompt: string, references: ReferenceImage[], count: number, options?: RequestOptions) {
+async function requestGeminiImages(config: AiConfig, prompt: string, references: ReferenceImage[], count: number, options?: RequestOptions, serverJobId?: string) {
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
     const requestPrompt = withImageSizeInstruction(prompt, config.size, requestSize);
-    const requests = Array.from({ length: count }, () => requestGeminiImagesOnce(config, requestPrompt, references, options));
+    const requests = Array.from({ length: count }, () => requestGeminiImagesOnce(config, requestPrompt, references, options, serverJobId));
     return (await Promise.all(requests)).flat();
 }
 
-async function requestGeminiImagesOnce(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
+async function requestGeminiImagesOnce(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions, serverJobId?: string) {
     const parts: GeminiPart[] = [{ text: prompt }];
     for (const image of references) {
         parts.push(toGeminiImagePart(await imageToDataUrl(image)));
@@ -1135,6 +1152,7 @@ async function requestGeminiImagesOnce(config: AiConfig, prompt: string, referen
         url: geminiApiUrl(config, "generateContent"),
         method: "POST",
         headers: geminiHeaders(config),
+        jobId: serverJobId,
         body: {
             ...toGeminiBody(config, [{ role: "user", content: prompt }], { generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }),
             contents: [{ role: "user", parts }],
@@ -1164,7 +1182,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     if (requestConfig.apiFormat === "gemini") {
         try {
-            return await requestGeminiImages(requestConfig, prompt, [], n, options);
+            return await requestGeminiImages(requestConfig, prompt, [], n, options, serverJobId);
         } catch (error) {
             throw new Error(readAxiosError(error, "请求失败"));
         }
@@ -1185,7 +1203,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 output_compression: 90,
             }, options, serverJobId);
         } catch (error) {
-            throw new Error(readAxiosError(error, "request failed"));
+            throw new Error(readAxiosError(error, "请求失败"));
         }
     }
     const url = aiApiUrl(requestConfig, "/images/generations");
@@ -1203,11 +1221,11 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     try {
         let payload: ImageApiResponse;
         try {
-            payload = await proxyFetch<ImageApiResponse>({ url, method: "POST", headers, body: body() });
+            payload = await proxyFetch<ImageApiResponse>({ url, method: "POST", headers, jobId: serverJobId, body: body() });
         } catch (error) {
             const aspectRatio = readAspectRetryRatio(errorText(error), config.size, requestSize);
             if (!aspectRatio) throw error;
-            payload = await proxyFetch<ImageApiResponse>({ url, method: "POST", headers, body: body(aspectRatio) });
+            payload = await proxyFetch<ImageApiResponse>({ url, method: "POST", headers, jobId: serverJobId, body: body(aspectRatio) });
         }
         return await resolveImageSubmission(requestConfig, payload, options, serverJobId);
     } catch (error) {
@@ -1224,7 +1242,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     if (requestConfig.apiFormat === "gemini") {
         if (mask) throw new Error("Gemini 调用格式暂不支持蒙版编辑");
         try {
-            return await requestGeminiImages(requestConfig, requestPrompt, references, n, options);
+            return await requestGeminiImages(requestConfig, requestPrompt, references, n, options, serverJobId);
         } catch (error) {
             throw new Error(readAxiosError(error, "请求失败"));
         }
@@ -1244,7 +1262,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                 output_compression: 90,
             }, options, serverJobId);
         } catch (error) {
-            throw new Error(readAxiosError(error, "request failed"));
+            throw new Error(readAxiosError(error, "请求失败"));
         }
     }
     const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
@@ -1271,6 +1289,8 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         formData.set("_proxy_url", aiApiUrl(requestConfig, "/images/edits"));
         formData.set("_proxy_method", "POST");
         formData.set("_proxy_headers", JSON.stringify(aiHeaders(requestConfig)));
+        // 任务号随表单一起走：上游一旦出图，服务端就地归档，不再赌这个标签页还活着
+        if (serverJobId) formData.set("_proxy_job", serverJobId);
         return fetch("/canvas/api/proxy/form-data", {
             method: "POST",
             body: formData,
@@ -1283,7 +1303,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         let response = await submit();
         let data = (await response.json().catch(() => null)) as ImageApiResponse | null;
         if (!response.ok) {
-            const message = readImageApiError(data, readStatusError(response.status, "request failed"));
+            const message = readImageApiError(data, readStatusError(response.status, "请求失败"));
             // 上游编辑端点不吃这个模型（apimart 只让 Grok 图像模型走 /images/edits）→ 按文档改走
             // 生成端点 + image_urls 重投一次。该答复是直接拒收，没建任务、没计费，重投不花钱。
             // 带蒙版的编辑没法这么改道（生成端点的 image_urls 不接蒙版），原样把上游原话抛出去。
@@ -1293,6 +1313,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                     url: aiApiUrl(requestConfig, "/images/generations"),
                     method: "POST",
                     headers: aiHeaders(requestConfig, "application/json"),
+                    jobId: serverJobId,
                     body: buildReferenceGenerationBody({
                         model: requestConfig.model,
                         prompt: withSystemPrompt(requestConfig, requestPrompt),
@@ -1310,7 +1331,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
             if (!aspectRatio) throw new Error(message);
             response = await submit(aspectRatio);
             data = (await response.json().catch(() => null)) as ImageApiResponse | null;
-            if (!response.ok) throw new Error(readImageApiError(data, readStatusError(response.status, "request failed")));
+            if (!response.ok) throw new Error(readImageApiError(data, readStatusError(response.status, "请求失败")));
         }
         return await resolveImageSubmission(requestConfig, data || {}, options, serverJobId);
     } catch (error) {

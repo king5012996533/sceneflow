@@ -472,6 +472,27 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/lib/old-url-aliases.ts", '"/canvas/records": "/records"', "旧 /canvas/records 外链必须能归一化到新页面，与其他工具页一致。");
 }
 
+// —— 成品抢救（2026-09-18 黑洞：上游 99% 成功，我们 374 条「成功」里 370 条手里什么都没有）——
+// 内联成品（b64_json）与上游临时直链都只存在于「上游」和「用户浏览器」这两处不属于我们的地方，
+// 所以服务端必须在代理层就把上游报文里的成品取出来自己留着。这里钉住「不能悄悄退回去」的几件事。
+{
+    const pure = read("src/lib/generation/generation-result.ts");
+    assert(pure.includes("MAX_EXTRACTED_ARTIFACTS = 8"), "单次抢救最多 8 份成品：无上限的提取会一口气吃掉内存。");
+    assert(pure.includes("MIN_INLINE_BASE64_CHARS"), "短 base64 不得当成品：任务号、哈希、图标会被误认为图片。");
+    assert(pure.includes("detectMediaMime("), "内联成品的类型必须按文件头判定，不能信上游声明的 MIME。");
+    const rescue = read("src/lib/generation/generation-rescue.server.ts");
+    assert(rescue.includes('data: { status: "succeeded"'), "抢救必须先认领（判成功），抢在客户端把任务关成失败、退款出手之前。");
+    assert(rescue.indexOf('data: { status: "succeeded"') < rescue.indexOf("void archiveResultSources("), "认领必须发生在归档之前：这笔账怎么结只看上游有没有产出，不看我们有没有落盘。");
+    assert(rescue.includes("RESCUABLE_KINDS"), "只有会产出成品的通道（图片/视频）才抢救，文本与工具调用不落盘。");
+    assertNotMatches("src/lib/generation/generation-rescue.server.ts", /externalGetUrl|apiKey|Authorization/i, "抢救只留成品，不得把上游凭据写进生成记录。");
+    assertIncludes("src/app/api/proxy/route.ts", "salvageGenerationArtifacts(", "JSON 代理是内联成品唯一经过的地方，必须抢救。");
+    assertIncludes("src/app/api/proxy/form-data/route.ts", "salvageGenerationArtifacts(", "参考图生图主路径走 form-data 代理，同样必须抢救。");
+    // 客户端不带任务号，服务端就不知道这份成品该归档给谁 —— 这是整条链路最容易被顺手删掉的一环
+    const image = read("src/services/api/image.ts");
+    assert(image.includes("jobId: serverJobId"), "图片代理请求必须带上任务号，否则服务端拿到成品也不知道归档给哪条任务。");
+    assert(image.includes('formData.set("_proxy_job"'), "form-data 生图路径同样要带任务号。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

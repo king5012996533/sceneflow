@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
 import { assertAllowedProxyUrl, fetchSafely, isHostOrSubdomain } from "@/lib/url-safety";
 import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
+import { salvageGenerationArtifacts } from "@/lib/generation/generation-rescue.server";
 import FormData from "form-data";
 
 export const runtime = "nodejs";
@@ -32,6 +33,8 @@ export async function POST(req: NextRequest) {
         const target = await assertAllowedProxyUrl(String(incoming.get("_proxy_url") || ""));
         const method = sanitizeMethod(incoming.get("_proxy_method") || "POST");
         const safeHeaders = sanitizeHeaders(parseHeaders(incoming.get("_proxy_headers")));
+        /** 本次上游调用属于哪条生成任务（参考图生图主路径也走抢救） */
+        const jobId = String(incoming.get("_proxy_job") || "");
 
         // 平台凭证（按目标 host + 可选 provider/model 匹配）；无平台凭证 → 无 Key（BYOK 已彻底移除）
         const sfProvider = typeof safeHeaders["x-sf-provider"] === "string" ? safeHeaders["x-sf-provider"] : undefined;
@@ -99,6 +102,14 @@ export async function POST(req: NextRequest) {
                 const raw = bearer || (typeof safeHeaders.apikey === "string" ? safeHeaders.apikey : "");
                 const masked = raw ? raw.replace(/^(.{6}).*(.{4})$/, "$1****$2") : "none";
                 console.error(`[proxy/form-data] 上游 ${response.status} ${method} ${target} key=${masked}: ${snippet}`);
+            }
+            // 上游产出即抢救（与 JSON 代理同一套）：图生图的成品也在这里就地留给服务端
+            if (response.ok && jobId) {
+                try {
+                    await salvageGenerationArtifacts({ userId: user.id, jobId, payload: data, source: `proxy/form-data ${method} ${target.pathname}` });
+                } catch (error) {
+                    console.error("[generation-rescue] 抢救异常", error instanceof Error ? error.message : error);
+                }
             }
             return NextResponse.json(data, { status: response.status });
         } finally {
