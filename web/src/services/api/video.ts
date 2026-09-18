@@ -14,6 +14,7 @@ import { apiPath } from "@/lib/app-paths";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
+import { reportGenerationResult } from "@/lib/generation/server-upstream-client";
 
 type VideoResponse = { id: string; status?: string; error?: { message?: string } };
 type ApiVideoResponse = VideoResponse | { code?: number; data?: VideoResponse | null; msg?: string };
@@ -39,7 +40,15 @@ const SEEDANCE_PROXY_IMAGE_URL_BUDGET_BYTES = 2_800_000;
 const REPLICATE_VIDEO_IMAGE_MAX_BYTES = 900 * 1024;
 const REPLICATE_VIDEO_IMAGE_MAX_SIDE = 1280;
 
-export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
+/**
+ * 视频成品。
+ *
+ * sourceUrl 是上游给的那条取件地址（dola / zjcdn / volces 这类第三方 CDN）。
+ * 它必须跟着结果一起传出来：调用方拿到成品的当下就要把这条地址上报服务端归档
+ * （见 reportGenerationResult），否则「浏览器没下完 → 任务被判失败 → 退款」
+ * 而钱已经在上游花掉了，损失只能平台自己扛。
+ */
+export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string; sourceUrl?: string };
 export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "replicate" | "minimax" | "aigccc" | "genvideo"; model: string; result?: VideoGenerationResult };
 export type VideoGenerationTaskState = { status: "pending" } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
@@ -87,7 +96,10 @@ export async function requestVideoGeneration(
     serverJobId?: string,
 ): Promise<VideoGenerationResult> {
     const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options, serverJobId);
-    if (task.result) return task.result;
+    if (task.result) {
+        reportVideoResult(serverJobId, task.result);
+        return task.result;
+    }
     const delayMs = videoPollDelayMs(task.provider);
     const attempts = POLL_ATTEMPTS[task.provider];
     let consecutiveFailures = 0;
@@ -103,13 +115,32 @@ export async function requestVideoGeneration(
             pollFailed = true;
             state = { status: "pending" };
         }
-        if (state.status === "completed") return state.result;
+        if (state.status === "completed") {
+            reportVideoResult(serverJobId, state.result);
+            return state.result;
+        }
         if (state.status === "failed") throw new Error(state.error);
         if (!pollFailed) consecutiveFailures = 0;
         if (attempt === attempts - 1) throw new Error(videoPollTimeoutMessage(task.provider, attempts, delayMs));
         await delay(delayMs, options?.signal);
     }
     throw new Error(videoPollTimeoutMessage(task.provider, attempts, delayMs));
+}
+
+/**
+ * 视频成品一到手就把上游取件地址上报服务端（服务端会先认领、再自己归档一份）。
+ *
+ * 视频这条链路过去是最脆的：上游地址是 dola / zjcdn 这类会过期、按 Referer 防盗链的
+ * 第三方 CDN 直链，浏览器那边一旦下载失败或页面被关掉，任务就被判失败并退款，
+ * 而上游的钱早就花掉了（2026-09-18 对账：视频失败 235 条 / 成功 121 条，
+ * 已结算成功的 121 条里只有 22 条留下了地址，还是很快会失效的那种）。
+ *
+ * 不 await：上报是后台动作，不能拖慢用户看视频；服务端认领只要一次写库，抢在
+ * 客户端把任务关成 failed 之前落地就够了。
+ */
+function reportVideoResult(serverJobId: string | undefined, result: VideoGenerationResult) {
+    if (!serverJobId || !result.sourceUrl) return;
+    void reportGenerationResult(serverJobId, [result.sourceUrl]);
 }
 
 function videoPollDelayMs(provider: VideoGenerationTask["provider"]) {
@@ -1044,11 +1075,11 @@ async function videoResultFromUrl(url: string, options?: RequestOptions): Promis
         // 一律 403（线上事故 2026-09-16：视频下载不到、节点回退成直链后 <video> 也放不出来）。
         const blob = await fetchAssetBlob(mediaUrl, options?.signal, "video");
         await assertVideoBlob(blob);
-        return { blob };
+        return { blob, sourceUrl: mediaUrl };
     } catch (error) {
         if (axios.isCancel(error) || options?.signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
         // 兜底：下载不成时给同源代理地址播放（相对直链更可靠，也绕开防盗链）
-        return { url: assetProxyUrl(mediaUrl, "video"), mimeType: "video/mp4" };
+        return { url: assetProxyUrl(mediaUrl, "video"), mimeType: "video/mp4", sourceUrl: mediaUrl };
     }
 }
 

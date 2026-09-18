@@ -5,6 +5,7 @@ import type { AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { beginClientGeneration, finishClientGeneration, runGuardedGeneration } from "./generation-guard";
+import { reportGenerationResult } from "./server-upstream-client";
 
 type RequestOptions = { signal?: AbortSignal };
 
@@ -51,9 +52,7 @@ export type ToolGenerationRequest = {
 
 export async function requestGeneratedImages({ config, prompt, references = [], mask, options }: ImageGenerationRequest) {
     const count = Math.max(1, Math.min(50, Math.floor(Number(config.count) || 1)));
-    return runGuardedGeneration("image", count, generationMetadata(config, prompt, references.length), (job) =>
-        references.length ? requestEdit(config, prompt, references, mask, options, job.id) : requestGeneration(config, prompt, options, job.id),
-    );
+    return runGuardedGeneration("image", count, generationMetadata(config, prompt, references.length), (job) => (references.length ? requestEdit(config, prompt, references, mask, options, job.id) : requestGeneration(config, prompt, options, job.id)));
 }
 
 export async function requestGeneratedVideo({ config, prompt, references = [], videoReferences = [], audioReferences = [], options }: VideoGenerationRequest) {
@@ -78,6 +77,10 @@ export async function createGeneratedVideoTask({ config, prompt, references = []
 export async function pollGeneratedVideoTask(config: AiConfig, task: GuardedVideoGenerationTask, options?: GenerationRequestOptions): Promise<VideoGenerationTaskState> {
     try {
         const state = await pollVideoGenerationTask(config, task, options);
+        // 成品一到手就先上报服务端归档（服务端认领后任务即算成功，不再看浏览器后面还活着没有）
+        if (task.generationJobId && state.status === "completed" && state.result.sourceUrl) {
+            void reportGenerationResult(task.generationJobId, [state.result.sourceUrl]);
+        }
         if (task.generationJobId && state.status !== "pending") {
             await finishClientGeneration(task.generationJobId, state.status === "completed" ? "succeeded" : "failed", state.status === "failed" ? state.error : undefined);
         }

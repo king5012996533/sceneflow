@@ -238,8 +238,10 @@ assertIncludes("src/services/api/image-ratio.ts", "pickSupportedRatio", "按上�
 assertNotMatches("src/services/api/image-ratio.ts", /proxyFetch|fetch\(|axios/, "image-ratio 必须是纯逻辑（不触网），才能在浏览器与 Node 下直接单测。");
 // —— 素材下载重试（2026-09-18：getapib.org 三个 IP 里有一个连不通，DNS 轮转 → 同一张图时好时坏）——
 assertIncludes("src/app/api/proxy/asset/route.ts", "ASSET_ATTEMPTS", "素材下载失败必须换解析结果重试，否则「上游已出图计费、前端却拿不回来」会反复出现。");
-assertIncludes("src/lib/url-safety.ts", "canFallbackToOtherAddresses", "GET 类请求必须在多个已校验地址间回退，否则个别不可达 IP 会让同一张图时好时坏。");
-assertIncludes("src/lib/url-safety.ts", "init?.body == null", "带请求体的请求不得换址重试（重复投递可能重复扣费）。");
+assertIncludes("src/lib/url-safety.ts", "raceConnect", "多地址必须并发抢连：个别地址是黑洞时，串行换址会把一次取件拖到 30 秒以上（实测 32 秒），浏览器早断开。");
+assertIncludes("src/lib/url-safety.ts", "socket.setTimeout(0)", "抢连用的空闲超时必须在建连成功后清掉，否则慢速下载会被中途掐断。");
+assertIncludes("src/lib/url-safety.ts", "createConnection: () => socket", "抢连只抢「连接」：请求必须写在唯一胜出的那条连接上，不得为换址重投请求（生成类请求重投会重复扣费）。");
+assertNotMatches("src/lib/url-safety.ts", /for \(const candidate of addresses\)/, "多地址不得再串行逐个试：黑洞地址会把一次取件拖到 30 秒以上（实测 32 秒）。");
 assertIncludes("src/app/api/proxy/asset/route.ts", "fetchSafely(url", "素材下载重试的每次尝试都必须重新过 fetchSafely（安全校验不得被重试绕过）。");
 assertIncludes("src/lib/credential-store.server.ts", "isHostOrSubdomain(targetHost, credHost)", "凭证 host 匹配必须边界匹配（禁止反向后缀，H-1）。");
 assertNotMatches("src/lib/credential-store.server.ts", /endsWith\(`\.\$\{targetHost\}`\)/, "凭证匹配不得允许反向后缀（H-1）。");
@@ -394,6 +396,18 @@ for (const storageModule of ["src/lib/media-store.server.ts", "src/lib/asset-cac
     assert(claimAt > -1 && archiveAt > -1 && claimAt < archiveAt, "必须先认领（判成功）再归档：认领是毫秒级写库，必须抢在客户端把任务关成 failed 之前落地。");
 }
 assertIncludes("src/services/api/image.ts", "reportGenerationResult(", "图片拿到成品地址后必须上报服务端归档，交付不得只靠浏览器。");
+// 视频是这条链路上最脆的一环：地址是 dola/zjcdn 这类会过期、按 Referer 防盗链的第三方直链，
+// 浏览器下载失败或页面被关掉就判失败退款，而上游的钱早花了（121 条成功里只有 22 条留了地址）。
+assertIncludes("src/services/api/video.ts", "sourceUrl", "上游取件地址必须跟着视频结果一起传出来，否则上报时无地址可用。");
+assertIncludes("src/services/api/video.ts", "reportVideoResult", "视频成品一到手就得上报服务端归档。");
+assertIncludes("src/services/api/video.ts", "void reportGenerationResult(", "上报是后台动作，不得 await 拖慢出片。");
+{
+    const request = read("src/lib/generation/generation-request.ts");
+    const at = request.indexOf("export async function pollGeneratedVideoTask(");
+    const body = at > -1 ? request.slice(at, request.indexOf("\n}", at)) : "";
+    assert(body.includes("reportGenerationResult("), "异步任务制视频（先建任务、再轮询）过去结算时一个成品地址都不留，必须补上报。");
+    assert(body.indexOf("reportGenerationResult(") < body.indexOf("finishClientGeneration("), "视频也必须先上报（认领）再结算：反了就等于先退款、再想把钱要回来。");
+}
 assertIncludes("src/lib/generation/server-upstream-client.ts", "reportGenerationResult", "客户端必须有成品上报入口。");
 assertNotMatches("src/lib/generation/generation-result.ts", /fetch\(|prisma|axios|import /, "成品归档的判定逻辑必须是纯逻辑（不触网、不连库、无依赖），才能在 Node 下直接单测。");
 assertIncludes("src/lib/generation/server-media-storage.server.ts", "archiveGenerationMedia", "服务端归档模块必须保留归档写入入口。");

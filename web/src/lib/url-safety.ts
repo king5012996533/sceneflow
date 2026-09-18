@@ -245,52 +245,110 @@ function finishRequest(req: ClientRequest, init: RequestInit | undefined, reject
     req.end();
 }
 
-/** 用 node:http/https 直连钉死的 IP，返回标准 Response（后续代理层逻辑无需改动）。 */
-function pinnedFetch(target: URL, ip: string, family: number, init?: RequestInit): Promise<Response> {
+/**
+ * 单个地址的建连时限。全黑洞的域名必须在有限时间内失败：内核 SYN 重试要跑完 6 轮（约 127 秒），
+ * 那期间请求只是挂着——浏览器早断开（nginx 里是一串 499），上游却已经收钱。
+ * 连上之后立刻清掉这个定时器（见 raceConnect），否则慢速下载会被当成「空闲超时」掐断。
+ */
+export const CONNECT_ATTEMPT_TIMEOUT_MS = 8_000;
+/** 并发抢连的错峰间隔：先开第一个地址，很短时间没连上就并行开后面的 */
+export const CONNECT_RACE_STAGGER_MS = 200;
+
+/** 建一个到已校验地址的连接（https 用真实域名做 SNI，证书照常校验；绝不做二次 DNS）。 */
+function connectPinned(target: URL, address: PinnedAddress): Socket | TLSSocket {
+    const isHttps = target.protocol === "https:";
+    const options = {
+        host: address.address,
+        family: address.family,
+        port: Number(target.port || (isHttps ? 443 : 80)),
+        servername: isHttps ? target.hostname : undefined,
+        rejectUnauthorized: true,
+        timeout: CONNECT_ATTEMPT_TIMEOUT_MS,
+    };
+    return isHttps ? tlsConnect(options) : netConnect(options);
+}
+
+/**
+ * 多地址并发抢连（Happy Eyeballs）。
+ *
+ * 2026-09-18 线上实测：apimart 的图床 getapib.org 三个地址里，124.156.129.98 是黑洞
+ * （SYN 被丢，连不上也报不了错），43.154.188.71 建连只要 11 毫秒。原来的「逐个地址试」
+ * 一旦先撞上黑洞地址，一张 1MB 的图要 32 秒才拿到（curl 与线上请求都复现了同样的 32 秒）；
+ * 生成类 POST 更糟——那时干脆没有换址逻辑，只能挂到内核放弃为止。
+ *
+ * 这里同时向所有已校验地址发起连接，谁先连上就用谁，其余立刻销毁：
+ *   - 只抢「连接」不抢「请求」：最终只有胜出的那条连接会被写入请求，POST 依然只投递一次
+ *     （会重复扣费的是重投请求，不是并发建连）；
+ *   - 不放宽任何安全约束：候选地址在解析阶段已逐一校验为公网，SNI/证书校验照旧对真实域名。
+ */
+function raceConnect(target: URL, addresses: PinnedAddress[]): Promise<Socket | TLSSocket> {
+    return new Promise((resolve, reject) => {
+        const readyEvent = target.protocol === "https:" ? "secureConnect" : "connect";
+        const sockets: Array<Socket | TLSSocket> = [];
+        let settled = false;
+        let pending = addresses.length;
+        let firstError: Error | null = null;
+
+        const settleWithError = (error: Error) => {
+            firstError = firstError || error;
+            pending -= 1;
+            if (!settled && pending <= 0) reject(firstError);
+        };
+
+        const start = (address: PinnedAddress) => {
+            if (settled) return;
+            const socket = connectPinned(target, address);
+            sockets.push(socket);
+            socket.once(readyEvent, () => {
+                if (settled) {
+                    socket.destroy();
+                    return;
+                }
+                settled = true;
+                // 建连用的空闲超时不能带进下载阶段：大文件传输中途静默几秒是正常的
+                socket.setTimeout(0);
+                for (const other of sockets) if (other !== socket) other.destroy();
+                resolve(socket);
+            });
+            socket.once("error", settleWithError);
+            socket.once("timeout", () => socket.destroy(new Error("连接超时")));
+        };
+
+        addresses.forEach((address, index) => {
+            if (index === 0) start(address);
+            else setTimeout(start, CONNECT_RACE_STAGGER_MS * index, address);
+        });
+    });
+}
+
+/** 在已建好的连接上发请求，返回标准 Response（后续代理层逻辑无需改动）。 */
+function fetchOverSocket(target: URL, socket: Socket | TLSSocket, init?: RequestInit): Promise<Response> {
     const isHttps = target.protocol === "https:";
     const headers = { Host: target.host, ...headersToRecord(init?.headers) };
 
     return new Promise<Response>((resolve, reject) => {
         const options = {
             protocol: target.protocol,
-            hostname: ip, // 钉死的 IP，不做二次 DNS
-            family,
+            hostname: target.hostname,
             port: target.port || (isHttps ? 443 : 80),
             method: String(init?.method || "GET"),
             path: target.pathname + target.search,
             headers,
             // SNI 仍用原始域名，保证 TLS 证书校验针对真实域名而非 IP
             servername: isHttps ? target.hostname : undefined,
+            agent: false,
+            // 连接已经建好（且钉在已校验的 IP 上），直接交出去，不再走 agent 的 DNS
+            createConnection: () => socket,
         };
         const req = (isHttps ? httpsRequest : httpRequest)(options, (res) => resolve(toWebResponse(res)));
         finishRequest(req, init, reject);
     });
 }
 
-/**
- * 多地址回退：DNS 常返回多个地址，其中个别地址在境内根本不可达（实测 getapib.org 三个 IP 里
- * 有一个连接必挂），过去只钉第一个，于是同一张图「时好时坏」。不带请求体的请求（GET/HEAD）
- * 是幂等的，逐个地址试到连上为止；带请求体的请求（生成类 POST）无法确认上游是否已收到，
- * 一律不换址重试，避免重复投递导致重复扣费。
- * 换址不放宽任何安全约束：候选地址在解析阶段已逐一校验为公网，且始终不做二次 DNS。
- */
-export function canFallbackToOtherAddresses(addresses: PinnedAddress[], init?: RequestInit): boolean {
-    // 带请求体的请求一律不换址：无法确认上游是否已收到，生成类 POST 重投会重复扣费
-    return addresses.length > 1 && init?.body == null;
-}
-
 async function pinnedFetchAny(target: URL, addresses: PinnedAddress[], init?: RequestInit): Promise<Response> {
-    if (!canFallbackToOtherAddresses(addresses, init)) return pinnedFetch(target, addresses[0].address, addresses[0].family, init);
-
-    let lastError: unknown;
-    for (const candidate of addresses) {
-        try {
-            return await pinnedFetch(target, candidate.address, candidate.family, init);
-        } catch (error) {
-            lastError = error;
-        }
-    }
-    throw lastError instanceof Error ? lastError : new Error("连接失败");
+    if (!addresses.length) throw new Error("目标域名解析失败");
+    const socket = await raceConnect(target, addresses);
+    return fetchOverSocket(target, socket, init);
 }
 
 /** CONNECT 响应头最大字节数：本地代理回一个状态行就够，超了说明对面不是代理。 */

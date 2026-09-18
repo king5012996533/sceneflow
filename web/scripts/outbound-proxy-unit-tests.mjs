@@ -15,7 +15,7 @@ import assert from "node:assert";
 import http from "node:http";
 import net from "node:net";
 
-import { assertAllowedProxyUrl, canFallbackToOtherAddresses, fetchSafely } from "../src/lib/url-safety.ts";
+import { CONNECT_ATTEMPT_TIMEOUT_MS, CONNECT_RACE_STAGGER_MS, assertAllowedProxyUrl, fetchSafely } from "../src/lib/url-safety.ts";
 
 let passed = 0;
 const failures = [];
@@ -243,27 +243,13 @@ rejectProxy.server.close();
 sniProxy.server.close();
 capture.server.close();
 
-// —— 多地址回退的边界（2026-09-18：getapib.org 三个 IP 里有一个连不通，同一张图时好时坏）——
-// 换址重试只允许用在**不带请求体**的请求上：GET/HEAD 幂等，而生成类 POST 无法确认上游是否已收到，
-// 重投会造成重复扣费。
-const THREE = [
-    { address: "203.0.113.10", family: 4 },
-    { address: "203.0.113.11", family: 4 },
-    { address: "203.0.113.12", family: 4 },
-];
-
-await check("换址回退：多个地址 + 无请求体（GET）才允许换址", () => {
-    assert.strictEqual(canFallbackToOtherAddresses(THREE, undefined), true);
-    assert.strictEqual(canFallbackToOtherAddresses(THREE, { method: "GET" }), true);
-});
-
-await check("换址回退：带请求体的请求（生成类 POST）一律不换址，避免重复扣费", () => {
-    assert.strictEqual(canFallbackToOtherAddresses(THREE, { method: "POST", body: "{}" }), false);
-    assert.strictEqual(canFallbackToOtherAddresses(THREE, { method: "POST", body: new Uint8Array(1) }), false);
-});
-
-await check("换址回退：只有一个地址时没什么可换", () => {
-    assert.strictEqual(canFallbackToOtherAddresses([THREE[0]], undefined), false);
+// —— 多地址并发抢连（2026-09-18：getapib.org 三个地址里一个是黑洞，串行换址让一张图要 32 秒）——
+// 规则收在常量里：单个地址的建连时限必须有界（否则全黑洞的域名会挂到内核 SYN 重试跑完，约 127 秒），
+// 错峰间隔要足够小（否则「抢」就退化成串行）。真正的抢连行为在线上用真实图床验证过（32 秒 → 1 秒）。
+await check("抢连参数：建连时限有界、错峰间隔足够小", () => {
+    assert.ok(CONNECT_ATTEMPT_TIMEOUT_MS > 0 && CONNECT_ATTEMPT_TIMEOUT_MS <= 15_000, `单个地址建连时限必须在 15 秒内，实际 ${CONNECT_ATTEMPT_TIMEOUT_MS}`);
+    assert.ok(CONNECT_RACE_STAGGER_MS > 0 && CONNECT_RACE_STAGGER_MS <= 500, `错峰间隔必须不超过 500ms，实际 ${CONNECT_RACE_STAGGER_MS}`);
+    assert.ok(CONNECT_RACE_STAGGER_MS < CONNECT_ATTEMPT_TIMEOUT_MS, "错峰间隔必须小于建连时限，否则后面的地址还没开始就先输了");
 });
 
 console.log(failures.length === 0 ? `\n全部通过：${passed} 项` : `\n通过 ${passed} 项，失败 ${failures.length} 项：${failures.join("、")}`);
