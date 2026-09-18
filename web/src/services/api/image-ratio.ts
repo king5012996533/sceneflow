@@ -68,3 +68,23 @@ export function pickSupportedRatio(desired: string | undefined, supported: strin
     }
     return best;
 }
+
+/**
+ * 被上游按画幅拒收之后，照它自己列出的比例重投用的请求体（服务端执行路径也用这一份）。
+ *
+ * 只认「明确说画幅不支持」的报错；改法就是把像素尺寸换成比例串（与客户端
+ * `body(aspectRatio)` 是同一件事），其余字段原样带过去。
+ * 请求体里没有可用的画幅时返回 null —— 那说明这不是画幅问题，别乱重投。
+ */
+export function aspectRetryBody(body: unknown, errorMessage: string): Record<string, unknown> | null {
+    if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+    if (!isAspectRejection(errorMessage)) return null;
+    const record = body as Record<string, unknown>;
+    const desired = typeof record.size === "string" ? record.size : typeof record.aspect_ratio === "string" ? record.aspect_ratio : "";
+    if (!desired) return null;
+    // 像素尺寸（1824x1024）与比例串（16:9）都能被 pickSupportedRatio 读懂
+    const ratio = pickSupportedRatio(desired.replace(/x/gi, ":"), parseSupportedRatios(errorMessage));
+    if (!ratio) return null;
+    const { size: _size, ...rest } = record;
+    return { ...rest, aspect_ratio: ratio };
+}

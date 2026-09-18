@@ -213,9 +213,18 @@ assertIncludes("src/stores/use-config-store.ts", 'value.includes("aigccc666.com"
 // proxy/route.ts 现在必须走那个共享函数，规则本身仍必须是域名边界匹配（禁止 includes 子串，H-1 防 Key 外泄）。
 assertIncludes("src/lib/credential-store.server.ts", 'isHostOrSubdomain(hostname, "aigccc666.com")', "平台鉴权头规则必须用域名边界匹配为 aigccc 注入 ApiKey（禁止 includes 子串，防 Key 外泄 H-1）。");
 assertNotMatches("src/lib/credential-store.server.ts", /includes\("aigccc666\.com"\)/, "平台鉴权头规则不得用 includes 子串匹配 aigccc 域名（H-1 平台 Key 外泄）。");
-assertIncludes("src/app/api/proxy/form-data/route.ts", 'isHostOrSubdomain(target.hostname, "aigccc666.com")', "form-data proxy 必须用域名边界匹配为 aigccc 注入 ApiKey（禁止 includes 子串）。");
+// 2026-09-18：两条代理路由的鉴权收进 upstream-auth.server.ts（补发与服务端执行也要发上游请求），
+// 路由只负责调它。aigccc 的 apikey 头规则留在 platformAuthHeaders 里，不得在别处再抄一份。
+assertIncludes("src/lib/generation/upstream-auth.server.ts", "platformAuthHeaders(", "上游鉴权必须走共享的头规则（platformAuthHeaders），不得再就地写一套。");
+assertNotMatches("src/lib/generation/upstream-auth.server.ts", /includes\("aigccc666\.com"\)/, "上游鉴权不得用 includes 子串匹配 aigccc 域名（H-1 平台 Key 外泄）。");
+assertIncludes("src/app/api/proxy/route.ts", "authorizeUpstreamRequest(", "JSON 代理必须走共享的鉴权实现（信封重放与它用同一份）。");
+assertIncludes("src/app/api/proxy/form-data/route.ts", "authorizeUpstreamRequest(", "form-data 代理必须走共享的鉴权实现（信封重放与它用同一份）。");
 assertNotMatches("src/app/api/proxy/route.ts", /includes\("aigccc666\.com"\)/, "proxy 不得再用 includes 子串匹配 aigccc 域名（H-1 平台 Key 外泄）。");
 assertNotMatches("src/app/api/proxy/form-data/route.ts", /includes\("aigccc666\.com"\)/, "form-data proxy 不得再用 includes 子串匹配 aigccc 域名（H-1）。");
+// 信封要落库，所以平台密钥绝不能被写进去：platformAuthHeaders 会产出的每个头名都必须在摘除名单里
+for (const credentialHeader of ["authorization", "apikey", "x-goog-api-key"]) {
+    assertIncludes("src/lib/generation/upstream-auth.server.ts", `"${credentialHeader}"`, `信封摘除名单必须包含 ${credentialHeader}：漏掉它，平台密钥会被写进任务记录的 metadata。`);
+}
 
 // —— 安全加固（2026-08-18 审计）——
 assertIncludes("src/lib/url-safety.ts", "embeddedIpv4", "SSRF 校验必须识别内嵌 IPv4（mapped/NAT64/6to4/IPv4-compatible，H-2）。");
@@ -436,9 +445,9 @@ assertNotMatches("src/lib/generation/generation-recovery.ts", /fetch\(|prisma|ax
     assert(recovery.includes('where: { id: job.id, status: "running" }'), "补取件认领必须带 status=running 条件，不得覆盖用户自己的结算。");
     assert(!recovery.includes("refundCredits"), "补取件只负责把成品取回并按成功结算，退款是清扫的事。");
 }
-// 鉴权头规则只有一份：代理路由（浏览器请求）与补取件（服务端自己问上游）共用
-assertIncludes("src/app/api/proxy/route.ts", "platformAuthHeaders(", "代理路由必须用共享的鉴权头规则，不得再就地写一套。");
-assertIncludes("src/lib/credential-store.server.ts", "export function platformAuthHeaders(", "平台鉴权头规则必须集中导出，供代理与补取件共用。");
+// 鉴权头规则只有一份：代理路由（浏览器请求）、信封重放（服务端自己问上游）共用同一份实现
+assertIncludes("src/lib/generation/upstream-auth.server.ts", "platformAuthHeaders(", "上游鉴权必须用共享的鉴权头规则，不得再就地写一套。");
+assertIncludes("src/lib/credential-store.server.ts", "export function platformAuthHeaders(", "平台鉴权头规则必须集中导出，供代理、补取件与信封重放共用。");
 
 // —— 成品的保留期与自动清理（2026-09-18：归档只进不出会撑爆磁盘，但也不能用完即删）——
 // 归档目录现在只进不出，一张图 1–3MB、一条视频几十 MB，迟早占满磁盘；可是删早了又回到
@@ -496,7 +505,10 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(guard.includes("recover?"), "结算失败后要留一个「服务端其实已判成功」的补救入口。");
     assert(guard.includes('settled?.status === "succeeded"'), "补救必须以服务端结算结果为准，不能拿本地状态猜。");
     assertIncludes("src/lib/generation/generation-request.ts", "recoverDeliveredImages", "图片生成失败时必须尝试把服务端已归档的成品取回来给用户。");
-    assertIncludes("src/lib/generation/generation-request.ts", "resultUrlsFromItems(", "补救取件地址要走统一的下标映射，别自己拼媒体路径。");
+    // 取件实现只有一份（server-run-client）：兜底恢复与「服务端替我们执行」要的是同一件事，
+    // 各写一份迟早一边改了、另一边取不到图。下标映射仍在 resultUrlsFromItems 里，别自己拼媒体路径。
+    assertIncludes("src/lib/generation/generation-request.ts", "imagesFromServerRun(", "补救取件必须复用统一的取件实现（server-run-client），不得各写一份。");
+    assertIncludes("src/lib/generation/server-run-client.ts", "resultUrlsFromItems(", "补救取件地址要走统一的下标映射，别自己拼媒体路径。");
 }
 
 // —— 「客户端放弃」不再等于「上游没产出」（2026-09-18 黑洞最后一环）——
@@ -570,6 +582,67 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(report.includes("有成品却没留下"), "日报必须单独列出「有成品却没留下」，这是白烧钱的直接指标。");
     assertIncludes("src/lib/generation/generation-report.server.ts", "externalStatus", "日报要从任务上读「丢弃」标记，否则这项永远是 0。");
     assertIncludes("src/app/api/internal/generation/daily-report/route.ts", "GENERATION_WORKER_SECRET", "日报接口是内部接口，必须校验 worker 密钥。");
+}
+
+// —— 阶段 1/2：请求信封存服务端 + 服务端替浏览器执行（2026-09-18 深夜）——
+// 背景：7 天 170 条失败里 51 条死在我们自己这侧（部署重启、900 秒超时、连接被重置），
+// 而同步通道没有上游任务号 —— 发起调用的进程一没，成品就永远拿不回来（上游照收费）。
+{
+    const envelope = read("src/lib/generation/generation-envelope.ts");
+    // 纯逻辑：判定与执行分开，判定这一半才能在 Node 下直接单测（补发是拿钱换确定性，必须钉得住）
+    assert(!/^import|require\(/.test(envelope), "信封的判定必须是纯逻辑（无 import），才能在 Node 下直接单测。");
+    assert(envelope.includes("MAX_ENVELOPE_BODY_BYTES"), "留信封必须有体积上限：超大素材信封落盘不划算，宁可这一单走补取件。");
+    assert(envelope.includes("export function decideResend") && envelope.includes("budget-spent"), "补发必须收成一条决策，且必须带预算上限（每单最多补发几次）。");
+    assert(envelope.includes('input.status !== "running"') && envelope.includes("has-artifact"), "已经结账或已经有成品的任务一律不补发。");
+    assert(envelope.includes("call-in-flight"), "有调用在飞时不得补发：那是双份计费最直接的来源。");
+    assert(envelope.includes("upstream-task-known"), "手上有上游任务号的（任务制通道）不得重放提交：那只会在上游多建一个任务、多收一次钱。");
+    // 服务端执行默认关闭：这是把整条链路换个主人，必须由运维显式打开、也能一个变量改回去
+    assert(envelope.includes("SERVER_RUN_GENERATION") && envelope.includes("if (!input.policy.enabled) return false;"), "服务端执行开关必须默认关闭（运维显式打开），出问题能一个环境变量回滚。");
+    // 白名单按主机名配：线上 ProviderCredential.provider 是协议标签（ggwk1 与 apimart 都是 openai），
+    // 只按标签配会把任务制通道（提交只回任务号、需要有人轮询）一起放进名单，那是这套机制最不该碰的一类。
+    assert(envelope.includes("SERVER_RUN_HOSTS") && envelope.includes("SERVER_REPLAY_HOSTS"), "可补发/可服务端执行的渠道必须按主机名配（渠道标签分不开 ggwk1 与 apimart）。");
+    assert(envelope.includes("hosts.endsWith") || envelope.includes("isHostMatch"), "渠道主机名必须做域名边界匹配，不得用子串匹配（evil-前缀域名会混进白名单）。");
+    assert(envelope.includes("EnvelopeSlot") && envelope.includes("upstreamEnvelopeFallback"), "信封要分主/备两个槽位：改道方案不能被主请求覆盖。");
+
+    const auth = read("src/lib/generation/upstream-auth.server.ts");
+    assert(auth.includes("stripCredentialHeaders("), "信封落库前必须摘掉鉴权头（包括 aigccc 的 apikey 与 gemini 的 x-goog-api-key）。");
+    assert(!/sk-[A-Za-z0-9]/.test(auth), "信封相关代码里不得出现任何真实密钥字面量。");
+
+    const spool = read("src/lib/generation/generation-spool.server.ts");
+    assert(spool.includes("os.homedir()") && !spool.includes("process.cwd()"), "信封必须落在用户主目录下：放在 cwd 等于每次部署（也就是最需要它的时候）被清空。");
+    assert(spool.includes("safeJobId("), "信封的文件路径必须由任务号推导并校验，防止目录穿越。");
+    assert(spool.includes("不影响本次生成"), "信封写失败绝不能让这次生成失败：它保的是「万一这也挂了」，不能成为新的失败点。");
+
+    const jsonRoute = read("src/app/api/proxy/route.ts");
+    const formRoute = read("src/app/api/proxy/form-data/route.ts");
+    for (const [name, route] of [
+        ["JSON 代理", jsonRoute],
+        ["form-data 代理", formRoute],
+    ]) {
+        assert(route.includes("saveUpstreamEnvelope("), `${name}必须把这次调用的信封留给服务端（阶段 1 的全部依据）。`);
+        assert(route.indexOf("saveUpstreamEnvelope(") < route.indexOf("fetchSafely("), `${name}必须在**发出请求之前**落信封：反过来，进程死在半路时这一单既没成品也没信封。`);
+        assert(route.includes("canRunOnServer(") && route.includes("resolveServerRunPolicy("), `${name}的延后必须由服务端策略决定（客户端只声明，不决定）。`);
+        assert(route.includes("stripCredentialHeaders("), `${name}落库的信封不得带鉴权头。`);
+        assert(route.includes("findRunnableGenerationJob("), `${name}只能把任务交给本人、且仍在跑的任务（已结账的任务不接受新的上游调用）。`);
+    }
+    assert(jsonRoute.includes("deferred: true") && formRoute.includes("deferred: true"), "延后执行必须回一个可识别的 202（客户端据此转轮询），不能只回任务号。");
+
+    const run = read("src/lib/generation/generation-run.server.ts");
+    assert(run.includes("beginUpstreamCall(") && run.includes("isUpstreamCallInFlight("), "服务端执行与补发必须登记在飞状态，否则补发会与它自己并发重投。");
+    assert(run.includes("recordResendAttempt("), "补发前必须先记预算：进程被杀也不能变成无限重试。");
+    assert(run.includes("AbortSignal.timeout(RUN_TIMEOUT_MS)"), "服务端执行必须有超时，不得裸 fetch 一个可能永不返回的上游。");
+    assert(run.includes("salvageGenerationArtifacts("), "服务端执行必须走同一套抢救与结账，不得另写一份归档逻辑。");
+
+    const resendRoute = read("src/app/api/internal/generation/resend/route.ts");
+    assert(resendRoute.includes('req.headers.get("x-generation-worker-secret")'), "补发接口是内部接口，密钥必须从请求头取（不得放进 URL 查询串）。");
+    assert(resendRoute.includes('runtime = "nodejs"'), "补发接口要用 node runtime（要读 spool 目录、要连库）。");
+
+    const client = read("src/services/api/proxy-client.ts");
+    assert(client.includes("export async function proxyFetchDeferrable") && client.includes("status === 202"), "客户端必须能识别服务端的 202 并转到轮询（老路径与延后路径共用一份响应解析）。");
+    const image = read("src/services/api/image.ts");
+    assert(image.includes("proxyFetchDeferrable<") && image.includes("awaitServerRunImages("), "图片主路径（生成与参考图生图）必须接上服务端执行的那条路。");
+    const serverRun = read("src/lib/generation/server-run-client.ts");
+    assert(serverRun.includes("AbortError"), "用户在服务端执行期间点取消必须抛 AbortError：否则会被结算成「失败」而不是「取消」。");
 }
 
 if (failures.length) {

@@ -15,7 +15,7 @@
  */
 import assert from "node:assert";
 
-import { isAspectRejection, parseSupportedRatios, pickSupportedRatio } from "../src/services/api/image-ratio.ts";
+import { aspectRetryBody, isAspectRejection, parseSupportedRatios, pickSupportedRatio } from "../src/services/api/image-ratio.ts";
 
 let passed = 0;
 const failures = [];
@@ -91,6 +91,45 @@ check("挑比例：目标画幅读不出来时不重投", () => {
 check("组合：拿到线上那句 400，端到端应当重投 16:9", () => {
     const ratio = isAspectRejection(ASPECT_400) ? pickSupportedRatio("57:32", parseSupportedRatios(ASPECT_400)) : null;
     assert.strictEqual(ratio, "16:9");
+});
+
+// —— 重投请求体（服务端执行路径用它，客户端那条路用的是 image.ts 里同一套判据） ——
+check("重投体：像素尺寸换成上游列出的比例串，size 去掉、其余字段原样带过去", () => {
+    const body = { model: "gemini-3.1-flash-image-preview", prompt: "一只猫", n: 1, size: "1824x1024", response_format: "b64_json" };
+    assert.deepStrictEqual(aspectRetryBody(body, ASPECT_400), {
+        model: "gemini-3.1-flash-image-preview",
+        prompt: "一只猫",
+        n: 1,
+        response_format: "b64_json",
+        aspect_ratio: "16:9",
+    });
+});
+
+check("重投体：请求体里没有画幅时返回 null（这不是画幅问题，别乱重投）", () => {
+    assert.strictEqual(aspectRetryBody({ model: "m", prompt: "p" }, ASPECT_400), null);
+    assert.strictEqual(aspectRetryBody({}, ASPECT_400), null);
+});
+
+check("重投体：上游报的明显不是画幅问题（内容审核/余额）时一律不重投", () => {
+    const body = { size: "1824x1024", prompt: "p" };
+    assert.strictEqual(aspectRetryBody(body, "内容审核未通过"), null);
+    assert.strictEqual(aspectRetryBody(body, "当前服务器没有可用账号，自动补号启动，请重试"), null);
+    assert.strictEqual(aspectRetryBody(body, ""), null);
+});
+
+check("重投体：只认得出 auto 时返回 null（等于放弃画幅意图，不如把上游原话抛给用户）", () => {
+    assert.strictEqual(aspectRetryBody({ size: "1824x1024" }, 'unsupported image aspect ratio "1824:1024" supported ratios: auto'), null);
+});
+
+check("重投体：非对象请求体（字符串/数组/null）不得崩，也不得乱改", () => {
+    assert.strictEqual(aspectRetryBody("model=m&size=1824x1024", ASPECT_400), null);
+    assert.strictEqual(aspectRetryBody(["1824x1024"], ASPECT_400), null);
+    assert.strictEqual(aspectRetryBody(null, ASPECT_400), null);
+});
+
+check("重投体：已经带 aspect_ratio 的请求体也能被改（用它的值当目标画幅）", () => {
+    const body = { prompt: "p", aspect_ratio: "1824x1024" };
+    assert.deepStrictEqual(aspectRetryBody(body, ASPECT_400), { prompt: "p", aspect_ratio: "16:9" });
 });
 
 console.log(failures.length === 0 ? `\n全部通过：${passed} 项` : `\n通过 ${passed} 项，失败 ${failures.length} 项：${failures.join("、")}`);

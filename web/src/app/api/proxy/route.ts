@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
 import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
-import { isCredentialTargetAllowed, platformAuthHeaders, resolvePlatformCredential } from "@/lib/credential-store.server";
 import { salvageGenerationArtifacts } from "@/lib/generation/generation-rescue.server";
 import { settleDeferredClientFailure } from "@/lib/generation/generation-jobs.server";
 import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
+import { authorizeUpstreamRequest, pickContentType, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
+import { canRunOnServer, resolveServerRunPolicy, shouldPersistEnvelope, type UpstreamEnvelope } from "@/lib/generation/generation-envelope";
+import { findRunnableGenerationJob, startServerRun } from "@/lib/generation/generation-run.server";
+import { saveUpstreamEnvelope } from "@/lib/generation/generation-spool.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,6 +57,8 @@ export async function POST(req: NextRequest) {
             stream?: unknown;
             /** 本次上游调用属于哪条生成任务：有值且上游确实产出了成品时，服务端就地抢救归档 */
             jobId?: unknown;
+            /** 调用方声明「我能接受延后取结果」：是否真的延后由服务端按环境开关决定（阶段 2） */
+            deferrable?: unknown;
         };
 
         const target = await assertAllowedProxyUrl(String(envelope.url || ""));
@@ -65,36 +70,15 @@ export async function POST(req: NextRequest) {
         const sfProvider = typeof safeHeaders["x-sf-provider"] === "string" ? safeHeaders["x-sf-provider"] : undefined;
         const sfModel = typeof safeHeaders["x-sf-model"] === "string" ? safeHeaders["x-sf-model"] : undefined;
 
-        const platformCred = await resolvePlatformCredential({ targetUrl: target.toString(), provider: sfProvider, model: sfModel });
-
+        // 鉴权与白名单：与其他两条上游路径（form-data 代理、信封重放）共用同一份实现
+        const authorization = await authorizeUpstreamRequest({ headers: safeHeaders, targetUrl: target.toString(), providerHint: sfProvider, modelHint: sfModel });
         // 代理白名单：只放行已注册渠道（目标必须与凭证同源）。
         // 只做同源校验、不做路径前缀限制（各渠道端点拼接规则不同，见 isCredentialTargetAllowed）。
         // 无凭证（未注册 host）或跨源目标直接拒绝，避免把请求发往任意地址。
-        if (!platformCred || !isCredentialTargetAllowed(platformCred.baseUrl, target.toString())) {
+        if (!authorization) {
             return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
         }
-
-        let finalToken = "";
-        let keySource: KeySource = "none";
-        if (platformCred) {
-            finalToken = platformCred.apiKey;
-            keySource = "platform";
-        }
-
-        // 清掉原有的 Authorization（可能是 "Authorization" 或 "authorization"，避免同名字头重复），统一写小写
-        for (const key of Object.keys(safeHeaders)) {
-            if (key.toLowerCase() === "authorization") delete safeHeaders[key];
-        }
-        if (finalToken) {
-            // 鉴权头规则与超时补取件共用一份（platformAuthHeaders）：两处用的是同一把密钥、同一批网关
-            const authHeaders = platformAuthHeaders({ provider: platformCred.provider, apiKey: finalToken }, target.toString());
-            for (const [name, value] of Object.entries(authHeaders)) {
-                for (const key of Object.keys(safeHeaders)) {
-                    if (key.toLowerCase() === name) delete safeHeaders[key];
-                }
-                safeHeaders[name] = value;
-            }
-        }
+        const keySource: KeySource = "platform";
         console.log(`[proxy] key-source=${keySource} target=${target.hostname}${target.pathname}`);
 
         const upstreamBody = buildUpstreamBody(envelope.body, envelope.bodyBase64, safeHeaders);
@@ -124,6 +108,57 @@ export async function POST(req: NextRequest) {
 
         const method = sanitizeMethod(envelope.method);
         const jobId = typeof envelope.jobId === "string" && envelope.jobId ? envelope.jobId : "";
+
+        // —— 阶段 2：把这次调用交给服务端执行，浏览器不再等长连接 ——
+        // 客户端在信封里声明「我能接受延后取结果」（deferrable），是否真的延后由服务端按环境开关决定：
+        // 开关关着时这里整个跳过，走的还是原来的同步路径（回滚不需要改客户端、也不需要重新构建前端）。
+        const serverRunPolicy = resolveServerRunPolicy();
+        const canDefer = envelope.deferrable === true && canRunOnServer({ policy: serverRunPolicy, provider: authorization.provider, url: target.toString(), stream: envelope.stream, responseType: envelope.responseType, hasJobId: Boolean(jobId) });
+        if (canDefer) {
+            const job = await findRunnableGenerationJob(user.id, jobId);
+            if (job) {
+                const deferredEnvelope: Omit<UpstreamEnvelope, "savedAt"> = {
+                    url: target.toString(),
+                    method,
+                    headers: stripCredentialHeaders(safeHeaders),
+                    contentType: pickContentType(safeHeaders),
+                    provider: authorization.provider,
+                    model: sfModel,
+                    bodyBytes: upstreamBody.byteLength,
+                    origin: "defer",
+                };
+                // 信封先落盘再交给后台执行：进程若在落盘前死掉，这一单既没有成品也没有信封
+                const stored = await saveUpstreamEnvelope({ userId: user.id, jobId, envelope: deferredEnvelope, body: upstreamBody.value as Buffer | string | undefined });
+                if (stored) {
+                    startServerRun({ job, envelope: { ...deferredEnvelope, savedAt: Date.now() } });
+                    console.log(`[proxy] 任务 ${jobId} 转由服务端执行（渠道 ${authorization.provider}）：浏览器不再持有这条长连接`);
+                    return NextResponse.json({ deferred: true, jobId, status: "running" }, { status: 202 });
+                }
+                // 信封存不下来就别逞强：这类请求正是最需要「活下来的凭据」的，落回同步路径用户才拿得到图
+                console.warn(`[proxy] 任务 ${jobId} 信封落库失败，回落到同步路径`);
+            }
+        }
+
+        // 留信封（阶段 1）：把「怎么问上游」记在任务上，调用方死在半路时服务端能原样再问一次。
+        // 鉴权头不落库（Key 只在发送那一刻注入），重放时重新解析。
+        if (shouldPersistEnvelope({ stream: envelope.stream === true, hasJobId: Boolean(jobId), bodyBytes: upstreamBody.byteLength, responseType: envelope.responseType })) {
+            await saveUpstreamEnvelope({
+                userId: user.id,
+                jobId,
+                envelope: {
+                    url: target.toString(),
+                    method,
+                    headers: stripCredentialHeaders(safeHeaders),
+                    contentType: pickContentType(safeHeaders),
+                    provider: authorization.provider,
+                    model: sfModel,
+                    bodyBytes: upstreamBody.byteLength,
+                    origin: "live",
+                },
+                body: upstreamBody.value as Buffer | string | undefined,
+            });
+        }
+
         // 登记「我们发往上游的这一次调用还在飞」：浏览器那条长连接断了之后，
         // 客户端会立刻报失败结账，可上游其实还在跑、还在收我们的钱。
         // 结算侧据此先不结账（见 generation-jobs.server.ts），等这里真正看见上游结果再定论。

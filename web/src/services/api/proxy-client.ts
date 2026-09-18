@@ -15,7 +15,16 @@ export interface ProxyRequestOptions {
      * 内联成品（b64）与任务制取件都必须带上：成品落在服务端，就不再看这个标签页的生死。
      */
     jobId?: string;
+    /**
+     * 声明「我能接受延后取结果」（阶段 2）。
+     * 服务端据此可以不走同步长连接，而是自己执行这次调用、把成品归档，让客户端轮询任务状态。
+     * 是否真的延后由服务端的环境开关决定：开关关着时它照旧同步返回，客户端按老路径解析。
+     */
+    deferrable?: boolean;
 }
+
+/** 一次代理调用的两种结局：要么拿到上游报文（老路径），要么服务端接下了这一单（返回任务号） */
+export type ProxyOutcome<T> = { deferred: true; jobId: string } | { deferred: false; data: T };
 
 export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Promise<T> {
     const payload = JSON.stringify(options);
@@ -41,12 +50,47 @@ export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Pro
         return res.blob() as Promise<T>;
     }
 
+    return (await readProxyOutcome<T>(res)) as T;
+}
+
+/**
+ * 可延后的代理调用（阶段 2 入口）：向服务端声明「我能接受延后取结果」。
+ *
+ * 服务端若接下这一单，会立刻回 202 + 任务号，调用方转去轮询任务状态（见 server-run-client）；
+ * 若服务端开关没开、或这一单不适合交给服务端（任务制通道等），它照旧同步返回上游报文，
+ * 这里把报文原样交回去走老路径。**回滚只需改服务端环境变量**，客户端不用重新构建。
+ */
+export async function proxyFetchDeferrable<T = unknown>(options: ProxyRequestOptions): Promise<ProxyOutcome<T>> {
+    const payload = JSON.stringify({ ...options, deferrable: true });
+    if (payload.length > PROXY_WARNING_BYTES && !options.bodyBase64) {
+        // 体积超限的请求不留信封（服务端也会拒绝延后），直接按老路径发，让服务端给出准确提示
+        return { deferred: false, data: await proxyFetch<T>(options) };
+    }
+    const res = await fetch(PROXY_PATH, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        credentials: "include",
+    });
+    return readProxyOutcome<T>(res);
+}
+
+/**
+ * 读一次代理响应的结局：202 + {deferred:true} 表示服务端接下了这一单，
+ * 其余情况按老路径解析报文（含错误映射）。form-data 路由手写 fetch 的那几处也复用它。
+ */
+export async function readProxyOutcome<T = unknown>(res: Response): Promise<ProxyOutcome<T>> {
+    if (res.status === 202) {
+        const payload = await res.json().catch(() => null);
+        const jobId = (payload as { deferred?: unknown; jobId?: unknown } | null)?.deferred === true ? (payload as { jobId?: unknown }).jobId : undefined;
+        if (typeof jobId === "string" && jobId) return { deferred: true, jobId };
+    }
     const data = await res.json().catch(() => null);
     if (!res.ok) {
         const msg = proxyErrorMessage(data) || proxyStatusMessage(res.status);
         throw new Error(normalizeUpstreamError(msg));
     }
-    return data as T;
+    return { deferred: false, data: data as T };
 }
 
 /**

@@ -33,6 +33,7 @@
         "test:artifact": "node scripts/generation-artifact-unit-tests.mjs",
         "test:inflight": "node scripts/upstream-inflight-unit-tests.mjs",
         "test:report": "node scripts/generation-report-unit-tests.mjs",
+        "test:envelope": "node scripts/generation-envelope-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

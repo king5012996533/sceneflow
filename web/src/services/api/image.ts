@@ -6,12 +6,13 @@ import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
-import { proxyFetch, proxyFetchStream } from "./proxy-client";
+import { proxyFetch, proxyFetchDeferrable, proxyFetchStream, readProxyOutcome } from "./proxy-client";
 import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskId, upstreamProviderFromBaseUrl } from "./image-task";
 import { composeUpstreamFailure, describeEnvelopeFailure, describeHttpStatus, describeNetworkFailure } from "@/lib/generation/upstream-error";
 import { isAspectRejection, parseSupportedRatios, pickSupportedRatio } from "./image-ratio";
 import { buildReferenceGenerationBody, isEditsEndpointUnsupported, normalizeReferenceDataUrl } from "./image-reference";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
+import { awaitServerRunImages, ServerRunError } from "@/lib/generation/server-run-client";
 import { reportGenerationResult, reportUpstreamTask } from "@/lib/generation/server-upstream-client";
 
 export type AiTextMessage = {
@@ -26,10 +27,7 @@ export type ResponseToolCall = {
     thoughtSignature?: string;
 };
 
-export type ResponseInputMessage =
-    | AiTextMessage
-    | { type: "function_call"; call_id: string; name: string; arguments: string; thoughtSignature?: string }
-    | { role: "tool"; tool_call_id: string; content: string };
+export type ResponseInputMessage = AiTextMessage | { type: "function_call"; call_id: string; name: string; arguments: string; thoughtSignature?: string } | { role: "tool"; tool_call_id: string; content: string };
 
 export type ResponseFunctionTool = {
     type: "function";
@@ -49,10 +47,7 @@ export type ToolResponseResult = {
 type ToolChoice = "auto" | "required" | { type: "function"; name: string };
 type ResponseMessageContent = AiTextMessage["content"] | string;
 type ResponseInputContent = { type: "input_text"; text: string } | { type: "input_image"; image_url: string };
-type ResponseInputItem =
-    | { role: "system" | "user" | "assistant"; content: string | ResponseInputContent[] }
-    | { type: "function_call"; call_id: string; name: string; arguments: string }
-    | { type: "function_call_output"; call_id: string; output: string };
+type ResponseInputItem = { role: "system" | "user" | "assistant"; content: string | ResponseInputContent[] } | { type: "function_call"; call_id: string; name: string; arguments: string } | { type: "function_call_output"; call_id: string; output: string };
 type ResponseApiToolDefinition = {
     type: "function";
     name: string;
@@ -60,9 +55,7 @@ type ResponseApiToolDefinition = {
     parameters: Record<string, unknown>;
     strict?: boolean;
 };
-type ResponseApiOutputItem =
-    | { type?: "message"; content?: Array<{ type?: string; text?: string }> }
-    | { type?: "function_call"; id?: string; call_id?: string; name?: string; arguments?: string };
+type ResponseApiOutputItem = { type?: "message"; content?: Array<{ type?: string; text?: string }> } | { type?: "function_call"; id?: string; call_id?: string; name?: string; arguments?: string };
 type ResponseApiPayload = {
     id?: string;
     output?: ResponseApiOutputItem[];
@@ -290,13 +283,7 @@ function parseImagePayload(payload: ImageApiResponse) {
         if (Array.isArray(value)) candidates.push(...value);
     }
     const images = candidates
-        .map((item) =>
-            item && typeof item === "object" && !Array.isArray(item)
-                ? resolveImageDataUrl(item as Record<string, unknown>)
-                : typeof item === "string" && (/^https?:\/\//i.test(item) || /^data:image\//i.test(item))
-                  ? item
-                  : null,
-        )
+        .map((item) => (item && typeof item === "object" && !Array.isArray(item) ? resolveImageDataUrl(item as Record<string, unknown>) : typeof item === "string" && (/^https?:\/\//i.test(item) || /^data:image\//i.test(item)) ? item : null))
         .filter((value): value is string => Boolean(value))
         .map((dataUrl) => ({ id: nanoid(), dataUrl }));
 
@@ -316,12 +303,16 @@ function describePayloadShape(payload: unknown): string {
     if (Array.isArray(data)) {
         const first = data[0];
         if (first && typeof first === "object") {
-            return `顶层{${top}}，data 数组${data.length}项，项字段{${Object.keys(first as Record<string, unknown>).slice(0, 6).join(",")}}`;
+            return `顶层{${top}}，data 数组${data.length}项，项字段{${Object.keys(first as Record<string, unknown>)
+                .slice(0, 6)
+                .join(",")}}`;
         }
         return `顶层{${top}}，data 数组${data.length}项`;
     }
     if (data && typeof data === "object") {
-        return `顶层{${top}}，data 对象字段{${Object.keys(data as Record<string, unknown>).slice(0, 6).join(",")}}`;
+        return `顶层{${top}}，data 对象字段{${Object.keys(data as Record<string, unknown>)
+            .slice(0, 6)
+            .join(",")}}`;
     }
     return `顶层{${top}}`;
 }
@@ -342,10 +333,7 @@ function readAxiosError(error: unknown, fallback: string) {
     if (axios.isAxiosError<{ error?: { message?: string } | string; msg?: string; code?: number }>(error)) {
         const responseData = error.response?.data;
         const status = error.response?.status;
-        return composeUpstreamFailure(
-            [responseData?.msg || envelopeFailureMessage(responseData), status ? readStatusError(status, fallback) : "", describeNetworkFailure(error)],
-            fallback,
-        );
+        return composeUpstreamFailure([responseData?.msg || envelopeFailureMessage(responseData), status ? readStatusError(status, fallback) : "", describeNetworkFailure(error)], fallback);
     }
     if (error instanceof DOMException && error.name === "AbortError") return "请求已取消";
     if (error instanceof Error) return composeUpstreamFailure([error.message, describeNetworkFailure(error)], fallback);
@@ -437,7 +425,10 @@ async function resolveImageSubmission(config: AiConfig, payload: ImageApiRespons
  * 不 await：回报是后台动作，不能拖慢用户看到图片。
  */
 function reportThenReturn(serverJobId: string | undefined, images: Array<{ id: string; dataUrl: string }>) {
-    void reportGenerationResult(serverJobId, images.map((image) => image.dataUrl));
+    void reportGenerationResult(
+        serverJobId,
+        images.map((image) => image.dataUrl),
+    );
     return images;
 }
 
@@ -814,7 +805,10 @@ function toChatCompletionBody(config: AiConfig, body: Record<string, unknown>) {
                 let reasoningContent = (msg as any).reasoning_content || (msg as any).reasoning || "";
                 if (!reasoningContent && rawContent.includes("[REASONING]")) {
                     const parts = rawContent.split(/\[REASONING\]|\[\/REASONING\]/);
-                    if (parts.length >= 3) { reasoningContent = parts[1]; cleanContent = parts.slice(2).join(""); }
+                    if (parts.length >= 3) {
+                        reasoningContent = parts[1];
+                        cleanContent = parts.slice(2).join("");
+                    }
                 }
                 const assistantMsg: any = { role: "assistant", content: cleanContent || null };
                 // DeepSeek 严格要求往返携带 reasoning_content
@@ -880,7 +874,7 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
     let streamError = "";
     let strayPayload = "";
 
-stream: for (;;) {
+    stream: for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -924,7 +918,9 @@ stream: for (;;) {
                         if (tc.function?.arguments) existing.function.arguments += tc.function.arguments;
                     }
                 }
-            } catch { /* skip parse errors */ }
+            } catch {
+                /* skip parse errors */
+            }
         }
     }
 
@@ -943,12 +939,7 @@ stream: for (;;) {
 }
 
 function toGeminiBody(config: AiConfig, messages: ResponseInputMessage[], extra?: Record<string, unknown>) {
-    const systemText = [
-        config.systemPrompt.trim(),
-        ...messages.flatMap((message) => (!("type" in message) && message.role === "system" ? [geminiTextContent(message.content)] : [])),
-    ]
-        .filter(Boolean)
-        .join("\n\n");
+    const systemText = [config.systemPrompt.trim(), ...messages.flatMap((message) => (!("type" in message) && message.role === "system" ? [geminiTextContent(message.content)] : []))].filter(Boolean).join("\n\n");
     const contents = toGeminiContents(messages.filter((message) => ("type" in message ? true : message.role !== "system")));
     return {
         contents,
@@ -1008,10 +999,7 @@ function toGeminiToolOptions(tools: ResponseFunctionTool[], toolChoice: ToolChoi
         description: tool.function.description,
         parameters: tool.function.parameters,
     }));
-    const functionCallingConfig =
-        typeof toolChoice === "object"
-            ? { mode: "ANY", allowedFunctionNames: [toolChoice.name] }
-            : { mode: toolChoice === "required" ? "ANY" : "AUTO" };
+    const functionCallingConfig = typeof toolChoice === "object" ? { mode: "ANY", allowedFunctionNames: [toolChoice.name] } : { mode: toolChoice === "required" ? "ANY" : "AUTO" };
     return {
         tools: [{ functionDeclarations }],
         toolConfig: { functionCallingConfig },
@@ -1192,16 +1180,21 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     const requestPrompt = withImageSizeInstruction(prompt, config.size, requestSize);
     if (requestConfig.apiFormat === "replicate") {
         try {
-            return await requestReplicateImages(requestConfig, {
-                prompt: withSystemPrompt(requestConfig, requestPrompt),
-                quality: quality || "auto",
-                background: "auto",
-                moderation: "auto",
-                aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
-                output_format: "webp",
-                number_of_images: n,
-                output_compression: 90,
-            }, options, serverJobId);
+            return await requestReplicateImages(
+                requestConfig,
+                {
+                    prompt: withSystemPrompt(requestConfig, requestPrompt),
+                    quality: quality || "auto",
+                    background: "auto",
+                    moderation: "auto",
+                    aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
+                    output_format: "webp",
+                    number_of_images: n,
+                    output_compression: 90,
+                },
+                options,
+                serverJobId,
+            );
         } catch (error) {
             throw new Error(readAxiosError(error, "请求失败"));
         }
@@ -1221,11 +1214,20 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     try {
         let payload: ImageApiResponse;
         try {
-            payload = await proxyFetch<ImageApiResponse>({ url, method: "POST", headers, jobId: serverJobId, body: body() });
+            // 可延后提交（阶段 2）：服务端若接下这一单，浏览器就不再抱那条长连接，
+            // 转去轮询我们自己的任务状态；服务端开关没开时它同步返回，这里照旧解析上游报文。
+            const outcome = await proxyFetchDeferrable<ImageApiResponse>({ url, method: "POST", headers, jobId: serverJobId, body: body() });
+            if (outcome.deferred) return await awaitServerRunImages(outcome.jobId, options?.signal);
+            payload = outcome.data;
         } catch (error) {
+            // 服务端执行这一单已经有结论（成功取图失败/真失败/服务端超时）：这不是「上游按画幅拒收」，
+            // 客户端不能再投一次 —— 重投会在上游多建一次调用、多收一次钱，而服务端那边还开着。
+            if (error instanceof ServerRunError) throw error;
             const aspectRatio = readAspectRetryRatio(errorText(error), config.size, requestSize);
             if (!aspectRatio) throw error;
-            payload = await proxyFetch<ImageApiResponse>({ url, method: "POST", headers, jobId: serverJobId, body: body(aspectRatio) });
+            const retry = await proxyFetchDeferrable<ImageApiResponse>({ url, method: "POST", headers, jobId: serverJobId, body: body(aspectRatio) });
+            if (retry.deferred) return await awaitServerRunImages(retry.jobId, options?.signal);
+            payload = retry.data;
         }
         return await resolveImageSubmission(requestConfig, payload, options, serverJobId);
     } catch (error) {
@@ -1250,17 +1252,22 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     if (requestConfig.apiFormat === "replicate") {
         if (mask) throw new Error("Replicate gpt-image-2 does not support mask editing yet. Use reference-image editing without a mask.");
         try {
-            return await requestReplicateImages(requestConfig, {
-                prompt: withSystemPrompt(requestConfig, requestPrompt),
-                quality: quality || "auto",
-                background: "auto",
-                moderation: "auto",
-                aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
-                input_images: await Promise.all(references.map((image) => imageToDataUrl(image))),
-                output_format: "webp",
-                number_of_images: n,
-                output_compression: 90,
-            }, options, serverJobId);
+            return await requestReplicateImages(
+                requestConfig,
+                {
+                    prompt: withSystemPrompt(requestConfig, requestPrompt),
+                    quality: quality || "auto",
+                    background: "auto",
+                    moderation: "auto",
+                    aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
+                    input_images: await Promise.all(references.map((image) => imageToDataUrl(image))),
+                    output_format: "webp",
+                    number_of_images: n,
+                    output_compression: 90,
+                },
+                options,
+                serverJobId,
+            );
         } catch (error) {
             throw new Error(readAxiosError(error, "请求失败"));
         }
@@ -1291,6 +1298,8 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         formData.set("_proxy_headers", JSON.stringify(aiHeaders(requestConfig)));
         // 任务号随表单一起走：上游一旦出图，服务端就地归档，不再赌这个标签页还活着
         if (serverJobId) formData.set("_proxy_job", serverJobId);
+        // 声明「我能接受延后取结果」：服务端开关开着时，参考图生图也不再由浏览器抱着长连接等
+        formData.set("_proxy_defer", "1");
         return fetch("/canvas/api/proxy/form-data", {
             method: "POST",
             body: formData,
@@ -1301,6 +1310,12 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
 
     try {
         let response = await submit();
+        // 服务端接下了这一单（阶段 2）：不再等上游长连接，转去轮询我们自己的任务
+        if (response.status === 202) {
+            const outcome = await readProxyOutcome<ImageApiResponse>(response);
+            if (outcome.deferred) return await awaitServerRunImages(outcome.jobId, options?.signal);
+            response = new Response(JSON.stringify(outcome.data), { status: 200, headers: { "Content-Type": "application/json" } });
+        }
         let data = (await response.json().catch(() => null)) as ImageApiResponse | null;
         if (!response.ok) {
             const message = readImageApiError(data, readStatusError(response.status, "请求失败"));
@@ -1309,7 +1324,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
             // 带蒙版的编辑没法这么改道（生成端点的 image_urls 不接蒙版），原样把上游原话抛出去。
             if (!mask && isEditsEndpointUnsupported(message)) {
                 const imageUrls = await Promise.all(references.map(async (image) => normalizeReferenceDataUrl(await imageToDataUrl(image))));
-                const payload = await proxyFetch<ImageApiResponse>({
+                const outcome = await proxyFetchDeferrable<ImageApiResponse>({
                     url: aiApiUrl(requestConfig, "/images/generations"),
                     method: "POST",
                     headers: aiHeaders(requestConfig, "application/json"),
@@ -1325,11 +1340,17 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                         outputFormat: IMAGE_OUTPUT_FORMAT,
                     }),
                 });
-                return await resolveImageSubmission(requestConfig, payload || {}, options, serverJobId);
+                if (outcome.deferred) return await awaitServerRunImages(outcome.jobId, options?.signal);
+                return await resolveImageSubmission(requestConfig, outcome.data || {}, options, serverJobId);
             }
             const aspectRatio = readAspectRetryRatio(message, config.size, requestSize);
             if (!aspectRatio) throw new Error(message);
             response = await submit(aspectRatio);
+            if (response.status === 202) {
+                const outcome = await readProxyOutcome<ImageApiResponse>(response);
+                if (outcome.deferred) return await awaitServerRunImages(outcome.jobId, options?.signal);
+                response = new Response(JSON.stringify(outcome.data), { status: 200, headers: { "Content-Type": "application/json" } });
+            }
             data = (await response.json().catch(() => null)) as ImageApiResponse | null;
             if (!response.ok) throw new Error(readImageApiError(data, readStatusError(response.status, "请求失败")));
         }
@@ -1347,10 +1368,18 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
             if (answer === "没有返回内容") onDelta(answer);
             return answer;
         }
-        const answer = (await requestStreamingResponse(requestConfig, {
-            model: requestConfig.model,
-            input: toResponseInput(withSystemMessage(requestConfig, messages)),
-        }, onDelta, options)).content || "没有返回内容";
+        const answer =
+            (
+                await requestStreamingResponse(
+                    requestConfig,
+                    {
+                        model: requestConfig.model,
+                        input: toResponseInput(withSystemMessage(requestConfig, messages)),
+                    },
+                    onDelta,
+                    options,
+                )
+            ).content || "没有返回内容";
         if (answer === "没有返回内容") onDelta(answer);
         return answer;
     } catch (error) {

@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
-import { assertAllowedProxyUrl, fetchSafely, isHostOrSubdomain } from "@/lib/url-safety";
-import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
+import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
 import { salvageGenerationArtifacts } from "@/lib/generation/generation-rescue.server";
 import { settleDeferredClientFailure } from "@/lib/generation/generation-jobs.server";
 import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
-import FormData from "form-data";
+import { authorizeUpstreamRequest, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
+import { canRunOnServer, resolveServerRunPolicy, shouldPersistEnvelope, type UpstreamEnvelope } from "@/lib/generation/generation-envelope";
+import { findRunnableGenerationJob, startServerRun } from "@/lib/generation/generation-run.server";
+import { saveUpstreamEnvelope } from "@/lib/generation/generation-spool.server";
+import { buildEditFallback } from "@/lib/generation/edit-fallback";
+// 走 npm 的 form-data 包构建 multipart（要它的 getBuffer/getBoundary）。
+// 刻意改名：这个包里也有 FormData，会遮蔽浏览器原生的 FormData 类型，
+// 而本路由同时要处理 `req.formData()` 返回的原生对象（下方 buildEditFallback 的入参就是它）。
+import FormDataPackage from "form-data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,31 +42,23 @@ export async function POST(req: NextRequest) {
         const target = await assertAllowedProxyUrl(String(incoming.get("_proxy_url") || ""));
         const method = sanitizeMethod(incoming.get("_proxy_method") || "POST");
         const safeHeaders = sanitizeHeaders(parseHeaders(incoming.get("_proxy_headers")));
-        /** 本次上游调用属于哪条生成任务（参考图生图主路径也走抢救） */
-        const jobId = String(incoming.get("_proxy_job") || "");
-
-        // 平台凭证（按目标 host + 可选 provider/model 匹配）；无平台凭证 → 无 Key（BYOK 已彻底移除）
         const sfProvider = typeof safeHeaders["x-sf-provider"] === "string" ? safeHeaders["x-sf-provider"] : undefined;
         const sfModel = typeof safeHeaders["x-sf-model"] === "string" ? safeHeaders["x-sf-model"] : undefined;
-        const platformCred = await resolvePlatformCredential({ targetUrl: target.toString(), provider: sfProvider, model: sfModel });
+        /** 本次上游调用属于哪条生成任务（参考图生图主路径也走抢救） */
+        const jobId = String(incoming.get("_proxy_job") || "");
+        /** 调用方声明「我能接受延后取结果」：是否真的延后由服务端按环境开关决定（见 generation-envelope） */
+        const deferrable = String(incoming.get("_proxy_defer") || "") === "1";
 
+        // 平台凭证 + 白名单 + 鉴权头注入：与 JSON 代理、信封重放共用同一份实现（含 aigccc 的 apikey 头特例）
+        const authorization = await authorizeUpstreamRequest({ headers: safeHeaders, targetUrl: target.toString(), providerHint: sfProvider, modelHint: sfModel });
         // 代理白名单：只放行已注册渠道（目标与凭证同源），无凭证或跨源目标直接拒绝
-        if (!platformCred || !isCredentialTargetAllowed(platformCred.baseUrl, target.toString())) {
+        if (!authorization) {
             return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
         }
-
-        if (platformCred) {
-            if (platformCred.provider === "aigccc" || isHostOrSubdomain(target.hostname, "aigccc666.com")) {
-                // aigccc 网关用 ApiKey 头（非 Bearer）：按目标 host 判断，避免供应商标签漏配时误发 Bearer
-                safeHeaders["apikey"] = platformCred.apiKey;
-            } else {
-                safeHeaders["authorization"] = `Bearer ${platformCred.apiKey}`;
-            }
-            console.log(`[proxy/form-data] key-source=platform target=${target.hostname}`);
-        }
+        console.log(`[proxy/form-data] key-source=platform target=${target.hostname}`);
 
         // 使用 form-data 包构建 multipart body
-        const form = new FormData();
+        const form = new FormDataPackage();
         for (const [key, value] of incoming.entries()) {
             if (key.startsWith("_proxy_")) continue;
             // 字段名/文件名剔除 CRLF，防止 form-data CRLF 注入（GHSA-q6p4-2r3g-8vhj）
@@ -74,6 +73,81 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // multipart 缓冲一次性拷贝；收到响应头说明请求体已发完，尽早释放引用缓解长等待期间的内存常驻
+        let bodyBuffer = form.getBuffer();
+        const multipartType = `multipart/form-data; boundary=${form.getBoundary()}`;
+
+        // —— 阶段 2：把这次调用交给服务端执行，浏览器不再等长连接 ——
+        // 参考图生图是画布的主路径，也是「素材只在浏览器里」最要命的一条：
+        // 信封（含素材二进制）先落到服务端，之后即使标签页关掉、进程重启，这一单照样能画完并归档。
+        const serverRunPolicy = resolveServerRunPolicy();
+        const canDefer = deferrable && canRunOnServer({ policy: serverRunPolicy, provider: authorization.provider, url: target.toString(), stream: false, responseType: "json", hasJobId: Boolean(jobId) });
+        if (canDefer) {
+            const job = await findRunnableGenerationJob(user.id, jobId);
+            if (job) {
+                const stored = await saveUpstreamEnvelope({
+                    userId: user.id,
+                    jobId,
+                    envelope: {
+                        url: target.toString(),
+                        method,
+                        headers: stripCredentialHeaders(safeHeaders),
+                        contentType: multipartType,
+                        provider: authorization.provider,
+                        model: sfModel,
+                        bodyBytes: bodyBuffer.length,
+                        origin: "defer",
+                    },
+                    body: bodyBuffer,
+                });
+                if (stored) {
+                    // 备好改道方案：上游回「编辑端点不吃这个模型」时，服务端自己改走生成端点 + image_urls
+                    const fallback = await buildEditFallback({ form: incoming, target: target.toString(), model: String(incoming.get("model") || ""), headers: stripCredentialHeaders(safeHeaders), hasMask: incoming.get("mask") !== null });
+                    if (fallback) {
+                        await saveUpstreamEnvelope({ userId: user.id, jobId, slot: "fallback", envelope: { ...fallback, provider: authorization.provider, model: sfModel, bodyBytes: Buffer.byteLength(fallback.json) }, body: fallback.json });
+                    }
+                    startServerRun({
+                        job,
+                        envelope: {
+                            url: target.toString(),
+                            method,
+                            headers: stripCredentialHeaders(safeHeaders),
+                            contentType: multipartType,
+                            provider: authorization.provider,
+                            model: sfModel,
+                            bodyBytes: bodyBuffer.length,
+                            origin: "defer",
+                            savedAt: Date.now(),
+                        },
+                    });
+                    console.log(`[proxy/form-data] 任务 ${jobId} 转由服务端执行（渠道 ${authorization.provider}）：浏览器不再持有这条长连接`);
+                    // 后台执行读的是落盘的那份信封，内存里的这份可以立刻放下（素材不再常驻整个等待期）
+                    bodyBuffer = Buffer.alloc(0);
+                    return NextResponse.json({ deferred: true, jobId, status: "running" }, { status: 202 });
+                }
+                console.warn(`[proxy/form-data] 任务 ${jobId} 信封落库失败，回落到同步路径`);
+            }
+        }
+
+        // 留信封（阶段 1）：调用方死在半路时服务端能原样再问一次上游（鉴权头不落库，重放时重新签发）
+        if (shouldPersistEnvelope({ hasJobId: Boolean(jobId), bodyBytes: bodyBuffer.length, responseType: "json" })) {
+            await saveUpstreamEnvelope({
+                userId: user.id,
+                jobId,
+                envelope: {
+                    url: target.toString(),
+                    method,
+                    headers: stripCredentialHeaders(safeHeaders),
+                    contentType: multipartType,
+                    provider: authorization.provider,
+                    model: sfModel,
+                    bodyBytes: bodyBuffer.length,
+                    origin: "live",
+                },
+                body: bodyBuffer,
+            });
+        }
+
         const controller = new AbortController();
         const timeout = setTimeout(() => {
             timedOut = true;
@@ -86,18 +160,17 @@ export async function POST(req: NextRequest) {
         const releaseUpstreamCall = beginUpstreamCall(jobId);
 
         try {
-            // multipart 缓冲一次性拷贝；收到响应头说明请求体已发完，尽早释放引用缓解长等待期间的内存常驻
-            let bodyBuffer = form.getBuffer();
             const response = await fetchSafely(target.toString(), {
                 method,
                 headers: {
                     ...safeHeaders,
-                    "content-type": `multipart/form-data; boundary=${form.getBoundary()}`,
+                    "content-type": multipartType,
                     "content-length": String(bodyBuffer.length),
                 },
                 body: bodyBuffer as unknown as BodyInit,
                 signal: controller.signal,
             });
+            // 请求体已发出（收到响应头即已写完），尽早解除引用：慢中转单次生成最长等 15 分钟
             bodyBuffer = Buffer.alloc(0);
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
             // 与 JSON 代理的「[proxy] 上游 <status>」对齐。本路由是参考图生图（/images/edits）主路径，
