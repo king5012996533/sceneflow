@@ -1,4 +1,4 @@
-import { CreditCard, FileText, Images, Maximize2, Scissors, Shield, Sparkles } from "lucide-react";
+import { CreditCard, FileText, History, Images, Maximize2, Scissors, Shield, Sparkles } from "lucide-react";
 
 export const navigationTools = [
     {
@@ -27,6 +27,11 @@ export const navigationTools = [
         slug: "cut",
         label: "后期剪辑器",
         icon: Scissors,
+    },
+    {
+        slug: "records",
+        label: "生成记录",
+        icon: History,
     },
     {
         slug: "pricing",

@@ -23,7 +23,7 @@ type NavDrawerProps = {
 const NAV_GROUPS: { eyebrow: string; slugs: NavigationToolSlug[] }[] = [
     { eyebrow: "创作 · Create", slugs: ["canvas", "studio", "cut"] },
     { eyebrow: "素材 · Assets", slugs: ["prompts", "assets"] },
-    { eyebrow: "账户 · Account", slugs: ["pricing", "admin"] },
+    { eyebrow: "账户 · Account", slugs: ["records", "pricing", "admin"] },
 ];
 
 export function NavDrawer({ open, activeToolSlug, onClose }: NavDrawerProps) {
