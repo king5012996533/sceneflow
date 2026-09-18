@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 import { readGenerationMedia } from "@/lib/generation/server-media-storage.server";
+import { mimeTypeExtension, purgedMediaMessage, resolveRetentionDays } from "@/lib/generation/generation-media-retention";
 
 export const runtime = "nodejs";
+
+/** 保留天数与清理任务共用同一份配置（默认 2 天） */
+const RETENTION_DAYS = resolveRetentionDays(process.env.GENERATION_MEDIA_RETENTION_DAYS);
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string; index: string }> }) {
     const user = await requireCurrentUser(req);
@@ -14,10 +18,18 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const items = Array.isArray((job.resultData as { items?: unknown[] }).items) ? (job.resultData as { items: Array<{ archiveKey?: string; mimeType?: string }> }).items : [];
     const item = items[Number(index)];
     if (!item?.archiveKey) return NextResponse.json({ error: "媒体尚未归档" }, { status: 404 });
+    const mimeType = item.mimeType || "application/octet-stream";
     try {
         const body = await readGenerationMedia(item.archiveKey);
-        return new NextResponse(body as unknown as BodyInit, { headers: { "Content-Type": item.mimeType || "application/octet-stream", "Cache-Control": "private, max-age=3600" } });
-    } catch {
+        const headers: Record<string, string> = { "Content-Type": mimeType, "Cache-Control": "private, max-age=3600" };
+        // ?download=1：生成记录页的「下载」按钮，给个像样的文件名（同源 + 已鉴权，直接 attachment 即可）
+        if (new URL(req.url).searchParams.get("download") === "1") {
+            headers["Content-Disposition"] = `attachment; filename="sceneflow-${id}-${index}.${mimeTypeExtension(mimeType)}"`;
+        }
+        return new NextResponse(body as unknown as BodyInit, { headers });
+    } catch (error) {
+        // 文件不在有两种可能：从没归档成功，或已过保留期被定时清理——对用户要说清是哪一种
+        if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return NextResponse.json({ error: purgedMediaMessage(RETENTION_DAYS) }, { status: 404 });
         return NextResponse.json({ error: "媒体读取失败" }, { status: 404 });
     }
 }

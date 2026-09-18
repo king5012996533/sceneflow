@@ -28,6 +28,7 @@
         "test:sweep": "node scripts/stale-sweep-unit-tests.mjs",
         "test:result": "node scripts/generation-result-unit-tests.mjs",
         "test:recovery": "node scripts/generation-recovery-unit-tests.mjs",
+        "test:retention": "node scripts/generation-media-retention-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

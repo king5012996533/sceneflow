@@ -440,6 +440,36 @@ assertNotMatches("src/lib/generation/generation-recovery.ts", /fetch\(|prisma|ax
 assertIncludes("src/app/api/proxy/route.ts", "platformAuthHeaders(", "代理路由必须用共享的鉴权头规则，不得再就地写一套。");
 assertIncludes("src/lib/credential-store.server.ts", "export function platformAuthHeaders(", "平台鉴权头规则必须集中导出，供代理与补取件共用。");
 
+// —— 成品的保留期与自动清理（2026-09-18：归档只进不出会撑爆磁盘，但也不能用完即删）——
+// 归档目录现在只进不出，一张图 1–3MB、一条视频几十 MB，迟早占满磁盘；可是删早了又回到
+// 「上游钱了、用户没拿到、我们也就没法收额度」的黑洞。所以定一条有边界的保留期：
+// 默认 2 天（今天 + 昨天），每天凌晨清一次更早的；判定收在纯模块里，清理程序照着执行。
+{
+    const pure = read("src/lib/generation/generation-media-retention.ts");
+    assert(pure.includes("DEFAULT_RETENTION_DAYS = 2"), "成品默认保留 2 天（今天 + 昨天）：留太短用户第二天来找就扑空，等于没留。");
+    assert(pure.includes("MIN_RETENTION_DAYS = 1"), "保留期下限必须是 1 天：允许配出「0 天」就等于允许把成品全删光。");
+    assertNotMatches("src/lib/generation/generation-media-retention.ts", /fetch\(|prisma|axios|import /, "保留期判定必须是纯逻辑（不触网、不连库、无依赖），才能直接单测。");
+    const prune = read("src/lib/generation/generation-media-retention.server.ts");
+    assert(prune.includes("parseArchiveKey("), "清理只认 <jobId>/<index> 形态的文件：目录里将来多出来的东西一律不碰（删文件不可逆）。");
+    assert(prune.includes("shouldPurgeArchiveFile("), "删不删必须走纯模块的判定（时间读不出来/修改时间在未来一律不删）。");
+    assert(prune.includes("rmdir("), "任务目录里文件清空了才收掉目录本身。");
+    assert(prune.includes("ENOENT"), "归档目录不存在（还没人生成过）不是错误，清理必须当成空处理。");
+    assertIncludes("src/app/api/internal/generation/media-prune/route.ts", "GENERATION_WORKER_SECRET", "清理入口必须校验内部 worker 密钥，不得对外开放。");
+    // 过期后要明说「已过保留期」，不能让用户对着一张破图猜
+    assertIncludes("src/app/api/generation/jobs/[id]/media/[index]/route.ts", "purgedMediaMessage(", "媒体路由必须把「已过保留期被清理」与「从未归档」区分开。");
+    assertIncludes("src/app/api/generation/jobs/[id]/media/[index]/route.ts", "resolveRetentionDays(", "媒体路由提示的保留天数必须与清理任务用同一份配置。");
+}
+
+// —— 用户自助的「生成记录」（2026-09-18：有东西可交付，这笔额度才收得下去）——
+{
+    const route = read("src/app/api/generation/records/route.ts");
+    assert(route.includes("userId: user.id"), "生成记录只能回当前登录用户自己的任务。");
+    assertNotMatches("src/app/api/generation/records/route.ts", /externalGetUrl|externalId/, "上游任务号/取件地址属内部凭据，不得随生成记录出网。");
+    assert(route.includes("hasGenerationMedia("), "记录里要标出成品是否还在（已清理的不该渲染成破图）。");
+    assertIncludes("src/app/(user)/records/page.tsx", "downloadUrl", "生成记录页必须提供成品下载入口，否则用户还是拿不到东西。");
+    assertIncludes("src/constant/navigation-tools.ts", 'slug: "records"', "生成记录必须在导航里有入口，不然没人找得到。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

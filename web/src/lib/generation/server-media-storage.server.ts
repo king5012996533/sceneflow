@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, isAbsolute, normalize } from "node:path";
 import os from "node:os";
 
@@ -34,4 +34,16 @@ export async function archiveGenerationMedia(key: string, body: ArrayBuffer) {
 
 export async function readGenerationMedia(key: string) {
     return readFile(join(root, safeKey(key)));
+}
+
+/**
+ * 归档文件还在不在。生成记录页用它区分「成品可下载」与「已过保留期被清理」——
+ * 后者不该显示成一张破图，而应当明说已经清理掉了。
+ */
+export async function hasGenerationMedia(key: string): Promise<boolean> {
+    try {
+        return (await stat(join(root, safeKey(key)))).isFile();
+    } catch {
+        return false;
+    }
 }
