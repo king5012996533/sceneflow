@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
-import { assertAllowedProxyUrl, fetchSafely, isHostOrSubdomain } from "@/lib/url-safety";
-import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
+import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
+import { isCredentialTargetAllowed, platformAuthHeaders, resolvePlatformCredential } from "@/lib/credential-store.server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,20 +81,13 @@ export async function POST(req: NextRequest) {
             if (key.toLowerCase() === "authorization") delete safeHeaders[key];
         }
         if (finalToken) {
-            if (platformCred?.provider === "gemini") {
-                // Gemini 用 x-goog-api-key 而非 Authorization
+            // 鉴权头规则与超时补取件共用一份（platformAuthHeaders）：两处用的是同一把密钥、同一批网关
+            const authHeaders = platformAuthHeaders({ provider: platformCred.provider, apiKey: finalToken }, target.toString());
+            for (const [name, value] of Object.entries(authHeaders)) {
                 for (const key of Object.keys(safeHeaders)) {
-                    if (key.toLowerCase() === "x-goog-api-key") delete safeHeaders[key];
+                    if (key.toLowerCase() === name) delete safeHeaders[key];
                 }
-                safeHeaders["x-goog-api-key"] = finalToken;
-            } else if (platformCred?.provider === "aigccc" || isHostOrSubdomain(target.hostname, "aigccc666.com")) {
-                // aigccc 网关用 ApiKey 头（非 Bearer）：按目标 host 判断，避免供应商标签漏配时误发 Bearer 导致 7002 Token 无效
-                for (const key of Object.keys(safeHeaders)) {
-                    if (key.toLowerCase() === "apikey") delete safeHeaders[key];
-                }
-                safeHeaders["apikey"] = finalToken;
-            } else {
-                safeHeaders["authorization"] = `Bearer ${finalToken}`;
+                safeHeaders[name] = value;
             }
         }
         console.log(`[proxy] key-source=${keySource} target=${target.hostname}${target.pathname}`);
@@ -116,12 +109,13 @@ export async function POST(req: NextRequest) {
         const controller = new AbortController();
         // 流式请求（SSE/文本流）不设超时：长对话可能持续数分钟，由客户端自行中止；
         // 非流式请求保持 900s 上限防止上游挂起（慢中转出图/出片可达 5-15 分钟，见 PROXY_TIMEOUT_MS 注释）。
-        const timeout = envelope.stream === true
-            ? null
-            : setTimeout(() => {
-                  timedOut = true;
-                  controller.abort();
-              }, PROXY_TIMEOUT_MS);
+        const timeout =
+            envelope.stream === true
+                ? null
+                : setTimeout(() => {
+                      timedOut = true;
+                      controller.abort();
+                  }, PROXY_TIMEOUT_MS);
 
         const method = sanitizeMethod(envelope.method);
         try {

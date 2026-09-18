@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/ic-prisma";
 import { refundCredits } from "@/lib/credit-ledger";
 import { isSweepExcluded, resolveSweepWindow } from "./generation-stale";
+import { isRecoveryEligible } from "./generation-recovery";
+import { recoverStaleGenerationJob, type RecoveryOutcome } from "./generation-recovery.server";
 
 /**
  * 超时任务的全局兜底清扫（2026-09-18 事故：7 条 running 挂着 24 积分没人退）。
@@ -22,10 +24,21 @@ const SWEEP_ERROR = "任务超时自动关闭（服务端清扫）";
 const SWEEP_NOTE = "任务超时自动关闭（服务端清扫）";
 
 export type SweptJob = { id: string; userId: string; kind: string; creditsCost: number; ageMinutes: number };
-export type SweepResult = { scanned: number; skipped: number; closed: number; refundedCredits: number; jobs: SweptJob[] };
+export type RecoveredJob = { id: string; userId: string; kind: string; creditsCost: number; ageMinutes: number };
+export type SweepResult = {
+    scanned: number;
+    skipped: number;
+    closed: number;
+    refundedCredits: number;
+    jobs: SweptJob[];
+    /** 补取件成功（上游其实产出了，成品已取回、任务改判成功、积分不退） */
+    recovered: number;
+    recoveredCredits: number;
+    recoveredJobs: RecoveredJob[];
+};
 
 export async function sweepStaleGenerationJobs(input: { olderThanMs?: number | null; limit?: number | null; now?: number } = {}): Promise<SweepResult> {
-    const result: SweepResult = { scanned: 0, skipped: 0, closed: 0, refundedCredits: 0, jobs: [] };
+    const result: SweepResult = { scanned: 0, skipped: 0, closed: 0, refundedCredits: 0, jobs: [], recovered: 0, recoveredCredits: 0, recoveredJobs: [] };
     if (!prisma) return result;
     const window = resolveSweepWindow(input);
     // 先按「超时窗口」粗筛（最老的优先），再由 isSweepExcluded 决定跳过——跳过规则只有一份，写在纯模块里
@@ -33,7 +46,7 @@ export async function sweepStaleGenerationJobs(input: { olderThanMs?: number | n
         where: { status: "running", startedAt: { lt: window.cutoff } },
         orderBy: { startedAt: "asc" },
         take: window.limit,
-        select: { id: true, userId: true, kind: true, requestKey: true, creditsCost: true, startedAt: true, provider: true, externalGetUrl: true },
+        select: { id: true, userId: true, kind: true, requestKey: true, creditsCost: true, startedAt: true, provider: true, externalId: true, externalGetUrl: true, providerModel: true },
     });
     result.scanned = candidates.length;
 
@@ -41,6 +54,26 @@ export async function sweepStaleGenerationJobs(input: { olderThanMs?: number | n
         if (isSweepExcluded(job)) {
             result.skipped += 1;
             continue;
+        }
+        // 关闭之前先补一次件：上游其实产出了的话，成品归我们、积分照收，不该退款了事
+        const ageMinutes = Math.max(0, Math.round((Date.now() - job.startedAt.getTime()) / 60_000));
+        if (isRecoveryEligible(job)) {
+            let outcome: RecoveryOutcome = "ineligible";
+            try {
+                outcome = await recoverStaleGenerationJob(job, window.now);
+            } catch (error) {
+                console.error("[generation-sweep] 补取件异常", job.id, error instanceof Error ? error.message : error);
+            }
+            if (outcome === "wait") {
+                result.skipped += 1;
+                continue;
+            }
+            if (outcome === "archived") {
+                result.recovered += 1;
+                result.recoveredCredits += job.creditsCost;
+                result.recoveredJobs.push({ id: job.id, userId: job.userId, kind: job.kind, creditsCost: job.creditsCost, ageMinutes });
+                continue;
+            }
         }
         try {
             const closed = await prisma.$transaction(async (tx) => {
@@ -60,7 +93,7 @@ export async function sweepStaleGenerationJobs(input: { olderThanMs?: number | n
                 userId: job.userId,
                 kind: job.kind,
                 creditsCost: job.creditsCost,
-                ageMinutes: Math.max(0, Math.round((Date.now() - job.startedAt.getTime()) / 60_000)),
+                ageMinutes,
             });
         } catch (error) {
             console.error("[generation-sweep] 关闭超时任务失败", job.id, error instanceof Error ? error.message : error);

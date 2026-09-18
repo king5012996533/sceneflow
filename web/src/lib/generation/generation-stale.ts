@@ -22,7 +22,7 @@ export const MAX_SWEEP_LIMIT = 200;
 /** 有服务端轮询器认领的通道（判据与 replicate-poller 的查询一致：provider 且 externalGetUrl 非空） */
 export const SWEEP_POLLED_PROVIDER = "replicate";
 
-export type SweepWindow = { olderThanMs: number; cutoff: Date; limit: number };
+export type SweepWindow = { olderThanMs: number; cutoff: Date; limit: number; now: number };
 
 /** 清扫窗口：非法输入退回默认值，窗口不得短于 1 分钟，批量不得超上限。 */
 export function resolveSweepWindow(input: { olderThanMs?: number | null; limit?: number | null; now?: number } = {}): SweepWindow {
@@ -31,7 +31,8 @@ export function resolveSweepWindow(input: { olderThanMs?: number | null; limit?:
     const olderThanMs = Number.isFinite(rawWindow) && rawWindow > 0 ? Math.max(MIN_SWEEP_WINDOW_MS, Math.floor(rawWindow)) : STALE_JOB_MS;
     const rawLimit = Number(input.limit);
     const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(MAX_SWEEP_LIMIT, Math.floor(rawLimit)) : DEFAULT_SWEEP_LIMIT;
-    return { olderThanMs, cutoff: new Date(now - olderThanMs), limit };
+    // now 一并带出去：补取件的「过期没过期」判定必须与粗筛用的是同一个时刻
+    return { olderThanMs, cutoff: new Date(now - olderThanMs), limit, now };
 }
 
 /**

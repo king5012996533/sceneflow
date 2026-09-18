@@ -171,6 +171,28 @@ export async function resolvePlatformCredential(options: { targetUrl?: string; p
     }
 }
 
+/**
+ * 把平台密钥写成上游要求的鉴权头。
+ *
+ * 各家中转站的要求不一样（Gemini 用 x-goog-api-key，aigccc 网关用 apikey，其余 Bearer），
+ * 而用同一把密钥的地方有两处：代理路由（用户在浏览器里发起的请求）和超时补取件
+ * （服务端自己去问上游「那个任务到底出了没有」）。规则只留这一份，
+ * 免得某一处漏改之后另一边「明明配了密钥却报 Token 无效」。
+ */
+export function platformAuthHeaders(credential: Pick<ResolvedCredential, "provider" | "apiKey">, targetUrl: string): Record<string, string> {
+    if (!credential.apiKey) return {};
+    let hostname = "";
+    try {
+        hostname = new URL(targetUrl).hostname;
+    } catch {
+        hostname = "";
+    }
+    if (credential.provider === "gemini") return { "x-goog-api-key": credential.apiKey };
+    // aigccc 网关用 ApiKey 头（非 Bearer）：按目标 host 判断，避免供应商标签漏配时误发 Bearer 导致 7002 Token 无效
+    if (credential.provider === "aigccc" || isHostOrSubdomain(hostname, "aigccc666.com")) return { apikey: credential.apiKey };
+    return { authorization: `Bearer ${credential.apiKey}` };
+}
+
 // —— admin CRUD（明文 Key 只在创建/更新时接收，落库前加密） ——
 
 export type CredentialInput = {

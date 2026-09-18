@@ -209,7 +209,10 @@ assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", "pickPricing",
 // —— Aigccc / Seedance 2.0 网关接入 ——
 assertIncludes("src/stores/use-config-store.ts", '"aigccc"', "ApiCallFormat 必须支持 aigccc。");
 assertIncludes("src/stores/use-config-store.ts", 'value.includes("aigccc666.com")', "config store 必须按 aigccc666.com 识别网关 Base URL。");
-assertIncludes("src/app/api/proxy/route.ts", 'isHostOrSubdomain(target.hostname, "aigccc666.com")', "proxy 必须用域名边界匹配为 aigccc 注入 ApiKey（禁止 includes 子串，防 Key 外泄 H-1）。");
+// aigccc 的 ApiKey 注入规则已收进 platformAuthHeaders（代理路由与补取件共用同一份）；
+// proxy/route.ts 现在必须走那个共享函数，规则本身仍必须是域名边界匹配（禁止 includes 子串，H-1 防 Key 外泄）。
+assertIncludes("src/lib/credential-store.server.ts", 'isHostOrSubdomain(hostname, "aigccc666.com")', "平台鉴权头规则必须用域名边界匹配为 aigccc 注入 ApiKey（禁止 includes 子串，防 Key 外泄 H-1）。");
+assertNotMatches("src/lib/credential-store.server.ts", /includes\("aigccc666\.com"\)/, "平台鉴权头规则不得用 includes 子串匹配 aigccc 域名（H-1 平台 Key 外泄）。");
 assertIncludes("src/app/api/proxy/form-data/route.ts", 'isHostOrSubdomain(target.hostname, "aigccc666.com")', "form-data proxy 必须用域名边界匹配为 aigccc 注入 ApiKey（禁止 includes 子串）。");
 assertNotMatches("src/app/api/proxy/route.ts", /includes\("aigccc666\.com"\)/, "proxy 不得再用 includes 子串匹配 aigccc 域名（H-1 平台 Key 外泄）。");
 assertNotMatches("src/app/api/proxy/form-data/route.ts", /includes\("aigccc666\.com"\)/, "form-data proxy 不得再用 includes 子串匹配 aigccc 域名（H-1）。");
@@ -411,6 +414,31 @@ assertIncludes("src/services/api/video.ts", "void reportGenerationResult(", "上
 assertIncludes("src/lib/generation/server-upstream-client.ts", "reportGenerationResult", "客户端必须有成品上报入口。");
 assertNotMatches("src/lib/generation/generation-result.ts", /fetch\(|prisma|axios|import /, "成品归档的判定逻辑必须是纯逻辑（不触网、不连库、无依赖），才能在 Node 下直接单测。");
 assertIncludes("src/lib/generation/server-media-storage.server.ts", "archiveGenerationMedia", "服务端归档模块必须保留归档写入入口。");
+
+// —— 超时任务的服务端补取件（2026-09-18：判了超时退款，上游其实出了图，差价平台认）——
+// 铁律：① 补取件跑在「关闭 + 退款」之前；② 只有留了上游任务号 + 取件地址的任务才补；
+//       ③ 补回来的任务按成功结算、绝不退款；④ 认领仍是条件更新，不覆盖用户自己的结算。
+{
+    const sweep = read("src/lib/generation/generation-sweep.server.ts");
+    const recoverAt = sweep.indexOf("recoverStaleGenerationJob(job");
+    const refundAt = sweep.indexOf("refundCredits(tx, job.userId");
+    assert(recoverAt > -1, "清扫必须先尝试补取件：上游其实产出了的任务不该退款了事。");
+    assert(refundAt > -1 && recoverAt < refundAt, "补取件必须跑在关闭退款之前，否则成品还没取回就把钱退了。");
+    assert(sweep.includes("isRecoveryEligible(job)"), "只有留了上游任务号 + 取件地址的任务才谈得上补取件。");
+}
+assertIncludes("src/lib/generation/generation-recovery.ts", "decideRecovery", "补取件的判定必须收在纯模块里（配单测），清扫只管照着执行。");
+assertNotMatches("src/lib/generation/generation-recovery.ts", /fetch\(|prisma|axios|import /, "补取件判定必须是纯逻辑（不触网、不连库、无依赖），才能直接单测。");
+{
+    const recovery = read("src/lib/generation/generation-recovery.server.ts");
+    assert(recovery.includes("platformAuthHeaders("), "补取件必须复用与代理路由同一份鉴权头规则（各网关要求不同，两份规则必然漂移）。");
+    assert(recovery.includes("parseImageTaskState("), "补取件必须复用客户端那套任务报文解析，不得自写一份。");
+    assert(recovery.includes("fetchSafely("), "补取件是服务端发起的对外请求，必须走 fetchSafely 过 SSRF 校验。");
+    assert(recovery.includes('where: { id: job.id, status: "running" }'), "补取件认领必须带 status=running 条件，不得覆盖用户自己的结算。");
+    assert(!recovery.includes("refundCredits"), "补取件只负责把成品取回并按成功结算，退款是清扫的事。");
+}
+// 鉴权头规则只有一份：代理路由（浏览器请求）与补取件（服务端自己问上游）共用
+assertIncludes("src/app/api/proxy/route.ts", "platformAuthHeaders(", "代理路由必须用共享的鉴权头规则，不得再就地写一套。");
+assertIncludes("src/lib/credential-store.server.ts", "export function platformAuthHeaders(", "平台鉴权头规则必须集中导出，供代理与补取件共用。");
 
 if (failures.length) {
     console.error("Regression guards failed:");
