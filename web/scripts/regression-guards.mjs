@@ -631,12 +631,19 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
         assert(route.includes("findRunnableGenerationJob("), `${name}只能把任务交给本人、且仍在跑的任务（已结账的任务不接受新的上游调用）。`);
     }
     assert(jsonRoute.includes("deferred: true") && formRoute.includes("deferred: true"), "延后执行必须回一个可识别的 202（客户端据此转轮询），不能只回任务号。");
+    // 执行器读的是**磁盘上**的请求体：交给它的信封必须带 spoolKey。
+    // 2026-09-19 线上踩到：把内存里那份（没有 spoolKey）交给执行器，等于发了个空请求体，
+    // 上游回 400 invalid JSON request body —— 延后路径当场全废，而日志里只有一句「上游 400」。
+    const storedCall = "startServerRun({ job, envelope: stored })";
+    assert(jsonRoute.includes(storedCall), "JSON 代理延后执行必须用落盘后返回的那份信封（带 spoolKey），不能用内存里拼的。");
+    assert(formRoute.includes(storedCall), "form-data 代理延后执行同样必须用落盘后返回的那份信封（素材也是靠它读回来）。");
 
     const run = read("src/lib/generation/generation-run.server.ts");
     assert(run.includes("beginUpstreamCall(") && run.includes("isUpstreamCallInFlight("), "服务端执行与补发必须登记在飞状态，否则补发会与它自己并发重投。");
     assert(run.includes("recordResendAttempt("), "补发前必须先记预算：进程被杀也不能变成无限重试。");
     assert(run.includes("AbortSignal.timeout(RUN_TIMEOUT_MS)"), "服务端执行必须有超时，不得裸 fetch 一个可能永不返回的上游。");
     assert(run.includes("salvageGenerationArtifacts("), "服务端执行必须走同一套抢救与结账，不得另写一份归档逻辑。");
+    assert(run.includes("body: retry.body"), "被拒收后改道重投必须把改好的请求体一起交给执行器：磁盘上那份是原请求，不会自己变成新画幅。");
 
     const resendRoute = read("src/app/api/internal/generation/resend/route.ts");
     assert(resendRoute.includes('req.headers.get("x-generation-worker-secret")'), "补发接口是内部接口，密钥必须从请求头取（不得放进 URL 查询串）。");

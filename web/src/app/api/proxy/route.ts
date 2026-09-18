@@ -130,7 +130,9 @@ export async function POST(req: NextRequest) {
                 // 信封先落盘再交给后台执行：进程若在落盘前死掉，这一单既没有成品也没有信封
                 const stored = await saveUpstreamEnvelope({ userId: user.id, jobId, envelope: deferredEnvelope, body: upstreamBody.value as Buffer | string | undefined });
                 if (stored) {
-                    startServerRun({ job, envelope: { ...deferredEnvelope, savedAt: Date.now() } });
+                    // 必须把**存下来的那一份**交给执行器：请求体在磁盘上，执行时靠 spoolKey 去读。
+                    // 拿内存里这份（没有 spoolKey）去跑，等于发空请求体，上游回 400（线上真踩过）。
+                    startServerRun({ job, envelope: stored });
                     console.log(`[proxy] 任务 ${jobId} 转由服务端执行（渠道 ${authorization.provider}）：浏览器不再持有这条长连接`);
                     return NextResponse.json({ deferred: true, jobId, status: "running" }, { status: 202 });
                 }

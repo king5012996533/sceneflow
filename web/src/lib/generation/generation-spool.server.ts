@@ -44,9 +44,13 @@ function safeJobId(jobId: string) {
  * 只在调用方给出任务号时调用（文本/工具调用没有成品归属，留它没有意义）。
  * 整体是尽力而为：**信封写失败绝不能让这次生成失败** —— 它保的是「万一这也挂了」，
  * 不能反过来成为新的失败点。
+ *
+ * 返回值就是「存下来的那一份信封」（含 spoolKey），调用方必须拿它去执行：
+ * 请求体落在磁盘上，执行时靠 spoolKey 去读（2026-09-19 线上踩到：拿了内存里那份没 spoolKey 的
+ * 信封去重放，等于发了个空请求体，上游直接回 400 invalid JSON request body）。
  */
-export async function saveUpstreamEnvelope(input: { userId: string; jobId: string; envelope: Omit<UpstreamEnvelope, "savedAt"> & { savedAt?: number }; body?: Buffer | string | null; slot?: EnvelopeSlot }): Promise<boolean> {
-    if (!prisma) return false;
+export async function saveUpstreamEnvelope(input: { userId: string; jobId: string; envelope: Omit<UpstreamEnvelope, "savedAt"> & { savedAt?: number }; body?: Buffer | string | null; slot?: EnvelopeSlot }): Promise<UpstreamEnvelope | null> {
+    if (!prisma) return null;
     try {
         const jobId = safeJobId(input.jobId);
         const slot: EnvelopeSlot = input.slot === "fallback" ? "fallback" : "primary";
@@ -72,10 +76,10 @@ export async function saveUpstreamEnvelope(input: { userId: string; jobId: strin
             WHERE id = ${jobId} AND "userId" = ${input.userId}
         `;
         void maybeSweepSpool();
-        return true;
+        return envelope;
     } catch (error) {
         console.error("[generation-envelope] 信封落库失败（不影响本次生成）", input.jobId, error instanceof Error ? error.message : error);
-        return false;
+        return null;
     }
 }
 

@@ -72,7 +72,7 @@ export async function executeStoredEnvelope(input: { job: RunnableJob; envelope:
         const retry = await planRetry({ job, envelope, message: attempt.message });
         if (retry) {
             console.log(`[generation-run] 任务 ${job.id} 被上游拒收（${attempt.message.slice(0, 80)}）：按 ${retry.reason} 改道重投一次`);
-            const second = await runOnce({ job, envelope: retry.envelope, source: `${source} · ${retry.reason}` });
+            const second = await runOnce({ job, envelope: retry.envelope, source: `${source} · ${retry.reason}`, body: retry.body });
             return settleAttempt({ job, envelope, attempt: second, source });
         }
     }
@@ -82,7 +82,7 @@ export async function executeStoredEnvelope(input: { job: RunnableJob; envelope:
 type Attempt = { kind: "ok"; payload: unknown; status: number; counted: { claimed: boolean; taskId: string } } | { kind: "rejected"; status: number; message: string; snippet: string } | { kind: "network-error"; message: string };
 
 /** 发一次上游请求并解析报文，不做任何结账（结账统一在 settleAttempt 里） */
-async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; source: string }): Promise<Attempt> {
+async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; source: string; body?: Buffer }): Promise<Attempt> {
     const { job, envelope } = input;
     const headers: Record<string, string> = { ...envelope.headers };
     // content-type 单独存（multipart 的 boundary 只能来自构建那一刻），重放时原样带上
@@ -97,9 +97,9 @@ async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; so
         return { kind: "network-error", message: "未注册渠道或缺少凭证" };
     }
 
-    let body: Buffer | undefined;
+    let body: Buffer | undefined = input.body;
     try {
-        body = await readEnvelopeBody(job.id, envelope);
+        if (!body) body = await readEnvelopeBody(job.id, envelope);
     } catch (error) {
         console.error("[generation-run] 读取信封请求体失败", job.id, error instanceof Error ? error.message : error);
         return { kind: "rejected", status: 0, message: "信封请求体读取失败", snippet: "" };
@@ -172,18 +172,21 @@ async function settleAttempt(input: { job: RunnableJob; envelope: UpstreamEnvelo
 
 /**
  * 被上游拒收时的改道方案（最多一次）：
- *   - 画幅不被接受 → 换成上游自己列出的比例串重投；
+ *   - 画幅不被接受 → 换成上游自己列出的比例串重投（**新请求体直接带在返回值里**：
+ *     落盘的那份是原请求，指望它自己变成改过画幅的版本是不可能的）；
  *   - 编辑端点不吃这个模型 → 换用提交时就备好的「生成端点 + image_urls」信封
  *     （参考素材在提交那一刻由代理路由一起存下，不依赖浏览器还在不在）。
  */
-async function planRetry(input: { job: RunnableJob; envelope: UpstreamEnvelope; message: string }): Promise<{ envelope: UpstreamEnvelope; reason: string } | null> {
+async function planRetry(input: { job: RunnableJob; envelope: UpstreamEnvelope; message: string }): Promise<{ envelope: UpstreamEnvelope; reason: string; body?: Buffer } | null> {
     const body = await readEnvelopeBodyBuffer(input.job.id, input.envelope);
     const jsonBody = parseJsonBody(body, input.envelope.contentType);
     const rewritten = jsonBody ? aspectRetryBody(jsonBody, input.message) : null;
     if (rewritten) {
+        const rewrittenBody = Buffer.from(JSON.stringify(rewritten));
         return {
-            envelope: { ...input.envelope, bodyBytes: Buffer.byteLength(JSON.stringify(rewritten)), savedAt: Date.now() },
+            envelope: { ...input.envelope, bodyBytes: rewrittenBody.byteLength, savedAt: Date.now() },
             reason: "画幅改成上游支持的比例",
+            body: rewrittenBody,
         };
     }
 

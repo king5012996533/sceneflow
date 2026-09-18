@@ -106,20 +106,7 @@ export async function POST(req: NextRequest) {
                     if (fallback) {
                         await saveUpstreamEnvelope({ userId: user.id, jobId, slot: "fallback", envelope: { ...fallback, provider: authorization.provider, model: sfModel, bodyBytes: Buffer.byteLength(fallback.json) }, body: fallback.json });
                     }
-                    startServerRun({
-                        job,
-                        envelope: {
-                            url: target.toString(),
-                            method,
-                            headers: stripCredentialHeaders(safeHeaders),
-                            contentType: multipartType,
-                            provider: authorization.provider,
-                            model: sfModel,
-                            bodyBytes: bodyBuffer.length,
-                            origin: "defer",
-                            savedAt: Date.now(),
-                        },
-                    });
+                    startServerRun({ job, envelope: stored });
                     console.log(`[proxy/form-data] 任务 ${jobId} 转由服务端执行（渠道 ${authorization.provider}）：浏览器不再持有这条长连接`);
                     // 后台执行读的是落盘的那份信封，内存里的这份可以立刻放下（素材不再常驻整个等待期）
                     bodyBuffer = Buffer.alloc(0);
