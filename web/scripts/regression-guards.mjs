@@ -523,8 +523,9 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
 
     // 被暂缓的这段时间里，用户不该只看到「请求失败」——成品一到就要照常出图
     const guard = read("src/lib/generation/generation-guard.ts");
-    assert(guard.includes('settled?.status === "running"'), "结算被暂缓（仍是 running）时，客户端必须等上游出结论而不是直接报失败。");
+    assert(guard.includes('settled?.status === "running"') || guard.includes("settled.status === \"running\""), "结算被暂缓（仍是 running）时，客户端必须等上游出结论而不是直接报失败。");
     assert(guard.includes("awaitDeferredSettlement("), "等待必须是轮询服务端状态，而不是本地干等一个定时器。");
+    assert(guard.includes("!settled ||"), "连结算请求都没送到服务端（断网）时同样要问服务端：任务生死未知，不能断言失败。");
     assertIncludes("src/app/api/generation/jobs/[id]/route.ts", "export async function GET", "客户端要轮询任务状态，任务接口必须提供读接口。");
 }
 

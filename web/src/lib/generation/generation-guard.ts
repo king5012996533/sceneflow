@@ -87,8 +87,10 @@ export async function runGuardedGeneration<T>(
             });
             if (recovered) return recovered;
         }
-        // 服务端还没结账（我们的上游调用仍在飞）：等它自己出结论 —— 出成品就照常出图，真没成品才报失败
-        if (recover && status === "failed" && settled?.status === "running") {
+        // 服务端还没结账（我们的上游调用仍在飞）：等它自己出结论 —— 出成品就照常出图，真没成品才报失败。
+        // 连结算请求本身都发不出去（整个断网）时同样要问：那一刻谁也说不清任务死没死，
+        // 而服务端手里的成品不会因为浏览器断网就消失，联网恢复后应该照样把图交出来。
+        if (recover && status === "failed" && (!settled || settled.status === "running")) {
             const awaited = await awaitDeferredSettlement(job.id, options?.signal);
             if (awaited?.status === "succeeded") {
                 const recovered = await recover(awaited).catch((recoverError) => {
@@ -97,7 +99,7 @@ export async function runGuardedGeneration<T>(
                 });
                 if (recovered) return recovered;
             }
-            if (!awaited || awaited.status === "running") throw new Error(DEFERRED_PENDING_MESSAGE);
+            if (!awaited || awaited.status === "running") throw new Error(settled ? DEFERRED_PENDING_MESSAGE : UNREACHABLE_SETTLEMENT_MESSAGE);
         }
         throw error;
     }
@@ -105,6 +107,9 @@ export async function runGuardedGeneration<T>(
 
 /** 连接断了但上游仍在生成：这一刻的真相还不确定，别让用户以为白花钱 */
 const DEFERRED_PENDING_MESSAGE = "这条连接中断了，但上游仍在生成：结果出来后会出现在「生成记录」里，积分不会白扣。";
+
+/** 连结算都没送到服务端（断网）：任务生死未知，别断言失败 */
+const UNREACHABLE_SETTLEMENT_MESSAGE = "网络中断，这次生成的状态还没能同步到服务端：请稍后到「生成记录」里确认结果，积分不会白扣。";
 
 /** 等上游出结论的上限：慢中转单次出图 5-15 分钟，等太久不如让用户先去记录页 */
 const DEFERRED_WAIT_MS = 5 * 60 * 1000;
