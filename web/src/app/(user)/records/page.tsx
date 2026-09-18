@@ -204,7 +204,7 @@ function RecordCard({ record }: { record: GenerationRecord }) {
                 {record.media.length ? (
                     record.media.slice(0, 4).map((item) => <MediaPreview key={item.index} record={record} item={item} />)
                 ) : (
-                    <div className="flex aspect-[4/3] items-center justify-center rounded-xl border border-dashed border-[#e2dfdc] px-3 text-center text-xs text-[#a49f9a]">{record.status === "running" ? "生成中…" : "没有成品"}</div>
+                    <div className="flex aspect-[4/3] items-center justify-center rounded-xl border border-dashed border-[#e2dfdc] px-3 text-center text-xs text-[#726d67]">{record.status === "running" ? "生成中…" : "没有成品"}</div>
                 )}
             </div>
 
@@ -245,16 +245,18 @@ function RecordCard({ record }: { record: GenerationRecord }) {
 }
 
 function MediaPreview({ record, item }: { record: GenerationRecord; item: MediaItem }) {
-    if (!item.available) {
-        return (
-            <div className="flex aspect-[4/3] items-center justify-center rounded-xl border border-dashed border-[#e2dfdc] px-3 text-center text-xs text-[#a49f9a]">{item.archived ? "成品已过保留期，服务器已自动清理" : "未取回成品（上游直链已失效）"}</div>
-        );
+    // 归档文件读得出来但解不开（上游当年给的就是坏文件/截断文件）时，浏览器只会给一个破图图标。
+    // 这里退化成一个说人话的占位：文件其实还在，点「下载」就能拿原件核对。
+    const [broken, setBroken] = useState(false);
+    if (!item.available || broken) {
+        const message = item.available ? "预览加载失败，可点下方「下载」取原件" : item.archived ? "成品已过保留期，服务器已自动清理" : "未取回成品（上游直链已失效）";
+        return <div className="flex aspect-[4/3] items-center justify-center rounded-xl border border-dashed border-[#e2dfdc] px-3 text-center text-xs leading-relaxed text-[#726d67]">{message}</div>;
     }
     if (record.kind === "video") {
-        return <video src={item.url} controls preload="metadata" className="aspect-[4/3] w-full rounded-xl border border-[#e2dfdc] bg-[#000000]" />;
+        return <video src={item.url} controls preload="metadata" onError={() => setBroken(true)} className="aspect-[4/3] w-full rounded-xl border border-[#e2dfdc] bg-[#000000]" />;
     }
     return (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={item.url} alt="生成成品" className="aspect-[4/3] w-full rounded-xl border border-[#e2dfdc] object-cover" />
+        <img src={item.url} alt="生成成品" onError={() => setBroken(true)} className="aspect-[4/3] w-full rounded-xl border border-[#e2dfdc] object-cover" />
     );
 }
