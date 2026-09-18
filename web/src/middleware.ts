@@ -16,6 +16,10 @@ const PUBLIC_PATHS = [
     "/api/payments/callback",
     "/api/prompts",
     "/api/billing/packages", // 积分包价目公开（定价页展示用）；下单接口仍保护
+    // 内部定时任务入口（服务器 crontab 调用，无 Cookie）：必须自带 worker 密钥校验。
+    // 2026-09-18 实测发现：不在这里放行的话，请求会先被会话中间件挡成 401「请先登录」，
+    // 路由自己的密钥校验根本轮不到执行 —— internal/generation/poll 因此从来没被调通过。
+    "/api/internal",
 ];
 
 const STATIC_PREFIXES = [

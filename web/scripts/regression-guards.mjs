@@ -340,6 +340,13 @@ assertIncludes("src/lib/generation/generation-jobs.server.ts", "import { STALE_J
 assertIncludes("src/app/api/internal/generation/sweep/route.ts", "GENERATION_WORKER_SECRET", "内部清扫接口必须校验 worker 密钥（与 internal/generation/poll 同一把）。");
 assertIncludes("src/app/api/internal/generation/sweep/route.ts", 'req.headers.get("x-generation-worker-secret")', "worker 密钥必须从请求头取，不得放进 URL 查询串（会落到访问日志里）。");
 assertNotMatches("src/app/api/internal/generation/sweep/route.ts", /getServerSession|requireCurrentUser|export async function GET/, "清扫接口不得对外开放，也不得有免鉴权的 GET 入口，只能由服务器 cron 带密钥 POST。");
+// 内部路由是「中间件放行 + 路由自校验」的组合拳：中间件放行整段 /api/internal，
+// 所以这一段下面每个新路由都必须自带 worker 密钥校验，否则等于把定时任务入口裸奔在公网。
+// 2026-09-18 实测踩过：不放行的话请求先被会话中间件挡成 401「请先登录」，密钥校验根本轮不到执行。
+assertIncludes("src/middleware.ts", '"/api/internal"', "内部定时任务入口必须在中间件里放行，否则请求到不了路由自己的密钥校验（poll 路由因此从没跑通过）。");
+for (const route of walkFiles("src/app/api/internal").filter((path) => path.endsWith("route.ts"))) {
+    assert(read(route).includes("GENERATION_WORKER_SECRET"), `${route} 在 /api/internal 下必须自带 worker 密钥校验（中间件已放行这一整段路径）。`);
+}
 
 if (failures.length) {
     console.error("Regression guards failed:");
