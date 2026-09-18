@@ -60,6 +60,7 @@ export async function requestGeneratedImages({ config, prompt, references = [], 
         generationMetadata(config, prompt, references.length),
         (job) => (references.length ? requestEdit(config, prompt, references, mask, options, job.id) : requestGeneration(config, prompt, options, job.id)),
         recoverDeliveredImages,
+        options,
     );
 }
 

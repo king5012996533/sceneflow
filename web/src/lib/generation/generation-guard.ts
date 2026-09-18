@@ -55,8 +55,19 @@ export async function finishClientGeneration(jobId: string, status: "succeeded" 
  * `recover` 是给「我们这侧失败、但服务端其实已经收下成品」准备的：上游出了图、
  * 代理层已经归档、任务在服务端被改判成功，可浏览器这条长连接断了。
  * 这时候用户该看到的是图，不是「请求失败」——所以把成品取回来当结果返回。
+ *
+ * 2026-09-18 又补了一种情形：结算被**暂缓**（服务端返回 status 仍是 running）。
+ * 浏览器那条长连接断了就报失败，可我们发往上游的请求还在飞、上游还在出图（见 upstream-inflight.ts）。
+ * 服务端这时不退钱也不判死，客户端就该等它出结论，而不是急着把「请求失败」甩给用户。
  */
-export async function runGuardedGeneration<T>(kind: ClientGenerationKind, count: number, metadata: Record<string, unknown>, run: (job: GenerationJob) => Promise<T>, recover?: (job: GenerationJob) => Promise<T | undefined>) {
+export async function runGuardedGeneration<T>(
+    kind: ClientGenerationKind,
+    count: number,
+    metadata: Record<string, unknown>,
+    run: (job: GenerationJob) => Promise<T>,
+    recover?: (job: GenerationJob) => Promise<T | undefined>,
+    options?: { signal?: AbortSignal },
+) {
     const job = await beginClientGeneration(kind, count, metadata);
     try {
         const result = await run(job);
@@ -76,8 +87,48 @@ export async function runGuardedGeneration<T>(kind: ClientGenerationKind, count:
             });
             if (recovered) return recovered;
         }
+        // 服务端还没结账（我们的上游调用仍在飞）：等它自己出结论 —— 出成品就照常出图，真没成品才报失败
+        if (recover && status === "failed" && settled?.status === "running") {
+            const awaited = await awaitDeferredSettlement(job.id, options?.signal);
+            if (awaited?.status === "succeeded") {
+                const recovered = await recover(awaited).catch((recoverError) => {
+                    console.error("[generation] failed to recover delivered result", recoverError);
+                    return undefined;
+                });
+                if (recovered) return recovered;
+            }
+            if (!awaited || awaited.status === "running") throw new Error(DEFERRED_PENDING_MESSAGE);
+        }
         throw error;
     }
+}
+
+/** 连接断了但上游仍在生成：这一刻的真相还不确定，别让用户以为白花钱 */
+const DEFERRED_PENDING_MESSAGE = "这条连接中断了，但上游仍在生成：结果出来后会出现在「生成记录」里，积分不会白扣。";
+
+/** 等上游出结论的上限：慢中转单次出图 5-15 分钟，等太久不如让用户先去记录页 */
+const DEFERRED_WAIT_MS = 5 * 60 * 1000;
+const DEFERRED_POLL_MS = 5_000;
+
+/** 轮询任务状态直到它不再是 running（或超出等待上限、或用户取消） */
+async function awaitDeferredSettlement(jobId: string, signal?: AbortSignal): Promise<GenerationJob | undefined> {
+    const deadline = Date.now() + DEFERRED_WAIT_MS;
+    while (Date.now() < deadline) {
+        if (signal?.aborted) return undefined;
+        await sleep(DEFERRED_POLL_MS);
+        if (signal?.aborted) return undefined;
+        const job = await readGenerationJob(jobId).catch(() => undefined);
+        // 读不到（网络抖动）继续等：这条路径本来就是「连接不稳」时的兜底
+        if (job && job.status !== "running") return job;
+    }
+    return undefined;
+}
+
+async function readGenerationJob(jobId: string): Promise<GenerationJob | undefined> {
+    const response = await fetch(apiPath(`/api/generation/jobs/${encodeURIComponent(jobId)}`), { credentials: "include" });
+    if (!response.ok) return undefined;
+    const payload = await response.json().catch(() => null);
+    return (payload?.job as GenerationJob) ?? undefined;
 }
 
 async function retryGenerationSettlement<T>(settle: () => Promise<T>) {

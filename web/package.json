@@ -31,6 +31,7 @@
         "test:retention": "node scripts/generation-media-retention-unit-tests.mjs",
         "test:upstream": "node scripts/upstream-error-unit-tests.mjs",
         "test:artifact": "node scripts/generation-artifact-unit-tests.mjs",
+        "test:inflight": "node scripts/upstream-inflight-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

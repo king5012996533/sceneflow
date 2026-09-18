@@ -2,7 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { requireCurrentUser } from "@/lib/current-user";
 import { isSameOriginRequest } from "@/lib/auth";
-import { finishGenerationJob, GenerationPolicyError } from "@/lib/generation/generation-jobs.server";
+import { finishGenerationJob, getGenerationJob, GenerationPolicyError } from "@/lib/generation/generation-jobs.server";
+
+/**
+ * 读一条任务的状态。
+ *
+ * 客户端在被「暂缓结账」之后靠它轮询：浏览器那条长连接断了、任务还在服务端跑着的时候，
+ * 用户不该只收到一句「请求失败」—— 成品一进归档就照常出图（见 generation-guard.ts）。
+ */
+export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
+    try {
+        const user = await requireCurrentUser(req);
+        if (!user) return NextResponse.json({ error: "请先登录" }, { status: 401 });
+
+        const { id } = await context.params;
+        const job = await getGenerationJob(user.id, id);
+        return NextResponse.json({ job });
+    } catch (error) {
+        const status = error instanceof GenerationPolicyError ? error.status : 500;
+        const message = error instanceof Error ? error.message : "读取生成任务失败";
+        return NextResponse.json({ error: message }, { status });
+    }
+}
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {
     try {

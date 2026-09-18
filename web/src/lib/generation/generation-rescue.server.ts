@@ -2,6 +2,7 @@ import { prisma } from "@/lib/ic-prisma";
 
 import { extractArtifacts, resultSources } from "./generation-result";
 import { archiveResultSources, storeGenerationResults } from "./generation-result.server";
+import { takeClientGaveUp } from "./upstream-inflight";
 
 /**
  * 代理侧的成品抢救。
@@ -42,6 +43,10 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
         data: { status: "succeeded", quotaRefunded: false, finishedAt: new Date() },
     });
     if (!claimed.count) return false;
+
+    // 认领成功即定论：把可能存在的「客户端已放弃」记录丢掉，
+    // 免得它留到下一个调用结束时反过来把这条已经成功的任务结为失败（见 settleDeferredClientFailure）。
+    takeClientGaveUp(job.id);
 
     console.log(`[generation-rescue] 任务 ${job.id} 上游已产出 ${sources.length} 份成品（${input.source}），改判成功并开始归档`);
     void archiveResultSources(job.id, sources)

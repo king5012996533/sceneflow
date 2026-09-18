@@ -499,6 +499,35 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/lib/generation/generation-request.ts", "resultUrlsFromItems(", "补救取件地址要走统一的下标映射，别自己拼媒体路径。");
 }
 
+// —— 「客户端放弃」不再等于「上游没产出」（2026-09-18 黑洞最后一环）——
+// 浏览器那条长连接一断，客户端就报失败退款；可我们发往上游的请求还在飞（代理的 abort 只挂自家 900s 超时，
+// 不跟随客户端信号），上游几十秒后带着成品回来时任务已经 failed，抢救只能空手而归：钱付了、图丢了、额度还退了。
+// 这里钉住「谁看见真相谁定论」这条链：登记在飞 → 暂缓结账 → 上游出成品就认领、确认没成品才退款。
+{
+    const inflight = read("src/lib/generation/upstream-inflight.ts");
+    assert(inflight.includes("export function beginUpstreamCall"), "上游调用必须留「还在飞」的登记，否则结算侧无从判断该不该等。");
+    assert(inflight.includes("export function takeClientGaveUp"), "「客户端已放弃」必须能被唯一认领一次，避免重复结账。");
+
+    assertIncludes("src/app/api/proxy/route.ts", "beginUpstreamCall(", "JSON 代理（图片直连主路径）必须登记在飞调用。");
+    assertIncludes("src/app/api/proxy/form-data/route.ts", "beginUpstreamCall(", "form-data 代理（参考图生图主路径）必须登记在飞调用。");
+
+    const jobs = read("src/lib/generation/generation-jobs.server.ts");
+    assert(jobs.includes("isUpstreamCallInFlight("), "客户端报失败时，结算必须先看我们的上游调用还在不在飞。");
+    assert(jobs.includes("noteClientGaveUp("), "在上飞期间客户端报失败，只能记账不能结账退款。");
+    assert(jobs.includes("DEFERRABLE_KINDS"), "只有会产出成品的通道（图片/视频）才延后结账，文本没有等的必要。");
+    assert(jobs.includes("export async function settleDeferredClientFailure"), "延后结账必须有人接手：上游调用结束时确认没成品才退款。");
+    const settleGuard = jobs.slice(jobs.indexOf("export async function settleDeferredClientFailure"));
+    assert(settleGuard.indexOf("isUpstreamCallInFlight(jobId)") < settleGuard.indexOf("takeClientGaveUp(jobId)"), "还有调用在飞时不得认领放弃记录，否则会提前把任务判死。");
+    assert(settleGuard.includes("job.externalId"), "手上已有上游任务号的任务交给补取件（generation-recovery）定论，代理侧不得抢先退款。");
+    assertIncludes("src/lib/generation/generation-rescue.server.ts", "takeClientGaveUp(", "抢救认领成功即定论，必须把放弃记录取走，免得反过来把成功改判失败。");
+
+    // 被暂缓的这段时间里，用户不该只看到「请求失败」——成品一到就要照常出图
+    const guard = read("src/lib/generation/generation-guard.ts");
+    assert(guard.includes('settled?.status === "running"'), "结算被暂缓（仍是 running）时，客户端必须等上游出结论而不是直接报失败。");
+    assert(guard.includes("awaitDeferredSettlement("), "等待必须是轮询服务端状态，而不是本地干等一个定时器。");
+    assertIncludes("src/app/api/generation/jobs/[id]/route.ts", "export async function GET", "客户端要轮询任务状态，任务接口必须提供读接口。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

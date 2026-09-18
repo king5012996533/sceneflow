@@ -3,6 +3,8 @@ import { requireCurrentUser } from "@/lib/current-user";
 import { assertAllowedProxyUrl, fetchSafely, isHostOrSubdomain } from "@/lib/url-safety";
 import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
 import { salvageGenerationArtifacts } from "@/lib/generation/generation-rescue.server";
+import { settleDeferredClientFailure } from "@/lib/generation/generation-jobs.server";
+import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
 import FormData from "form-data";
 
 export const runtime = "nodejs";
@@ -78,6 +80,11 @@ export async function POST(req: NextRequest) {
             controller.abort();
         }, PROXY_TIMEOUT_MS);
 
+        // 登记「我们发往上游的这一次调用还在飞」：浏览器那条长连接断了之后，
+        // 客户端会立刻报失败结账，可上游其实还在跑、还在收我们的钱。
+        // 结算侧据此先不结账（见 generation-jobs.server.ts），等这里真正看见上游结果再定论。
+        const releaseUpstreamCall = beginUpstreamCall(jobId);
+
         try {
             // multipart 缓冲一次性拷贝；收到响应头说明请求体已发完，尽早释放引用缓解长等待期间的内存常驻
             let bodyBuffer = form.getBuffer();
@@ -114,6 +121,12 @@ export async function POST(req: NextRequest) {
             return NextResponse.json(data, { status: response.status });
         } finally {
             clearTimeout(timeout);
+            releaseUpstreamCall();
+            // 上游结果已经落地（要不要抢救也已经有结论）：这时候若客户端早已放弃且没被抢救认领，
+            // 才轮到我们代为结账退款 —— 拿不准的情形一律留着，见 settleDeferredClientFailure
+            if (jobId) {
+                void settleDeferredClientFailure(user.id, jobId).catch((error) => console.error("[generation-settle] 代为结账异常", error instanceof Error ? error.message : error));
+            }
         }
     } catch (err: unknown) {
         // 我们自己的超时中止：上游（通常是中转站）可能已收单并扣费、仍在生成，只是响应超过了时限

@@ -6,12 +6,22 @@ import { resolveConfiguredPricing } from "@/lib/credential-store.server";
 import { normalizeGenerationMetadata } from "@/lib/generation/generation-config";
 import { getOperationNumber, getPricingDefaults } from "@/lib/operation-config";
 import { STALE_JOB_MS } from "./generation-stale";
+import { isUpstreamCallInFlight, noteClientGaveUp, takeClientGaveUp } from "./upstream-inflight";
 
 // 超时阈值与「超时后怎么关账」的规则收在 generation-stale.ts：懒清扫（本文件）与
 // 全局清扫（generation-sweep.server.ts）必须共用同一份数字，否则两套标准会漂移。
 
 // 套餐系统已下线：不再有并发权益。保留固定并发守卫防止单用户打爆上游（防滥用常量，非权益概念，可调）。
 const MAX_CONCURRENT_JOBS = 8;
+
+/**
+ * 会产出成品、值得等上游把话说完的通道（与 generation-rescue 的 RESCUABLE_KINDS 同一批）。
+ * 文本/工具调用不落盘，客户端说失败就是失败，没有等的必要。
+ */
+const DEFERRABLE_KINDS = new Set<GenerationKind>(["image", "video"]);
+
+/** 客户端放弃、上游仍在飞：写进 error 的占位文案（真正的失败原因在结算时代入） */
+const AWAITING_UPSTREAM_NOTE = "客户端连接中断，上游仍在生成，等待上游结果";
 
 type BeginGenerationInput = {
     requestKey: string;
@@ -109,6 +119,20 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
         if (!job) throw new GenerationPolicyError("生成任务不存在", 404);
         if (job.status !== "running") return job;
 
+        // 客户端放弃 ≠ 上游没产出（2026-09-18 黑洞的最后一环）。
+        //
+        // 浏览器那条长连接一断，客户端会立刻报失败退款；但我们发往上游的请求**还在飞**
+        // —— 代理里的 AbortController 只挂自家 900s 超时，不跟随客户端信号
+        // （app/api/proxy/route.ts）。上游随后带着成品回来时任务已经 failed，抢救只能空手而归：
+        // 钱付了、图丢了、额度还退了。所以这里先不结账，只把「客户端已放弃」记在登记簿上，
+        // 谁看见真相谁定论：上游出成品 → 抢救认领成功（积分照收，成品进归档）；
+        // 上游确认没成品 → 代理调用结束时代为结账退款（settleDeferredClientFailure）。
+        if (status === "failed" && DEFERRABLE_KINDS.has(job.kind as GenerationKind) && isUpstreamCallInFlight(job.id)) {
+            noteClientGaveUp(job.id, error);
+            console.log(`[generation-settle] 任务 ${job.id} 客户端报失败，但我们的上游调用仍在飞：暂不结账，等上游结果`);
+            return tx.generationJob.update({ where: { id: job.id }, data: { error: AWAITING_UPSTREAM_NOTE } });
+        }
+
         // 失败/取消/超时：退还积分（幂等，重复结算不会重复退）
         if (status !== "succeeded" && !job.quotaRefunded && job.creditsCost > 0) {
             await refundCredits(tx, userId, job.creditsCost, job.requestKey, `生成任务${status === "cancelled" ? "已取消" : "失败"}退款`);
@@ -125,6 +149,44 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
             },
         });
     });
+}
+
+/**
+ * 代理侧为「客户端已放弃、上游仍在飞」的任务代为结账。
+ *
+ * 只有真正看见上游结果的人才能定论，而这里就是那个时刻：调用已经结束、成品也没有被抢救认领，
+ * 说明这一次上游确实什么都没给出来 —— 这时候才退款，不会冤枉任何一种「上游还在跑」的情形。
+ *
+ * 拿不准的一律不动：还有别的调用在飞、任务已经被认领（不再 running）、
+ * 或者手上已经握着上游任务号（那属于「补取件」的活，generation-sweep 会按任务号去问上游要成品，
+ * 见 generation-recovery.ts），都原样留着，等更清楚的一方来处理。
+ */
+export async function settleDeferredClientFailure(userId: string, jobId: string): Promise<"settled" | "kept" | "none"> {
+    if (!prisma) return "none";
+    if (isUpstreamCallInFlight(jobId)) return "none";
+
+    // 取走即视为已处理：同一条放弃记录只认领一次，避免下一个调用结束时重复结账
+    const reason = takeClientGaveUp(jobId);
+    if (!reason) return "none";
+
+    const job = await prisma.generationJob.findFirst({ where: { id: jobId, userId }, select: { id: true, status: true, externalId: true } });
+    if (!job || job.status !== "running") return "none";
+    if (job.externalId) return "kept";
+
+    await finishGenerationJob(userId, jobId, "failed", reason);
+    console.log(`[generation-settle] 任务 ${jobId} 上游调用已结束且未产出成品：按客户端原因结为失败并退款（${reason.slice(0, 60)}）`);
+    return "settled";
+}
+
+/** 读一条任务（供客户端在被暂缓结账后轮询状态：成品到了就照常取图） */
+export async function getGenerationJob(userId: string, jobId: string) {
+    if (!prisma) throw new Error("Database unavailable");
+    const job = await prisma.generationJob.findFirst({
+        where: { id: jobId, userId },
+        select: { id: true, kind: true, status: true, error: true, resultUrl: true, resultData: true, quotaRefunded: true, finishedAt: true },
+    });
+    if (!job) throw new GenerationPolicyError("生成任务不存在", 404);
+    return job;
 }
 
 export async function bindExternalGenerationJob(userId: string, jobId: string, input: { provider: string; model: string; externalId: string; externalGetUrl: string; externalStatus?: string }) {
