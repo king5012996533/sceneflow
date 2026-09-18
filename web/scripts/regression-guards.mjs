@@ -612,6 +612,11 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(spool.includes("os.homedir()") && !spool.includes("process.cwd()"), "信封必须落在用户主目录下：放在 cwd 等于每次部署（也就是最需要它的时候）被清空。");
     assert(spool.includes("safeJobId("), "信封的文件路径必须由任务号推导并校验，防止目录穿越。");
     assert(spool.includes("不影响本次生成"), "信封写失败绝不能让这次生成失败：它保的是「万一这也挂了」，不能成为新的失败点。");
+    // jsonb_build_object 是 variadic "any"：参数不给类型，Postgres 会直接报 42P18
+    // "could not determine data type of parameter $1"。线上实测踩到（信封全部落库失败、延后全部回落同步），
+    // 而单测跑的是纯逻辑、碰不到这条 SQL —— 只能用门禁把它钉住。
+    assert(/jsonb_build_object\(\$\{envelopeKey\(slot\)\}::text/.test(spool), "写 metadata 的 jsonb_build_object 键必须显式 ::text，否则 Postgres 无法推断参数类型（42P18）。");
+    assert(/jsonb_build_object\('resend', \$\{JSON\.stringify\(state\)\}::jsonb\)/.test(spool), "补发记账的 jsonb_build_object 值必须显式 ::jsonb。");
 
     const jsonRoute = read("src/app/api/proxy/route.ts");
     const formRoute = read("src/app/api/proxy/form-data/route.ts");

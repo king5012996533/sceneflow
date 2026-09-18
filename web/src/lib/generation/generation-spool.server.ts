@@ -64,9 +64,11 @@ export async function saveUpstreamEnvelope(input: { userId: string; jobId: strin
 
         const envelope: UpstreamEnvelope = { ...input.envelope, spoolKey, bodyBytes, savedAt: Date.now() };
         // 只合并 metadata 里的这一个键：metadata 还装着计费口径字段，整体覆盖会把它们抹掉
+        // 键必须显式 ::text：jsonb_build_object 是 variadic "any"，不给类型 Postgres 直接
+        // 报 42P18 "could not determine data type of parameter $1"（线上真踩过：信封落库全失败）
         await prisma.$executeRaw`
             UPDATE "GenerationJob"
-            SET metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(${envelopeKey(slot)}, ${JSON.stringify(envelope)}::jsonb)
+            SET metadata = coalesce(metadata, '{}'::jsonb) || jsonb_build_object(${envelopeKey(slot)}::text, ${JSON.stringify(envelope)}::jsonb)
             WHERE id = ${jobId} AND "userId" = ${input.userId}
         `;
         void maybeSweepSpool();
