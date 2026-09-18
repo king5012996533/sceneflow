@@ -16,7 +16,7 @@
  */
 import assert from "node:assert";
 
-import { MAX_EXTRACTED_ARTIFACTS, MIN_INLINE_BASE64_CHARS, detectMediaMime, extractArtifacts, parseInlineDataUrl, resultSources } from "../src/lib/generation/generation-result.ts";
+import { MAX_EXTRACTED_ARTIFACTS, MIN_INLINE_BASE64_CHARS, detectMediaMime, extractArtifacts, parseInlineDataUrl, resultSources, resultUrlsFromItems } from "../src/lib/generation/generation-result.ts";
 
 let passed = 0;
 const failures = [];
@@ -132,6 +132,25 @@ check("文件头判定：PNG / JPEG / GIF / WEBP / MP4 / WEBM 认得，文本不
 check("真实 PNG 的 base64 解出来能被文件头认出来（端到端对齐）", () => {
     const real = Buffer.from(FAKE_PNG_BASE64, "base64");
     assert.strictEqual(detectMediaMime(real), "image/png");
+});
+
+check("记录取件：已归档走本地媒体地址，未归档退回上游直链，脏数据不列", () => {
+    const urls = resultUrlsFromItems("job1", [
+        { archiveKey: "job1/0", mimeType: "image/png", bytes: 10 },
+        { url: "https://cdn.example.com/b.png" },
+        { url: "notaurl" },
+        null,
+        { archiveKey: "job1/3", mimeType: "image/png", bytes: 20 },
+    ]);
+    assert.deepStrictEqual(urls, ["/api/generation/jobs/job1/media/0", "https://cdn.example.com/b.png", "/api/generation/jobs/job1/media/4"]);
+    assert.deepStrictEqual(resultUrlsFromItems("job1", null), []);
+});
+
+// 取件下标是「items 数组里的位置」，与媒体路由读 items[index].archiveKey 的做法一致：
+// 两边只要都按位置来，跳过一份识别不出的成品也不会让用户取到别人的图。
+check("记录取件：按下标取，与媒体路由读 items[index] 的位置语义一致", () => {
+    const urls = resultUrlsFromItems("job2", [{ url: "https://cdn.example.com/a.png" }, { archiveKey: "job2/1" }]);
+    assert.strictEqual(urls[1], "/api/generation/jobs/job2/media/1");
 });
 
 console.log(`\n${passed} passed, ${failures.length} failed`);

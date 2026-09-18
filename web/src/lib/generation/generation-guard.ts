@@ -14,6 +14,8 @@ type GenerationJob = {
     id: string;
     requestKey: string;
     status: "running" | "succeeded" | "failed" | "cancelled";
+    resultUrl?: string | null;
+    resultData?: unknown;
 };
 
 export async function beginClientGeneration(kind: ClientGenerationKind, count = 1, metadata?: Record<string, unknown>) {
@@ -47,12 +49,14 @@ export async function finishClientGeneration(jobId: string, status: "succeeded" 
     });
 }
 
-export async function runGuardedGeneration<T>(
-    kind: ClientGenerationKind,
-    count: number,
-    metadata: Record<string, unknown>,
-    run: (job: GenerationJob) => Promise<T>,
-) {
+/**
+ * 包住一次生成：先占额度（begin），跑完再结算（finish）。
+ *
+ * `recover` 是给「我们这侧失败、但服务端其实已经收下成品」准备的：上游出了图、
+ * 代理层已经归档、任务在服务端被改判成功，可浏览器这条长连接断了。
+ * 这时候用户该看到的是图，不是「请求失败」——所以把成品取回来当结果返回。
+ */
+export async function runGuardedGeneration<T>(kind: ClientGenerationKind, count: number, metadata: Record<string, unknown>, run: (job: GenerationJob) => Promise<T>, recover?: (job: GenerationJob) => Promise<T | undefined>) {
     const job = await beginClientGeneration(kind, count, metadata);
     try {
         const result = await run(job);
@@ -61,9 +65,17 @@ export async function runGuardedGeneration<T>(
         return result;
     } catch (error) {
         const status = error instanceof DOMException && error.name === "AbortError" ? "cancelled" : "failed";
-        await finishClientGeneration(job.id, status, error).catch((settlementError) => {
+        const settled = await finishClientGeneration(job.id, status, error).catch((settlementError) => {
             console.error("[generation] failed to settle job", settlementError);
+            return undefined;
         });
+        if (recover && settled?.status === "succeeded") {
+            const recovered = await recover(settled).catch((recoverError) => {
+                console.error("[generation] failed to recover delivered result", recoverError);
+                return undefined;
+            });
+            if (recovered) return recovered;
+        }
         throw error;
     }
 }

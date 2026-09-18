@@ -491,6 +491,12 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     const image = read("src/services/api/image.ts");
     assert(image.includes("jobId: serverJobId"), "图片代理请求必须带上任务号，否则服务端拿到成品也不知道归档给哪条任务。");
     assert(image.includes('formData.set("_proxy_job"'), "form-data 生图路径同样要带任务号。");
+    // 服务端收下了、浏览器却没拿到：用户必须还能看到这张图（否则钱花了、图在服务器上，他却对着「请求失败」）
+    const guard = read("src/lib/generation/generation-guard.ts");
+    assert(guard.includes("recover?"), "结算失败后要留一个「服务端其实已判成功」的补救入口。");
+    assert(guard.includes('settled?.status === "succeeded"'), "补救必须以服务端结算结果为准，不能拿本地状态猜。");
+    assertIncludes("src/lib/generation/generation-request.ts", "recoverDeliveredImages", "图片生成失败时必须尝试把服务端已归档的成品取回来给用户。");
+    assertIncludes("src/lib/generation/generation-request.ts", "resultUrlsFromItems(", "补救取件地址要走统一的下标映射，别自己拼媒体路径。");
 }
 
 if (failures.length) {

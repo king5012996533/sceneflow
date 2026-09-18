@@ -87,6 +87,27 @@ export function resultMediaPath(jobId: string, index: number) {
     return `/api/generation/jobs/${encodeURIComponent(jobId)}/media/${index}`;
 }
 
+/**
+ * 从生成记录的 items 里取出成品地址（下标即媒体路由的 index）。
+ * 已归档 → 我们自己的媒体地址；未归档 → 上游直链。
+ *
+ * 用途是「浏览器这侧失败了，但服务端其实已经收下成品」时把图取回来（见 generation-request.ts）：
+ * 钱已经花了、图也在手上，不该只因为那条长连接断了就让用户看到「请求失败」。
+ */
+export function resultUrlsFromItems(jobId: string, items: unknown): string[] {
+    if (!Array.isArray(items)) return [];
+    const urls: string[] = [];
+    items.forEach((item, index) => {
+        if (isArchivedResultItem(item)) {
+            urls.push(resultMediaPath(jobId, index));
+            return;
+        }
+        const url = (item as { url?: unknown } | null)?.url;
+        if (typeof url === "string" && /^https?:\/\//i.test(url)) urls.push(url);
+    });
+    return urls;
+}
+
 // ---------- 上游报文里的成品提取 ----------
 //
 // 2026-09-18 线上账：7 天 374 条任务判「成功」，其中 370 条手上什么都没有
