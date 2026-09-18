@@ -73,11 +73,45 @@ export const LATE_RESCUE_WINDOW_MS = 10 * 60 * 1000;
 /** 已被结为失败、但还没超出补认领窗口：成品这时到达仍然该认领 */
 export function isLateRescueClaimable(status: string | null | undefined, finishedAt: Date | number | string | null | undefined, now = Date.now()): boolean {
     if (status !== "failed") return false;
+    return withinWindow(finishedAt, LATE_RESCUE_WINDOW_MS, now);
+}
+
+/**
+ * 用户主动取消之后，上游其实**停不下来**：同步通道没有取消接口，那边的图照样画完、照样计费
+ * （2026-09-18 真机验证：起任务 1.5 秒后取消，服务端当场退款，而上游 200 秒后返回 200 + 完整 PNG，
+ * 那时我们判的是 cancelled，抢救不认 —— 图被静默丢弃，等于白付一次 API）。
+ *
+ * 所以取消之后这段窗口内送回来的成品仍然归档保留，但**不改状态、不再收费**：
+ * 用户说了不要，就不该再扣他的钱；可我们已经付给上游了，扔掉是纯亏。
+ * 窗口比补认领长，因为视频/4K 这类任务在取消后还要跑好一会儿。
+ */
+export const CANCELED_ARTIFACT_WINDOW_MS = 30 * 60 * 1000;
+
+/** 已取消、但成品还在路上：这时到达的成品要保下来（只保图，不动钱和状态） */
+export function isCanceledArtifactKeepable(status: string | null | undefined, finishedAt: Date | number | string | null | undefined, now = Date.now()): boolean {
+    if (status !== "cancelled") return false;
+    return withinWindow(finishedAt, CANCELED_ARTIFACT_WINDOW_MS, now);
+}
+
+/** 成品到达时该怎么处置这条任务，规则全部收在这里（服务端只照着执行） */
+export type RescueAction = "claim" | "keep-artifact" | "skip";
+
+export function decideRescueAction(job: { status: string | null | undefined; finishedAt: Date | number | string | null | undefined }, now = Date.now()): RescueAction {
+    // 任务还在跑：就地定论，成品到手即成功（照常收费）
+    if (job.status === "running") return "claim";
+    // 客户端先跑了、我们按它的报告结成了失败：补认领（钱已退，不再重复收）
+    if (isLateRescueClaimable(job.status, job.finishedAt, now)) return "claim";
+    // 用户取消：保图不保账（退款照旧，图留给用户）
+    if (isCanceledArtifactKeepable(job.status, job.finishedAt, now)) return "keep-artifact";
+    return "skip";
+}
+
+/** 结账时间是否落在窗口内；时间读不出来、或离谱的将来（时钟漂移）一律不算 */
+function withinWindow(finishedAt: Date | number | string | null | undefined, windowMs: number, now: number): boolean {
     const finished = finishedAt instanceof Date ? finishedAt.getTime() : new Date(finishedAt ?? 0).getTime();
     if (!Number.isFinite(finished) || finished <= 0) return false;
     const elapsed = now - finished;
-    // 未来时间（时钟漂移/写库误差）不算超窗，但也不能是离谱的将来
-    return elapsed <= LATE_RESCUE_WINDOW_MS && elapsed > -LATE_RESCUE_WINDOW_MS;
+    return elapsed <= windowMs && elapsed > -windowMs;
 }
 
 /**

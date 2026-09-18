@@ -539,12 +539,37 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(recovery.includes("export function shouldAwaitUpstreamSettlement"), "要不要等上游结论的规则必须收成一个判定，客户端只负责照做。");
 
     const rescue = read("src/lib/generation/generation-rescue.server.ts");
-    assert(rescue.includes("isLateRescueClaimable("), "抢救侧必须用这条判定来决定能不能补认领，否则成品照样被丢掉。");
-    assert(/quotaRefunded: lateClaim \? true : false/.test(rescue), "补认领不得改动退款事实：钱已经退出手，账要照实记。");
+    assert(rescue.includes("decideRescueAction("), "抢救侧必须用这条判定来决定能不能补认领，否则成品照样被丢掉。");
+    assert(/quotaRefunded: lateClaim/.test(rescue), "补认领不得改动退款事实：钱已经退出手，账要照实记。");
 
     const guard = read("src/lib/generation/generation-guard.ts");
     assert(guard.includes("shouldAwaitUpstreamSettlement(") && guard.includes("isNetworkLayerFailure("), "客户端报网络层失败时也要等服务端出结论——这正是用户看到的「请求失败」。");
     assert(guard.includes("keepWaitingOnFailure"), "网络层失败下的「已失败」不算结论：上游成品可能几分钟后才被服务端补认领回来，那时该照常出图。");
+}
+
+// —— 用户取消：上游停不下来，图不能扔（2026-09-18 真机验证：1.5 秒取消，200 秒后上游返回完整 PNG，被静默丢弃）——
+{
+    const recovery = read("src/lib/generation/generation-recovery.ts");
+    assert(recovery.includes("export function decideRescueAction"), "成品到达该怎么处置必须收成一条决策，散在调用处迟早漏分支。");
+    assert(recovery.includes("CANCELED_ARTIFACT_WINDOW_MS") && recovery.includes("export function isCanceledArtifactKeepable"), "取消后的成品保留必须有自己的窗口与判定。");
+
+    const rescue = read("src/lib/generation/generation-rescue.server.ts");
+    assert(rescue.includes("decideRescueAction("), "抢救必须照决策执行，不得各写一套条件。");
+    assert(rescue.includes("keep-artifact"), "用户取消的任务要「保图不保账」：不得把上游已经画完的图丢掉。");
+    assert(rescue.includes("没能留下"), "有成品却保不住的分支必须留痕：取消口子就是静默丢弃藏了几天。");
+    assert(rescue.includes('externalStatus: "dropped"'), "丢弃要打标记，日报才能把「有成品却没留下」数出来。");
+
+    const result = read("src/lib/generation/generation-result.server.ts");
+    assert(result.includes('status: { in: ["succeeded", "cancelled"] }'), "取消的任务也要能挂上成品，否则归档了记录页也看不到。");
+}
+
+// —— 每日对账：把「上游给了成品、我们没收费」变成可数的数字 ——
+{
+    const report = read("src/lib/generation/generation-report.ts");
+    assert(report.includes("export function buildDailyReport"), "日报的归账与排版必须在纯逻辑里，才好单测。");
+    assert(report.includes("有成品却没留下"), "日报必须单独列出「有成品却没留下」，这是白烧钱的直接指标。");
+    assertIncludes("src/lib/generation/generation-report.server.ts", "externalStatus", "日报要从任务上读「丢弃」标记，否则这项永远是 0。");
+    assertIncludes("src/app/api/internal/generation/daily-report/route.ts", "GENERATION_WORKER_SECRET", "日报接口是内部接口，必须校验 worker 密钥。");
 }
 
 if (failures.length) {

@@ -208,8 +208,13 @@ function RecordCard({ record }: { record: GenerationRecord }) {
                 )}
             </div>
 
-            {/* 只在不成功的任务上展示原因：成品已经拿到的任务挂一句「连接中断/请求失败」只会让人以为白花钱 */}
-            {record.status !== "succeeded" && record.error ? <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-[#a3342c]">{record.error}</p> : null}
+            {/* 成品在手上的任务不该挂红字警告：图都给了，再写一句「失败/取消」只会让人以为白花钱。
+                取消的任务尤其要说清楚：这次没扣费，图是服务端替你留下的。 */}
+            {record.media.length && record.status !== "succeeded" ? (
+                <p className="mt-3 text-xs leading-relaxed text-[#726d67]">上游其实已经画完，图已为你保留，本次未扣费。</p>
+            ) : record.status !== "succeeded" && record.error ? (
+                <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-[#a3342c]">{record.error}</p>
+            ) : null}
 
             <div className="mt-3 space-y-1 text-[11px] text-[#726d67]">
                 <div className="font-medium text-[#47423c]">{meta.join(" · ")}</div>

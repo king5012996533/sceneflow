@@ -13,7 +13,7 @@
  */
 import assert from "node:assert";
 
-import { LATE_RESCUE_WINDOW_MS, RECOVERY_TASK_TIMEOUT_MS, RECOVERY_WINDOW_MS, decideRecovery, isLateRescueClaimable, isNetworkLayerFailure, isRecoveryEligible, isRecoveryExpired, shouldAwaitUpstreamSettlement } from "../src/lib/generation/generation-recovery.ts";
+import { CANCELED_ARTIFACT_WINDOW_MS, LATE_RESCUE_WINDOW_MS, RECOVERY_TASK_TIMEOUT_MS, RECOVERY_WINDOW_MS, decideRecovery, decideRescueAction, isCanceledArtifactKeepable, isLateRescueClaimable, isNetworkLayerFailure, isRecoveryEligible, isRecoveryExpired, shouldAwaitUpstreamSettlement } from "../src/lib/generation/generation-recovery.ts";
 
 let passed = 0;
 const failures = [];
@@ -138,6 +138,43 @@ check("要不要等结论：服务端已按上游真实报错结为失败 → �
     assert.strictEqual(shouldAwaitUpstreamSettlement({ settledStatus: "failed", networkLayerFailure: false }), false);
     assert.strictEqual(shouldAwaitUpstreamSettlement({ settledStatus: "cancelled", networkLayerFailure: false }), false);
     assert.strictEqual(shouldAwaitUpstreamSettlement({ settledStatus: "succeeded", networkLayerFailure: false }), false);
+});
+
+// —— 用户取消：上游停不下来照样出图，图要保下来（2026-09-18 真机验证的口子）——
+
+check("取消保留窗口是 30 分钟（视频/4K 取消后还会跑很久）", () => {
+    assert.strictEqual(CANCELED_ARTIFACT_WINDOW_MS, 30 * 60 * 1000);
+});
+
+check("取消保留：取消后不久到达的成品要留下，过了窗口才不认", () => {
+    assert.strictEqual(isCanceledArtifactKeepable("cancelled", new Date(NOW - 200_000), NOW), true);
+    assert.strictEqual(isCanceledArtifactKeepable("cancelled", new Date(NOW - CANCELED_ARTIFACT_WINDOW_MS + 1_000), NOW), true);
+    assert.strictEqual(isCanceledArtifactKeepable("cancelled", new Date(NOW - CANCELED_ARTIFACT_WINDOW_MS - 1_000), NOW), false);
+});
+
+check("取消保留：只管 cancelled，成功/失败/在跑都不走这条路", () => {
+    assert.strictEqual(isCanceledArtifactKeepable("succeeded", new Date(NOW - 1_000), NOW), false);
+    assert.strictEqual(isCanceledArtifactKeepable("failed", new Date(NOW - 1_000), NOW), false);
+    assert.strictEqual(isCanceledArtifactKeepable("running", new Date(NOW - 1_000), NOW), false);
+    assert.strictEqual(isCanceledArtifactKeepable("cancelled", null, NOW), false);
+    // 时钟漂移范围内的「将来」不算异常，超出窗口长度的将来才拒
+    assert.strictEqual(isCanceledArtifactKeepable("cancelled", new Date(NOW + 5 * 60 * 1000), NOW), true);
+    assert.strictEqual(isCanceledArtifactKeepable("cancelled", new Date(NOW + CANCELED_ARTIFACT_WINDOW_MS + 60_000), NOW), false);
+});
+
+check("处置决策：在跑 → 认领；失败但在窗口内 → 认领；取消但在窗口内 → 保图；其余 → 跳过", () => {
+    assert.strictEqual(decideRescueAction({ status: "running", finishedAt: null }, NOW), "claim");
+    assert.strictEqual(decideRescueAction({ status: "failed", finishedAt: new Date(NOW - 60_000) }, NOW), "claim");
+    assert.strictEqual(decideRescueAction({ status: "cancelled", finishedAt: new Date(NOW - 60_000) }, NOW), "keep-artifact");
+    assert.strictEqual(decideRescueAction({ status: "cancelled", finishedAt: new Date(NOW - CANCELED_ARTIFACT_WINDOW_MS - 1) }, NOW), "skip");
+    assert.strictEqual(decideRescueAction({ status: "failed", finishedAt: new Date(NOW - 30 * 60 * 1000) }, NOW), "skip");
+    assert.strictEqual(decideRescueAction({ status: "succeeded", finishedAt: new Date(NOW - 1_000) }, NOW), "skip");
+    assert.strictEqual(decideRescueAction({ status: null, finishedAt: new Date(NOW - 1_000) }, NOW), "skip");
+});
+
+check("事故复现：用户 1.5 秒后点了停止，上游 200 秒后才把图送回来 → 图必须留下", () => {
+    const canceledAt = NOW - 200_000;
+    assert.strictEqual(decideRescueAction({ status: "cancelled", finishedAt: new Date(canceledAt) }, NOW), "keep-artifact");
 });
 
 console.log(`\n补取件判定单测：${passed} 通过 / ${failures.length} 失败`);

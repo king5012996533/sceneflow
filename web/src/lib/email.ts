@@ -7,6 +7,19 @@ function getClient(): Resend | null {
   return new Resend(apiKey);
 }
 
+/** 发送一封自定义内容的邮件（日报、告警这类内部通知用） */
+export async function sendPlainEmail(to: string, subject: string, html: string): Promise<{ ok: boolean; error?: string }> {
+  const client = getClient();
+  if (!client) return { ok: false, error: "邮件服务未配置" };
+  const from = process.env.RESEND_FROM_EMAIL || "noreply@xingtudesign.com";
+  try {
+    await client.emails.send({ from, to, subject, html });
+    return { ok: true };
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : "邮件发送失败" };
+  }
+}
+
 export async function sendVerificationEmail(email: string, code: string): Promise<{ ok: boolean; error?: string }> {
   const client = getClient();
   if (!client) return { ok: false, error: "邮件服务未配置" };

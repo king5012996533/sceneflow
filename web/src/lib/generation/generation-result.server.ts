@@ -83,8 +83,10 @@ export async function storeGenerationResults(userId: string, jobId: string, item
     const merged = mergeResultItems(existing, items);
     const primary = merged[0];
     const resultUrl = primary ? (isArchivedResultItem(primary) ? resultMediaPath(jobId, 0) : primary.url) : undefined;
+    // 成功的任务照常挂上成品；**用户取消**的任务也要挂 —— 上游停不下来、图照样画完了，
+    // 我们已经付过钱，扔掉是纯亏（见 generation-rescue 的 keep-artifact）。取消不改钱、不改状态，只留图。
     await prisma.generationJob.updateMany({
-        where: { id: jobId, userId, status: "succeeded" },
+        where: { id: jobId, userId, status: { in: ["succeeded", "cancelled"] } },
         data: { resultData: { items: merged }, resultUrl },
     });
     return merged;
