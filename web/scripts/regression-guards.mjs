@@ -224,6 +224,11 @@ assertIncludes("src/lib/url-safety.ts", "isHostOrSubdomain(host, base)", "出站
 assertIncludes("src/lib/url-safety.ts", "if (!rawUrl || !rawHosts) return null;", "未配置出站代理时必须退回纯直连路径（行为与旧版一致）。");
 assertIncludes("src/lib/url-safety.ts", "tlsConnect({ socket, servername: target.hostname })", "经代理的 https 请求必须在隧道内用真实域名做 SNI（证书校验对象不能是代理）。");
 assertNotMatches("src/lib/url-safety.ts", /rawHosts\s*\.\s*includes\(/, "出站代理白名单不得用 includes 子串匹配。");
+// —— 异步任务制图片通道（2026-09-18：apimart 用 code:200 且先收单再取件）——
+assertIncludes("src/services/api/image.ts", "isSuccessCode", "图片上游成功码必须走统一判定：apimart 用 code:200，只认 code===0 会把成功判成失败。");
+assertNotMatches("src/services/api/image.ts", /payload\.code !== 0/, "不得退回「只认 code===0」的成功码判定（会把 apimart 的成功应答判成失败）。");
+assertIncludes("src/services/api/image.ts", "resolveImageSubmission", "任务制通道必须识别 task_id 并轮询取件，不能只解析一次性应答。");
+assertIncludes("src/services/api/image-task.ts", "parseImageTaskState", "任务取件解析必须收在 image-task 模块里（配单测）。");
 assertIncludes("src/lib/credential-store.server.ts", "isHostOrSubdomain(targetHost, credHost)", "凭证 host 匹配必须边界匹配（禁止反向后缀，H-1）。");
 assertNotMatches("src/lib/credential-store.server.ts", /endsWith\(`\.\$\{targetHost\}`\)/, "凭证匹配不得允许反向后缀（H-1）。");
 assertIncludes("src/app/api/payments/callback/route.ts", "createHmac", "支付回调必须做 HMAC 签名验证（H-4）。");

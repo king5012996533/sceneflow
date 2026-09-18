@@ -7,6 +7,7 @@ import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
 import { proxyFetch, proxyFetchStream } from "./proxy-client";
+import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskId } from "./image-task";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
 
 export type AiTextMessage = {
@@ -262,8 +263,9 @@ function pickString(record: Record<string, unknown>, keys: string[]) {
 }
 
 function parseImagePayload(payload: ImageApiResponse) {
-    if (typeof payload.code === "number" && payload.code !== 0) {
-        throw new Error(payload.msg || "请求失败");
+    // 成功码统一判定：apimart 用 code:200 表示成功（旧代码只认 code===0，会把成功判成「请求失败」）
+    if (!isSuccessCode(payload.code)) {
+        throw new Error(envelopeMessage(payload) || payload.msg || "请求失败");
     }
     const candidates: unknown[] = [];
     if (Array.isArray(payload.data)) {
@@ -340,6 +342,61 @@ function withUpstreamHint(message: string) {
         return `上游模型服务繁忙，请稍后重试（${message}）`;
     }
     return message;
+}
+
+// ---------- 异步任务制图片通道（apimart 等）----------
+// 提交应答里只有 task_id，图中转站侧异步生成，必须轮询 /tasks/{id} 取件。
+// 上游实测：单张出图约 10~20s 完成；这里是「客户端轮询」（与 GenVideo 视频通道同一模式）。
+const IMAGE_TASK_POLL_INTERVAL_MS = 3_000;
+const IMAGE_TASK_TIMEOUT_MS = 10 * 60 * 1_000;
+
+function sleep(ms: number, signal?: AbortSignal) {
+    return new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+            signal?.removeEventListener("abort", onAbort);
+            resolve();
+        }, ms);
+        const onAbort = () => {
+            clearTimeout(timer);
+            reject(new Error("请求已取消"));
+        };
+        if (signal?.aborted) onAbort();
+        else signal?.addEventListener("abort", onAbort, { once: true });
+    });
+}
+
+/** 轮询任务直到出图 / 失败 / 超时。 */
+async function pollImageTask(config: AiConfig, taskId: string, options?: RequestOptions) {
+    const deadline = Date.now() + IMAGE_TASK_TIMEOUT_MS;
+    for (;;) {
+        if (options?.signal?.aborted) throw new Error("请求已取消");
+        if (Date.now() > deadline) {
+            // 中转站多为收单即扣费：超时不能只说「失败」，要告诉用户去哪儿找回结果
+            throw new Error(`图片任务超时（超过 ${IMAGE_TASK_TIMEOUT_MS / 60000} 分钟）：上游任务 ${taskId} 仍未返回结果，可能仍在上游运行并已扣费，请稍后到中转站后台确认任务状态。`);
+        }
+        await sleep(IMAGE_TASK_POLL_INTERVAL_MS, options?.signal);
+
+        const payload = await proxyFetch<unknown>({
+            url: aiApiUrl(config, `/tasks/${encodeURIComponent(taskId)}`),
+            method: "GET",
+            headers: aiHeaders(config),
+        });
+        const state = parseImageTaskState(payload);
+        if (state.status === "completed") {
+            if (!state.urls.length) throw new Error(`上游任务已完成但没有返回图片地址（任务 ${taskId}）`);
+            return state.urls.map((dataUrl) => ({ id: nanoid(), dataUrl }));
+        }
+        if (state.status === "failed") {
+            throw new Error(withUpstreamHint(state.error || `上游图片任务失败（任务 ${taskId}）`));
+        }
+    }
+}
+
+/** 提交应答统一出口：任务制通道先轮询取件，同步通道直接解析。 */
+async function resolveImageSubmission(config: AiConfig, payload: ImageApiResponse, options?: RequestOptions) {
+    const taskId = pickSubmittedTaskId(payload);
+    if (taskId) return await pollImageTask(config, taskId, options);
+    return parseImagePayload(payload);
 }
 
 /**
@@ -499,10 +556,6 @@ function readReplicateError(error: unknown) {
     return "Replicate 生成失败";
 }
 
-function sleep(ms: number) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
 function withSystemMessage<T extends ResponseInputMessage>(config: AiConfig, messages: T[]): ResponseInputMessage[] {
     const systemPrompt = config.systemPrompt.trim();
     return systemPrompt ? [{ role: "system" as const, content: systemPrompt }, ...messages] : messages;
@@ -583,7 +636,7 @@ function stringValue(value: unknown) {
 }
 
 function validateResponsePayload(payload: ResponseApiPayload) {
-    if (typeof payload.code === "number" && payload.code !== 0) throw new Error(payload.msg || "请求失败");
+    if (!isSuccessCode(payload.code)) throw new Error(envelopeMessage(payload) || payload.msg || "请求失败");
     if (payload.error?.message) throw new Error(payload.error.message);
 }
 
@@ -1112,7 +1165,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 ...(isOpenAiApi(requestConfig) ? { output_format: IMAGE_OUTPUT_FORMAT } : {}),
             },
         });
-        return parseImagePayload(payload);
+        return await resolveImageSubmission(requestConfig, payload, options);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
     }
@@ -1180,8 +1233,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         });
         const data = (await response.json().catch(() => null)) as ImageApiResponse | null;
         if (!response.ok) throw new Error(readImageApiError(data, readStatusError(response.status, "request failed")));
-        const images = parseImagePayload(data || {});
-        return images;
+        return await resolveImageSubmission(requestConfig, data || {}, options);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
     }
