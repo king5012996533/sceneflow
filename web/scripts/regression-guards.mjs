@@ -468,6 +468,8 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(route.includes("hasGenerationMedia("), "记录里要标出成品是否还在（已清理的不该渲染成破图）。");
     assertIncludes("src/app/(user)/records/page.tsx", "downloadUrl", "生成记录页必须提供成品下载入口，否则用户还是拿不到东西。");
     assertIncludes("src/constant/navigation-tools.ts", 'slug: "records"', "生成记录必须在导航里有入口，不然没人找得到。");
+    // 新页面同样要接上旧外链（basePath 时代所有外链都带 /canvas 前缀，别名表是唯一的兼容层）
+    assertIncludes("src/lib/old-url-aliases.ts", '"/canvas/records": "/records"', "旧 /canvas/records 外链必须能归一化到新页面，与其他工具页一致。");
 }
 
 if (failures.length) {
