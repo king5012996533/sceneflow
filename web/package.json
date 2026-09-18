@@ -20,6 +20,7 @@
         "test:media": "node scripts/media-store-unit-tests.mjs",
         "test:scheduler": "node scripts/run-state-unit-tests.mjs && node scripts/run-control-unit-tests.mjs",
         "test:error": "node scripts/canvas-error-unit-tests.mjs",
+        "test:proxy": "node scripts/outbound-proxy-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

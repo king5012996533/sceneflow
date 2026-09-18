@@ -218,6 +218,12 @@ assertNotMatches("src/app/api/proxy/form-data/route.ts", /includes\("aigccc666\.
 assertIncludes("src/lib/url-safety.ts", "embeddedIpv4", "SSRF 校验必须识别内嵌 IPv4（mapped/NAT64/6to4/IPv4-compatible，H-2）。");
 assertIncludes("src/lib/url-safety.ts", "resolvePinnedTarget", "SSRF 必须 DNS 固定解析（防重绑定，H-3）。");
 assertIncludes("src/lib/url-safety.ts", "servername", "DNS 固定解析后 TLS SNI 必须仍用原始域名（证书校验）。");
+// —— 出站代理（2026-09-18：服务器无法直连 api.apimart.ai，改用运维侧隧道代理）——
+assertIncludes("src/lib/url-safety.ts", "OUTBOUND_PROXY_HOSTS", "出站代理必须由环境变量白名单控制，不得改成对所有域名生效。");
+assertIncludes("src/lib/url-safety.ts", "isHostOrSubdomain(host, base)", "出站代理白名单必须域名边界匹配（禁止子串，否则 evilapimart.ai 会被顺带放行）。");
+assertIncludes("src/lib/url-safety.ts", "if (!rawUrl || !rawHosts) return null;", "未配置出站代理时必须退回纯直连路径（行为与旧版一致）。");
+assertIncludes("src/lib/url-safety.ts", "tlsConnect({ socket, servername: target.hostname })", "经代理的 https 请求必须在隧道内用真实域名做 SNI（证书校验对象不能是代理）。");
+assertNotMatches("src/lib/url-safety.ts", /rawHosts\s*\.\s*includes\(/, "出站代理白名单不得用 includes 子串匹配。");
 assertIncludes("src/lib/credential-store.server.ts", "isHostOrSubdomain(targetHost, credHost)", "凭证 host 匹配必须边界匹配（禁止反向后缀，H-1）。");
 assertNotMatches("src/lib/credential-store.server.ts", /endsWith\(`\.\$\{targetHost\}`\)/, "凭证匹配不得允许反向后缀（H-1）。");
 assertIncludes("src/app/api/payments/callback/route.ts", "createHmac", "支付回调必须做 HMAC 签名验证（H-4）。");
