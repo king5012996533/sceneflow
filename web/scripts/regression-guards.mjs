@@ -375,6 +375,29 @@ for (const storageModule of ["src/lib/media-store.server.ts", "src/lib/asset-cac
     assert(read(storageModule).includes("os.homedir()"), `${storageModule} 的落盘目录必须由主目录推导，不得用 cwd（部署一次就清空一次）。`);
 }
 
+// —— 服务端握住成品（2026-09-18：上游 99% 成功、交付只有 55%，差价全由平台承担）——
+// 交付（下载/上传/回报）原本全发生在用户标签页里：标签页一关/一断/一刷新，上游已出图并计费，
+// 我们手里什么都没有，只能退款。现在客户端一拿到地址就上报，服务端自己取一份归档。
+// 铁律：① 先认领（快速判成功）再归档——认领必须抢在「浏览器下载失败→关成 failed」之前，
+//       否则退款已出手、上游的钱还是我们出；② 已关成失败/取消的任务不翻案（退款已出手）；
+//       ③ 归档失败不等于生成失败，不给用户退款也不改判。
+{
+    const route = read("src/app/api/generation/jobs/[id]/result/route.ts");
+    assertIncludes("src/app/api/generation/jobs/[id]/result/route.ts", "isSameOriginRequest", "成品上报接口必须校验同源，且只能写登录用户名下的任务。");
+    assertIncludes("src/app/api/generation/jobs/[id]/result/route.ts", 'runtime = "nodejs"', "成品归档要落盘，必须跑在 nodejs 运行时。");
+    assertIncludes("src/app/api/generation/jobs/[id]/result/route.ts", "normalizeResultUrls(", "成品地址必须走纯模块归一（只收 http(s) 直链、限量限长），不得就地过滤。");
+    assertIncludes("src/app/api/generation/jobs/[id]/result/route.ts", 'status: "running"', "认领必须是条件更新（status=running），防并发重复结算。");
+    assertNotMatches("src/app/api/generation/jobs/[id]/result/route.ts", /quotaRefunded: true/, "成品上报只负责判成功，不得写退款标记（退款只能由失败/取消结算出手）。");
+    assertIncludes("src/app/api/generation/jobs/[id]/result/route.ts", 'job.status !== "running" && job.status !== "succeeded"', "已关成失败/取消的任务不得被成品上报翻案（退款已出手）。");
+    const claimAt = route.indexOf("updateMany(");
+    const archiveAt = route.indexOf("archiveGenerationResults(");
+    assert(claimAt > -1 && archiveAt > -1 && claimAt < archiveAt, "必须先认领（判成功）再归档：认领是毫秒级写库，必须抢在客户端把任务关成 failed 之前落地。");
+}
+assertIncludes("src/services/api/image.ts", "reportGenerationResult(", "图片拿到成品地址后必须上报服务端归档，交付不得只靠浏览器。");
+assertIncludes("src/lib/generation/server-upstream-client.ts", "reportGenerationResult", "客户端必须有成品上报入口。");
+assertNotMatches("src/lib/generation/generation-result.ts", /fetch\(|prisma|axios|import /, "成品归档的判定逻辑必须是纯逻辑（不触网、不连库、无依赖），才能在 Node 下直接单测。");
+assertIncludes("src/lib/generation/server-media-storage.server.ts", "archiveGenerationMedia", "服务端归档模块必须保留归档写入入口。");
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

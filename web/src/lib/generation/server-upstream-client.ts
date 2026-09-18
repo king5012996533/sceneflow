@@ -1,4 +1,5 @@
 import { apiPath } from "@/lib/app-paths";
+import { normalizeResultUrls } from "./generation-result";
 
 export type GenerationUpstreamRecord = { provider: string; model: string; externalId: string; externalGetUrl?: string };
 
@@ -24,5 +25,30 @@ export async function reportUpstreamTask(jobId: string | undefined, record: Gene
         });
     } catch {
         // 留痕是尽力而为
+    }
+}
+
+/**
+ * 上报成品地址（拿到结果的当下就报，越早越好）。
+ *
+ * 服务端会立刻认领任务（判成功）并自己取一份归档——这样「用户有没有拿到成品」
+ * 就不再取决于这个标签页还活着没有。data: 形态的成品由浏览器自己带着字节，
+ * 不往回传（避免几 MB 的 body 拖着生成流程）。
+ * 与留痕同样尽力而为：失败绝不影响生成。
+ */
+export async function reportGenerationResult(jobId: string | undefined, urls: string[]): Promise<void> {
+    if (!jobId) return;
+    const httpUrls = normalizeResultUrls(urls);
+    if (!httpUrls.length) return;
+    try {
+        await fetch(apiPath(`/api/generation/jobs/${encodeURIComponent(jobId)}/result`), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ urls: httpUrls }),
+            keepalive: true,
+        });
+    } catch {
+        // 上报是尽力而为
     }
 }

@@ -11,7 +11,7 @@ import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskI
 import { isAspectRejection, parseSupportedRatios, pickSupportedRatio } from "./image-ratio";
 import { buildReferenceGenerationBody, isEditsEndpointUnsupported, normalizeReferenceDataUrl } from "./image-reference";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
-import { reportUpstreamTask } from "@/lib/generation/server-upstream-client";
+import { reportGenerationResult, reportUpstreamTask } from "@/lib/generation/server-upstream-client";
 
 export type AiTextMessage = {
     role: "system" | "user" | "assistant";
@@ -408,9 +408,19 @@ async function resolveImageSubmission(config: AiConfig, payload: ImageApiRespons
             externalId: taskId,
             externalGetUrl: aiApiUrl(config, `/tasks/${encodeURIComponent(taskId)}`),
         });
-        return await pollImageTask(config, taskId, options);
+        return await reportThenReturn(serverJobId, await pollImageTask(config, taskId, options));
     }
-    return parseImagePayload(payload);
+    return await reportThenReturn(serverJobId, parseImagePayload(payload));
+}
+
+/**
+ * 拿到成品的当下就把地址报给服务端（服务端会自己归档一份并把任务判成功）。
+ * 这是「交付不再依赖浏览器」的关键：不等页面去下载/入库再回报。
+ * 不 await：回报是后台动作，不能拖慢用户看到图片。
+ */
+function reportThenReturn(serverJobId: string | undefined, images: Array<{ id: string; dataUrl: string }>) {
+    void reportGenerationResult(serverJobId, images.map((image) => image.dataUrl));
+    return images;
 }
 
 /**
