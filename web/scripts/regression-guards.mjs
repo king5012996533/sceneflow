@@ -366,6 +366,15 @@ assertIncludes("src/app/api/generation/jobs/[id]/upstream/route.ts", "P2002", "�
     assert(!body.includes("nextPollAt"), "图片留痕不得设 nextPollAt：设了就会被轮询器抢走，超时清扫也就不敢碰它了。");
 }
 
+// —— 生成成品归档目录（2026-09-18：同一个「把数据放进构建产物」的坑，第三个漏网模块）——
+// server-media-storage 原本写 process.cwd()/.data/generation-media，而生产 PM2 的 cwd 就是
+// .next/standalone：next build 默认 cleanDistDir 会递归删掉整个 .next，等于每次部署都把
+// 已归档的成品删光（用户回头打不开自己刚生成的东西）。
+assertIncludes("src/lib/generation/server-media-storage.server.ts", "export function resolveGenerationMediaDir(", "成品归档目录必须留成纯函数，便于单测锁定「不在构建产物内」。");
+for (const storageModule of ["src/lib/media-store.server.ts", "src/lib/asset-cache.server.ts", "src/lib/generation/server-media-storage.server.ts"]) {
+    assert(read(storageModule).includes("os.homedir()"), `${storageModule} 的落盘目录必须由主目录推导，不得用 cwd（部署一次就清空一次）。`);
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

@@ -22,6 +22,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { MEDIA_FILE_ID_PATTERN, MEDIA_FILE_TTL_DAYS, MEDIA_FILE_TTL_MS, resolveMediaStoreDir } from "../src/lib/media-store.server.ts";
+import { resolveGenerationMediaDir } from "../src/lib/generation/server-media-storage.server.ts";
 
 // 生产 PM2 的真实 exec cwd（pm2 describe sceneflow → /root/infinite-canvas/web/.next/standalone）
 const ROOT = path.parse(process.cwd()).root;
@@ -100,6 +101,23 @@ check("32 位十六进制 + 白名单扩展名才认，路径穿越一律不认"
     assert.equal(MEDIA_FILE_ID_PATTERN.test("../../etc/passwd"), false);
     assert.equal(MEDIA_FILE_ID_PATTERN.test("827231aceb7a4e199ae8e682e34070b4.svg"), false);
     assert.equal(MEDIA_FILE_ID_PATTERN.test("827231aceb7a4e199ae8e682e34070b4"), false);
+});
+
+console.log("生成成品归档目录（2026-09-18 发现：同一事故的漏网模块）");
+
+check("归档目录也只由主目录推导，不落在构建产物里", () => {
+    assert.equal(resolveGenerationMediaDir(undefined, PROD_HOME), path.join(PROD_HOME, ".sceneflow", "generation-media"));
+    assert.equal(resolveGenerationMediaDir("", PROD_HOME), path.join(PROD_HOME, ".sceneflow", "generation-media"));
+    assert.ok(!resolveGenerationMediaDir(undefined, PROD_HOME).startsWith(PROD_CWD), "默认归档目录不得落在 .next 里");
+    assert.equal(resolveGenerationMediaDir("media-archive", PROD_HOME), path.join(PROD_HOME, "media-archive"));
+    assert.ok(!resolveGenerationMediaDir("media-archive", PROD_HOME).startsWith(PROD_CWD), "相对路径配置也不得落回构建产物");
+});
+
+check("归档目录不得再用 process.cwd()（每次部署 next build 会把成品删光）", () => {
+    const source = readFileSync(fileURLToPath(new URL("../src/lib/generation/server-media-storage.server.ts", import.meta.url)), "utf8");
+    const body = source.slice(source.indexOf("export function resolveGenerationMediaDir"));
+    assert.ok(!body.includes("process.cwd()"), "resolveGenerationMediaDir 里又出现了 process.cwd()");
+    assert.ok(body.includes("os.homedir()"), "默认目录应以 os.homedir() 为基准");
 });
 
 if (process.exitCode) console.error(`\n${passed} 项通过，存在失败`);
