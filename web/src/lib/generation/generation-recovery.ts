@@ -52,3 +52,58 @@ export function decideRecovery(state: RecoveryTaskState, options: { expired: boo
     if (state.status === "pending") return options.expired ? "refund" : "wait";
     return "refund";
 }
+
+/**
+ * 客户端报失败、我们按客户端的原因把任务结掉了（退款也退了），上游随后才把成品送回来：
+ * 从结账那一刻算起，这段窗口之内成品仍然认领（2026-09-18「谁看见真相谁定论」的补网）。
+ *
+ * 为什么会走到这里：客户端那条连接一断就报失败，而它报失败的那一瞬间，
+ * 我们发往上游的那次调用可能还没登记进「在飞登记簿」（见 upstream-inflight.ts）——
+ * 结算请求小、跑得快，代理请求背着几 MB 素材、慢半拍，于是竞速输了：
+ * 任务被结为失败并退款，紧接着上游调用照跑、照出图、照样计费。成品不能就这么扔了。
+ *
+ * 窗口刻意短：只兜「客户端先跑掉、上游紧跟着出结果」这一种时序，
+ * 不覆盖上游排队几分钟才出结果的情形（那种情形客户端还在等，是暂缓结账的活）。
+ *
+ * 注意：认领只改任务状态与成品归属，**不动钱** —— 退款已经出手，这笔不再向用户重复收取
+ * （用户白得一张图，总好过我们付了钱、图上谁都没有）。
+ */
+export const LATE_RESCUE_WINDOW_MS = 10 * 60 * 1000;
+
+/** 已被结为失败、但还没超出补认领窗口：成品这时到达仍然该认领 */
+export function isLateRescueClaimable(status: string | null | undefined, finishedAt: Date | number | string | null | undefined, now = Date.now()): boolean {
+    if (status !== "failed") return false;
+    const finished = finishedAt instanceof Date ? finishedAt.getTime() : new Date(finishedAt ?? 0).getTime();
+    if (!Number.isFinite(finished) || finished <= 0) return false;
+    const elapsed = now - finished;
+    // 未来时间（时钟漂移/写库误差）不算超窗，但也不能是离谱的将来
+    return elapsed <= LATE_RESCUE_WINDOW_MS && elapsed > -LATE_RESCUE_WINDOW_MS;
+}
+
+/**
+ * 浏览器这侧的失败是不是「网络层」的：连 HTTP 响应都没拿到（fetch 直接抛错），
+ * 而不是拿到了上游明确报错。前者真伪未定 —— 我们服务端那次上游调用可能还在跑，
+ * 后者已经有结论，可以立刻告诉用户。
+ */
+export function isNetworkLayerFailure(error: unknown): boolean {
+    if (error instanceof TypeError) return true;
+    const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
+    return /Failed to fetch|NetworkError|Load failed|Network request failed|网络层中断|ERR_NETWORK|ERR_CONNECTION/i.test(message);
+}
+
+/**
+ * 客户端报失败之后，要不要继续等上游的结论。
+ *
+ * - 结算没送到服务端：任务生死未知，等；
+ * - 结算被暂缓（服务端返回仍是 running）：上游调用还在飞，等；
+ * - 失败是网络层的：浏览器连响应都没拿到，我们服务端可能正在跑这次上游调用，等。
+ *
+ * 其余情形不等：服务端已经按上游的真实报错结为失败，再等只是让用户白等。
+ * 等待本身就是「不要断言我们并不知道的事」，而不是拖延报错 —— 服务端若已结为失败，
+ * 第一轮轮询就会拿到结论并立刻报错。
+ */
+export function shouldAwaitUpstreamSettlement(options: { settledStatus?: string | null; networkLayerFailure: boolean }): boolean {
+    if (options.networkLayerFailure) return true;
+    if (!options.settledStatus) return true;
+    return options.settledStatus === "running";
+}

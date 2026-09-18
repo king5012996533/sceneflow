@@ -1,4 +1,5 @@
 import { apiPath } from "@/lib/app-paths";
+import { isNetworkLayerFailure, shouldAwaitUpstreamSettlement } from "./generation-recovery";
 
 /** 积分不足（服务端 403）：由 /api/generation/jobs 返回"积分不足…"时抛出 */
 export class InsufficientCreditsError extends Error {
@@ -89,7 +90,12 @@ export async function runGuardedGeneration<T>(
         // 服务端还没结账（我们的上游调用仍在飞）：等它自己出结论 —— 出成品就照常出图，真没成品才报失败。
         // 连结算请求本身都发不出去（整个断网）时同样要问：那一刻谁也说不清任务死没死，
         // 而服务端手里的成品不会因为浏览器断网就消失，联网恢复后应该照样把图交出来。
-        if (recover && status === "failed" && (!settled || settled.status === "running")) {
+        //
+        // 2026-09-18 第三种情形：失败是**网络层**的（浏览器连 HTTP 响应都没拿到，就是用户看到的
+        // 「请求失败」）。这一刻我们服务端那次上游调用很可能还在飞、甚至正在出图，
+        // 而客户端报失败跑得可能比它登记进在飞登记簿还快 —— 服务端会把这种成品补认领回来。
+        // 所以这里也要等：第一轮轮询若拿到「已失败」就立刻报错，等不出额外代价。
+        if (recover && status === "failed" && shouldAwaitUpstreamSettlement({ settledStatus: settled?.status, networkLayerFailure: isNetworkLayerFailure(error) })) {
             const awaited = await awaitDeferredSettlement(job.id);
             if (awaited?.status === "succeeded") {
                 const recovered = await recover(awaited).catch((recoverError) => {

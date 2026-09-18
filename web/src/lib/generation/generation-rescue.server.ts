@@ -2,6 +2,7 @@ import { prisma } from "@/lib/ic-prisma";
 
 import { extractArtifacts, resultSources } from "./generation-result";
 import { archiveResultSources, storeGenerationResults } from "./generation-result.server";
+import { isLateRescueClaimable } from "./generation-recovery";
 import { takeClientGaveUp } from "./upstream-inflight";
 
 /**
@@ -35,12 +36,23 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
     const sources = resultSources(extractArtifacts(input.payload));
     if (!sources.length) return false;
 
-    const job = await prisma.generationJob.findFirst({ where: { id: input.jobId, userId: input.userId }, select: { id: true, kind: true, status: true } });
-    if (!job || job.status !== "running" || !RESCUABLE_KINDS.has(job.kind)) return false;
+    const job = await prisma.generationJob.findFirst({
+        where: { id: input.jobId, userId: input.userId },
+        select: { id: true, kind: true, status: true, finishedAt: true },
+    });
+    if (!job || !RESCUABLE_KINDS.has(job.kind)) return false;
 
+    // 两种可认领的情形：
+    //   running —— 常规路径，任务还在跑，成品到了就地定论；
+    //   failed 且在补认领窗口内 —— 客户端报失败跑得比上游调用的登记还快（见 isLateRescueClaimable），
+    //   任务已被结为失败并退款，上游随后才出图。钱不退回来，但成品不能扔。
+    const lateClaim = isLateRescueClaimable(job.status, job.finishedAt);
+    if (job.status !== "running" && !lateClaim) return false;
+
+    const claimableStatuses = job.status === "running" ? ["running"] : ["failed"];
     const claimed = await prisma.generationJob.updateMany({
-        where: { id: job.id, userId: input.userId, status: "running" },
-        data: { status: "succeeded", quotaRefunded: false, finishedAt: new Date() },
+        where: { id: job.id, userId: input.userId, status: { in: claimableStatuses } },
+        data: { status: "succeeded", quotaRefunded: lateClaim ? true : false, finishedAt: new Date() },
     });
     if (!claimed.count) return false;
 
@@ -48,7 +60,11 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
     // 免得它留到下一个调用结束时反过来把这条已经成功的任务结为失败（见 settleDeferredClientFailure）。
     takeClientGaveUp(job.id);
 
-    console.log(`[generation-rescue] 任务 ${job.id} 上游已产出 ${sources.length} 份成品（${input.source}），改判成功并开始归档`);
+    if (lateClaim) {
+        console.log(`[generation-rescue] 任务 ${job.id} 已按客户端原因结为失败并退款，上游成品随后到达：补认领为成功并归档（本次不向用户收费）`);
+    } else {
+        console.log(`[generation-rescue] 任务 ${job.id} 上游已产出 ${sources.length} 份成品（${input.source}），改判成功并开始归档`);
+    }
     void archiveResultSources(job.id, sources)
         .then((items) => storeGenerationResults(input.userId, job.id, items))
         .then((items) => {

@@ -13,7 +13,7 @@
  */
 import assert from "node:assert";
 
-import { RECOVERY_TASK_TIMEOUT_MS, RECOVERY_WINDOW_MS, decideRecovery, isRecoveryEligible, isRecoveryExpired } from "../src/lib/generation/generation-recovery.ts";
+import { LATE_RESCUE_WINDOW_MS, RECOVERY_TASK_TIMEOUT_MS, RECOVERY_WINDOW_MS, decideRecovery, isLateRescueClaimable, isNetworkLayerFailure, isRecoveryEligible, isRecoveryExpired, shouldAwaitUpstreamSettlement } from "../src/lib/generation/generation-recovery.ts";
 
 let passed = 0;
 const failures = [];
@@ -79,6 +79,65 @@ check("窗口过了还等不到 → 按失败退款，不无限期挂着", () =>
 check("上游明确失败 → 退款，与没有补取件能力时一致", () => {
     assert.strictEqual(decideRecovery({ status: "failed", urls: [] }, { expired: false }), "refund");
     assert.strictEqual(decideRecovery({ status: "failed", urls: [] }, { expired: true }), "refund");
+});
+
+// —— 补认领：客户端报失败跑赢了上游调用的登记，成品随后才到 ——
+
+check("补认领窗口是 10 分钟", () => {
+    assert.strictEqual(LATE_RESCUE_WINDOW_MS, 10 * 60 * 1000);
+});
+
+check("补认领：刚结为失败的任务，成品这时到达仍然认领", () => {
+    assert.strictEqual(isLateRescueClaimable("failed", new Date(NOW - 30_000), NOW), true);
+    assert.strictEqual(isLateRescueClaimable("failed", new Date(NOW - LATE_RESCUE_WINDOW_MS + 1_000), NOW), true);
+    assert.strictEqual(isLateRescueClaimable("failed", new Date(NOW - LATE_RESCUE_WINDOW_MS - 1_000), NOW), false);
+});
+
+check("补认领：只认失败态，成功/取消/还在跑都不走这条路", () => {
+    assert.strictEqual(isLateRescueClaimable("succeeded", new Date(NOW - 1_000), NOW), false);
+    assert.strictEqual(isLateRescueClaimable("cancelled", new Date(NOW - 1_000), NOW), false);
+    assert.strictEqual(isLateRescueClaimable("running", new Date(NOW - 1_000), NOW), false);
+    assert.strictEqual(isLateRescueClaimable(null, new Date(NOW - 1_000), NOW), false);
+});
+
+check("补认领：结账时间读不出来就不认（宁可漏一次，也不能把陈年任务翻出来）", () => {
+    for (const bad of [null, undefined, 0, "", "not-a-date"]) {
+        assert.strictEqual(isLateRescueClaimable("failed", bad, NOW), false, `input=${String(bad)}`);
+    }
+});
+
+check("补认领：时钟漂移写出来的「将来」时间不被当成新鲜失败", () => {
+    assert.strictEqual(isLateRescueClaimable("failed", new Date(NOW + 20 * 60 * 1000), NOW), false);
+    assert.strictEqual(isLateRescueClaimable("failed", new Date(NOW + 60_000), NOW), true);
+});
+
+check("网络层失败：fetch 抛错/断网文案算，上游明确报错不算", () => {
+    assert.strictEqual(isNetworkLayerFailure(new TypeError("Failed to fetch")), true);
+    assert.strictEqual(isNetworkLayerFailure(new Error("Failed to fetch")), true);
+    assert.strictEqual(isNetworkLayerFailure(new Error("NetworkError when attempting to fetch resource.")), true);
+    assert.strictEqual(isNetworkLayerFailure(new Error("Failed to fetch；网络层中断（没拿到 HTTP 响应）")), true);
+    assert.strictEqual(isNetworkLayerFailure(new Error("Load failed")), true);
+    assert.strictEqual(isNetworkLayerFailure("网络层中断（没拿到 HTTP 响应）"), true);
+});
+
+check("网络层失败：上游的真实报错不算网络层，用户该立刻看到原因", () => {
+    assert.strictEqual(isNetworkLayerFailure(new Error("您提供的内容可能不符合平台规范，请调整后重试。")), false);
+    assert.strictEqual(isNetworkLayerFailure(new Error("鉴权失败，请检查 API Key 或模型权限")), false);
+    assert.strictEqual(isNetworkLayerFailure(new Error("HTTP 500：上游服务异常")), false);
+    assert.strictEqual(isNetworkLayerFailure(undefined), false);
+});
+
+check("要不要等结论：结算没送到 → 等；被暂缓（running）→ 等；网络层失败 → 等", () => {
+    assert.strictEqual(shouldAwaitUpstreamSettlement({ settledStatus: undefined, networkLayerFailure: false }), true);
+    assert.strictEqual(shouldAwaitUpstreamSettlement({ settledStatus: null, networkLayerFailure: false }), true);
+    assert.strictEqual(shouldAwaitUpstreamSettlement({ settledStatus: "running", networkLayerFailure: false }), true);
+    assert.strictEqual(shouldAwaitUpstreamSettlement({ settledStatus: "failed", networkLayerFailure: true }), true);
+});
+
+check("要不要等结论：服务端已按上游真实报错结为失败 → 不等，立刻报错", () => {
+    assert.strictEqual(shouldAwaitUpstreamSettlement({ settledStatus: "failed", networkLayerFailure: false }), false);
+    assert.strictEqual(shouldAwaitUpstreamSettlement({ settledStatus: "cancelled", networkLayerFailure: false }), false);
+    assert.strictEqual(shouldAwaitUpstreamSettlement({ settledStatus: "succeeded", networkLayerFailure: false }), false);
 });
 
 console.log(`\n补取件判定单测：${passed} 通过 / ${failures.length} 失败`);

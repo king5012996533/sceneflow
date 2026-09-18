@@ -523,10 +523,27 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
 
     // 被暂缓的这段时间里，用户不该只看到「请求失败」——成品一到就要照常出图
     const guard = read("src/lib/generation/generation-guard.ts");
-    assert(guard.includes('settled?.status === "running"') || guard.includes("settled.status === \"running\""), "结算被暂缓（仍是 running）时，客户端必须等上游出结论而不是直接报失败。");
+    assert(guard.includes("shouldAwaitUpstreamSettlement("), "结算被暂缓（仍是 running）时，客户端必须等上游出结论而不是直接报失败。");
+    assert(read("src/lib/generation/generation-recovery.ts").includes('settledStatus === "running"'), "「服务端还没结账 → 继续等」这条规则必须留在纯逻辑里，客户端只照做。");
     assert(guard.includes("awaitDeferredSettlement("), "等待必须是轮询服务端状态，而不是本地干等一个定时器。");
-    assert(guard.includes("!settled ||"), "连结算请求都没送到服务端（断网）时同样要问服务端：任务生死未知，不能断言失败。");
     assertIncludes("src/app/api/generation/jobs/[id]/route.ts", "export async function GET", "客户端要轮询任务状态，任务接口必须提供读接口。");
+}
+
+// —— 客户端报失败跑赢了上游调用的登记：成品随后到达仍要认领（2026-09-18 补网）——
+// 结算请求小、跑得快；代理请求背着几 MB 素材、慢半拍。竞速输掉的那一次，
+// 任务已被结为失败并退款，上游却照跑照出图：成品不能扔，钱也不该再向用户收一次。
+{
+    const recovery = read("src/lib/generation/generation-recovery.ts");
+    assert(recovery.includes("export function isLateRescueClaimable"), "「已结为失败但成品随后到达」必须有一条明确的判定，不能散在调用处。");
+    assert(recovery.includes("export function isNetworkLayerFailure"), "「没拿到 HTTP 响应」与「上游明确报错」必须分开：前者真伪未定，后者已有结论。");
+    assert(recovery.includes("export function shouldAwaitUpstreamSettlement"), "要不要等上游结论的规则必须收成一个判定，客户端只负责照做。");
+
+    const rescue = read("src/lib/generation/generation-rescue.server.ts");
+    assert(rescue.includes("isLateRescueClaimable("), "抢救侧必须用这条判定来决定能不能补认领，否则成品照样被丢掉。");
+    assert(/quotaRefunded: lateClaim \? true : false/.test(rescue), "补认领不得改动退款事实：钱已经退出手，账要照实记。");
+
+    const guard = read("src/lib/generation/generation-guard.ts");
+    assert(guard.includes("shouldAwaitUpstreamSettlement(") && guard.includes("isNetworkLayerFailure("), "客户端报网络层失败时也要等服务端出结论——这正是用户看到的「请求失败」。");
 }
 
 if (failures.length) {
