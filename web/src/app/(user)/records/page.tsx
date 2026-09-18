@@ -208,7 +208,8 @@ function RecordCard({ record }: { record: GenerationRecord }) {
                 )}
             </div>
 
-            {record.error ? <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-[#a3342c]">{record.error}</p> : null}
+            {/* 只在不成功的任务上展示原因：成品已经拿到的任务挂一句「连接中断/请求失败」只会让人以为白花钱 */}
+            {record.status !== "succeeded" && record.error ? <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-[#a3342c]">{record.error}</p> : null}
 
             <div className="mt-3 space-y-1 text-[11px] text-[#726d67]">
                 <div className="font-medium text-[#47423c]">{meta.join(" · ")}</div>

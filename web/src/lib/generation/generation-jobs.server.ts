@@ -20,9 +20,6 @@ const MAX_CONCURRENT_JOBS = 8;
  */
 const DEFERRABLE_KINDS = new Set<GenerationKind>(["image", "video"]);
 
-/** 客户端放弃、上游仍在飞：写进 error 的占位文案（真正的失败原因在结算时代入） */
-const AWAITING_UPSTREAM_NOTE = "客户端连接中断，上游仍在生成，等待上游结果";
-
 type BeginGenerationInput = {
     requestKey: string;
     kind: GenerationKind;
@@ -130,7 +127,11 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
         if (status === "failed" && DEFERRABLE_KINDS.has(job.kind as GenerationKind) && isUpstreamCallInFlight(job.id)) {
             noteClientGaveUp(job.id, error);
             console.log(`[generation-settle] 任务 ${job.id} 客户端报失败，但我们的上游调用仍在飞：暂不结账，等上游结果`);
-            return tx.generationJob.update({ where: { id: job.id }, data: { error: AWAITING_UPSTREAM_NOTE } });
+            // 刻意不动 error：任务还是 running，客户端看到 running 就知道该等；
+            // 而「客户端连接中断」这句话如果落库，等上游真出了图、任务改判成功之后
+            // 就会挂成一条自相矛盾的失败说明（记录页会照原样展示）。原因留在日志与内存登记簿里，
+            // 真失败时代为结账那一刻再写进 error。
+            return job;
         }
 
         // 失败/取消/超时：退还积分（幂等，重复结算不会重复退）
