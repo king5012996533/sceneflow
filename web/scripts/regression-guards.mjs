@@ -348,6 +348,23 @@ for (const route of walkFiles("src/app/api/internal").filter((path) => path.ends
     assert(read(route).includes("GENERATION_WORKER_SECRET"), `${route} 在 /api/internal 下必须自带 worker 密钥校验（中间件已放行这一整段路径）。`);
 }
 
+// —— 图片任务的上游留痕（2026-09-18 事故：全库 1900+ 条图片任务的 provider/model/externalId 全空）——
+// 任务卡在 running 时服务端既不知道用的哪个模型、也不知道上游任务号，只能退款了事、没法取件。
+assertIncludes("src/services/api/image.ts", "reportUpstreamTask(serverJobId", "图片任务拿到上游任务号后必须留痕，否则卡住时无从追账、也没法取件。");
+assertIncludes("src/lib/generation/server-upstream-client.ts", "keepalive: true", "留痕请求必须 keepalive：页面跳转/关闭时也要尽量发出去。");
+assertNotMatches("src/lib/generation/server-upstream-client.ts", /throw/, "留痕必须尽力而为，不得把异常抛回生成链路。");
+assertIncludes("src/services/api/image-task.ts", "upstreamProviderFromBaseUrl", "上游渠道标识必须收在纯模块里（配单测），不能就地拼字符串。");
+assertIncludes("src/app/api/generation/jobs/[id]/upstream/route.ts", "isSameOriginRequest", "留痕接口必须校验同源，且只写登录用户名下的任务。");
+{
+    const jobsServer = read("src/lib/generation/generation-jobs.server.ts");
+    const at = jobsServer.indexOf("export async function recordGenerationUpstream(");
+    assert(at > -1, "服务端必须提供 recordGenerationUpstream 留痕入口。");
+    const body = at > -1 ? jobsServer.slice(at, jobsServer.indexOf("\n}", at)) : "";
+    assert(body.includes("userId"), "留痕必须按 userId 归属写，不能改别人的任务。");
+    assert(body.includes('status: "running"'), "留痕只能写还在跑的任务。");
+    assert(!body.includes("nextPollAt"), "图片留痕不得设 nextPollAt：设了就会被轮询器抢走，超时清扫也就不敢碰它了。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

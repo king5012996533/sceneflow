@@ -28,6 +28,21 @@ export function isSuccessCode(code: unknown): boolean {
     return code === 0 || (code >= 200 && code < 300);
 }
 
+/**
+ * 上游渠道标识（写进 GenerationJob.provider 供追账用）。
+ *
+ * 2026-09-18 事故：全库 1900+ 条图片任务的 provider / providerModel / externalId 全是空，
+ * 任务一旦卡住，既不知道用的哪个模型、也不知道上游任务号，只能退款了事、没法取件。
+ * 这里用 baseUrl 的主机名当渠道标识（apimart / ggwk1 / quanzil 一眼可分）。
+ */
+export function upstreamProviderFromBaseUrl(baseUrl: string): string {
+    try {
+        return new URL(baseUrl).hostname || "unknown";
+    } catch {
+        return "unknown";
+    }
+}
+
 /** 从上游应答里取错误文案（各家中转站的字段名不统一）。 */
 export function envelopeMessage(payload: unknown): string {
     if (!payload || typeof payload !== "object") return "";

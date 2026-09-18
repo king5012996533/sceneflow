@@ -7,10 +7,11 @@ import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
 import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
 import { proxyFetch, proxyFetchStream } from "./proxy-client";
-import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskId } from "./image-task";
+import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskId, upstreamProviderFromBaseUrl } from "./image-task";
 import { isAspectRejection, parseSupportedRatios, pickSupportedRatio } from "./image-ratio";
 import { buildReferenceGenerationBody, isEditsEndpointUnsupported, normalizeReferenceDataUrl } from "./image-reference";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
+import { reportUpstreamTask } from "@/lib/generation/server-upstream-client";
 
 export type AiTextMessage = {
     role: "system" | "user" | "assistant";
@@ -395,9 +396,20 @@ async function pollImageTask(config: AiConfig, taskId: string, options?: Request
 }
 
 /** 提交应答统一出口：任务制通道先轮询取件，同步通道直接解析。 */
-async function resolveImageSubmission(config: AiConfig, payload: ImageApiResponse, options?: RequestOptions) {
+async function resolveImageSubmission(config: AiConfig, payload: ImageApiResponse, options?: RequestOptions, serverJobId?: string) {
     const taskId = pickSubmittedTaskId(payload);
-    if (taskId) return await pollImageTask(config, taskId, options);
+    if (taskId) {
+        // 留痕：把上游任务号告诉服务端。任务卡住时才知道去哪儿取件、用的哪个模型
+        // （2026-09-18 事故：1900+ 条图片任务没有任何上游线索，卡住只能退款）。
+        // 尽力而为：reportUpstreamTask 自己吞异常，不会影响生成。
+        void reportUpstreamTask(serverJobId, {
+            provider: upstreamProviderFromBaseUrl(config.baseUrl),
+            model: config.model,
+            externalId: taskId,
+            externalGetUrl: aiApiUrl(config, `/tasks/${encodeURIComponent(taskId)}`),
+        });
+        return await pollImageTask(config, taskId, options);
+    }
     return parseImagePayload(payload);
 }
 
@@ -1187,7 +1199,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
             if (!aspectRatio) throw error;
             payload = await proxyFetch<ImageApiResponse>({ url, method: "POST", headers, body: body(aspectRatio) });
         }
-        return await resolveImageSubmission(requestConfig, payload, options);
+        return await resolveImageSubmission(requestConfig, payload, options, serverJobId);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
     }
@@ -1282,7 +1294,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                         outputFormat: IMAGE_OUTPUT_FORMAT,
                     }),
                 });
-                return await resolveImageSubmission(requestConfig, payload || {}, options);
+                return await resolveImageSubmission(requestConfig, payload || {}, options, serverJobId);
             }
             const aspectRatio = readAspectRetryRatio(message, config.size, requestSize);
             if (!aspectRatio) throw new Error(message);
@@ -1290,7 +1302,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
             data = (await response.json().catch(() => null)) as ImageApiResponse | null;
             if (!response.ok) throw new Error(readImageApiError(data, readStatusError(response.status, "request failed")));
         }
-        return await resolveImageSubmission(requestConfig, data || {}, options);
+        return await resolveImageSubmission(requestConfig, data || {}, options, serverJobId);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
     }

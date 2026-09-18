@@ -15,7 +15,7 @@
  */
 import assert from "node:assert";
 
-import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskId } from "../src/services/api/image-task.ts";
+import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskId, upstreamProviderFromBaseUrl } from "../src/services/api/image-task.ts";
 
 let passed = 0;
 const failures = [];
@@ -117,6 +117,22 @@ check("错误文案提取：覆盖各家中转站字段名", () => {
     assert.strictEqual(envelopeMessage({ code: 200, data: { fail_reason: "上游超时" } }), "上游超时");
     assert.strictEqual(envelopeMessage({ code: 200, data: [{ error: "渠道不可用" }] }), "渠道不可用");
     assert.strictEqual(envelopeMessage({}), "");
+});
+
+check("上游渠道标识：从 baseUrl 取主机名（写进 GenerationJob.provider 供追账）", () => {
+    assert.strictEqual(upstreamProviderFromBaseUrl("https://api.apimart.ai/v1"), "api.apimart.ai");
+    assert.strictEqual(upstreamProviderFromBaseUrl("https://www.aigccc666.com/v1/"), "www.aigccc666.com");
+    assert.strictEqual(upstreamProviderFromBaseUrl("http://127.0.0.1:3000/v1"), "127.0.0.1");
+});
+
+check("上游渠道标识：地址非法时给 unknown 而不是抛错（留痕绝不能拖垮生成）", () => {
+    assert.strictEqual(upstreamProviderFromBaseUrl(""), "unknown");
+    assert.strictEqual(upstreamProviderFromBaseUrl("not a url"), "unknown");
+    assert.strictEqual(upstreamProviderFromBaseUrl(undefined), "unknown");
+});
+
+check("上游渠道标识：不会与轮询器认领的通道名撞车（撞了就等于把任务交给轮询器管）", () => {
+    assert.notStrictEqual(upstreamProviderFromBaseUrl("https://api.replicate.com/v1"), "replicate");
 });
 
 console.log(failures.length === 0 ? `\n全部通过：${passed} 项` : `\n通过 ${passed} 项，失败 ${failures.length} 项：${failures.join("、")}`);

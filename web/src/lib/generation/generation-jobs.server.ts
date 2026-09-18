@@ -135,6 +135,21 @@ export async function bindExternalGenerationJob(userId: string, jobId: string, i
     });
 }
 
+/**
+ * 记录上游任务号（图片等「客户端提交、客户端取件」的通道用）。
+ *
+ * 与 bindExternalGenerationJob 的区别：这里不设 nextPollAt —— 这类任务没有服务端轮询器
+ * 认领（轮询器只挑 provider=replicate），超时兜底由全局清扫（generation-sweep.server.ts）负责。
+ * 只写 status=running 且还没绑定过外部的任务，重复调用无副作用。
+ */
+export async function recordGenerationUpstream(userId: string, jobId: string, input: { provider: string; model: string; externalId: string; externalGetUrl?: string }) {
+    if (!prisma) throw new Error("Database unavailable");
+    return prisma.generationJob.updateMany({
+        where: { id: jobId, userId, status: "running", externalId: null },
+        data: { provider: input.provider, providerModel: input.model, externalId: input.externalId, externalGetUrl: input.externalGetUrl ?? null, externalStatus: "submitted" },
+    });
+}
+
 export class GenerationPolicyError extends Error {
     constructor(
         message: string,
