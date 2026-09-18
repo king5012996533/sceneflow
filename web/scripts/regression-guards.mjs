@@ -544,6 +544,7 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
 
     const guard = read("src/lib/generation/generation-guard.ts");
     assert(guard.includes("shouldAwaitUpstreamSettlement(") && guard.includes("isNetworkLayerFailure("), "客户端报网络层失败时也要等服务端出结论——这正是用户看到的「请求失败」。");
+    assert(guard.includes("keepWaitingOnFailure"), "网络层失败下的「已失败」不算结论：上游成品可能几分钟后才被服务端补认领回来，那时该照常出图。");
 }
 
 if (failures.length) {

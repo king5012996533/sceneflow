@@ -93,10 +93,12 @@ export async function runGuardedGeneration<T>(
         //
         // 2026-09-18 第三种情形：失败是**网络层**的（浏览器连 HTTP 响应都没拿到，就是用户看到的
         // 「请求失败」）。这一刻我们服务端那次上游调用很可能还在飞、甚至正在出图，
-        // 而客户端报失败跑得可能比它登记进在飞登记簿还快 —— 服务端会把这种成品补认领回来。
-        // 所以这里也要等：第一轮轮询若拿到「已失败」就立刻报错，等不出额外代价。
-        if (recover && status === "failed" && shouldAwaitUpstreamSettlement({ settledStatus: settled?.status, networkLayerFailure: isNetworkLayerFailure(error) })) {
-            const awaited = await awaitDeferredSettlement(job.id);
+        // 而客户端报失败跑得可能比它登记进在飞登记簿还快 —— 服务端会把这种成品补认领回来
+        // （generation-recovery 的 isLateRescueClaimable）。所以这时连服务端那句「已失败」也不当作最终结论：
+        // 那句话本来就是照着客户端自己的报告说的，真相还没定。
+        const networkLayerFailure = isNetworkLayerFailure(error);
+        if (recover && status === "failed" && shouldAwaitUpstreamSettlement({ settledStatus: settled?.status, networkLayerFailure })) {
+            const awaited = await awaitDeferredSettlement(job.id, networkLayerFailure);
             if (awaited?.status === "succeeded") {
                 const recovered = await recover(awaited).catch((recoverError) => {
                     console.error("[generation] failed to recover delivered result", recoverError);
@@ -121,21 +123,29 @@ const DEFERRED_WAIT_MS = 5 * 60 * 1000;
 const DEFERRED_POLL_MS = 5_000;
 
 /**
- * 轮询任务状态直到它不再是 running（或超出等待上限）。
+ * 轮询任务状态，直到有结论（成功/取消，或失败且不必再等）或超出等待上限。
  *
  * 刻意不看调用方的 AbortSignal：那条信号是给「这次生成请求」用的，请求一失败调用方就会把它回收，
  * 在这里当成「用户取消」会当场把自己的恢复流程掐死（2026-09-18 真实浏览器里只轮询了一次就退出的原因）。
  * 真正的用户取消不会走到这里 —— 取消是 AbortError，结算状态是 cancelled，本函数只服务 failed。
+ *
+ * `keepWaitingOnFailure`：网络层失败时，「已失败」不算结论（那句话是照客户端自己的报告说的），
+ * 上游成品可能过几分钟才被服务端补认领回来 —— 那时任务会翻成成功，成品该照常出图。
+ * 等满上限后把最后看到的状态交回去：failed 就照实报错，running/读不到才算「还没结论」。
  */
-async function awaitDeferredSettlement(jobId: string): Promise<GenerationJob | undefined> {
+async function awaitDeferredSettlement(jobId: string, keepWaitingOnFailure = false): Promise<GenerationJob | undefined> {
     const deadline = Date.now() + DEFERRED_WAIT_MS;
+    let lastKnown: GenerationJob | undefined;
     while (Date.now() < deadline) {
         await sleep(DEFERRED_POLL_MS);
         const job = await readGenerationJob(jobId).catch(() => undefined);
         // 读不到（网络抖动）继续等：这条路径本来就是「连接不稳」时的兜底
-        if (job && job.status !== "running") return job;
+        if (!job) continue;
+        lastKnown = job;
+        if (job.status === "succeeded" || job.status === "cancelled") return job;
+        if (job.status === "failed" && !keepWaitingOnFailure) return job;
     }
-    return undefined;
+    return lastKnown && lastKnown.status !== "running" ? lastKnown : undefined;
 }
 
 async function readGenerationJob(jobId: string): Promise<GenerationJob | undefined> {

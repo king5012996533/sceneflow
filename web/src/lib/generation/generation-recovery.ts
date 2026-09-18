@@ -98,9 +98,12 @@ export function isNetworkLayerFailure(error: unknown): boolean {
  * - 结算被暂缓（服务端返回仍是 running）：上游调用还在飞，等；
  * - 失败是网络层的：浏览器连响应都没拿到，我们服务端可能正在跑这次上游调用，等。
  *
- * 其余情形不等：服务端已经按上游的真实报错结为失败，再等只是让用户白等。
- * 等待本身就是「不要断言我们并不知道的事」，而不是拖延报错 —— 服务端若已结为失败，
- * 第一轮轮询就会拿到结论并立刻报错。
+ * 其余情形不等：服务端已经拿到了上游的真实报错（内容违规、鉴权失败之类），
+ * 那种结论是独立的证据，再等只是让用户白等。
+ *
+ * 等待不是拖延报错：服务端若已按上游报错结为失败，第一轮轮询就拿到结论、立刻报错。
+ * 网络层失败的例外见客户端 awaitDeferredSettlement 的 keepWaitingOnFailure ——
+ * 那种失败下的「已失败」是照客户端自己的报告说的，成品可能几分钟后才被补认领回来。
  */
 export function shouldAwaitUpstreamSettlement(options: { settledStatus?: string | null; networkLayerFailure: boolean }): boolean {
     if (options.networkLayerFailure) return true;
