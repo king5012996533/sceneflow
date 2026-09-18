@@ -5,8 +5,10 @@ import { estimateGenerationCostCents, generationModel, getGenerationCreditsCost,
 import { resolveConfiguredPricing } from "@/lib/credential-store.server";
 import { normalizeGenerationMetadata } from "@/lib/generation/generation-config";
 import { getOperationNumber, getPricingDefaults } from "@/lib/operation-config";
+import { STALE_JOB_MS } from "./generation-stale";
 
-const STALE_JOB_MS = 30 * 60 * 1000;
+// 超时阈值与「超时后怎么关账」的规则收在 generation-stale.ts：懒清扫（本文件）与
+// 全局清扫（generation-sweep.server.ts）必须共用同一份数字，否则两套标准会漂移。
 
 // 套餐系统已下线：不再有并发权益。保留固定并发守卫防止单用户打爆上游（防滥用常量，非权益概念，可调）。
 const MAX_CONCURRENT_JOBS = 8;

@@ -327,6 +327,20 @@ assertIncludes("src/services/api/image-reference.ts", "image_urls", "改道必�
 assertNotMatches("src/services/api/image-reference.ts", /fetch\(|axios|proxyFetch/, "改道模块必须是纯逻辑，不碰网络，便于单测。");
 assertIncludes("src/services/api/image-reference.ts", "mime.toLowerCase()", "seedream 要求 Data URI 的格式小写，必须统一压成小写。");
 
+// —— 超时任务兜底清扫（2026-09-18 事故：7 条 running 挂着 24 积分没人退，最久 24 天）——
+// 积分先扣后结，而「结算」原本只由浏览器和「同一用户下次生成」的懒清扫负责：
+// 浏览器中途消失（关标签页/刷新/断网）就没人关账，用户不回来就永远挂着。
+// 铁律：清扫只能走幂等退款、只能条件认领 running、不得抢轮询器的任务。
+assertIncludes("src/lib/generation/generation-sweep.server.ts", "refundCredits(tx,", "清扫必须走 credit-ledger 的幂等退款，不得自己改余额（否则会重复退）。");
+assertIncludes("src/lib/generation/generation-sweep.server.ts", "where: { id: job.id, status: \"running\" }", "清扫认领必须带 status=running 条件，防并发/重复调用把同一条任务结算两次。");
+assertIncludes("src/lib/generation/generation-sweep.server.ts", "isSweepExcluded(job)", "清扫必须跳过有轮询器认领的任务（replicate + 取件地址），那种任务归轮询器自己的超时逻辑管。");
+assertIncludes("src/lib/generation/generation-stale.ts", "isSweepExcluded", "跳过规则必须收在纯模块里（配单测），且图片通道的任务不得被一起跳过。");
+assertNotMatches("src/lib/generation/generation-stale.ts", /fetch\(|axios|prisma|import /, "超时判定必须是纯逻辑（不触网、不连库），才能在 Node 下直接单测。");
+assertIncludes("src/lib/generation/generation-jobs.server.ts", "import { STALE_JOB_MS } from \"./generation-stale\"", "懒清扫与全局清扫必须共用同一个超时阈值，不得各留一份数字。");
+assertIncludes("src/app/api/internal/generation/sweep/route.ts", "GENERATION_WORKER_SECRET", "内部清扫接口必须校验 worker 密钥（与 internal/generation/poll 同一把）。");
+assertIncludes("src/app/api/internal/generation/sweep/route.ts", 'req.headers.get("x-generation-worker-secret")', "worker 密钥必须从请求头取，不得放进 URL 查询串（会落到访问日志里）。");
+assertNotMatches("src/app/api/internal/generation/sweep/route.ts", /getServerSession|requireCurrentUser|export async function GET/, "清扫接口不得对外开放，也不得有免鉴权的 GET 入口，只能由服务器 cron 带密钥 POST。");
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);
