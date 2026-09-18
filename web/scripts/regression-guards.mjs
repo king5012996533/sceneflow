@@ -317,6 +317,16 @@ assertIncludes("src/app/api/proxy/asset/route.ts", '\"X-Asset-Cache\": \"hit\"',
 // 但该路由只记了目标 host、不记状态码，日志里查不到，最后是靠数据库里的报错文本才定位到。
 assertIncludes("src/app/api/proxy/form-data/route.ts", "[proxy/form-data] 上游 ${response.status}", "表单代理必须记录上游 4xx/5xx，否则这条路线的失败是黑盒。");
 
+// —— 参考图生图：编辑端点被拒时改走生成端点 + image_urls（2026-09-18 apimart 事故）——
+// apimart 的 /v1/images/edits 只接受 Grok 图像模型，qwen / seedream / gemini 一律秒拒；
+// 文档写明图生图走 /v1/images/generations + `image_urls`（URL 与 Data URI 可混填）。
+assertIncludes("src/services/api/image.ts", "isEditsEndpointUnsupported(message)", "参考图生图必须识别「编辑端点不吃这个模型」的答复并改道。");
+assertIncludes("src/services/api/image.ts", "if (!mask && isEditsEndpointUnsupported(message))", "带蒙版的编辑不能改道（生成端点不接蒙版），必须在改道前挡掉。");
+assertIncludes("src/services/api/image.ts", "buildReferenceGenerationBody({", "改道请求体必须走统一构造函数，便于单测钉住形状。");
+assertIncludes("src/services/api/image-reference.ts", "image_urls", "改道必须带上 image_urls，否则等于退回文生图、参考图白传。");
+assertNotMatches("src/services/api/image-reference.ts", /fetch\(|axios|proxyFetch/, "改道模块必须是纯逻辑，不碰网络，便于单测。");
+assertIncludes("src/services/api/image-reference.ts", "mime.toLowerCase()", "seedream 要求 Data URI 的格式小写，必须统一压成小写。");
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

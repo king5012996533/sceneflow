@@ -9,6 +9,7 @@ import type { ReferenceImage } from "@/types/image";
 import { proxyFetch, proxyFetchStream } from "./proxy-client";
 import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskId } from "./image-task";
 import { isAspectRejection, parseSupportedRatios, pickSupportedRatio } from "./image-ratio";
+import { buildReferenceGenerationBody, isEditsEndpointUnsupported, normalizeReferenceDataUrl } from "./image-reference";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
 
 export type AiTextMessage = {
@@ -1261,6 +1262,28 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         let data = (await response.json().catch(() => null)) as ImageApiResponse | null;
         if (!response.ok) {
             const message = readImageApiError(data, readStatusError(response.status, "request failed"));
+            // 上游编辑端点不吃这个模型（apimart 只让 Grok 图像模型走 /images/edits）→ 按文档改走
+            // 生成端点 + image_urls 重投一次。该答复是直接拒收，没建任务、没计费，重投不花钱。
+            // 带蒙版的编辑没法这么改道（生成端点的 image_urls 不接蒙版），原样把上游原话抛出去。
+            if (!mask && isEditsEndpointUnsupported(message)) {
+                const imageUrls = await Promise.all(references.map(async (image) => normalizeReferenceDataUrl(await imageToDataUrl(image))));
+                const payload = await proxyFetch<ImageApiResponse>({
+                    url: aiApiUrl(requestConfig, "/images/generations"),
+                    method: "POST",
+                    headers: aiHeaders(requestConfig, "application/json"),
+                    body: buildReferenceGenerationBody({
+                        model: requestConfig.model,
+                        prompt: withSystemPrompt(requestConfig, requestPrompt),
+                        n,
+                        quality,
+                        size: requestSize,
+                        imageUrls,
+                        openAiResponseFormat: isOpenAiApi(requestConfig),
+                        outputFormat: IMAGE_OUTPUT_FORMAT,
+                    }),
+                });
+                return await resolveImageSubmission(requestConfig, payload || {}, options);
+            }
             const aspectRatio = readAspectRetryRatio(message, config.size, requestSize);
             if (!aspectRatio) throw new Error(message);
             response = await submit(aspectRatio);
