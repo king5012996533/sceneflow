@@ -90,6 +90,16 @@ export async function POST(req: NextRequest) {
             });
             bodyBuffer = Buffer.alloc(0);
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
+            // 与 JSON 代理的「[proxy] 上游 <status>」对齐。本路由是参考图生图（/images/edits）主路径，
+            // 原先只记目标 host、不记上游状态码，4xx/5xx 完全不留痕：2026-09-18 那三次图生图秒失败
+            // （apimart 回「/v1/images/edits only supports Grok image models」）就是因此只能靠数据库翻出来。
+            if (response.status >= 400) {
+                const snippet = typeof data === "object" && data !== null ? JSON.stringify(data).slice(0, 400) : String(data).slice(0, 400);
+                const bearer = typeof safeHeaders.authorization === "string" ? safeHeaders.authorization.replace(/^Bearer\s+/i, "") : "";
+                const raw = bearer || (typeof safeHeaders.apikey === "string" ? safeHeaders.apikey : "");
+                const masked = raw ? raw.replace(/^(.{6}).*(.{4})$/, "$1****$2") : "none";
+                console.error(`[proxy/form-data] 上游 ${response.status} ${method} ${target} key=${masked}: ${snippet}`);
+            }
             return NextResponse.json(data, { status: response.status });
         } finally {
             clearTimeout(timeout);

@@ -297,6 +297,26 @@ assertIncludes("src/app/(user)/canvas/utils/agent-prompt.ts", "autoRun=true", "�
 assertNotMatches("src/app/(user)/canvas/utils/agent-prompt.ts", /除非用户明确要求立即生成，否则只创建可确认流程卡/, "旧的「一律只建卡」规范会让生成永远停在用户手点，不得回归。");
 assertIncludes("src/app/(user)/canvas/utils/agent-prompt.ts", "只有回执是「生成已完成」时", "回执说生成还没落地时不得谎报完成，提示词必须禁止这种说法。");
 
+// —— 素材本地副本（2026-09-18 事故：上游已出图并计费，前端经 /api/proxy/asset 取图 502）——
+// 取过一次就留本地副本，之后不再赌那条会抖的 CDN，也不受上游 24 小时清理影响。
+assertIncludes("src/lib/asset-cache.server.ts", "os.homedir()", "副本目录必须由主目录推导（与 media-store 同规则），不得用 cwd。");
+assertIncludes("src/lib/asset-cache.server.ts", "export function resolveAssetCacheDir(", "目录解析必须留成纯函数，便于单测锁定「不在构建产物内」。");
+assertIncludes("src/app/api/proxy/asset/route.ts", "readCachedAsset(rawUrl)", "素材路由必须先查本地副本。");
+assertIncludes("src/app/api/proxy/asset/route.ts", "writeCachedAsset(rawUrl, { body: buffer, contentType })", "完整读取的素材必须落本地副本。");
+assertIncludes("src/app/api/proxy/asset/route.ts", "if (!range && response.status === 200)", "分部响应（206）与流式透传不得写入副本，否则会把半张图当成完整副本回给用户。");
+assertIncludes("src/app/api/proxy/asset/route.ts", '\"X-Asset-Cache\": \"hit\"', "命中本地副本必须留标记，线上排查要能一眼看出有没有回源。");
+{
+    const assetRoute = read("src/app/api/proxy/asset/route.ts");
+    const cachedAt = assetRoute.indexOf("await readCachedAsset(");
+    const fetchAt = assetRoute.indexOf("await fetchAsset(");
+    assert(cachedAt > -1 && fetchAt > -1 && cachedAt < fetchAt, "素材路由必须先查副本再回源，顺序反了等于没缓存。");
+}
+
+// —— 参考图生图（表单代理）的上游状态必须留痕 ——
+// 2026-09-18：apimart 回「/v1/images/edits only supports Grok image models」导致三次秒失败，
+// 但该路由只记了目标 host、不记状态码，日志里查不到，最后是靠数据库里的报错文本才定位到。
+assertIncludes("src/app/api/proxy/form-data/route.ts", "[proxy/form-data] 上游 ${response.status}", "表单代理必须记录上游 4xx/5xx，否则这条路线的失败是黑盒。");
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

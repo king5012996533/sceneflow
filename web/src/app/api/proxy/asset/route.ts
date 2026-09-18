@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readCachedAsset, writeCachedAsset } from "@/lib/asset-cache.server";
 import { assetLimitBytes, mediaContentType, normalizeAssetKind } from "@/lib/asset-tier";
 import { requireCurrentUser } from "@/lib/current-user";
 import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
@@ -73,9 +74,26 @@ export async function GET(req: NextRequest) {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ASSET_TIMEOUT_MS);
+    // 转发 Range：<video> 边播边拖进度时只取需要的分段，不必每次把整段几十 MB 拉完
+    const range = req.headers.get("range");
     try {
-        // 转发 Range：<video> 边播边拖进度时只取需要的分段，不必每次把整段几十 MB 拉完
-        const range = req.headers.get("range");
+        // 本地副本优先：同一张图会被反复取（生成时归档一次、画布与列表渲染再取多次），
+        // 取过一次就不必再赌那条会抖的 CDN，也不受上游 24 小时清理影响。
+        // Range 是分段播放（206），只取一段不能当完整副本，不参与缓存。
+        if (!range) {
+            const cached = await readCachedAsset(rawUrl);
+            if (cached) {
+                return new NextResponse(new Uint8Array(cached.body), {
+                    status: 200,
+                    headers: {
+                        "Content-Type": cached.contentType,
+                        "Content-Length": String(cached.body.byteLength),
+                        "Cache-Control": "private, max-age=3600",
+                        "X-Asset-Cache": "hit",
+                    },
+                });
+            }
+        }
         const response = await fetchAsset(target.toString(), controller.signal, range);
         if (!response.ok) {
             return NextResponse.json({ error: `素材下载失败（上游 ${response.status}）` }, { status: 502 });
@@ -94,6 +112,8 @@ export async function GET(req: NextRequest) {
         const passthroughHeaders: Record<string, string> = {
             "Content-Type": contentType,
             "Cache-Control": "private, max-age=3600",
+            // 命中本地副本时改写为 hit，线上排查一眼能看出这次有没有回源
+            "X-Asset-Cache": "miss",
         };
         if (contentRange) passthroughHeaders["Content-Range"] = contentRange;
         const acceptRanges = response.headers.get("accept-ranges");
@@ -105,6 +125,10 @@ export async function GET(req: NextRequest) {
                 return NextResponse.json({ error: `素材体积超过代理限制（${Math.round(limit / 1024 / 1024)}MB）` }, { status: 413 });
             }
             passthroughHeaders["Content-Length"] = String(buffer.byteLength);
+            // 完整读取的响应留一份本地副本（流式透传与分段响应不缓存）
+            if (!range && response.status === 200) {
+                await writeCachedAsset(rawUrl, { body: buffer, contentType }).catch(() => undefined);
+            }
             return new NextResponse(new Uint8Array(buffer), { status: response.status, headers: passthroughHeaders });
         }
         if (!response.body) {
