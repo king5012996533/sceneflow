@@ -10,6 +10,10 @@
  *   4. 没有 /images/edits 端点 → 参考图只能走生成端点。
  * 这几条各自都能悄悄毁掉一次生成（或一次收费），所以钉在这里。
  *
+ * 2026-09-19 二次补丁：尺寸的接受区间**逐模型不同**（实测 lite 拒收 3686400 像素以下、pro 拒收
+ * 4624220 像素以上，两家都认档位标签），于是 arkImageUpstreamSize 改成按模型算 —— 这一块用自己的
+ * 用例钉住：2K 的 16:9（2048x1152）与 4K，正是「照原样发就 400」的两个代表性尺寸。
+ *
  * 运行：npm run test:ark
  */
 import assert from "node:assert";
@@ -27,8 +31,12 @@ import {
     buildArkImageBody,
     isArkImageBaseUrl,
     isArkImageChannel,
-    isArkPixelSizeAcceptable,
 } from "../src/lib/ark-image.ts";
+
+/** 上游两个模型的 id（pro 的 id 里带 `pro`，lite 的 id 不带 —— 尺寸边界就是按这个认的） */
+const PRO = "doubao-seedream-5-0-pro-260628";
+const LITE = "doubao-seedream-5-0-260128";
+const LITE_ALIAS = "doubao-seedream-5-0-lite-260128";
 
 let passed = 0;
 const failures = [];
@@ -92,7 +100,7 @@ check("显式关水印（与其它渠道的出图口径一致，别多一个「A
     assert.equal(ARK_IMAGE_WATERMARK, false);
 });
 
-check("显式要链接（不写就按上游默认走，默认若是 base64 会塞爆 32MB 信封）", () => {
+check("显式要链接（4K 的 base64 能顶到 32MB 代理信封上限）", () => {
     assert.equal(baseBody.response_format, "url");
 });
 
@@ -127,53 +135,80 @@ check("出图格式只认 png / jpeg（方舟没有 webp，认不出来回 png�
     assert.equal(arkImageOutputFormat("乱填"), "png");
 });
 
-console.log("arkImageUpstreamSize（画幅写法）");
-
-check("区间内的像素串原样发（用户选的就是它，提示词里的数字也对得上）", () => {
-    assert.equal(arkImageUpstreamSize("1024x1024"), "1024x1024");
-    assert.equal(arkImageUpstreamSize("1280x720"), "1280x720");
-    assert.equal(arkImageUpstreamSize("1824x1024"), "1824x1024");
-    assert.equal(arkImageUpstreamSize("2048x2048"), "2048x2048");
-    assert.equal(arkImageUpstreamSize("2048x1152"), "2048x1152");
-    assert.equal(arkImageUpstreamSize("3136x1344"), "3136x1344");
+check("output_format 每次都在请求体里（上游默认是 jpeg，靠这一行才是 png）", () => {
+    assert.equal("output_format" in buildArkImageBody({ model: PRO, prompt: "p" }), true);
+    assert.equal(buildArkImageBody({ model: PRO, prompt: "p" }).output_format, "png");
+    assert.equal(buildArkImageBody({ model: PRO, prompt: "p", outputFormat: "webp" }).output_format, "png");
+    assert.equal(buildArkImageBody({ model: PRO, prompt: "p", outputFormat: "jpeg" }).output_format, "jpeg");
 });
 
-check("超出像素区间（4K 的 3840x2160 = 8.29MP）改发档位标签，而不是发一个必被拒的值", () => {
-    assert.equal(arkImageUpstreamSize("3840x2160"), "4K");
-    assert.equal(arkImageUpstreamSize("2160x3840"), "4K");
-    assert.equal(arkImageUpstreamSize("4096x4096"), "4K");
+console.log("arkImageUpstreamSize（尺寸边界逐模型不同）");
+
+check("pro：0.92–4.62MP 的像素串原样发（用户选的就是它，提示词里的数字也对得上）", () => {
+    for (const size of ["1024x1024", "1248x832", "1360x768", "1824x1024", "2048x1152", "2048x2048", "2368x1776", "2496x1664", "3136x1344"]) {
+        assert.equal(arkImageUpstreamSize(size, PRO), size, size);
+    }
 });
 
-check("像素不够 / 宽高比越界也走档位标签（发过去只会 400）", () => {
-    assert.equal(arkImageUpstreamSize("512x512"), "1K", "总像素低于下限");
-    assert.equal(arkImageUpstreamSize("10000x100"), "1K", "宽高比 100 超过 1/16..16");
-    assert.equal(arkImageUpstreamSize("2368x1776"), "2368x1776", "4.2MP 在区间内，照原样发（别拿档位换掉用户选的像素）");
-    assert.equal(arkImageUpstreamSize("2368x2000"), "2K", "4.74MP 超上限 → 换成它所在的档");
-    assert.equal(arkImageUpstreamSize("2560x2560"), "4K", "6.55MP 超上限 → 换成它所在的档");
+check("pro：超过 4624220 像素（4K 8.29MP）改发档位标签，不发一个必被拒的像素值", () => {
+    assert.equal(arkImageUpstreamSize("3840x2160", PRO), "2K", "4K 超出 pro 上限 → 收敛到它支持的最高档");
+    assert.equal(arkImageUpstreamSize("2160x3840", PRO), "2K");
+    assert.equal(arkImageUpstreamSize("2880x2880", PRO), "2K");
+    assert.equal(arkImageUpstreamSize("2368x2000", PRO), "2K", "4.74MP 超上限");
 });
 
-check("档位标签原样给上游；比例串 / auto / 空不发 size", () => {
-    assert.equal(arkImageUpstreamSize("2K"), "2K");
-    assert.equal(arkImageUpstreamSize("1.5k"), "1.5K");
-    assert.equal(arkImageUpstreamSize("16:9"), undefined, "方舟的 size 不认比例串（比例靠 prompt 描述）");
+check("lite：低于 3686400 像素改发档位标签（2K 的 16:9 = 2048x1152 正好落在下限之下）", () => {
+    assert.equal(arkImageUpstreamSize("1824x1024", LITE), "2K", "实测 lite 收到它回 400：image size must be at least 3686400 pixels");
+    assert.equal(arkImageUpstreamSize("1024x1024", LITE), "2K", "lite 没有 1K 档 → 收敛到它支持的最低档");
+    assert.equal(arkImageUpstreamSize("2048x1152", LITE), "2K", "2.36MP 在下限之下");
+    assert.equal(arkImageUpstreamSize("1152x2048", LITE), "2K");
+});
+
+check("lite：够到下限就照原样发（4K 也在它的接受区间里，别拿档位换掉用户选的像素）", () => {
+    assert.equal(arkImageUpstreamSize("2048x2048", LITE), "2048x2048");
+    assert.equal(arkImageUpstreamSize("2496x1664", LITE), "2496x1664");
+    assert.equal(arkImageUpstreamSize("3840x2160", LITE), "3840x2160", "实测 lite 收到 3840x2160 能出图");
+    assert.equal(arkImageUpstreamSize("4096x4096", LITE), "4096x4096");
+});
+
+check("lite 的别名（doubao-seedream-5-0-lite-260128）与主 id 同一套边界", () => {
+    assert.equal(arkImageUpstreamSize("1024x1024", LITE_ALIAS), "2K");
+    assert.equal(arkImageUpstreamSize("3840x2160", LITE_ALIAS), "3840x2160");
+});
+
+check("认不出模型时只走两家都认的安全带（宁可小一点，也不要发必被拒的尺寸）", () => {
+    assert.equal(arkImageUpstreamSize("2048x2048", "some-seedream-clone"), "2048x2048", "4.19MP 两家都收");
+    assert.equal(arkImageUpstreamSize("3840x2160", "some-seedream-clone"), "2K");
+    assert.equal(arkImageUpstreamSize("1024x1024", "some-seedream-clone"), "2K");
+    assert.equal(arkImageUpstreamSize("2048x2048"), "2048x2048", "没给模型名也走同一套交集");
+    assert.equal(arkImageUpstreamSize("1024x1024"), "2K");
+});
+
+check("宽高比越界（文档的第二个条件）也换标签", () => {
+    assert.equal(arkImageUpstreamSize("10000x100", PRO), "1K", "宽高比 100 超过 1/16..16");
+    assert.equal(arkImageUpstreamSize("512x512", PRO), "1K", "低于 pro 的下限");
+});
+
+check("显式给来的档位标签：收敛到该模型支持的档；比例串 / auto / 空不发 size", () => {
+    assert.equal(arkImageUpstreamSize("2K", PRO), "2K");
+    assert.equal(arkImageUpstreamSize("1.5k", PRO), "1.5K");
+    assert.equal(arkImageUpstreamSize("4K", PRO), "2K", "pro 不认 4K → 收敛到它支持的最高档");
+    assert.equal(arkImageUpstreamSize("1K", LITE), "2K", "lite 不认 1K");
+    assert.equal(arkImageUpstreamSize("3k", LITE), "3K");
+    assert.equal(arkImageUpstreamSize("4K", LITE), "4K");
+    assert.equal(arkImageUpstreamSize("16:9", PRO), undefined, "方舟的 size 不认比例串（比例靠 prompt 描述）");
     assert.equal(arkImageUpstreamSize("auto"), undefined);
     assert.equal(arkImageUpstreamSize(""), undefined);
     assert.equal(arkImageUpstreamSize(undefined), undefined);
 });
 
-check("isArkPixelSizeAcceptable 的两个条件都要满足", () => {
-    assert.equal(isArkPixelSizeAcceptable(2048, 2048), true);
-    assert.equal(isArkPixelSizeAcceptable(2048, 1152), true);
-    assert.equal(isArkPixelSizeAcceptable(4096, 4096), false, "总像素超上限");
-    assert.equal(isArkPixelSizeAcceptable(512, 512), false, "总像素低于下限");
-    assert.equal(isArkPixelSizeAcceptable(20000, 100), false, "宽高比越界");
-    assert.equal(isArkPixelSizeAcceptable(0, 0), false);
-});
-
-check("size 落到 body 里（档位标签与像素串都走同一条路）", () => {
-    assert.equal(buildArkImageBody({ model: "m", prompt: "p", size: "2048x1152" }).size, "2048x1152");
-    assert.equal(buildArkImageBody({ model: "m", prompt: "p", size: "3840x2160" }).size, "4K");
-    assert.equal("size" in buildArkImageBody({ model: "m", prompt: "p" }), false);
+check("size 落到 body 里：按 body 里那个 model 算（同一个尺寸，两个模型可能发得不一样）", () => {
+    assert.equal(buildArkImageBody({ model: PRO, prompt: "p", size: "2048x2048" }).size, "2048x2048");
+    assert.equal(buildArkImageBody({ model: PRO, prompt: "p", size: "2048x1152" }).size, "2048x1152");
+    assert.equal(buildArkImageBody({ model: LITE, prompt: "p", size: "2048x1152" }).size, "2K", "同一个尺寸，lite 要换标签");
+    assert.equal(buildArkImageBody({ model: LITE, prompt: "p", size: "3840x2160" }).size, "3840x2160");
+    assert.equal(buildArkImageBody({ model: PRO, prompt: "p", size: "3840x2160" }).size, "2K");
+    assert.equal("size" in buildArkImageBody({ model: PRO, prompt: "p" }), false);
 });
 
 console.log("使用限制与计费口径");

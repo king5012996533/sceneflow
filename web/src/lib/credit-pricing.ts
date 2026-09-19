@@ -11,7 +11,7 @@
  * 本模块为纯函数（无 DB/服务端依赖），客户端预检、成本展示与服务端扣费共用。
  */
 
-import { applyImageQualityPricing, applyImageResolutionPricing, imageResolutionTier } from "@/lib/image-resolution";
+import { applyImageQualityPricing, applyImageResolutionPricing, imageResolutionTier, parseImagePixelSize } from "@/lib/image-resolution";
 import type { ImageQuality } from "@/lib/model-capability-spec";
 
 export type GenerationKind = "image" | "video" | "audio" | "text" | "tool";
@@ -75,6 +75,9 @@ export function modelName(metadata?: GenerationMetadata): string {
 function imageBaseDraftCredits(model: string): number {
     if (model.includes("gpt-image") || model.includes("dall-e")) return 10;
     if (model.includes("minimax") || model.includes("hailuo") || model.includes("h3")) return 1;
+    // 方舟 Seedream 5.0：官方 0.22–0.60 元/张（口径见 estimateGenerationCostCents），草案给 6 积分（≈¥0.60）。
+    // 没这一条就会落到最后的 2 积分（¥0.20）—— 那是 pro 2K（¥0.60）的三分之一，每出一张赔一张。
+    if (/seedream-5[.-]0/.test(model)) return 6;
     return 2;
 }
 
@@ -178,11 +181,37 @@ const FLARE_QUALITY_COST_CENTS: Partial<Record<ImageQuality, number>> = {
  */
 const FLAT_IMAGE_COST_CENTS: ReadonlyArray<{ pattern: RegExp; cents: number }> = [{ pattern: /recraft-v4-pro/i, cents: 178 }];
 
+/**
+ * 方舟 Seedream 5.0（火山方舟官方）的单张成本，单位：分（人民币）。
+ *
+ * 来源：官方《模型价格》「图片生成模型」表（2026-09-19 抓取）—— **按张计价，且按输出像素分档**：
+ *   pro —— ≤ 261 万像素（1K/1.5K）0.30 元/张（30 分）；> 261 万像素（2K）0.60 元/张（60 分）；
+ *          输入参考图首张免费、第 2 张起 0.02 元/张（上限 10 张 → 输入侧最多再加 18 分）。
+ *   lite —— 0.22 元/张（22 分，2K/3K/4K 同价），输入参考图免费。
+ * 按**实际像素**判档而不是按 1K/2K/4K 桶：pro 的 2K 里 16:9 是 2048x1152（2.36MP ≤ 261 万）上游只收 30 分，
+ * 按档位估会把成本多算一倍 —— 这张表是拿来对账的，宁可算准。
+ * 中转站上同名的 seedream-5-0 也按这套官方价估（上游档位一致，误差可接受）。
+ */
+const ARK_SEEDREAM_PRO_PIXEL_BOUNDARY = 2_610_000;
+
+function arkSeedreamCostCents(model: string, metadata?: GenerationMetadata): number {
+    // lite 不分像素档，参考图也不另收
+    if (!model.includes("pro")) return 22;
+    const size = String(metadata?.size ?? "");
+    const dimensions = parseImagePixelSize(size);
+    // 没给像素（比例串 / auto）时退回档位判：落进 2K 就按贵的那档算，宁可高估成本
+    const highBand = dimensions ? dimensions.width * dimensions.height > ARK_SEEDREAM_PRO_PIXEL_BOUNDARY : imageResolutionTier(size, String(metadata?.quality ?? "")) !== "1k";
+    const references = Math.max(0, Math.floor(Number(metadata?.referenceCount) || 0));
+    return (highBand ? 60 : 30) + Math.max(0, references - 1) * 2;
+}
+
 /** 平台单次生成的估算成本（分），供对账与定价校准（公开价粗估） */
 export function estimateGenerationCostCents(kind: GenerationKind, metadata?: GenerationMetadata): number | null {
     const model = modelName(metadata);
     switch (kind) {
         case "image": {
+            // 方舟 Seedream 5.0：官方按张 + 像素档计价（见 arkSeedreamCostCents）
+            if (/seedream-5[.-]0/.test(model)) return arkSeedreamCostCents(model, metadata);
             if (/gpt-image-2\.5-flare/.test(model)) {
                 const quality = String(metadata?.quality ?? "")
                     .trim()

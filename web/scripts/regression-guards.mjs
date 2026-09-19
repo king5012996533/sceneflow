@@ -951,6 +951,8 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
 //   ② 没有 n / quality —— 我们通用体恒定带这两个字段（上游严格校验 → 400）；
 //   ③ 不显式关 watermark 就会带「AI生成」角标（比别的渠道多一个）；
 //   ④ 没有 /images/edits 端点 —— 参考图必须走生成端点，multipart 编辑链路在它上面是 404。
+//   ⑤ 尺寸的接受区间**逐模型不同** —— 实测 lite 拒收 3686400 像素以下（我们 2K 的 16:9 = 2048x1152
+//      正好被拒）、pro 拒收 4624220 像素以上（4K = 8.29MP）；像素串照原样发之前必须先按模型算。
 // 整形规则只许有一处（lib/ark-image.ts），两条调用路径都引用它。
 {
     assertIncludes("src/lib/ark-image.ts", "export function buildArkImageBody", "方舟请求体的拼装必须收在一个纯函数里（别再散回两条调用路径）。");
@@ -979,8 +981,26 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
         assert(arkGuard >= 0 && editsSubmit > arkGuard, "方舟分支必须拦在 multipart 编辑端点之前，否则参考图会打到方舟不存在的 /images/edits（404）。");
     }
     assertIncludes("src/services/api/image.ts", "ARK_IMAGE_MASK_UNSUPPORTED", "带蒙版的编辑对方舟是无解（没有 mask 入参）：必须明确报错，不能发出去被静默忽略。");
+    // 尺寸：模型名必须一路传到尺寸判定里（漏掉第二个参数 = 所有模型都按「未知模型」的安全带去发，
+    // 用户的 4K 请求会被悄悄降级），并且判定必须真的读该模型的上下限。
+    assertIncludes("src/lib/ark-image.ts", "arkImageUpstreamSize(input.size, input.model)", "尺寸判定必须带上模型：同一个像素串对 pro / lite 的合法性不一样。");
+    {
+        const ark = read("src/lib/ark-image.ts");
+        const start = ark.indexOf("export function arkImageUpstreamSize");
+        const end = ark.indexOf("\n}\n", start);
+        assert(start >= 0 && end > start, "找不到 arkImageUpstreamSize 的函数体，无法确认尺寸是按模型算的。");
+        const body = ark.slice(start, end);
+        assert(
+            /limits\.minPixels/.test(body) && /limits\.maxPixels/.test(body),
+            "像素串要按该模型的上下限判断（lite 下限 3686400 / pro 上限 4624220 都是实测的，越界就是 400 + 白扣一次费）。",
+        );
+    }
     // 扣费口径：请求体里没有张数，计费那边就必须把 Ark 渠道夹到 1（否则「按 4 张扣钱、只回 1 张」）。
     assertIncludes("src/lib/credential-store.server.ts", "isArkImageBaseUrl(credential.baseUrl)) return ARK_IMAGE_MAX_OUTPUTS", "方舟渠道的 maxCount 必须在服务端夹到 1：张数是直接乘进扣费的。");
+    // 定价口径：官方是「按张 + 输出像素档」计价（pro 30/60 分、lite 22 分），成本与草案两处都要认得这两个模型，
+    // 否则对账表会按默认的 10 分算（pro 2K 实际 60 分，毛利会被算成 6 倍）。
+    assertIncludes("src/lib/credit-pricing.ts", "arkSeedreamCostCents", "方舟 Seedream 5.0 的成本要按官方「按张 + 像素档」算（见 estimateGenerationCostCents）。");
+    assertMatchesNormalized("src/lib/credit-pricing.ts", /seedream-5\[\.-\]0\/\.test\(model\)\)\s*return 6/, "方舟 Seedream 5.0 的草案兜底价不能是 2 积分（¥0.20）：官方成本 0.22–0.60 元/张，那是赔钱价。");
 }
 
 if (failures.length) {

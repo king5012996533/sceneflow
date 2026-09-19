@@ -2,7 +2,8 @@
  * ark-image.ts —— 火山方舟（Ark / 豆包 Seedream）图片通道的入参整形（纯逻辑：无网络、无 React、无依赖）。
  *
  * 为什么单开这一层：方舟的图片接口长着 OpenAI 的形状，参数表却和别的通道不一样，照现在的通用请求体
- * 发过去会被 400 拒收。四处差异（2026-09-19 按官方《图片生成 API》+ Seedream 5.0 pro 文档核对）：
+ * 发过去会被 400 拒收。五处差异（2026-09-19 按官方《图片生成 API》+ Seedream 5.0 文档核对，
+ * 每一条都用真 key 打到上游复验过 —— 文档与实测不一致的地方以实测为准，见下面各处的注释）：
  *
  *   1. **参考图字段叫 `image`**（单张给字符串、多张给数组），不是我们 generations 回退路径用的
  *      `image_urls` —— 上游对不认识的字段是**静默忽略**的，发错了不会报错，只会照常出图、照常计费，
@@ -14,11 +15,15 @@
  *   4. **没有 `/images/edits` 端点** —— 参考图生图只能走 `/images/generations` + `image`。
  *      我们默认那条 multipart 编辑链路对方舟是死路（点进去是 404，不是「编辑端点不支持这个模型」，
  *      所以 image-reference.ts 的重投也救不回来）。
+ *   5. **尺寸的接受区间是逐模型的** —— 像素方法不是全模型通用：实测 lite 拒收 3686400 像素以下的
+ *      （我们 2K 的 16:9 = 2048x1152 = 2.36MP 正好落在它下限之下），pro 拒收 4624220 像素以上的
+ *      （4K 的 3840x2160 = 8.29MP）。两家都认档位标签，所以尺寸要按模型算着发，见 arkImageUpstreamSize。
  *
  * 判定按 base URL（与 seedance-video.ts 认 `/api/plan/v3` 同一套惯例），**不按模型名**：
  * 中转站上的同名 seedream 走的是 `image_urls` 那条路，按名字认会把参考图整段丢掉。
+ * （唯一的例外是尺寸边界：那两组数字取自方舟自家模型的实测，只在这条通道内按模型名取用。）
  * 模块保持零 import —— scripts/*-unit-tests.mjs 是拿 node 直接跑 .ts 的，解析不了 `@/` 别名，
- * 所以这里不引 lib/image-resolution.ts（档位阈值那份口径在下面按同值抄了一份）。
+ * 所以这里不引 lib/image-resolution.ts（档位词汇在下面按同义抄了一份，只用于换标签，不参与计费）。
  */
 
 /** 方舟图片生成端点。参考图生图也走这里（方舟没有 /images/edits） */
@@ -44,24 +49,124 @@ export const ARK_IMAGE_MAX_OUTPUTS = 1;
 /** 方舟图片接口没有蒙版入参（mask / 局部重绘不在它的参数表里） */
 export const ARK_IMAGE_MASK_UNSUPPORTED = "方舟图片通道没有蒙版入参：带蒙版的重绘发过去只会被忽略（等于按整图重画、照样计费）。请改用文字描述要修改的区域，或换支持蒙版的模型。";
 
-/** 「方式 2：指定宽高像素值」的容许区间（官方文档：总像素 + 宽高比两个条件必须同时满足） */
-const ARK_MIN_PIXELS = 921_600; // 1280x720
-const ARK_MAX_PIXELS = 4_624_220; // 2048x2048x1.1025
+/** Seedance 视频通道（同一个 host、同一个账号）的路径前缀，认成图片通道会把视频请求塞进图片请求体 */
+const ARK_PLAN_PATH = "/api/plan/v3";
+
+/**
+ * 「方式 2：指定宽高像素值」的宽高比容许区间（官方文档：总像素与宽高比两个条件必须同时满足）。
+ * 总像素那一半不是常数 —— 它逐模型不同，见下面两组边界。
+ */
 const ARK_MIN_RATIO = 1 / 16;
 const ARK_MAX_RATIO = 16;
 
+/** 方舟的档位标签词汇表，从低到高（pro 与 lite 各自支持其中一段） */
+const ARK_TIER_LADDER = ["1K", "1.5K", "2K", "3K", "4K"] as const;
+
 /**
- * 档位阈值与 lib/image-resolution.ts 的 TIER_2K_MIN_PIXELS / TIER_4K_MIN_PIXELS 同一口径
- * （1K < 2.2MP ≤ 2K < 6MP ≤ 4K）。只影响「超区间的像素串换成哪个档位标签」，不参与计费，
- * 所以这里允许抄一份；改动 image-resolution.ts 的阈值时要同步。
+ * 档位标签对应的像素下沿（实测输出反推：pro 的 1K→1248x832、1.5K→1872x1248、2K→2816x1584，
+ * lite 的 3K→3072x3072、4K→4096x4096）。只用来把「面积」翻译成「该发哪个标签」，不参与计费。
  */
-const TIER_2K_MIN_PIXELS = 2_200_000;
-const TIER_4K_MIN_PIXELS = 6_000_000;
+const ARK_TIER_MIN_PIXELS: Record<string, number> = {
+    "1K": 0,
+    "1.5K": 2_200_000,
+    "2K": 4_300_000,
+    "3K": 8_000_000,
+    "4K": 12_000_000,
+};
 
-/** 方舟认识的档位标签（pro：1K/1.5K/2K；lite：2K/3K/4K —— 这里只放我们词汇表里有的并集） */
-const ARK_SIZE_TIER_LABELS = new Set(["1K", "1.5K", "2K", "3K", "4K"]);
+/** 某个模型对像素方法的接受区间，以及它认得的档位标签 */
+type ArkImageSizeLimits = { minPixels: number; maxPixels: number; tiers: readonly string[] };
 
-const ARK_PLAN_PATH = "/api/plan/v3";
+/**
+ * 两个已知模型的边界（2026-09-19 用真 key 逐档实测；官方文档只写了 pro 支持 1K/1.5K/2K、
+ * lite 支持 2K/3K/4K，像素方法的下限/上限是这么试出来的）：
+ *   pro（doubao-seedream-5-0-pro-260628）：上沿就是文档「方式 2」的 4624220，下沿宽松（1024x1024 能出图）；
+ *   lite（doubao-seedream-5-0-260128 及 -lite- 别名）：下限 3686400（1824x1024 / 1024x1024 都是 400
+ *        「image size must be at least 3686400 pixels」），上沿至少到 16.7MP（4096x4096 能出图）。
+ *
+ * 「发像素串还是发档位标签」就是这两组边界决定的：像素串最忠实（用户选的就是它），
+ * 但只要有一方会拒收就必须换成档位标签 —— 被拒是硬失败（上游照样算一次调用，用户扣了费拿不到图）。
+ */
+const ARK_SEEDREAM_PRO_LIMITS: ArkImageSizeLimits = { minPixels: 921_600, maxPixels: 4_624_220, tiers: ["1K", "1.5K", "2K"] };
+const ARK_SEEDREAM_LITE_LIMITS: ArkImageSizeLimits = { minPixels: 3_686_400, maxPixels: 16_777_216, tiers: ["2K", "3K", "4K"] };
+/**
+ * 认不出模型时（别人自建的方舟渠道、或方舟上别家的模型）只走「两家都认」的交集：
+ * 像素串只发 3.68–4.62MP 这段安全带，其余一律退到双方共有的 2K 档。
+ * 宁可出图比用户要的小一点，也不要发一个上游必然拒收的尺寸（拒收 = 钱花了、图没有）。
+ */
+const ARK_UNKNOWN_MODEL_LIMITS: ArkImageSizeLimits = { minPixels: 3_686_400, maxPixels: 4_624_220, tiers: ["2K"] };
+
+/**
+ * 按模型名认边界。只认方舟自家的 seedream 5.0 两个 id：
+ * pro 的 id 里带 `pro`（doubao-seedream-5-0-pro-260628），lite 的 id 不带（doubao-seedream-5-0-260128），
+ * 所以判据是「带 pro 算 pro，其余 seedream-5.0 算 lite」，而不是去找 `lite` 这个词。
+ */
+function arkImageSizeLimits(model?: string): ArkImageSizeLimits {
+    const name = String(model ?? "")
+        .trim()
+        .toLowerCase();
+    if (!name.includes("seedream-5-0") && !name.includes("seedream-5.0")) return ARK_UNKNOWN_MODEL_LIMITS;
+    return name.includes("pro") ? ARK_SEEDREAM_PRO_LIMITS : ARK_SEEDREAM_LITE_LIMITS;
+}
+
+function arkTierIndex(label: string): number {
+    return (ARK_TIER_LADDER as readonly string[]).indexOf(
+        String(label ?? "")
+            .trim()
+            .toUpperCase(),
+    );
+}
+
+/** 总像素 → 档位标签（按 ARK_TIER_MIN_PIXELS 的分档，upstream 的档位语义比我们的 1K/2K/4K 细） */
+export function arkSizeTierLabel(pixels: number): string {
+    let label: string = ARK_TIER_LADDER[0];
+    for (const candidate of ARK_TIER_LADDER) {
+        if (pixels >= ARK_TIER_MIN_PIXELS[candidate]) label = candidate;
+    }
+    return label;
+}
+
+/**
+ * 把档位标签收敛到该模型支持的档：取「不低于它的最小支持档」，支持里全都比它低就取最高的那个。
+ * 只往高走是刻意的 —— 发一个上游不认的标签是 400，退到低一档则是「图小一点但出得来」。
+ */
+function arkClampTierLabel(label: string, tiers: readonly string[]): string {
+    const supported = tiers
+        .map(arkTierIndex)
+        .filter((index) => index >= 0)
+        .sort((left, right) => left - right);
+    if (!supported.length) return label;
+    const need = arkTierIndex(label);
+    return ARK_TIER_LADDER[supported.find((index) => index >= need) ?? supported[supported.length - 1]];
+}
+
+/**
+ * 上游该收到的 `size`。
+ *
+ * 方舟两种写法都认（「方式 2：像素值」/「方式 1：档位」），取舍按模型算：
+ *   1. 像素串在该模型的接受区间内（且宽高比在 [1/16,16]）→ 原样发：用户选的就是它，最忠实，也最省
+ *      （上游按输出像素计 token，档位标签会让它自己映射成一个未必更小的尺寸）；
+ *   2. 区间外 → 换成档位标签，并收敛到该模型支持的档（lite 收到 2K 的 16:9 会被拒，改发 "2K"；
+ *      pro 收到 4K 会被拒，但 pro 本来也只支持到 2K）。
+ * 比例串（"16:9"）不发 size —— 方舟的 size 只认像素值与档位标签，画幅描述由 prompt 里那句带着。
+ */
+export function arkImageUpstreamSize(size?: string, model?: string): string | undefined {
+    const value = String(size ?? "").trim();
+    if (!value || value.toLowerCase() === "auto") return undefined;
+    const limits = arkImageSizeLimits(model);
+    const dimensions = parseArkPixelSize(value);
+    if (!dimensions) {
+        // 已经是档位标签：收敛到该模型支持的档；其余写法（比例串等）不发 size，让上游按默认值走
+        return arkTierIndex(value) >= 0 ? arkClampTierLabel(value, limits.tiers) : undefined;
+    }
+    const { width, height } = dimensions;
+    const pixels = width * height;
+    const ratio = width / height;
+    if (pixels >= limits.minPixels && pixels <= limits.maxPixels && ratio >= ARK_MIN_RATIO && ratio <= ARK_MAX_RATIO) {
+        return `${width}x${height}`;
+    }
+    return arkClampTierLabel(arkSizeTierLabel(pixels), limits.tiers);
+}
 
 /**
  * 这个 base URL 是不是方舟的**图片**端点。
@@ -94,45 +199,7 @@ function parseArkPixelSize(value: string): { width: number; height: number } | n
     return { width, height };
 }
 
-/** 像素串是否落在方舟「方式 2」的容许区间内（总像素与宽高比两个条件都要满足） */
-export function isArkPixelSizeAcceptable(width: number, height: number): boolean {
-    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return false;
-    const pixels = width * height;
-    if (pixels < ARK_MIN_PIXELS || pixels > ARK_MAX_PIXELS) return false;
-    const ratio = width / height;
-    return ratio >= ARK_MIN_RATIO && ratio <= ARK_MAX_RATIO;
-}
-
-/** 总像素 → 档位标签（与 image-resolution.ts 的分档阈值同口径） */
-export function arkSizeTierLabel(pixels: number): string {
-    if (pixels >= TIER_4K_MIN_PIXELS) return "4K";
-    if (pixels >= TIER_2K_MIN_PIXELS) return "2K";
-    return "1K";
-}
-
-/**
- * 上游该收到的 `size`。
- *
- * 两种写法方舟都认（「方式 2：宽高像素值」/「方式 1：分辨率档位 + prompt 里的宽高比描述」），
- * 取舍是：像素值原样发（用户选的就是它，图纸与提示词里的数字也一致），**超出像素区间时才改发档位标签**
- * —— 我们的 4K 像素串（3840x2160 = 8.29MP）超过文档给的上限，而 4K 是 lite 的合法档位，
- * 发一个上游必然拒收的像素值，用户只会看到「请求失败」（画幅描述已经由 prompt 里的
- * 「宽高比 X，输出尺寸 WxHpx」那句带着，换成档位不会丢比例意图）。
- */
-export function arkImageUpstreamSize(size?: string): string | undefined {
-    const value = String(size ?? "").trim();
-    if (!value || value.toLowerCase() === "auto") return undefined;
-    const dimensions = parseArkPixelSize(value);
-    if (!dimensions) {
-        // 已经是档位标签就原样给上游；其余（比例串等）不发 size，让上游按 2K 默认值走
-        const label = value.toUpperCase();
-        return ARK_SIZE_TIER_LABELS.has(label) ? label : undefined;
-    }
-    if (isArkPixelSizeAcceptable(dimensions.width, dimensions.height)) return `${dimensions.width}x${dimensions.height}`;
-    return arkSizeTierLabel(dimensions.width * dimensions.height);
-}
-
-/** 出图格式：方舟只认 png / jpeg（没有 webp），认不出来一律 png（也是上游默认） */
+/** 出图格式：方舟只认 png / jpeg（没有 webp）；认不出来一律 png —— 实测上游默认是 jpeg，必须显式发 */
 export function arkImageOutputFormat(configured?: string): "png" | "jpeg" {
     return String(configured ?? "")
         .trim()
@@ -156,7 +223,7 @@ export function arkReferenceImagesPayload(images?: readonly string[]): Record<st
 export type ArkImageBodyInput = {
     model: string;
     prompt: string;
-    /** 输出画幅：像素串（2048x1152）或档位标签（2K）；空 = 不指定，上游按 2K 默认值走 */
+    /** 输出画幅：像素串（2048x2048）或档位标签（2K）；空 = 不指定，上游按自己的默认档走 */
     size?: string;
     /** 参考图（Data URI 或可被上游访问的 URL）；空 = 文生图 */
     images?: readonly string[];
@@ -169,7 +236,7 @@ export type ArkImageBodyInput = {
  * （不报错、不出效果、照样收费），不允许散在两条调用路径里各写一遍。
  */
 export function buildArkImageBody(input: ArkImageBodyInput): Record<string, unknown> {
-    const size = arkImageUpstreamSize(input.size);
+    const size = arkImageUpstreamSize(input.size, input.model);
     return {
         model: input.model,
         prompt: input.prompt,
@@ -178,9 +245,10 @@ export function buildArkImageBody(input: ArkImageBodyInput): Record<string, unkn
         output_format: arkImageOutputFormat(input.outputFormat),
         // 见文件头第 3 条：不显式关掉就会带上「AI生成」角标
         watermark: ARK_IMAGE_WATERMARK,
-        // 显式要链接而不是 base64：不写就按上游默认走，而默认若是 b64_json，几 MB 的图会以
-        // JSON 字符串回传（代理信封 32MB 上限），失败起来很难查。链接只有 24 小时有效期，
-        // 客户端拿到成品就会立刻归档一份，与其它渠道同一条链路。
+        // 显式要链接而不是 base64：默认值没有保证，而 b64 的图是十几 MB 的 JSON 字符串
+        // （实测一张 1K 的 png 就有 2.1MB base64，4K 能顶到代理信封 32MB 上限附近），
+        // 一旦超限就是「扣了费、拿不到图」且现场只留一个截断的响应，很难查。
+        // 链接只有 24 小时有效期，客户端拿到成品就会立刻归档一份，与其它渠道同一条链路。
         response_format: "url",
     };
 }
