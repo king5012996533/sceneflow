@@ -226,6 +226,26 @@ assertIncludes("src/stores/platform-catalog-store.ts", "getPlatformPricing", "�
 assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "videoCreditsStandard", "后台必须提供逐模型定价编辑器（含视频分档）。");
 assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", "pickPricing", "后台表单必须提供 pickPricing。");
 
+// —— 图片按分辨率分档定价（2026-09-19：过去所有分辨率一个价，2K/4K 按 1K 卖，越卖越亏）——
+// 后台按「尺寸 × 分辨率 × 张数」标定，价格按分辨率分档；口径必须处处一致，否则会出现
+// 「面板显示 8、实扣 16」或「后台配了不生效」。
+assertIncludes("src/lib/image-resolution.ts", "IMAGE_RESOLUTION_TIERS", "分辨率档位（1K/2K/4K）必须收在 image-resolution 模块里（客户端预检与服务端扣费共用同一把尺子）。");
+assertIncludes("src/lib/image-resolution.ts", "TIER_2K_MIN_PIXELS", "档位必须按总像素判定：按最长边会把普通 16:9（1824x1024）算成 2K，用户选普通尺寸就被多扣钱。");
+assertIncludes("src/lib/image-resolution.ts", "applyImageResolutionPricing", "2K/4K 专价优先、未配沿用基础价的规则必须在纯函数里（配单测，防止哪天上线的改动悄悄涨价）。");
+assertIncludes("src/lib/credit-pricing.ts", "imageResolutionTier", "图片扣费必须先判定本次请求落在哪一档分辨率。");
+assertIncludes("src/lib/credit-pricing.ts", "applyImageResolutionPricing", "图片扣费必须套用分辨率分档（不接 = 后台配了 2K/4K 价也不生效）。");
+assertIncludes("src/lib/model-capability-spec.ts", "imageCredits2k", "定价落库白名单必须放行 2K 档价（漏掉 = 后台填了也存不进去）。");
+assertIncludes("src/lib/model-capability-spec.ts", "imageCredits4k", "定价落库白名单必须放行 4K 档价（漏掉 = 后台填了也存不进去）。");
+assertIncludes("src/lib/model-capability-spec.ts", "normalizeImageCapability", "旧标定（分辨率写在宽高比后缀里）必须能读出新形状，否则老模型的能力标定会失效。");
+assertIncludes("src/app/(user)/admin/model-capability-fields.tsx", "IMAGE_RESOLUTION_OPTIONS", "后台能力标定必须能逐模型勾选分辨率档位（不勾的档位用户面板上不应出现）。");
+assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "IMAGE_TIERS", "后台必须能按分辨率分档设置图片价（1K/2K/4K 三个输入框）。");
+assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", "capabilities={form.capabilities}", "定价编辑器必须拿到能力标定（用于标注「该档位没勾」）。");
+assertIncludes("src/components/image-settings-panel.tsx", "IMAGE_RESOLUTION_OPTIONS", "用户面板必须有「分辨率」一轴。");
+assertIncludes("src/components/image-settings-panel.tsx", "normalizeImageCapability", "用户面板必须走能力归一化（兼容旧标定形状）。");
+assertIncludes("src/constant/credits.tsx", "options?.size", "客户端积分预检必须带 size：不带会把 2K/4K 按 1K 价显示，预检与实扣不一致。");
+assertNotMatches("src/app/(user)/studio/page.tsx", /videoSizeToImageSize\s*\(/, "studio 不得再把像素尺寸压成比例：用户选的 2K/4K 会被降级，出图口径与面板选择不一致。");
+assertIncludes("package.json", "test:resolution", "分辨率分档必须有单测入口（npm run test:resolution）。");
+
 // —— Aigccc / Seedance 2.0 网关接入 ——
 assertIncludes("src/stores/use-config-store.ts", '"aigccc"', "ApiCallFormat 必须支持 aigccc。");
 assertIncludes("src/stores/use-config-store.ts", 'value.includes("aigccc666.com")', "config store 必须按 aigccc666.com 识别网关 Base URL。");

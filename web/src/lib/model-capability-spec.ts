@@ -12,6 +12,7 @@
 // 本模块不依赖任何业务库，可同时在服务端（admin 清洗）与客户端（面板过滤）使用。
 
 import type { CredentialPricing, ModelPricing } from "@/lib/credit-pricing";
+import { IMAGE_BASE_ASPECTS, IMAGE_RESOLUTION_TIERS, deriveResolutionTiers, normalizeResolutionTiers, stripAspectSuffixes, type ImageResolutionTier } from "@/lib/image-resolution";
 
 // ---------- 图片 ----------
 export type ImageQuality = "auto" | "high" | "medium" | "low";
@@ -20,10 +21,16 @@ export type ImageAspect = "1:1" | "3:2" | "2:3" | "4:3" | "3:4" | "16:9" | "9:16
 export type ImageCapabilitySpec = {
     kind: "image";
     qualities: ImageQuality[];
+    /** 支持的宽高比（纯比例；分辨率不写在这里，见 resolutions） */
     aspects: ImageAspect[];
+    /** 支持的分辨率档位（1k/2k/4k）。旧配置缺这一项时由 normalizeImageCapability 从 aspects 后缀推导 */
+    resolutions?: ImageResolutionTier[];
     /** 最大生成张数 1-15 */
     maxCount: number;
 };
+
+/** 归一化后的图片能力（resolutions 必定存在），后台编辑器与用户面板都读这个形状 */
+export type ImageCapabilityView = Omit<ImageCapabilitySpec, "resolutions"> & { resolutions: ImageResolutionTier[] };
 
 // ---------- 视频 · Seedance ----------
 export type SeedanceResolution = "480p" | "720p" | "1080p";
@@ -96,21 +103,8 @@ export const IMAGE_QUALITY_OPTIONS: ReadonlyArray<{ value: ImageQuality; label: 
     { value: "low", label: "低" },
 ];
 
-export const IMAGE_ASPECT_OPTIONS: ReadonlyArray<{ value: ImageAspect; label: string }> = [
-    { value: "1:1", label: "1:1" },
-    { value: "3:2", label: "3:2" },
-    { value: "2:3", label: "2:3" },
-    { value: "4:3", label: "4:3" },
-    { value: "3:4", label: "3:4" },
-    { value: "16:9", label: "16:9" },
-    { value: "9:16", label: "9:16" },
-    { value: "1:1-2k", label: "1:1 (2k)" },
-    { value: "16:9-2k", label: "16:9 (2k)" },
-    { value: "9:16-2k", label: "9:16 (2k)" },
-    { value: "16:9-4k", label: "16:9 (4k)" },
-    { value: "9:16-4k", label: "9:16 (4k)" },
-    { value: "auto", label: "自定义" },
-];
+/** 宽高比选项（后台能力标定用；分辨率是独立一轴，不写在这里） */
+export const IMAGE_ASPECT_OPTIONS: ReadonlyArray<{ value: ImageAspect; label: string }> = IMAGE_BASE_ASPECTS.map((value) => ({ value, label: value === "auto" ? "自定义" : value }));
 
 export const SEEDANCE_RESOLUTION_OPTIONS: ReadonlyArray<{ value: SeedanceResolution; label: string }> = [
     { value: "480p", label: "480p" },
@@ -209,6 +203,7 @@ export const DEFAULT_IMAGE_CAPABILITY: ImageCapabilitySpec = {
     kind: "image",
     qualities: IMAGE_QUALITY_OPTIONS.map((item) => item.value),
     aspects: IMAGE_ASPECT_OPTIONS.map((item) => item.value),
+    resolutions: [...IMAGE_RESOLUTION_TIERS],
     maxCount: 4,
 };
 
@@ -279,7 +274,7 @@ export function defaultCapabilityForModel(model: string): ModelCapabilitySpec | 
         return { kind, resolutions: [...DEFAULT_SEEDANCE_VIDEO_CAPABILITY.resolutions], ratios: [...DEFAULT_SEEDANCE_VIDEO_CAPABILITY.ratios], durations: [...DEFAULT_SEEDANCE_VIDEO_CAPABILITY.durations], audio: true, watermark: true };
     }
     if (kind === IMAGE_KIND) {
-        return { kind, qualities: [...DEFAULT_IMAGE_CAPABILITY.qualities], aspects: [...DEFAULT_IMAGE_CAPABILITY.aspects], maxCount: DEFAULT_IMAGE_CAPABILITY.maxCount };
+        return { kind, qualities: [...DEFAULT_IMAGE_CAPABILITY.qualities], aspects: [...DEFAULT_IMAGE_CAPABILITY.aspects], resolutions: [...IMAGE_RESOLUTION_TIERS], maxCount: DEFAULT_IMAGE_CAPABILITY.maxCount };
     }
     if (kind === GENERIC_VIDEO_KIND) {
         return { kind, clarity: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.clarity], sizes: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.sizes], seconds: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.seconds] };
@@ -296,6 +291,7 @@ export function defaultCapabilityForModel(model: string): ModelCapabilitySpec | 
 // ---------- 服务端清洗（admin API 落库前调用，只保留合法字段） ----------
 
 const IMAGE_QUALITY_VALUES: readonly ImageQuality[] = ["auto", "high", "medium", "low"];
+// 允许出现的宽高比（含旧配置里的 -2k/-4k 后缀写法，落库前统一剥成纯比例，见 baseImageAspect）
 const IMAGE_ASPECT_VALUES: readonly ImageAspect[] = ["1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16", "1:1-2k", "16:9-2k", "9:16-2k", "16:9-4k", "9:16-4k", "auto"];
 const SEEDANCE_RESOLUTION_VALUES: readonly SeedanceResolution[] = ["480p", "720p", "1080p"];
 const SEEDANCE_RATIO_VALUES: readonly SeedanceRatio[] = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"];
@@ -321,6 +317,19 @@ function pickNumbers<T extends number>(input: unknown, allowed: readonly T[]): T
     return picked;
 }
 
+// ---------- 图片能力归一化（旧数据把分辨率写在宽高比后缀里：16:9-2k / 9:16-4k） ----------
+
+/**
+ * 读取侧归一化：宽高比只留纯比例，分辨率档位缺失时从旧后缀推导。
+ * 纯函数在 image-resolution.ts（可被 node 单测直接加载）；这里只做类型收口。
+ * 用于「库里存的是旧形状」的模型（管理员重新保存即自动升级为新形状）。
+ */
+export function normalizeImageCapability(spec: ImageCapabilitySpec): ImageCapabilityView {
+    const aspects = stripAspectSuffixes(spec.aspects as readonly string[]) as ImageAspect[];
+    const explicit = Array.isArray(spec.resolutions) && spec.resolutions.length ? normalizeResolutionTiers(spec.resolutions) : null;
+    return { ...spec, aspects, resolutions: explicit ?? deriveResolutionTiers(spec.aspects as readonly string[]) };
+}
+
 export function sanitizeCapabilities(input: unknown): CredentialCapabilities | undefined {
     if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
     const result: CredentialCapabilities = {};
@@ -339,10 +348,15 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
     const kind = MODEL_KINDS.includes(value.kind as ModelCapabilityKind) ? (value.kind as ModelCapabilityKind) : null;
     if (!kind) return null;
     if (kind === IMAGE_KIND) {
+        // 宽高比统一落成纯比例（旧值 16:9-2k 剥成 16:9），分辨率档位单独存；
+        // 旧配置没带 resolutions 时从后缀推导，管理员下次保存即完成升级，无需数据迁移。
+        const pickedAspects = pickStrings(value.aspects, IMAGE_ASPECT_VALUES);
+        const resolutions = Array.isArray(value.resolutions) && value.resolutions.length ? normalizeResolutionTiers(value.resolutions) : deriveResolutionTiers(pickedAspects);
         return {
             kind,
             qualities: pickStrings(value.qualities, IMAGE_QUALITY_VALUES),
-            aspects: pickStrings(value.aspects, IMAGE_ASPECT_VALUES),
+            aspects: stripAspectSuffixes(pickedAspects) as ImageAspect[],
+            resolutions,
             maxCount: Math.max(1, Math.min(IMAGE_MAX_COUNT_LIMIT, Math.floor(Number(value.maxCount)) || DEFAULT_IMAGE_CAPABILITY.maxCount)),
         };
     }
@@ -399,6 +413,10 @@ export function sanitizePricing(input: unknown): CredentialPricing | undefined {
         const pricing: ModelPricing = {};
         const imageCredits = toPricingNumber(value.imageCredits);
         if (imageCredits !== undefined) pricing.imageCredits = imageCredits;
+        const imageCredits2k = toPricingNumber(value.imageCredits2k);
+        if (imageCredits2k !== undefined) pricing.imageCredits2k = imageCredits2k;
+        const imageCredits4k = toPricingNumber(value.imageCredits4k);
+        if (imageCredits4k !== undefined) pricing.imageCredits4k = imageCredits4k;
         const videoCredits = toPricingNumber(value.videoCredits);
         if (videoCredits !== undefined) pricing.videoCredits = videoCredits;
         const videoCreditsStandard = toPricingNumber(value.videoCreditsStandard);

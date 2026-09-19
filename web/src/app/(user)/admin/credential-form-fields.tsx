@@ -119,8 +119,8 @@ export function CredentialFormFields({ form, onChange, editMode }: CredentialFor
                 <CredentialCapabilityEditor models={models} value={form.capabilities} provider={form.provider} onChange={(capabilities) => set({ capabilities })} />
             </div>
             <div>
-                <div className="mb-1 text-sm text-[#332f2a]">逐模型积分定价（图片每张 / 视频每条 / 音频每次 / 文本每次；未配置 = 全局默认 → 内置草案）</div>
-                <CredentialPricingEditor models={models} value={form.pricing} onChange={(pricing) => set({ pricing })} />
+                <div className="mb-1 text-sm text-[#332f2a]">逐模型积分定价（图片按分辨率分档 / 视频按分辨率分档 / 音频每次 / 文本每次；未配置 = 全局默认 → 内置草案）</div>
+                <CredentialPricingEditor models={models} value={form.pricing} capabilities={form.capabilities} onChange={(pricing) => set({ pricing })} />
             </div>
         </div>
     );

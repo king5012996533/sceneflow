@@ -40,7 +40,13 @@ export function CanvasNodePromptPanel({ node, isRunning, onPromptChange, onConfi
     const isEditingExistingContent = hasTextContent || hasImageContent;
     const [prompt, setPrompt] = useState(isEditingExistingContent ? "" : node.metadata?.prompt || "");
     const [expanded, setExpanded] = useState(false);
-    const credits = estimatedRequestCost(mode, config.model, { count: mode === "image" ? config.count : 1, videoSeconds: mode === "video" ? config.videoSeconds : undefined, vquality: mode === "video" ? config.vquality : undefined });
+    const credits = estimatedRequestCost(mode, config.model, {
+        count: mode === "image" ? config.count : 1,
+        size: mode === "image" ? config.size : undefined,
+        quality: mode === "image" ? config.quality : undefined,
+        videoSeconds: mode === "video" ? config.videoSeconds : undefined,
+        vquality: mode === "video" ? config.vquality : undefined,
+    });
 
     useEffect(() => {
         setPrompt(isEditingExistingContent ? "" : node.metadata?.prompt || "");

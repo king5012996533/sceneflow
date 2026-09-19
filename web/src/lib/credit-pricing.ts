@@ -11,12 +11,18 @@
  * 本模块为纯函数（无 DB/服务端依赖），客户端预检、成本展示与服务端扣费共用。
  */
 
+import { applyImageResolutionPricing, imageResolutionTier } from "@/lib/image-resolution";
+
 export type GenerationKind = "image" | "video" | "audio" | "text" | "tool";
 
 /** 单个模型的后台可配置积分定价（全部可选，留空 = 该项走全局默认/内置草案） */
 export type ModelPricing = {
-    /** 每张图片扣积分 */
+    /** 每张图片扣积分（= 1K 基础档；未配 2K/4K 专价时，所有档位都按这个价） */
     imageCredits?: number;
+    /** 每张 2K 图片扣积分（留空 = 沿用 imageCredits） */
+    imageCredits2k?: number;
+    /** 每张 4K 图片扣积分（留空 = 沿用 imageCredits） */
+    imageCredits4k?: number;
     /** 每条视频扣积分（按条计费，与时长无关）。统一档，兼容旧配置；配了分档时被分档覆盖 */
     videoCredits?: number;
     /** 每条标准分辨率视频扣积分（768P/720p/480p 等），优先于 videoCredits */
@@ -65,16 +71,22 @@ function isHighQuality(metadata?: GenerationMetadata): boolean {
  * 单次生成消耗积分（admin 跳过计费，调用方自行处理）。
  * 取值优先级：configured（后台逐模型定价）> defaults（后台全局默认）> 内置草案。
  * 视频按条计费：每条固定积分，与时长无关。
+ * 图片按分辨率档位（1K/2K/4K）计费：档位由 metadata 的 size/quality 判定（见 image-resolution.ts），
+ * 2K/4K 未单独定价时沿用 1K 基础价 —— 后台不配 = 行为与过去完全一致。
  */
 export function getGenerationCreditsCost(kind: GenerationKind, metadata?: GenerationMetadata, configured?: ModelPricing, defaults?: PricingDefaults): number {
     const model = modelName(metadata);
     switch (kind) {
         case "image": {
-            if (configured?.imageCredits !== undefined) return Math.max(0, Math.floor(configured.imageCredits));
-            if (defaults?.imageCredits !== undefined) return Math.max(0, Math.floor(defaults.imageCredits));
-            if (model.includes("gpt-image") || model.includes("dall-e")) return 10;
-            if (model.includes("minimax") || model.includes("hailuo") || model.includes("h3")) return 1;
-            return 2;
+            // 分辨率分档：先取基础价（= 1K 价，逐模型 > 全局默认 > 内置草案），再套 2K/4K 专价
+            const tier = imageResolutionTier(String(metadata?.size ?? ""), String(metadata?.quality ?? ""));
+            let baseCredits: number;
+            if (configured?.imageCredits !== undefined) baseCredits = configured.imageCredits;
+            else if (defaults?.imageCredits !== undefined) baseCredits = defaults.imageCredits;
+            else if (model.includes("gpt-image") || model.includes("dall-e")) baseCredits = 10;
+            else if (model.includes("minimax") || model.includes("hailuo") || model.includes("h3")) baseCredits = 1;
+            else baseCredits = 2;
+            return applyImageResolutionPricing(tier, configured, baseCredits);
         }
         case "video": {
             if (configured?.videoCredits !== undefined || configured?.videoCreditsStandard !== undefined || configured?.videoCreditsHigh !== undefined) {

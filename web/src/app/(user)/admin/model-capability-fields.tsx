@@ -2,6 +2,7 @@
 
 import { Button, Checkbox, InputNumber, Radio, Switch } from "antd";
 
+import { IMAGE_RESOLUTION_OPTIONS, type ImageResolutionTier } from "@/lib/image-resolution";
 import {
     DEFAULT_GENVIDEO_VIDEO_CAPABILITY,
     DEFAULT_GENERIC_VIDEO_CAPABILITY,
@@ -28,6 +29,7 @@ import {
     VIDEO_SECONDS_OPTIONS,
     VIDEO_SIZE_OPTIONS,
     defaultCapabilityForModel,
+    normalizeImageCapability,
     type ImageAspect,
     type ImageCapabilitySpec,
     type ImageQuality,
@@ -101,19 +103,25 @@ function FieldLabel({ children }: { children: string }) {
 }
 
 function ImageFields({ spec, onChange }: { spec: ImageCapabilitySpec; onChange: (next: ModelCapabilitySpec) => void }) {
+    const view = normalizeImageCapability(spec);
     return (
         <div className="space-y-2.5">
             <div>
-                <FieldLabel>画质</FieldLabel>
-                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...IMAGE_QUALITY_OPTIONS]} value={spec.qualities} onChange={(values) => onChange({ ...spec, qualities: values as ImageQuality[] })} />
+                <FieldLabel>尺寸（宽高比，含自定义）</FieldLabel>
+                <Checkbox.Group className="grid grid-cols-4 gap-x-3 gap-y-1" options={[...IMAGE_ASPECT_OPTIONS]} value={view.aspects} onChange={(values) => onChange({ ...view, aspects: values as ImageAspect[] })} />
             </div>
             <div>
-                <FieldLabel>宽高比（含 2k/4k 与自定义）</FieldLabel>
-                <Checkbox.Group className="grid grid-cols-3 gap-x-3 gap-y-1" options={[...IMAGE_ASPECT_OPTIONS]} value={spec.aspects} onChange={(values) => onChange({ ...spec, aspects: values as ImageAspect[] })} />
+                <FieldLabel>分辨率（不勾的档位用户面板上不会出现）</FieldLabel>
+                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...IMAGE_RESOLUTION_OPTIONS]} value={view.resolutions} onChange={(values) => onChange({ ...view, resolutions: values as ImageResolutionTier[] })} />
+                <div className="mt-1 text-[11px] leading-4 text-[#726d67]">各档位的积分在下方「逐模型积分定价 → 图片生成」里分别设置。</div>
             </div>
             <div className="flex items-center gap-3">
                 <FieldLabel>最大生成张数</FieldLabel>
-                <InputNumber min={1} max={IMAGE_MAX_COUNT_LIMIT} value={spec.maxCount} onChange={(value) => onChange({ ...spec, maxCount: Math.max(1, Math.min(IMAGE_MAX_COUNT_LIMIT, Math.floor(Number(value)) || 1)) })} />
+                <InputNumber min={1} max={IMAGE_MAX_COUNT_LIMIT} value={spec.maxCount} onChange={(value) => onChange({ ...view, maxCount: Math.max(1, Math.min(IMAGE_MAX_COUNT_LIMIT, Math.floor(Number(value)) || 1)) })} />
+            </div>
+            <div>
+                <FieldLabel>画质（高级，一般不用动）</FieldLabel>
+                <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...IMAGE_QUALITY_OPTIONS]} value={view.qualities} onChange={(values) => onChange({ ...view, qualities: values as ImageQuality[] })} />
             </div>
         </div>
     );
