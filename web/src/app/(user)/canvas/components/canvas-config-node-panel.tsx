@@ -8,6 +8,7 @@ import { ModelPicker } from "@/components/model-picker";
 import { defaultConfig, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { CreditSymbol, estimatedRequestCost } from "@/constant/credits";
 import { canvasThemes } from "@/lib/canvas-theme";
+import { usePlatformCapability } from "@/stores/platform-catalog-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
@@ -29,7 +30,11 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const mode = node.metadata?.generationMode || "image";
     const config = buildNodeConfig(globalConfig, node, mode);
-    const count = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
+    // 张数按模型标定夹（不能只夹 15）：这个数字乘进预估积分，硬夹 15 会让 recraft
+    // 这类固定出单张的模型显示成 120 积分（40×3），用户以为买 3 张、实际只拿 1 张。
+    const capability = usePlatformCapability(config.model);
+    const maxCount = mode === "image" && capability?.kind === "image" ? Math.max(1, Math.min(15, capability.maxCount)) : 15;
+    const count = Math.max(1, Math.min(maxCount, Math.floor(Math.abs(Number(config.count)) || 1)));
     const credits = estimatedRequestCost(mode, config.model, {
         count: mode === "image" ? count : 1,
         size: mode === "image" ? config.size : undefined,
