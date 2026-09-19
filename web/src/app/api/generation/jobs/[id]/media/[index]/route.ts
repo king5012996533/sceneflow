@@ -13,7 +13,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const user = await requireCurrentUser(req);
     if (!user || !prisma) return NextResponse.json({ error: "未授权" }, { status: 401 });
     const { id, index } = await context.params;
-    const job = await (prisma.generationJob as any).findFirst({ where: { id, userId: user.id }, select: { resultData: true } });
+    // 管理员要能核对「用户生成的图」：这里原先是死认 userId 的，管理员点开别人的任务一律 404。
+    // 2026-09-18 起成品改由本路由交付（任务表里的 resultUrl 就是这条地址），于是后台的预览列
+    // 整列变成破图（2026-09-19 反馈）。后台的生成记录本就对管理员全量可见，这里同样放行管理员；
+    // 普通用户照旧只能取自己名下的成品。
+    const isAdmin = user.role === "admin";
+    const job = await (prisma.generationJob as any).findFirst({ where: isAdmin ? { id } : { id, userId: user.id }, select: { resultData: true } });
     if (!job?.resultData || !Number.isInteger(Number(index))) return NextResponse.json({ error: "媒体不存在" }, { status: 404 });
     const items = Array.isArray((job.resultData as { items?: unknown[] }).items) ? (job.resultData as { items: Array<{ archiveKey?: string; mimeType?: string }> }).items : [];
     const item = items[Number(index)];

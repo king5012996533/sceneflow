@@ -387,15 +387,7 @@ export default function AdminPage() {
                                                         <td className="py-3">
                                                             <Tag color={job.status === "succeeded" ? "green" : job.status === "failed" ? "red" : "blue"}>{job.status}</Tag>
                                                         </td>
-                                                        <td className="py-3">
-                                                            {job.resultUrl ? (
-                                                                <a href={job.resultUrl} target="_blank" rel="noopener noreferrer">
-                                                                    <img src={job.resultUrl} alt="生成结果" className="h-12 w-12 rounded border border-[#e2dfdc] object-cover" />
-                                                                </a>
-                                                            ) : (
-                                                                <span className="text-xs text-[#a49f9a]">-</span>
-                                                            )}
-                                                        </td>
+                                                        <td className="py-3">{job.resultUrl ? <JobPreview url={job.resultUrl} /> : <span className="text-xs text-[#a49f9a]">-</span>}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -488,5 +480,17 @@ function DataTable({ children, empty }: { children: ReactNode; empty: boolean })
         <div className="overflow-x-auto">
             <table className="admin-tbl w-full min-w-[980px] text-left text-sm">{children}</table>
         </div>
+    );
+}
+
+/** 生成记录的预览：成品在归档目录里也可能已经过了保留期，破图图标不如直接说「取不到」 */
+function JobPreview({ url }: { url: string }) {
+    const [broken, setBroken] = useState(false);
+    if (broken) return <span className="text-xs text-[#a49f9a]">取不到</span>;
+    return (
+        <a href={url} target="_blank" rel="noopener noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="生成结果" onError={() => setBroken(true)} className="h-12 w-12 rounded border border-[#e2dfdc] object-cover" />
+        </a>
     );
 }

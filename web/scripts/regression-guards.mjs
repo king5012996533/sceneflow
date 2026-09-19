@@ -467,6 +467,11 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     // 过期后要明说「已过保留期」，不能让用户对着一张破图猜
     assertIncludes("src/app/api/generation/jobs/[id]/media/[index]/route.ts", "purgedMediaMessage(", "媒体路由必须把「已过保留期被清理」与「从未归档」区分开。");
     assertIncludes("src/app/api/generation/jobs/[id]/media/[index]/route.ts", "resolveRetentionDays(", "媒体路由提示的保留天数必须与清理任务用同一份配置。");
+    // 2026-09-19：任务表的 resultUrl 指向的正是这条路由，而它原先死认 userId，管理员点开别人的
+    // 任务一律 404 —— 后台生成记录的预览列整列破图。管理员放行，普通用户照旧按归属收敛。
+    const mediaRoute = read("src/app/api/generation/jobs/[id]/media/[index]/route.ts");
+    assert(mediaRoute.includes('user.role === "admin"'), "媒体路由必须放行管理员，否则后台看不到用户生成的图（预览整列破图）。");
+    assert(mediaRoute.includes("userId: user.id"), "放行管理员之外，普通用户仍必须按 userId 收敛，不得变成谁都能取。");
 }
 
 // —— 用户自助的「生成记录」（2026-09-18：有东西可交付，这笔额度才收得下去）——
