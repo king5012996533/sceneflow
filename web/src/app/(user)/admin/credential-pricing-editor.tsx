@@ -33,6 +33,17 @@ const IMAGE_TIERS: Array<{ key: keyof ModelPricing; tier: ImageResolutionTier; l
     { key: "imageCredits4k", tier: "4k", label: "4K", hint: "留空 = 按 1K 价扣" },
 ];
 
+/**
+ * 画质档位轴的模型（标了 qualityTiers）价格桶换名：这些模型没有 1K/2K/4K 像素档，
+ * 价格按用户选的画质档走 —— 低=基础 / 中=2K 桶 / 高及以上=4K 桶（映射见 image-resolution 的 QUALITY_TIERS）。
+ * 不改名的话后台会以为自己配的是像素档，实际扣的是画质档的价。
+ */
+const IMAGE_QUALITY_TIER_PRICING: Array<{ key: keyof ModelPricing; tier: ImageResolutionTier; label: string; hint: string }> = [
+    { key: "imageCredits", tier: "1k", label: "低（基础档）", hint: "用户选「低 / 自动」按此价" },
+    { key: "imageCredits2k", tier: "2k", label: "中", hint: "用户选「中」按此价；留空 = 按基础价扣" },
+    { key: "imageCredits4k", tier: "4k", label: "高 / 极高 / 最高", hint: "用户选「高」及以上按此价；留空 = 按基础价扣" },
+];
+
 /** 视频分档定价：高清档（2K/1080p）与标准档（768P/720p 等）分开配置 */
 const VIDEO_TIERS: Array<{ key: keyof ModelPricing; label: string; hint: string }> = [
     { key: "videoCreditsStandard", label: "标准档（768P/720p）", hint: "如 20：768P 等标准分辨率每条扣 20" },
@@ -89,7 +100,15 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
     const capabilityTiers = (model: string): ImageResolutionTier[] | null => {
         const spec = capabilities?.[model];
         if (!spec || spec.kind !== IMAGE_KIND) return null;
-        return normalizeImageCapability(spec).resolutions;
+        const view = normalizeImageCapability(spec);
+        // 画质档位轴的模型没有像素档可言，别拿 1K/2K/4K 去标「能力未勾选」
+        return view.qualityTiers?.length ? null : view.resolutions;
+    };
+
+    /** 该模型是不是画质档位轴（价格桶要跟着换名） */
+    const usesQualityAxis = (model: string): boolean => {
+        const spec = capabilities?.[model];
+        return Boolean(spec && spec.kind === IMAGE_KIND && normalizeImageCapability(spec).qualityTiers?.length);
     };
 
     if (!models.length) {
@@ -120,7 +139,7 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
     };
 
     /** 渲染一组定价字段：同组字段都写在同一个 pricing 对象上 */
-    const renderGroup = (model: string, kind: PricingKind, pricing: ModelPricing | undefined, group: PricingGroupId, allowedTiers: ImageResolutionTier[] | null) => {
+    const renderGroup = (model: string, kind: PricingKind, pricing: ModelPricing | undefined, group: PricingGroupId, allowedTiers: ImageResolutionTier[] | null, qualityAxis: boolean) => {
         if (group === "textAudio") {
             return (
                 <div key={group} className="rounded-lg border border-[#e9e6e3] bg-white/60 p-2.5">
@@ -142,11 +161,12 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
             );
         }
         if (group === "image") {
+            const tierFields = qualityAxis ? IMAGE_QUALITY_TIER_PRICING : IMAGE_TIERS;
             return (
                 <div key={group} className="rounded-lg border border-[#e9e6e3] bg-white/60 p-2.5">
-                    <div className="mb-1.5 text-xs text-[#332f2a]">{GROUP_TITLE.image}</div>
+                    <div className="mb-1.5 text-xs text-[#332f2a]">{qualityAxis ? "图片生成（每张，按画质档分档）" : GROUP_TITLE.image}</div>
                     <div className="grid grid-cols-3 gap-3">
-                        {IMAGE_TIERS.map((item) => {
+                        {tierFields.map((item) => {
                             const unsupported = allowedTiers ? !allowedTiers.includes(item.tier) : false;
                             return (
                                 <div key={item.key}>
@@ -160,7 +180,9 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
                             );
                         })}
                     </div>
-                    <div className="mt-1.5 text-[11px] leading-4 text-[#726d67]">分档只影响扣费，不影响上游出图：用户选 2K/4K 才按对应档位扣。参考倍率 2K ≈ 1.5–2×、4K ≈ 3–4× 基础价。</div>
+                    <div className="mt-1.5 text-[11px] leading-4 text-[#726d67]">
+                        {qualityAxis ? "分档只影响扣费，不影响上游出图：用户选「中」按 2K 桶扣、选「高」及以上按 4K 桶扣。" : "分档只影响扣费，不影响上游出图：用户选 2K/4K 才按对应档位扣。参考倍率 2K ≈ 1.5–2×、4K ≈ 3–4× 基础价。"}
+                    </div>
                 </div>
             );
         }
@@ -188,6 +210,7 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
                 const enabled = Boolean(pricing);
                 const open = Boolean(expanded[model]);
                 const allowedTiers = capabilityTiers(model);
+                const qualityAxis = usesQualityAxis(model);
                 const kind = inferPricingKind(model, capabilities?.[model]?.kind);
                 const primaryGroups = primaryGroupsForKind(kind);
                 const allOpen = Boolean(showAllFields[model]);
@@ -207,7 +230,7 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
                             <div className="border-t border-[#e2dfdc] px-3 py-3">
                                 {enabled ? (
                                     <div className="space-y-2">
-                                        {shownGroups.map((group) => renderGroup(model, kind, pricing, group, allowedTiers))}
+                                        {shownGroups.map((group) => renderGroup(model, kind, pricing, group, allowedTiers, qualityAxis))}
                                         <button
                                             type="button"
                                             className="cursor-pointer text-[11px] text-[#726d67] underline decoration-dotted underline-offset-2 hover:text-[#332f2a]"

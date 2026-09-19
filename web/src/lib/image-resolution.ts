@@ -36,7 +36,14 @@ export const IMAGE_RESOLUTION_OPTIONS: ReadonlyArray<{ value: ImageResolutionTie
 /** 档位 → 上游 quality 参数（与 services/api/image.ts 的 QUALITY_ALIASES 同一套取值） */
 const TIER_QUALITY: Record<ImageResolutionTier, string> = { "1k": "low", "2k": "medium", "4k": "high" };
 
-/** 上游 quality 取值 → 档位（1k/2k/4k 别名与 low/medium/high、standard/hd 同义） */
+/**
+ * 上游 quality 取值 → 档位（1k/2k/4k 别名与 low/medium/high、standard/hd 同义）。
+ *
+ * xhigh / max 是后加的顶档（Replicate 的 gpt-image-2.5-flare 有六档）：按最高档计价。
+ * 宁可归到最高档也不能落回 1K 档 —— 落回 1K 等于「用户选了最贵的画质，我们按最便宜的价扣」。
+ * 三档定价词汇表暂时只有「基础 / 2K / 4K」三个桶，所以 高 / 极高 / 最高 共用一个桶；
+ * 要给极高/最高单独定价，得先给 ModelPricing 加字段（尚未做）。
+ */
 const QUALITY_TIERS: Record<string, ImageResolutionTier> = {
     "1k": "1k",
     low: "1k",
@@ -46,6 +53,8 @@ const QUALITY_TIERS: Record<string, ImageResolutionTier> = {
     hd: "2k",
     "4k": "4k",
     high: "4k",
+    xhigh: "4k",
+    max: "4k",
 };
 
 // 总像素分档阈值：1K < 2.2MP ≤ 2K < 6MP ≤ 4K

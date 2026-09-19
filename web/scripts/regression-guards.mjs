@@ -256,6 +256,20 @@ assertIncludes("src/constant/credits.tsx", "options?.size", "客户端积分预�
 assertNotMatches("src/app/(user)/studio/page.tsx", /videoSizeToImageSize\s*\(/, "studio 不得再把像素尺寸压成比例：用户选的 2K/4K 会被降级，出图口径与面板选择不一致。");
 assertIncludes("package.json", "test:resolution", "分辨率分档必须有单测入口（npm run test:resolution）。");
 
+// —— 画质档位轴（2026-09-19 Replicate gpt-image-2.5-flare：它没有 1K/2K/4K 像素档，只有 low…max 六档画质）——
+// 事故背景：面板把「分辨率」当成唯一的保真度轴，而这个模型的真实入参只有 quality。
+// 于是「选 2K」发不出任何东西（像素由上游按 quality 定），用户以为买了高清、拿到的仍是默认档。
+assertIncludes("src/lib/model-capability-spec.ts", "qualityTiers?: ImageQuality[]", "能力标定必须有「画质档位轴」这一项，否则模型用 quality 表达分辨率时无从标定。");
+assertIncludes("src/lib/model-capability-spec.ts", "IMAGE_QUALITY_TIER_OPTIONS", "画质档位必须有独立选项清单（low…max + auto），不能拿「画质（高级）」那四个凑。");
+assertIncludes("src/lib/model-capability-spec.ts", "normalizeQualityTiers", "画质档位必须归一化：只留合法取值、没标与标了空要能分清。");
+assertIncludes("src/components/image-settings-panel.tsx", "qualityTierOptions", "用户面板必须认画质档位轴，否则标了也不显示。");
+assertIncludes("src/components/image-settings-panel.tsx", 'onConfigChange("quality", item.value)', "画质档位必须写进 config.quality（写进 size 就变成像素档，发的还是老参数）。");
+assertIncludes("src/components/image-settings-panel.tsx", "usesQualityAxis", "画质档位轴必须能整轴替掉分辨率档位并收起像素输入（像素由上游按 quality 决定，写数字是骗用户）。");
+assertIncludes("src/app/(user)/admin/model-capability-fields.tsx", "IMAGE_QUALITY_TIER_OPTIONS", "后台能力标定必须能勾画质档位轴（只能在代码里写死的话，换模型就得改代码）。");
+assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "IMAGE_QUALITY_TIER_PRICING", "画质档位轴的模型定价必须换名成「低/中/高及以上」，否则后台以为在配像素档、实际扣的是画质档的价。");
+assertIncludes("src/lib/image-resolution.ts", 'xhigh: "4k"', "xhigh/max 必须归到最高价桶：落回 1K 桶等于「用户选最贵画质、我们按最便宜价扣」。");
+assertIncludes("src/lib/image-resolution.ts", 'max: "4k"', "xhigh/max 必须归到最高价桶（同上）。");
+
 // —— Aigccc / Seedance 2.0 网关接入 ——
 assertIncludes("src/stores/use-config-store.ts", '"aigccc"', "ApiCallFormat 必须支持 aigccc。");
 assertIncludes("src/stores/use-config-store.ts", 'value.includes("aigccc666.com")', "config store 必须按 aigccc666.com 识别网关 Base URL。");

@@ -15,7 +15,8 @@ import type { CredentialPricing, ModelPricing } from "@/lib/credit-pricing";
 import { IMAGE_BASE_ASPECTS, IMAGE_RESOLUTION_TIERS, deriveResolutionTiers, normalizeResolutionTiers, stripAspectSuffixes, type ImageResolutionTier } from "@/lib/image-resolution";
 
 // ---------- 图片 ----------
-export type ImageQuality = "auto" | "high" | "medium" | "low";
+/** 出图保真度档（上游 quality 参数）。low/medium/high 是三档老词汇，xhigh/max 是顶档（Replicate gpt-image-2.5-flare 有六档） */
+export type ImageQuality = "auto" | "high" | "medium" | "low" | "xhigh" | "max";
 export type ImageAspect = "1:1" | "3:2" | "2:3" | "4:3" | "3:4" | "16:9" | "9:16" | "1:1-2k" | "16:9-2k" | "9:16-2k" | "16:9-4k" | "9:16-4k" | "auto";
 
 export type ImageCapabilitySpec = {
@@ -25,6 +26,19 @@ export type ImageCapabilitySpec = {
     aspects: ImageAspect[];
     /** 支持的分辨率档位（1k/2k/4k）。旧配置缺这一项时由 normalizeImageCapability 从 aspects 后缀推导 */
     resolutions?: ImageResolutionTier[];
+    /**
+     * 画质档位轴：模型用 quality 直接表达出图保真度/分辨率时标这一项
+     * （Replicate 的 gpt-image-2.5-flare：low / medium / high / xhigh / max / auto，
+     * 它没有「1K/2K/4K」这种像素档概念，面板上的分辨率档对它发不出任何东西）。
+     *
+     * 标了它 = 告诉面板「这个模型的『分辨率』就是画质档」：
+     *   - 用户面板把 1K/2K/4K 那一行整行换成这里的档位，选项写进 config.quality（而不是像素尺寸）；
+     *   - 尺寸只留宽高比，不再显示像素值与 W/H 输入（像素由上游按 quality 决定，我们给不出准确数字）；
+     *   - 后台定价按「基础 / 中 / 高及以上」三个桶收，见 image-resolution.ts 的 QUALITY_TIERS。
+     *
+     * 不标（undefined / 空）= 沿用原有「分辨率档位」口径，其它渠道行为完全不变。
+     */
+    qualityTiers?: ImageQuality[];
     /** 最大生成张数 1-15 */
     maxCount: number;
 };
@@ -101,6 +115,21 @@ export const IMAGE_QUALITY_OPTIONS: ReadonlyArray<{ value: ImageQuality; label: 
     { value: "high", label: "高" },
     { value: "medium", label: "中" },
     { value: "low", label: "低" },
+    { value: "xhigh", label: "极高" },
+    { value: "max", label: "最高" },
+];
+
+/**
+ * 画质档位轴的选项（按保真度从低到高，自动收尾）—— 与上游枚举顺序一致，用户面板直接铺这一行。
+ * 只有标了 qualityTiers 的模型才用这一套；其余模型照旧走 IMAGE_QUALITY_OPTIONS / 分辨率档位。
+ */
+export const IMAGE_QUALITY_TIER_OPTIONS: ReadonlyArray<{ value: ImageQuality; label: string; hint: string }> = [
+    { value: "low", label: "低", hint: "最快最省，适合打草稿" },
+    { value: "medium", label: "中", hint: "速度与质量的平衡" },
+    { value: "high", label: "高", hint: "细节与保真更好，更慢" },
+    { value: "xhigh", label: "极高", hint: "更高的细节与保真" },
+    { value: "max", label: "最高", hint: "最高保真，最慢最贵" },
+    { value: "auto", label: "自动", hint: "由模型自行决定" },
 ];
 
 /** 宽高比选项（后台能力标定用；分辨率是独立一轴，不写在这里） */
@@ -290,7 +319,7 @@ export function defaultCapabilityForModel(model: string): ModelCapabilitySpec | 
 
 // ---------- 服务端清洗（admin API 落库前调用，只保留合法字段） ----------
 
-const IMAGE_QUALITY_VALUES: readonly ImageQuality[] = ["auto", "high", "medium", "low"];
+const IMAGE_QUALITY_VALUES: readonly ImageQuality[] = ["auto", "high", "medium", "low", "xhigh", "max"];
 // 允许出现的宽高比（含旧配置里的 -2k/-4k 后缀写法，落库前统一剥成纯比例，见 baseImageAspect）
 const IMAGE_ASPECT_VALUES: readonly ImageAspect[] = ["1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16", "1:1-2k", "16:9-2k", "9:16-2k", "16:9-4k", "9:16-4k", "auto"];
 const SEEDANCE_RESOLUTION_VALUES: readonly SeedanceResolution[] = ["480p", "720p", "1080p"];
@@ -327,7 +356,19 @@ function pickNumbers<T extends number>(input: unknown, allowed: readonly T[]): T
 export function normalizeImageCapability(spec: ImageCapabilitySpec): ImageCapabilityView {
     const aspects = stripAspectSuffixes(spec.aspects as readonly string[]) as ImageAspect[];
     const explicit = Array.isArray(spec.resolutions) && spec.resolutions.length ? normalizeResolutionTiers(spec.resolutions) : null;
-    return { ...spec, aspects, resolutions: explicit ?? deriveResolutionTiers(spec.aspects as readonly string[]) };
+    return { ...spec, aspects, resolutions: explicit ?? deriveResolutionTiers(spec.aspects as readonly string[]), qualityTiers: normalizeQualityTiers(spec.qualityTiers) };
+}
+
+/**
+ * 画质档位轴归一化：只留合法取值、按保真度排序、去重；空/缺 = 该模型不用这条轴（返回 undefined）。
+ * 「没标」与「标了但一个都没勾」必须区分开：前者走分辨率档位，后者是后台配置写坏了 ——
+ * 这里统一按「没用这条轴」处理，不让面板出现一行空档位。
+ */
+export function normalizeQualityTiers(input: unknown): ImageQuality[] | undefined {
+    if (!Array.isArray(input)) return undefined;
+    const picked = new Set(input.map((item) => String(item).trim()));
+    const tiers = IMAGE_QUALITY_TIER_OPTIONS.map((item) => item.value).filter((value) => picked.has(value));
+    return tiers.length ? tiers : undefined;
 }
 
 export function sanitizeCapabilities(input: unknown): CredentialCapabilities | undefined {
@@ -352,11 +393,14 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
         // 旧配置没带 resolutions 时从后缀推导，管理员下次保存即完成升级，无需数据迁移。
         const pickedAspects = pickStrings(value.aspects, IMAGE_ASPECT_VALUES);
         const resolutions = Array.isArray(value.resolutions) && value.resolutions.length ? normalizeResolutionTiers(value.resolutions) : deriveResolutionTiers(pickedAspects);
+        const qualityTiers = normalizeQualityTiers(value.qualityTiers);
         return {
             kind,
             qualities: pickStrings(value.qualities, IMAGE_QUALITY_VALUES),
             aspects: stripAspectSuffixes(pickedAspects) as ImageAspect[],
             resolutions,
+            // 没标就整个字段不落库：留一个空数组会让「标了但没勾」和「没标」分不清
+            ...(qualityTiers ? { qualityTiers } : {}),
             maxCount: Math.max(1, Math.min(IMAGE_MAX_COUNT_LIMIT, Math.floor(Number(value.maxCount)) || DEFAULT_IMAGE_CAPABILITY.maxCount)),
         };
     }

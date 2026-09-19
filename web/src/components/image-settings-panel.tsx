@@ -6,16 +6,11 @@ import { ConfigProvider, Switch } from "antd";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { getGenerationCreditsCost } from "@/lib/credit-pricing";
 import { CUSTOM_IMAGE_RATIO, IMAGE_RESOLUTION_OPTIONS, imageRatioOf, imageResolutionTier, imageSizeForRatio, nearestAllowedTier, parseImagePixelSize, synthesizeImagePixelSize, type ImageResolutionTier } from "@/lib/image-resolution";
-import { normalizeImageCapability, type ImageAspect, type ImageCapabilityView, type ImageQuality } from "@/lib/model-capability-spec";
+import { normalizeImageCapability, IMAGE_QUALITY_OPTIONS, IMAGE_QUALITY_TIER_OPTIONS, type ImageAspect, type ImageCapabilityView, type ImageQuality } from "@/lib/model-capability-spec";
 import { getPlatformPricing, getPricingDefaults, usePlatformCapability } from "@/stores/platform-catalog-store";
 import { modelOptionName, type AiConfig } from "@/stores/use-config-store";
 
-const qualityOptions = [
-    { value: "auto", label: "自动" },
-    { value: "high", label: "高" },
-    { value: "medium", label: "中" },
-    { value: "low", label: "低" },
-];
+const qualityOptions = IMAGE_QUALITY_OPTIONS;
 const DIMENSION_STEP = 16;
 
 /** 比例清单（像素值即 1K 档的定值；2K/4K 的定值由 image-resolution 提供） */
@@ -57,6 +52,13 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
     const effectiveQualities = qualityOptionsShown.length ? qualityOptionsShown : qualityOptions;
     const effectiveAspects = aspectOptionsShown.length ? aspectOptionsShown : aspectOptions;
     const effectiveResolutions = resolutionOptionsShown.length ? resolutionOptionsShown : [...IMAGE_RESOLUTION_OPTIONS];
+    /**
+     * 画质档位轴（模型自己用 quality 表达分辨率时标定，见 model-capability-spec 的 qualityTiers）。
+     * 有这条轴时：分辨率档位整行换成画质档、尺寸只留宽高比、像素与 W/H 输入都不出现 ——
+     * 因为像素是上游按 quality 决定的，我们给不出准确数字，硬写一个只会骗用户。
+     */
+    const qualityTierOptions = imageCapability?.qualityTiers?.length ? IMAGE_QUALITY_TIER_OPTIONS.filter((item) => imageCapability.qualityTiers!.includes(item.value)) : null;
+    const usesQualityAxis = Boolean(qualityTierOptions);
     const allowedTiers = effectiveResolutions.map((item) => item.value);
     const effectiveMaxCount = imageCapability ? Math.max(1, Math.min(maxCount, imageCapability.maxCount)) : maxCount;
     const quality = config.quality || "auto";
@@ -66,11 +68,20 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
     const selectedRatio = imageRatioOf(activeSize);
     const selectedAspect = effectiveAspects.find((item) => item.value === selectedRatio);
     const currentTier = imageResolutionTier(activeSize, quality);
-    const activeTier = allowedTiers.includes(currentTier) ? currentTier : nearestAllowedTier(currentTier, allowedTiers);
+    const activeTier = usesQualityAxis ? currentTier : allowedTiers.includes(currentTier) ? currentTier : nearestAllowedTier(currentTier, allowedTiers);
+    const activeQualityTier = qualityTierOptions?.find((item) => item.value === quality);
     const perImageCredits = getGenerationCreditsCost("image", { model, size: activeSize, quality }, getPlatformPricing(model), getPricingDefaults());
+    // 收敛 0（画质档位轴专用）：这类模型没有「像素尺寸」这一轴，把遗留的像素值收敛回纯比例。
+    // 不收敛会连带算错价：扣费按 size 判档，像素值会让档位脱离画质（选了「最高」却按 1K 扣）。
+    useEffect(() => {
+        if (!usesQualityAxis) return;
+        const ratio = imageRatioOf(activeSize);
+        const next = ratio === CUSTOM_IMAGE_RATIO ? "auto" : ratio;
+        if (next !== activeSize) onConfigChange("size", next);
+    }, [usesQualityAxis, activeSize]);
     // 收敛 1：档位不在标定里时只降不升地换档（不悄悄给用户涨价）
     useEffect(() => {
-        if (!imageCapability) return;
+        if (!imageCapability || usesQualityAxis) return;
         const allowed = imageCapability.resolutions;
         const current = imageResolutionTier(activeSize, quality);
         if (!allowed.length || allowed.includes(current)) return;
@@ -92,10 +103,10 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
         if (!allowedValues.length || allowedValues.includes(selectedRatio)) return;
         onConfigChange("size", imageSizeForRatio(allowedValues[0], activeTier) ?? allowedValues[0]);
     }, [spec, activeSize, quality]);
-    // 质量收敛（沿用原有逻辑）
+    // 质量收敛：画质档位轴的模型按自己的档位清单收敛，其余沿用「画质（高级）」清单
     useEffect(() => {
         if (!imageCapability) return;
-        const allowed = imageCapability.qualities;
+        const allowed = qualityTierOptions?.map((item) => item.value) || imageCapability.qualities;
         if (!allowed.length || allowed.includes(quality as ImageQuality)) return;
         onConfigChange("quality", allowed[0] || "auto");
     }, [spec, quality]);
@@ -105,7 +116,8 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
             onConfigChange("size", "auto");
             return;
         }
-        onConfigChange("size", imageSizeForRatio(value, activeTier) ?? value);
+        // 画质档位轴的模型只发宽高比（像素由上游按 quality 决定），不能再写像素值
+        onConfigChange("size", usesQualityAxis ? value : (imageSizeForRatio(value, activeTier) ?? value));
     };
     const selectResolution = (tier: ImageResolutionTier) => {
         if (selectedRatio === CUSTOM_IMAGE_RATIO) {
@@ -168,32 +180,52 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
                             >
                                 <AspectIcon type={item.icon} width={item.width} height={item.height} color={selectedRatio === item.value ? theme.node.activeStroke : theme.node.text} />
                                 <span>{item.label}</span>
-                                <AspectSizeHint ratio={item.value} tier={activeTier} className="sf-mono text-[9px] leading-none opacity-55" />
+                                <AspectSizeHint ratio={item.value} tier={usesQualityAxis ? null : activeTier} className="sf-mono text-[9px] leading-none opacity-55" />
                             </button>
                         ))}
                     </div>
-                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
-                        <DimensionInput prefix="W" value={dimensions.width} disabled={activeSize === "auto"} theme={theme} alignToStep={snapDimensionToStep} onChange={(value) => updateDimension("width", value)} />
-                        <span className="text-lg opacity-45">↔</span>
-                        <DimensionInput prefix="H" value={dimensions.height} disabled={activeSize === "auto"} theme={theme} alignToStep={snapDimensionToStep} onChange={(value) => updateDimension("height", value)} />
-                    </div>
+                    {/* 画质档位轴的模型不显示 W/H：像素由上游按 quality 决定，我们能给的数字是假的 */}
+                    {usesQualityAxis ? null : (
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
+                            <DimensionInput prefix="W" value={dimensions.width} disabled={activeSize === "auto"} theme={theme} alignToStep={snapDimensionToStep} onChange={(value) => updateDimension("width", value)} />
+                            <span className="text-lg opacity-45">↔</span>
+                            <DimensionInput prefix="H" value={dimensions.height} disabled={activeSize === "auto"} theme={theme} alignToStep={snapDimensionToStep} onChange={(value) => updateDimension("height", value)} />
+                        </div>
+                    )}
                 </div>
                 <div className="space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
-                        <SettingTitle index={5} en="RESOLUTION" color={theme.node.muted} faintColor={theme.node.faint}>
-                            分辨率
+                        <SettingTitle index={5} en={usesQualityAxis ? "QUALITY" : "RESOLUTION"} color={theme.node.muted} faintColor={theme.node.faint}>
+                            {usesQualityAxis ? "画质" : "分辨率"}
                         </SettingTitle>
                         <span className="sf-mono text-[11px] font-bold" style={{ color: theme.node.muted }}>
                             每张 {perImageCredits} 积分
                         </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2.5">
-                        {effectiveResolutions.map((item) => (
-                            <OptionPill key={item.value} selected={activeTier === item.value} theme={theme} onClick={() => selectResolution(item.value)}>
-                                {item.label}
-                            </OptionPill>
-                        ))}
-                    </div>
+                    {qualityTierOptions ? (
+                        <>
+                            <div className="grid grid-cols-3 gap-2.5">
+                                {qualityTierOptions.map((item) => (
+                                    <OptionPill key={item.value} title={item.hint} selected={quality === item.value} theme={theme} onClick={() => onConfigChange("quality", item.value)}>
+                                        {item.label}
+                                    </OptionPill>
+                                ))}
+                            </div>
+                            {activeQualityTier ? (
+                                <div className="text-[11px] leading-4" style={{ color: theme.node.muted }}>
+                                    {activeQualityTier.hint}
+                                </div>
+                            ) : null}
+                        </>
+                    ) : (
+                        <div className="grid grid-cols-3 gap-2.5">
+                            {effectiveResolutions.map((item) => (
+                                <OptionPill key={item.value} selected={activeTier === item.value} theme={theme} onClick={() => selectResolution(item.value)}>
+                                    {item.label}
+                                </OptionPill>
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <div className="space-y-2.5">
                     <SettingTitle index={6} en="COUNT" color={theme.node.muted} faintColor={theme.node.faint}>
@@ -208,20 +240,23 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
                         <CountInput value={count} max={effectiveMaxCount} theme={theme} onChange={(value) => onConfigChange("count", String(value || 1))} />
                     </div>
                 </div>
-                <details className="space-y-2.5">
-                    <summary className="cursor-pointer list-none select-none">
-                        <SettingTitle index={7} en="QUALITY" color={theme.node.muted} faintColor={theme.node.faint}>
-                            画质（高级）
-                        </SettingTitle>
-                    </summary>
-                    <div className="mt-2 grid grid-cols-4 gap-2.5">
-                        {effectiveQualities.map((item) => (
-                            <OptionPill key={item.value} selected={quality === item.value} theme={theme} onClick={() => onConfigChange("quality", item.value)}>
-                                {item.label}
-                            </OptionPill>
-                        ))}
-                    </div>
-                </details>
+                {/* 画质档位轴的模型：画质已经升格成上面那一行主档位，这里不再重复一遍 */}
+                {usesQualityAxis ? null : (
+                    <details className="space-y-2.5">
+                        <summary className="cursor-pointer list-none select-none">
+                            <SettingTitle index={7} en="QUALITY" color={theme.node.muted} faintColor={theme.node.faint}>
+                                画质（高级）
+                            </SettingTitle>
+                        </summary>
+                        <div className="mt-2 grid grid-cols-4 gap-2.5">
+                            {effectiveQualities.map((item) => (
+                                <OptionPill key={item.value} selected={quality === item.value} theme={theme} onClick={() => onConfigChange("quality", item.value)}>
+                                    {item.label}
+                                </OptionPill>
+                            ))}
+                        </div>
+                    </details>
+                )}
             </div>
         </ImageSettingsTheme>
     );
@@ -241,7 +276,7 @@ export function ImageSettingsTheme({ theme, children }: { theme: CanvasTheme; ch
 }
 
 export function imageQualityLabel(value: string) {
-    return ({ auto: "自动", high: "高", medium: "中", low: "低" } as Record<string, string>)[value] || value;
+    return IMAGE_QUALITY_OPTIONS.find((item) => item.value === value)?.label || value;
 }
 
 export function imageSizeLabel(size: string) {
@@ -253,20 +288,21 @@ export function imageSizeLabel(size: string) {
     return tier ? `${ratio} (${tier.toUpperCase()})` : ratio;
 }
 
-/** 比例 chip 上的像素提示：跟着当前分辨率档位走（"auto" 不显示） */
-function AspectSizeHint({ ratio, tier, className }: { ratio: string; tier: ImageResolutionTier; className?: string }) {
-    if (ratio === "auto") return null;
+/** 比例 chip 上的像素提示：跟着当前分辨率档位走（"auto" 与画质档位轴的模型都不显示） */
+function AspectSizeHint({ ratio, tier, className }: { ratio: string; tier: ImageResolutionTier | null; className?: string }) {
+    if (ratio === "auto" || !tier) return null;
     const size = imageSizeForRatio(ratio, tier);
     const dimensions = size ? parseImagePixelSize(size) : null;
     if (!dimensions) return null;
     return <span className={className}>{dimensions.width === dimensions.height ? `${dimensions.width}²` : `${dimensions.width}·${dimensions.height}`}</span>;
 }
 
-function OptionPill({ selected, theme, onClick, children }: { selected: boolean; theme: CanvasTheme; onClick: () => void; children: ReactNode }) {
+function OptionPill({ selected, theme, onClick, title, children }: { selected: boolean; theme: CanvasTheme; onClick: () => void; title?: string; children: ReactNode }) {
     return (
         <button
             type="button"
             className="h-9 cursor-pointer rounded-full border px-2 text-sm font-medium transition hover:opacity-80"
+            title={title}
             style={{
                 background: selected ? theme.node.fill : "transparent",
                 borderColor: selected ? theme.node.activeStroke : theme.node.stroke,

@@ -26,6 +26,7 @@ import {
     parseImagePixelSize,
     ratioForImageSize,
     resolutionTierFromPixels,
+    resolutionTierFromQuality,
     stripAspectSuffixes,
     synthesizeImagePixelSize,
 } from "../src/lib/image-resolution.ts";
@@ -224,6 +225,40 @@ check("旧数据：剥后缀只认合法比例，垃圾值不会变成选项", (
 check("旧数据：清单为空 = 三档全给（沿用「不勾选 = 全支持」的语义）", () => {
     assert.deepStrictEqual(deriveResolutionTiers([]), [...IMAGE_RESOLUTION_TIERS]);
     assert.deepStrictEqual(stripAspectSuffixes([]).length, 8);
+});
+
+// ---------- 画质档位轴（模型用 quality 表达分辨率：Replicate gpt-image-2.5-flare 六档） ----------
+
+check("画质档位轴：六档画质都落到确定的价桶，xhigh/max 不得掉回 1K 桶", () => {
+    assert.strictEqual(resolutionTierFromQuality("low"), "1k");
+    assert.strictEqual(resolutionTierFromQuality("medium"), "2k");
+    assert.strictEqual(resolutionTierFromQuality("high"), "4k");
+    assert.strictEqual(resolutionTierFromQuality("xhigh"), "4k");
+    assert.strictEqual(resolutionTierFromQuality("max"), "4k");
+    assert.strictEqual(resolutionTierFromQuality("XHIGH"), "4k"); // 大小写不敏感
+    assert.strictEqual(resolutionTierFromQuality("auto"), undefined); // auto = 上游自定，按最低档算
+});
+
+check("画质档位轴：比例串 + 画质档 → 价随画质走（像素由上游按 quality 决定）", () => {
+    assert.strictEqual(imageResolutionTier("1:1", "low"), "1k");
+    assert.strictEqual(imageResolutionTier("1:1", "medium"), "2k");
+    assert.strictEqual(imageResolutionTier("1:1", "xhigh"), "4k");
+    assert.strictEqual(imageResolutionTier("16:9", "max"), "4k");
+    assert.strictEqual(imageResolutionTier("9:16", "medium"), "2k");
+});
+
+check("画质档位轴：选「最高」按 4K 桶扣，不会按基础价卖（这是直接扣钱的判定）", () => {
+    const pricing = { imageCredits2k: 8, imageCredits4k: 10 };
+    assert.strictEqual(applyImageResolutionPricing(imageResolutionTier("1:1", "max"), pricing, 6), 10);
+    assert.strictEqual(applyImageResolutionPricing(imageResolutionTier("1:1", "xhigh"), pricing, 6), 10);
+    assert.strictEqual(applyImageResolutionPricing(imageResolutionTier("1:1", "medium"), pricing, 6), 8);
+    assert.strictEqual(applyImageResolutionPricing(imageResolutionTier("1:1", "low"), pricing, 6), 6);
+    assert.strictEqual(applyImageResolutionPricing(imageResolutionTier("1:1", "auto"), pricing, 6), 6);
+});
+
+check("画质档位轴：像素串优先于画质档（面板若还留着像素值，不能靠画质档把价改高）", () => {
+    assert.strictEqual(imageResolutionTier("1024x1024", "max"), "1k");
+    assert.strictEqual(imageResolutionTier("3840x2160", "low"), "4k");
 });
 
 console.log(`\n图片分辨率分档单测：${passed} 通过 / ${failures.length} 失败`);
