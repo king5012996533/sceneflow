@@ -242,6 +242,8 @@ assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "IMAGE_TIER
 assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", "capabilities={form.capabilities}", "定价编辑器必须拿到能力标定（用于标注「该档位没勾」）。");
 assertIncludes("src/components/image-settings-panel.tsx", "IMAGE_RESOLUTION_OPTIONS", "用户面板必须有「分辨率」一轴。");
 assertIncludes("src/components/image-settings-panel.tsx", "normalizeImageCapability", "用户面板必须走能力归一化（兼容旧标定形状）。");
+assertIncludes("src/components/image-settings-panel.tsx", "imageRatioOf", "用户面板判当前比例必须走 imageRatioOf：只认像素串的话，默认配置的 size=\"1:1\" 会被当成自定义像素，用户一点分辨率档位尺寸就被写成 auto（线上复现过）。");
+assertNotMatches("src/components/image-settings-panel.tsx", /selectedRatio\s*=\s*[^;]*ratioForImageSize/, "不得再用 ratioForImageSize 直接判当前比例（它只认像素串，会把比例串判成自定义像素）。");
 assertIncludes("src/constant/credits.tsx", "options?.size", "客户端积分预检必须带 size：不带会把 2K/4K 按 1K 价显示，预检与实扣不一致。");
 assertNotMatches("src/app/(user)/studio/page.tsx", /videoSizeToImageSize\s*\(/, "studio 不得再把像素尺寸压成比例：用户选的 2K/4K 会被降级，出图口径与面板选择不一致。");
 assertIncludes("package.json", "test:resolution", "分辨率分档必须有单测入口（npm run test:resolution）。");

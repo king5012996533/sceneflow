@@ -5,7 +5,7 @@ import { ConfigProvider, Switch } from "antd";
 
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { getGenerationCreditsCost } from "@/lib/credit-pricing";
-import { IMAGE_RESOLUTION_OPTIONS, imageResolutionTier, imageSizeForRatio, nearestAllowedTier, parseImagePixelSize, ratioForImageSize, synthesizeImagePixelSize, type ImageResolutionTier } from "@/lib/image-resolution";
+import { CUSTOM_IMAGE_RATIO, IMAGE_RESOLUTION_OPTIONS, imageRatioOf, imageResolutionTier, imageSizeForRatio, nearestAllowedTier, parseImagePixelSize, synthesizeImagePixelSize, type ImageResolutionTier } from "@/lib/image-resolution";
 import { normalizeImageCapability, type ImageAspect, type ImageCapabilityView, type ImageQuality } from "@/lib/model-capability-spec";
 import { getPlatformPricing, getPricingDefaults, usePlatformCapability } from "@/stores/platform-catalog-store";
 import { modelOptionName, type AiConfig } from "@/stores/use-config-store";
@@ -17,9 +17,6 @@ const qualityOptions = [
     { value: "low", label: "低" },
 ];
 const DIMENSION_STEP = 16;
-
-/** 自定义宽的占位值（"auto" 表示不指定尺寸，交给上游） */
-const CUSTOM_RATIO = "__custom__";
 
 /** 比例清单（像素值即 1K 档的定值；2K/4K 的定值由 image-resolution 提供） */
 const aspectOptions = [
@@ -60,8 +57,8 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
     const quality = config.quality || "auto";
     const count = Math.max(1, Math.min(effectiveMaxCount, Math.floor(Math.abs(Number(config.count)) || 1)));
     const activeSize = config.size || "auto";
-    // 当前选择落在哪个比例 / 哪一档分辨率（比例由像素值反推，自定义像素单独归一档）
-    const selectedRatio = activeSize === "auto" ? "auto" : (ratioForImageSize(activeSize) ?? CUSTOM_RATIO);
+    // 当前选择落在哪个比例 / 哪一档分辨率（比例由像素值或比例串反推，自定义像素单独归一档）
+    const selectedRatio = imageRatioOf(activeSize);
     const selectedAspect = effectiveAspects.find((item) => item.value === selectedRatio);
     const currentTier = imageResolutionTier(activeSize, quality);
     const activeTier = allowedTiers.includes(currentTier) ? currentTier : nearestAllowedTier(currentTier, allowedTiers);
@@ -73,8 +70,8 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
         const current = imageResolutionTier(activeSize, quality);
         if (!allowed.length || allowed.includes(current)) return;
         const next = nearestAllowedTier(current, allowed);
-        const ratio = activeSize === "auto" ? "auto" : (ratioForImageSize(activeSize) ?? CUSTOM_RATIO);
-        if (ratio === CUSTOM_RATIO) {
+        const ratio = imageRatioOf(activeSize);
+        if (ratio === CUSTOM_IMAGE_RATIO) {
             // 自定义像素：按原宽高比换算到允许档位（今天这里会把用户的输入直接丢掉，顺带修掉）
             const dimensions = parseImagePixelSize(activeSize);
             onConfigChange("size", (dimensions ? synthesizeImagePixelSize(`${dimensions.width}:${dimensions.height}`, next) : null) ?? "auto");
@@ -85,9 +82,9 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
     }, [spec, activeSize, quality]);
     // 收敛 2：当前比例不在标定里时换到第一个允许值（自定义像素不参与，避免把用户输入的尺寸改掉）
     useEffect(() => {
-        if (!imageCapability || selectedRatio === CUSTOM_RATIO || selectedRatio === "auto") return;
+        if (!imageCapability || selectedRatio === CUSTOM_IMAGE_RATIO || selectedRatio === "auto") return;
         const allowedValues = imageCapability.aspects.filter((value) => aspectOptions.some((item) => item.value === value));
-        if (!allowedValues.length || allowedValues.includes(selectedRatio as ImageAspect)) return;
+        if (!allowedValues.length || allowedValues.includes(selectedRatio)) return;
         onConfigChange("size", imageSizeForRatio(allowedValues[0], activeTier) ?? allowedValues[0]);
     }, [spec, activeSize, quality]);
     // 质量收敛（沿用原有逻辑）
@@ -106,7 +103,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
         onConfigChange("size", imageSizeForRatio(value, activeTier) ?? value);
     };
     const selectResolution = (tier: ImageResolutionTier) => {
-        if (selectedRatio === CUSTOM_RATIO) {
+        if (selectedRatio === CUSTOM_IMAGE_RATIO) {
             const dimensions = parseImagePixelSize(activeSize);
             if (dimensions) {
                 onConfigChange("size", synthesizeImagePixelSize(`${dimensions.width}:${dimensions.height}`, tier) ?? "auto");
@@ -244,13 +241,11 @@ export function imageQualityLabel(value: string) {
 
 export function imageSizeLabel(size: string) {
     if (!size || size === "auto") return "auto";
-    const ratio = ratioForImageSize(size);
-    if (ratio) {
-        const dimensions = parseImagePixelSize(size);
-        const tier = dimensions ? imageResolutionTier(size) : null;
-        return tier ? `${ratio} (${tier.toUpperCase()})` : ratio;
-    }
-    return size;
+    const ratio = imageRatioOf(size);
+    if (ratio === CUSTOM_IMAGE_RATIO) return size;
+    const dimensions = parseImagePixelSize(size);
+    const tier = dimensions ? imageResolutionTier(size) : null;
+    return tier ? `${ratio} (${tier.toUpperCase()})` : ratio;
 }
 
 /** 比例 chip 上的像素提示：跟着当前分辨率档位走（"auto" 不显示） */

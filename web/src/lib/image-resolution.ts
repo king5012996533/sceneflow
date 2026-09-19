@@ -178,6 +178,31 @@ export function ratioForImageSize(size: string): string | null {
     return best?.ratio ?? null;
 }
 
+/** 面板口径的「自定义像素」哨兵值（比例 chip 一个都不高亮） */
+export const CUSTOM_IMAGE_RATIO = "__custom__";
+
+/**
+ * 当前 size 落在哪个比例 chip（面板高亮 / 收敛逻辑共用）。
+ *
+ * 必须同时认两种写法，否则会出事故：
+ *   1. 像素串（1024x1024 / 2048x1152）→ 反推比例，推不出来算自定义；
+ *   2. 比例串（"1:1"，以及旧配置的 "16:9-2k"）→ 直接就是那个比例。
+ * 只认像素串的话，默认配置里的 size="1:1" 会被当成「自定义像素」，
+ * 用户一点分辨率档位就被写成 "auto"（尺寸被悄悄丢掉）。
+ */
+export function imageRatioOf(size?: string): ImageBaseAspect | typeof CUSTOM_IMAGE_RATIO {
+    const value = String(size ?? "").trim();
+    if (!value || value.toLowerCase() === "auto") return "auto";
+    // 比例串（含旧后缀）：按纯比例归类，后缀那部分交给分辨率档位这一轴表达
+    const aspect = baseImageAspect(value);
+    if (aspect) return aspect;
+    if (parseImagePixelSize(value)) {
+        const ratio = ratioForImageSize(value);
+        return ratio && (IMAGE_BASE_ASPECTS as readonly string[]).includes(ratio) ? (ratio as ImageBaseAspect) : CUSTOM_IMAGE_RATIO;
+    }
+    return CUSTOM_IMAGE_RATIO;
+}
+
 /** 从允许档位里挑一个最接近当前档位的（只降不升，避免自动收敛时悄悄给用户涨价） */
 export function nearestAllowedTier(current: ImageResolutionTier, allowed: readonly ImageResolutionTier[]): ImageResolutionTier {
     const list = allowed.length ? allowed : IMAGE_RESOLUTION_TIERS;

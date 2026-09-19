@@ -13,10 +13,12 @@
 import assert from "node:assert";
 
 import {
+    CUSTOM_IMAGE_RATIO,
     IMAGE_RESOLUTION_TIERS,
     applyImageResolutionPricing,
     baseImageAspect,
     deriveResolutionTiers,
+    imageRatioOf,
     imageResolutionTier,
     imageSizeForRatio,
     nearestAllowedTier,
@@ -147,6 +149,29 @@ check("面板：像素反推比例（选中的 chip 要认得出来）", () => {
     assert.strictEqual(ratioForImageSize("1024x1024"), "1:1");
     assert.strictEqual(ratioForImageSize("auto"), null);
     assert.strictEqual(ratioForImageSize("1234x999"), null); // 真·自定义像素，不硬归到某个比例
+});
+
+check("面板：比例串也要认得出来（默认配置 size 就是 \"1:1\"，不能被当成自定义像素）", () => {
+    assert.strictEqual(imageRatioOf("1:1"), "1:1");
+    assert.strictEqual(imageRatioOf("16:9"), "16:9");
+    assert.strictEqual(imageRatioOf("16:9-2k"), "16:9"); // 旧后缀那部分归到分辨率这一轴
+    assert.strictEqual(imageRatioOf("auto"), "auto");
+    assert.strictEqual(imageRatioOf(""), "auto");
+    assert.strictEqual(imageRatioOf(undefined), "auto");
+    assert.strictEqual(imageRatioOf("2048x1152"), "16:9");
+    assert.strictEqual(imageRatioOf("1600x1000"), CUSTOM_IMAGE_RATIO);
+    assert.strictEqual(imageRatioOf("abc"), CUSTOM_IMAGE_RATIO);
+});
+
+check("回归：默认配置（size=比例串）点分辨率档位要换成像素，不能写成 auto", () => {
+    // 线上复现过的 bug：只认像素串时 ratioForImageSize("1:1") = null → 判成自定义像素 →
+    // 点 2K 落到 "auto"，用户的尺寸被悄悄丢掉（W/H 输入框直接变空、档位也回到 1K）
+    const ratio = imageRatioOf("1:1");
+    assert.strictEqual(ratio, "1:1");
+    assert.strictEqual(imageSizeForRatio(ratio, "2k"), "2048x2048");
+    assert.strictEqual(imageSizeForRatio(imageRatioOf("16:9"), "4k"), "3840x2160");
+    assert.strictEqual(imageSizeForRatio(imageRatioOf("9:16-2k"), "2k"), "1152x2048");
+    assert.strictEqual(imageResolutionTier(imageSizeForRatio(ratio, "2k"), "auto"), "2k"); // 换算出来的像素自己就能判档
 });
 
 check("面板：自定义像素换算到允许档位时保持原宽高比（用户输入不被丢掉）", () => {
