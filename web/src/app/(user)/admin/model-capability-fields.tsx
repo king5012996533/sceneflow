@@ -110,6 +110,8 @@ function ImageFields({ spec, onChange }: { spec: ImageCapabilitySpec; onChange: 
     const qualityTiers = view.qualityTiers ?? [];
     const usesQualityAxis = qualityTiers.length > 0;
     const usesAspectOnly = view.aspectOnly === true;
+    // 参考图是三态：没标过（跟随名字名单）/ 明确支持 / 明确不支持
+    const referenceMode = view.references === true ? "on" : view.references === false ? "off" : "auto";
     return (
         <div className="space-y-2.5">
             <div className="rounded-lg border border-[#e9e6e3] bg-white/60 p-2.5">
@@ -128,6 +130,31 @@ function ImageFields({ spec, onChange }: { spec: ImageCapabilitySpec; onChange: 
                 <div className="mt-1 text-[11px] leading-4 text-[#726d67]">
                     勾上 = 用户面板的尺寸行只留宽高比（不显示像素数字、不给 W/H 输入），分辨率那一行只说明「由上游定」不放档位，画质（高级）整块不出现，扣费走一口价。 适用于上游压根没有分辨率/画质参数、像素写死的模型（例：Replicate 的
                     recraft-ai/recraft-v4-pro，约 400 万像素级）。有 quality 档位的模型请用上面的「画质档位」。
+                </div>
+            </div>
+            <div className="rounded-lg border border-[#e9e6e3] bg-white/60 p-2.5">
+                <FieldLabel>参考图</FieldLabel>
+                <Radio.Group
+                    size="small"
+                    optionType="button"
+                    buttonStyle="solid"
+                    value={referenceMode}
+                    onChange={(event) =>
+                        onChange({
+                            ...view,
+                            // 三态：跟随默认 = 整字段不落库（留给名字名单判定），支持/不支持 = 明确写死布尔值
+                            ...(event.target.value === "auto" ? { references: undefined } : { references: event.target.value === "on" }),
+                        })
+                    }
+                    options={[
+                        { label: "跟随默认", value: "auto" },
+                        { label: "支持参考图", value: "on" },
+                        { label: "不支持参考图", value: "off" },
+                    ]}
+                />
+                <div className="mt-1 text-[11px] leading-4 text-[#726d67]">
+                    选「不支持参考图」= 用户面板把「添加图片 / 从剪贴板添加 / 从素材库添加」三个入口禁用并写明原因，画布节点面板提示上游图片不会被使用，构造请求时也不再带参考图。 「跟随默认」按模型名判定：Replicate 的 recraft 系（recraft-v4-pro / v4 /
+                    v3）上游入参里压根没有图像字段，默认就是不支持 —— 上游对多余的入参是**静默忽略**的， 参考图发过去既不报错也不起作用，用户却会为一张与参考图无关的图付钱。上游哪天开放了图像入参，这里改成「支持参考图」即可。
                 </div>
             </div>
             <div>

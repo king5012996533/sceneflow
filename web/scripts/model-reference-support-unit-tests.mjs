@@ -13,7 +13,7 @@
  */
 import assert from "node:assert";
 
-import { REFERENCE_UNSUPPORTED_HINT, modelNameSupportsReferences, stripModelChannelPrefix } from "../src/lib/model-reference-support.ts";
+import { REFERENCE_UNSUPPORTED_HINT, modelNameSupportsReferences, resolveReferenceSupport, stripModelChannelPrefix } from "../src/lib/model-reference-support.ts";
 
 let passed = 0;
 const failures = [];
@@ -68,6 +68,23 @@ check("缺省即支持（名单外的一律放行，避免误伤）", () => {
 check("提示文案不为空（界面直接显示给用户）", () => {
     assert.equal(typeof REFERENCE_UNSUPPORTED_HINT, "string");
     assert.ok(REFERENCE_UNSUPPORTED_HINT.includes("不支持参考图"), "文案要说清是不支持参考图");
+});
+
+console.log("resolveReferenceSupport（后台标定 vs 名字名单）");
+
+// 第一次上线（459523d）就是栽在这里：线上所有老标定都没有 references 字段，
+// 若把「没有这个字段」当成「管理员说了支持」，名单就永远不会生效 —— 实测入口照开、参考图照发。
+check("标定里没有 references 字段（老标定）→ 必须回落名字名单，不能当成支持", () => {
+    assert.equal(resolveReferenceSupport("recraft-ai/recraft-v4-pro", undefined), false);
+    assert.equal(resolveReferenceSupport("recraft-ai/recraft-v4-pro", null), false);
+    assert.equal(resolveReferenceSupport("openai/gpt-image-2.5-flare", undefined), true);
+});
+
+check("明确布尔值说了算（上游开放图像入参后靠它解禁）", () => {
+    assert.equal(resolveReferenceSupport("recraft-ai/recraft-v4-pro", true), true);
+    assert.equal(resolveReferenceSupport("openai/gpt-image-2.5-flare", false), false);
+    assert.equal(resolveReferenceSupport("随便什么模型", true), true);
+    assert.equal(resolveReferenceSupport("随便什么模型", false), false);
 });
 
 if (failures.length) {

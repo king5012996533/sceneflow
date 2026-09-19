@@ -899,12 +899,18 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/lib/model-reference-support.ts", '"recraft"', "不支持参考图的名字名单必须留着 recraft（上游没有图像入参）。");
     // 缺省即支持：名单以外的一律放行，否则一有误判就会把正常模型的参考图入口也关掉。
     assertIncludes("src/lib/model-reference-support.ts", "if (!value) return true;", "判定必须是「缺省支持」，空模型名不能反过来把入口关掉。");
-    // 能力标定：只有「明确不支持」才落库 false，老配置不受影响。
-    assertIncludes("src/lib/model-capability-spec.ts", "references?: boolean", "能力标定必须能表达「这个模型不吃参考图」，否则后台无法为上游新增的图像入参解禁。");
-    assertIncludes("src/lib/model-capability-spec.ts", "references: spec.references !== false", "参考图能力缺省必须是支持（老配置没这个字段，不能因此被关掉入口）。");
-    assertIncludes("src/lib/model-capability-spec.ts", "value.references === false ? { references: false } : {}", "只有明确标成 false 才落库，避免把「没标定」写成「不支持」。");
+    // 能力标定是三态：true/false = 管理员明确标定，缺字段 = 没标过（回落名字名单）。
+    // 第一次上线把「缺字段」当成「支持」，线上老标定全都没有这个字段 → 名单永不生效（实测踩到）。
+    assertIncludes("src/lib/model-capability-spec.ts", "references?: boolean", "能力标定必须能表达「这个模型吃不吃参考图」，否则后台无法为上游新增的图像入参解禁。");
+    assertIncludes("src/lib/model-capability-spec.ts", 'typeof spec.references === "boolean" ? { references: spec.references } : {}', "参考图能力要保留三态：没标过就必须保持缺字段，不能替管理员补成 true（补了名单就永不生效）。");
+    assertIncludes("src/lib/model-capability-spec.ts", 'typeof value.references === "boolean" ? { references: value.references } : {}', "落库也要保留三态：只有明确勾了支持/不支持才写布尔值。");
+    assertIncludes("src/lib/model-reference-support.ts", "export function resolveReferenceSupport", "判定必须把「后台标定 vs 名字名单」的优先级收在一处纯函数里，否则又是各判各的。");
+    assertMatchesNormalized("src/lib/model-reference-support.ts", /if \(typeof declared === "boolean"\) return declared;\n\s*return modelNameSupportsReferences\(model\);/, "只有明确布尔值才能覆盖名字名单（缺字段回落名单）。");
+    assertIncludes("src/stores/platform-catalog-store.ts", "resolveReferenceSupport(model, spec?.kind === \"image\" ? spec.references : undefined)", "用户端判定要走同一个三态解析函数，别自己写 `!== false`（那就是把老标定当成支持）。");
+    assertNotMatches("src/stores/platform-catalog-store.ts", /spec\.references !== false/, "不得再把「标定里没有这个字段」当成支持：老标定全都没这个字段，名单会因此永不生效。");
     assertIncludes("src/stores/platform-catalog-store.ts", "export function imageModelSupportsReferences", "用户端要有统一的参考图判定入口（非 hook，供请求构造用）。");
     assertIncludes("src/stores/platform-catalog-store.ts", "export function useImageModelSupportsReferences", "用户端要有统一的参考图判定入口（hook，供渲染用）。");
+    assertIncludes("src/app/(user)/admin/model-capability-fields.tsx", "不支持参考图", "后台能力标定要有参考图三态开关（跟随默认/支持/不支持），否则上游解禁时只能改代码。");
     // 报文层：不吃参考图的模型不再发 input_images。
     assertIncludes("src/services/api/image.ts", "replicateInputImagesPayload", "Replicate 的参考图入参必须走统一收口函数（模型不吃参考图时整字段不发）。");
     // input_images 只允许出现在这个收口函数里面：外面还有一处就是「无条件发送」的老写法。

@@ -33,5 +33,20 @@ export function modelNameSupportsReferences(model: string): boolean {
     return !REFERENCE_UNSUPPORTED_KEYWORDS.some((keyword) => value.includes(keyword));
 }
 
+/**
+ * 综合「后台标定」与「名字名单」得出该模型吃不吃参考图。
+ *
+ * 三态语义（2026-09-19 上线后实测踩到的坑）：后台能力标定里的 references 可能是
+ *   - true  = 管理员明确勾了「支持参考图」→ 说了算（上游真开放了图像入参就用它解禁）；
+ *   - false = 管理员明确勾了「不支持参考图」→ 说了算；
+ *   - 没这个字段 = **没标定过**，绝不能当成「支持」—— 线上所有老标定都没有这个字段，
+ *     当成支持的话名单就永远不会生效（这正是第一次上线的实际结果：入口照开、参考图照发）。
+ * 所以只有明确布尔值才覆盖名单，否则一律按名字判定。
+ */
+export function resolveReferenceSupport(model: string, declared?: boolean | null): boolean {
+    if (typeof declared === "boolean") return declared;
+    return modelNameSupportsReferences(model);
+}
+
 /** 参考图入口被关掉时给用户看的说明（后台编辑器与用户端共用同一份文案） */
 export const REFERENCE_UNSUPPORTED_HINT = "该模型不支持参考图：它只认文字描述，参考图不会被用上。请换一个支持参考图的模型。";
