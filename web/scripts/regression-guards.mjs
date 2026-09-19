@@ -319,6 +319,11 @@ assertIncludes("src/lib/model-pricing-kind.ts", '"recraft"', "关键词表三处
 assertIncludes("src/stores/use-config-store.ts", 'value.includes("recraft")', "关键词表三处同步（前端启发式是「没标定能力」时的兜底分类，漏了会落进文本模型、图片模型选择器里看不到）。");
 assertIncludes("src/app/(user)/admin/credential-capability-editor.tsx", "enabled || Boolean(defaultCapabilityForModel(model))", "已标定过的模型必须一律可编辑：名字启发式认不出来不该反过来把标定字段锁死。");
 assertIncludes("src/app/(user)/admin/credential-capability-editor.tsx", "stashed[model]", "关掉「能力标定」开关不能把已填的配置扔掉：重新打开要原样退回。");
+// 2026-09-19：退款政策已关闭（GENERATION_REFUNDS_ENABLED = false，见 generation-refund-policy.ts），
+// 但定价页还在承诺「生成失败自动原路退回」——页面在承诺一件不会发生的事，用户会拿着截图来要账。
+// 文案改成如实口径；哪天政策重新打开，这两条会一起拦下来，提醒回来把文案改回去。
+assertNotMatches("src/app/(user)/pricing/page.tsx", /原路退回/, "退款已关闭，定价页不得再承诺「失败自动原路退回」。");
+assertIncludes("src/app/(user)/pricing/page.tsx", "失败 / 取消也不退", "定价页必须如实写明「任务一旦开跑就不退积分」。");
 // 2026-09-19：出网隧道断掉时，这条路由以前把 fetch 的异常冒成裸 500，前端只看到「Replicate 任务创建失败」，
 // 任务号也没进日志——隧道断了与上游拒绝长得一模一样。现在两条路分开报，失败文案必须带线索。
 assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "describeNetworkFailure(", "启动失败必须区分「连不上上游（出网通道）」与「上游拒绝」，网络层错误码要带出来。");
