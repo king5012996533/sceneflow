@@ -300,6 +300,7 @@ assertIncludes("src/lib/model-capability-spec.ts", "aspectOnly?: boolean", "能�
 assertIncludes("src/components/image-settings-panel.tsx", "usesAspectOnly", "只吃宽高比的模型：面板不得显示像素数字、W/H 与分辨率/画质档位。");
 assertIncludes("src/components/image-settings-panel.tsx", "Math.min(quickCount, effectiveMaxCount)", "生成张数的快捷档位必须受能力标定的 maxCount 限制（否则用户能选 10 张、按 10 张扣费，而上游只回 1 张）。");
 assertIncludes("src/components/image-settings-panel.tsx", "Math.min(next, max)", "自定义张数输入框必须在 onChange 里夹上限：input 的 max 属性只约束步进箭头，手打大数字照样提交，会按那个数扣费。");
+assertIncludes("src/components/image-settings-panel.tsx", "stored <= effectiveMaxCount", "config.count 超过 maxCount 时必须写回：面板那个 count 只用于显示，扣费与提交读的是 config.count，不写回就是「显示 1 张、按 3 张扣钱」。");
 assertMatchesNormalized(
     "src/components/image-settings-panel.tsx",
     /hidesPixelSize \? null : \(\n\s*<div className="flex items-center gap-2">/,

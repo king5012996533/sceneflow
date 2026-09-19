@@ -117,6 +117,14 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
         if (!allowedValues.length || allowedValues.includes(selectedRatio)) return;
         onConfigChange("size", imageSizeForRatio(allowedValues[0], activeTier) ?? allowedValues[0]);
     }, [spec, activeSize, quality]);
+    // 张数收敛：config.count 超过能力标定的 maxCount 时写回。
+    // 上面那个 count 只是「显示用」的夹取，扣费与提交读的是 config.count —— 不写回就是
+    // 「面板显示 1 张、按 3 张扣钱」。换模型（画布节点的默认值是 3 张）最容易撞上这条。
+    useEffect(() => {
+        const stored = Math.floor(Number(config.count));
+        if (!Number.isFinite(stored) || stored <= effectiveMaxCount) return;
+        onConfigChange("count", String(effectiveMaxCount));
+    }, [config.count, effectiveMaxCount]);
     // 质量收敛：画质档位轴的模型按自己的档位清单收敛，其余沿用「画质（高级）」清单
     useEffect(() => {
         if (!imageCapability) return;
