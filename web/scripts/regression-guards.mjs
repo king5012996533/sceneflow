@@ -1003,6 +1003,32 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertMatchesNormalized("src/lib/credit-pricing.ts", /seedream-5\[\.-\]0\/\.test\(model\)\)\s*return 6/, "方舟 Seedream 5.0 的草案兜底价不能是 2 积分（¥0.20）：官方成本 0.22–0.60 元/张，那是赔钱价。");
 }
 
+// ---------- 交互编辑（2026-09-20，方舟 Seedream 5.0 pro 的坐标标记）----------
+// 交互编辑**没有新参数**：位置是我们自己把像素换算成归一化坐标、写成 <point>/<bbox> 嵌进提示词的。
+// 于是出错的形态全是「安静地错」：坐标差一位 = 改错区域；标记发给不支持的模型 = 当普通文字忽略，
+// 图没变钱照扣；删掉参考图后编号越界 = 改不存在的图。守卫围绕这三点。
+{
+    assertIncludes("src/lib/image-marker.ts", "MARKER_GRID = 1000", "坐标必须归一化到官方的 1000×1000 网格（见《实现交互编辑指南》）。");
+    assertIncludes("src/lib/image-marker.ts", "MARKER_MAX_VALUE = MARKER_GRID - 1", "归一化取值上限是 999（右下角 999,999），不是 1000。");
+    assertIncludes("src/lib/image-marker.ts", "MARKER_MIN_DRAG_PX = 4", "拖拽小于 4px 视为误触（官方口径）：阈值被改掉会开始产生「点了就出框」的垃圾标记。");
+    assertIncludes("src/lib/image-marker.ts", "MARKER_UNSUPPORTED_HINT", "不支持交互编辑的模型必须有统一文案：标记发过去是静默无效的，得有人告诉用户。");
+    // 标记文字的拼装只许有一处：两处各写一遍「图片编号在前」这种细节，早晚有一处漏掉。
+    {
+        const offenders = walkFiles("src")
+            .filter((path) => /\.(tsx?|css)$/.test(path))
+            .filter((path) => path !== "src/lib/image-marker.ts")
+            .filter((path) => /<bbox>\$\{|<point>\$\{/.test(read(path)));
+        assert(!offenders.length, `标记文字（<point>/<bbox>）只许在 src/lib/image-marker.ts 里拼装，别处出现=迟早写歪：${offenders.join(", ")}`);
+    }
+    // 提交前的闸：发给不支持交互编辑的模型要拦住（上游静默忽略，钱照扣）。
+    assertIncludes("src/services/api/image.ts", "hasImageMarkers(requestPrompt) && !imageModelSupportsInteractiveEdit", "带坐标标记发给不支持的模型必须报错拦住，不能发出去被静默忽略。");
+    // 能力字段：只有管理员确认过才落库（缺字段 = 不支持），别存 false 占位。
+    assertIncludes("src/lib/model-capability-spec.ts", "value.interactiveEdit === true", "interactiveEdit 只有勾了才落库：缺字段就是不支持，没有任何名字兜底名单。");
+    assertIncludes("src/lib/image-reference-prompt.ts", "IMAGE_REFERENCE_TOKEN_SOURCE", "图片编号词汇（@图片 N）必须同时暴露正则源：标记体检靠它从提示词里回读编号。");
+    // 面板入口只在标定支持的模型上出现（对用户可见的能力，不能靠"试了才知道"）。
+    assertIncludes("src/components/studio/studio-composer.tsx", "interactiveEditEnabled", "参考图上的「标注」入口必须由能力标定控制。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

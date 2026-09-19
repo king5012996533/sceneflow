@@ -35,6 +35,7 @@
         "test:pricingkind": "node scripts/model-pricing-kind-unit-tests.mjs",
         "test:refsupport": "node scripts/model-reference-support-unit-tests.mjs",
         "test:ark": "node scripts/ark-image-unit-tests.mjs",
+        "test:marker": "node scripts/image-marker-unit-tests.mjs",
         "test:upstream": "node scripts/upstream-error-unit-tests.mjs",
         "test:artifact": "node scripts/generation-artifact-unit-tests.mjs",
         "test:inflight": "node scripts/upstream-inflight-unit-tests.mjs",

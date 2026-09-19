@@ -18,6 +18,8 @@ import { buildVideoGenerationConfig } from "@/lib/generation/generation-config";
 import { InsufficientCreditsError } from "@/lib/generation/generation-guard";
 import { SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
 import { REFERENCE_UNSUPPORTED_HINT } from "@/lib/model-reference-support";
+import { MARKER_ISSUE_HINT, MARKER_UNSUPPORTED_HINT, hasImageMarkers, validateMarkerReferences } from "@/lib/image-marker";
+import { IMAGE_REFERENCE_TOKEN_SOURCE } from "@/lib/image-reference-prompt";
 import { detectStudioKind, imageSizeToVideoSize } from "@/lib/studio/detect-kind";
 import { executeStudioInstruction, pollVideoTask } from "@/lib/studio/execute";
 import { deleteSession, readSession, readSessionMetas, saveSession, type StudioSessionMeta } from "@/lib/studio/session-store";
@@ -26,7 +28,7 @@ import type { StudioMessage, StudioSession, StudioStylePresetId } from "@/lib/st
 import { sceneflowTheme } from "@/lib/sceneflow-theme";
 import { uploadImage } from "@/services/image-storage";
 import { uploadMediaFile } from "@/services/file-storage";
-import { getPlatformPricing, getPricingDefaults, useImageModelSupportsReferences } from "@/stores/platform-catalog-store";
+import { getPlatformPricing, getPricingDefaults, useImageModelSupportsInteractiveEdit, useImageModelSupportsReferences } from "@/stores/platform-catalog-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -297,6 +299,13 @@ export default function StudioPage() {
      */
     const activeModelSupportsReferences = useImageModelSupportsReferences(activeModel);
     const referenceImagesSupported = effectiveKind === "image" ? activeModelSupportsReferences : true;
+    /**
+     * 参考图上要不要给「标注」入口（交互编辑）。同样是**本次真正会用的模型**说了算，理由更硬：
+     * 坐标标记是写在提示词里的纯文字，发给不支持的模型既不会报错也不会生效 —— 用户以为在改局部，
+     * 实际拿到一张重画的图，钱照扣。所以只有标定过 interactiveEdit 的模型才出现入口。
+     */
+    const activeModelSupportsInteractiveEdit = useImageModelSupportsInteractiveEdit(activeModel);
+    const interactiveEditSupported = effectiveKind === "image" ? activeModelSupportsInteractiveEdit : false;
 
     /**
      * 切到不吃参考图的模型时，把已经挂上的参考图清掉并说明原因。
@@ -445,6 +454,19 @@ export default function StudioPage() {
             message.warning(REFERENCE_UNSUPPORTED_HINT);
             setReferences([]);
             return;
+        }
+        // 交互编辑的坐标标记同样是"发了也不生效、钱照扣"的那一类，提交前必须体检：
+        // 模型不支持 / 标记前没编号 / 编号越界 / 有标记却没参考图 —— 四种都在这里拦住。
+        if (kind === "image" && hasImageMarkers(text)) {
+            if (!interactiveEditSupported) {
+                message.warning(MARKER_UNSUPPORTED_HINT);
+                return;
+            }
+            const markerIssues = validateMarkerReferences(text, { referenceCount: references.length, tokenSource: IMAGE_REFERENCE_TOKEN_SOURCE });
+            if (markerIssues.length) {
+                message.warning(MARKER_ISSUE_HINT[markerIssues[0].reason]);
+                return;
+            }
         }
         const model = kind === "image" ? effectiveConfig.imageModel || effectiveConfig.model : effectiveConfig.videoModel || effectiveConfig.model;
         if (!isAiConfigReady(effectiveConfig, model)) {
@@ -712,6 +734,7 @@ export default function StudioPage() {
                                     onAttachAudios={(files) => void addReferenceFiles(files)}
                                     referenceImagesEnabled={referenceImagesSupported}
                                     referenceImagesHint={REFERENCE_UNSUPPORTED_HINT}
+                                    interactiveEditEnabled={interactiveEditSupported}
                                     onPasteClipboard={() => void addReferencesFromClipboard()}
                                     onOpenAssetPicker={() => setAssetPickerOpen(true)}
                                     onOpenPromptDialog={() => setPromptDialogOpen(true)}

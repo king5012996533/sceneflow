@@ -157,6 +157,24 @@ function ImageFields({ spec, onChange }: { spec: ImageCapabilitySpec; onChange: 
                     v3）上游入参里压根没有图像字段，默认就是不支持 —— 上游对多余的入参是**静默忽略**的， 参考图发过去既不报错也不起作用，用户却会为一张与参考图无关的图付钱。上游哪天开放了图像入参，这里改成「支持参考图」即可。
                 </div>
             </div>
+            <div className="rounded-lg border border-[#e9e6e3] bg-white/60 p-2.5">
+                <Checkbox
+                    checked={view.interactiveEdit === true}
+                    onChange={(event) =>
+                        onChange({
+                            ...view,
+                            // 两态：只有勾了才落库（缺字段 = 不支持），别存 false 占位
+                            ...(event.target.checked ? { interactiveEdit: true } : { interactiveEdit: undefined }),
+                        })
+                    }
+                >
+                    支持交互编辑（提示词里的坐标标记）
+                </Checkbox>
+                <div className="mt-1 text-[11px] leading-4 text-[#726d67]">
+                    勾上 = 参考图上出现「标注」入口：用户点选 / 框选后，坐标按官方口径归一化到 1000×1000 写进提示词（点选 &lt;point&gt;x y&lt;/point&gt;、框选 &lt;bbox&gt;x1 y1 x2 y2&lt;/bbox&gt;），图片编号写在标记前面。
+                    交互编辑不需要任何新参数，上游只是读懂了提示词里的坐标 —— 所以标错不会报错：坐标会被当普通文字忽略，钱照扣、图没变。 只有确认过该模型真的按坐标改图才勾；不勾 = 入口不出现，行为与过去完全一致。
+                </div>
+            </div>
             <div>
                 <FieldLabel>尺寸（宽高比，含自定义）</FieldLabel>
                 <Checkbox.Group className="grid grid-cols-4 gap-x-3 gap-y-1" options={[...IMAGE_ASPECT_OPTIONS]} value={view.aspects} onChange={(values) => onChange({ ...view, aspects: values as ImageAspect[] })} />

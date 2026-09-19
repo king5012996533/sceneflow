@@ -5,6 +5,7 @@ import { create } from "zustand";
 
 import { apiPath } from "@/lib/app-paths";
 import type { ModelCapabilitySpec } from "@/lib/model-capability-spec";
+import { normalizeImageCapability } from "@/lib/model-capability-spec";
 import type { ModelPricing, PricingDefaults } from "@/lib/credit-pricing";
 import { resolveReferenceSupport } from "@/lib/model-reference-support";
 import { modelOptionName } from "@/stores/use-config-store";
@@ -128,4 +129,21 @@ export function imageModelSupportsReferences(model: string): boolean {
 export function useImageModelSupportsReferences(model: string): boolean {
     const spec = usePlatformCapability(model);
     return resolveReferenceSupport(model, spec?.kind === "image" ? spec.references : undefined);
+}
+
+/**
+ * 该模型是否支持**交互编辑**（提示词里写 `<point>` / `<bbox>` 坐标标记，上游按坐标改图）。
+ *
+ * 与参考图那条不同，这一项**没有名字兜底名单**：缺字段就是不支持 —— 上游对多余的提示词内容是
+ * 静默忽略的，标错等于让用户白写一段坐标、照旧扣费，所以宁可入口不出现。
+ */
+export function imageModelSupportsInteractiveEdit(model: string): boolean {
+    const spec = getPlatformCapability(model);
+    return spec?.kind === "image" && normalizeImageCapability(spec).interactiveEdit === true;
+}
+
+/** Hook 读取（面板渲染用）：与 imageModelSupportsInteractiveEdit 同一口径 */
+export function useImageModelSupportsInteractiveEdit(model: string): boolean {
+    const spec = usePlatformCapability(model);
+    return spec?.kind === "image" && normalizeImageCapability(spec).interactiveEdit === true;
 }

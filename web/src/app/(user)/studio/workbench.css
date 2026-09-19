@@ -909,6 +909,15 @@
     width: 11px;
     height: 11px;
 }
+/* 交互编辑的「标注」入口：左下角，右上角留给「移除」——两个按钮叠在一起会点错 */
+.sf-workbench .attachment-chip button.attachment-mark {
+    right: auto;
+    top: auto;
+    left: 3px;
+    bottom: 3px;
+    color: var(--accent-deep);
+    background: rgba(255, 253, 249, 0.92);
+}
 .sf-workbench .composer textarea {
     width: 100%;
     min-height: 88px;

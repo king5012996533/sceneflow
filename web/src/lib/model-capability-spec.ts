@@ -84,6 +84,21 @@ export type ImageCapabilitySpec = {
      * 画布节点面板提示上游图片不会被使用，且构造请求时不再把它当参考图（不发 input_images）。
      */
     references?: boolean;
+    /**
+     * 是否支持**交互编辑**（把点选/框选的坐标写进提示词，让上游只改那几个位置）。
+     *
+     * 官方口径（火山方舟《实现交互编辑指南》）：交互编辑**不需要任何新参数** —— 位置写成
+     * `<point>x y</point>` / `<bbox>x1 y1 x2 y2</bbox>`（归一化到 1000×1000，左上 0,0）
+     * 嵌在提示词里，图片编号写在标记前面。也就是说：上游照旧收 prompt + image + size，
+     * 只不过程序化地读懂了坐标标记。所以这一项标错**不会报错**，只会让你把坐标发过去、
+     * 上游当普通文字忽略掉，钱照扣、图没变。
+     *
+     * 因此：只有管理员**确认过**这个模型真的吃坐标标记才勾。勾上 = 用户面板在参考图上出现
+     * 「标注」入口（点选 / 框选 / 保持不变）。不勾（缺字段）= 入口不出现、行为与过去完全一致。
+     * 与 references 的区别：references 是三态（缺字段要回落名字名单），这一项是两态，
+     * 缺字段一律当不支持 —— 没有任何"按名字兜底"的名单可回落。
+     */
+    interactiveEdit?: boolean;
     /** 最大生成张数 1-15 */
     maxCount: number;
 };
@@ -436,6 +451,8 @@ export function normalizeImageCapability(spec: ImageCapabilitySpec): ImageCapabi
         // 参考图是三态：true/false = 管理员明确标定，缺字段 = 没标过（回落名字名单，见 resolveReferenceSupport）。
         // 老标定全都没这个字段，这里绝不能补成 true —— 那等于替管理员宣布「支持」，名单就永远不生效。
         ...(typeof spec.references === "boolean" ? { references: spec.references } : {}),
+        // 交互编辑是两态：缺字段 = 不支持（没有名字名单可回落），显式 true 才算数
+        interactiveEdit: spec.interactiveEdit === true,
     };
 }
 
@@ -509,6 +526,8 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
             ...(value.aspectOnly === true ? { aspectOnly: true } : {}),
             // 三态：只有管理员明确勾了「支持/不支持」才落库，没动过就保持缺字段（回落名字名单）
             ...(typeof value.references === "boolean" ? { references: value.references } : {}),
+            // 两态：只有勾了才落库（缺字段 = 不支持），别存 false 占位
+            ...(value.interactiveEdit === true ? { interactiveEdit: true } : {}),
             maxCount: Math.max(1, Math.min(IMAGE_MAX_COUNT_LIMIT, Math.floor(Number(value.maxCount)) || DEFAULT_IMAGE_CAPABILITY.maxCount)),
         };
     }

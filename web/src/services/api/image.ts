@@ -1,7 +1,8 @@
 import axios from "axios";
 
 import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
-import { imageModelSupportsReferences } from "@/stores/platform-catalog-store";
+import { imageModelSupportsInteractiveEdit, imageModelSupportsReferences } from "@/stores/platform-catalog-store";
+import { MARKER_UNSUPPORTED_HINT, hasImageMarkers } from "@/lib/image-marker";
 import { normalizeImageOutputFormat } from "@/lib/model-capability-spec";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
@@ -1290,6 +1291,12 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
     const requestPrompt = withImageSizeInstruction(buildImageReferencePromptText(prompt, references), config.size, requestSize);
+    // 交互编辑的最后一道闸：坐标标记只有标定过支持交互编辑的模型才吃得下。
+    // 上游对提示词里读不懂的内容是静默忽略的 —— 带着标记发给别的模型 = 用户以为在改局部、
+    // 实际得到一张重画的图，而且钱照扣。所以宁可在这里报错，也不发出去。
+    if (hasImageMarkers(requestPrompt) && !imageModelSupportsInteractiveEdit(requestConfig.model)) {
+        throw new Error(MARKER_UNSUPPORTED_HINT);
+    }
     if (requestConfig.apiFormat === "gemini") {
         if (mask) throw new Error("Gemini 调用格式暂不支持蒙版编辑");
         try {
