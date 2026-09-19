@@ -767,6 +767,17 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(/const outcome = await readProxyOutcome<T>\(res\);[\s\S]{0,260}?return outcome\.data;/.test(proxyClient), "proxyFetch 必须交回 outcome.data（上游报文本身）。");
 }
 
+// —— 删除画布也要落到云端（空列表的坑）——
+// 项目变更的自动同步有意跳过空列表（免得还没从云端恢复就先拿空列表覆盖掉），
+// 代价是删到最后一个画布时云端备份留在原地，删掉的画布其实没离开云端。
+// 删除是明确的用户动作，所以这条路径必须自己推一次。
+{
+    assertIncludes("src/app/(user)/canvas/components/canvas-delete-projects-dialog.tsx", "pushProjectsBackup", "删除画布后要立刻推一次云端备份，否则空列表永远同步不上去。");
+    const cloudSync = read("src/app/(user)/canvas/utils/cloud-sync.ts");
+    assertIncludes("src/app/(user)/canvas/utils/cloud-sync.ts", '"/canvas/api/sync"', "云端备份要打到 /canvas/api/sync。");
+    assert(cloudSync.includes('type: "projects"'), "备份信封要带 type=projects。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

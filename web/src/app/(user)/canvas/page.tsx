@@ -17,6 +17,7 @@ import type { CanvasExportFile } from "./export-types";
 import { useCanvasStore, type CanvasProject } from "./stores/use-canvas-store";
 import { useCanvasUiStore } from "./stores/use-canvas-ui-store";
 import { exportCanvasProjects } from "./utils/canvas-export";
+import { pushProjectsBackup } from "./utils/cloud-sync";
 
 export default function CanvasPage() {
     return (
@@ -93,21 +94,10 @@ function CanvasPageInner() {
         enterProject(mode === "new" ? createProject(`无限画布 ${projects.length + 1}`) : projects[0]?.id || createProject(`无限画布 ${projects.length + 1}`));
     }, [createProject, hydrated, mode, projects, router]);
 
-    // 云端同步：项目变更后自动备份
+    // 云端同步：项目变更后自动备份（空列表不在此处推，见 utils/cloud-sync.ts 的说明）
     useEffect(() => {
         if (!hydrated || !user || !projects.length) return;
-        const timer = setTimeout(async () => {
-            try {
-                await fetch("/canvas/api/sync", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({ type: "projects", data: projects }),
-                });
-            } catch {
-                /* 静默失败，下次同步重试 */
-            }
-        }, 5000);
+        const timer = setTimeout(() => void pushProjectsBackup(projects), 5000);
         return () => clearTimeout(timer);
     }, [hydrated, user, projects]);
 

@@ -5,6 +5,7 @@ import { Button, Modal } from "antd";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useCanvasStore } from "../stores/use-canvas-store";
 import { useCanvasUiStore } from "../stores/use-canvas-ui-store";
+import { pushProjectsBackup } from "../utils/cloud-sync";
 
 export function CanvasDeleteProjectsDialog() {
     const ids = useCanvasUiStore((state) => state.deleteProjectIds);
@@ -13,10 +14,14 @@ export function CanvasDeleteProjectsDialog() {
     const deleteProjects = useCanvasStore((state) => state.deleteProjects);
     const cleanupImages = useAssetStore((state) => state.cleanupImages);
     const confirm = () => {
+        // 先算出删完剩下什么：列表变空时自动同步会跳过，这里必须自己把结果推上去，
+        // 否则云端那份备份始终留着已经删掉的画布。
+        const remaining = useCanvasStore.getState().projects.filter((project) => !ids.includes(project.id));
         deleteProjects(ids);
         cleanupImages();
         removeSelectedIds(ids);
         setDeleteIds([]);
+        void pushProjectsBackup(remaining);
     };
 
     return (
