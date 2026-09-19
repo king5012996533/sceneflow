@@ -7,6 +7,7 @@ import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
 import { authorizeUpstreamRequest, pickContentType, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
 import { canRunOnServer, resolveServerRunPolicy, shouldPersistEnvelope, type UpstreamEnvelope } from "@/lib/generation/generation-envelope";
 import { findRunnableGenerationJob, startServerRun } from "@/lib/generation/generation-run.server";
+import { describeUnusableSuccess } from "@/lib/generation/upstream-error";
 import { saveUpstreamEnvelope } from "@/lib/generation/generation-spool.server";
 
 export const runtime = "nodejs";
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
         }
         const keySource: KeySource = "platform";
-        console.log(`[proxy] key-source=${keySource} target=${target.hostname}${target.pathname}`);
+        console.log(`[proxy] key-source=${keySource} target=${target.hostname}${target.pathname}${describeRequestModel(envelope.body)}`);
 
         const upstreamBody = buildUpstreamBody(envelope.body, envelope.bodyBase64, safeHeaders);
         const isRawUpload = typeof envelope.bodyBase64 === "string" && (envelope.bodyBase64 as string).length > 0;
@@ -206,10 +207,15 @@ export async function POST(req: NextRequest) {
             }
 
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
+            const snippetOf = () => (typeof data === "object" && data !== null ? JSON.stringify(data).slice(0, 400) : String(data).slice(0, 400));
+            const maskedKey = safeHeaders.authorization ? safeHeaders.authorization.replace(/^Bearer\s+/i, "").replace(/^(.{6}).*(.{4})$/, "$1****$2") : "none";
             if (response.status >= 400) {
-                const snippet = typeof data === "object" && data !== null ? JSON.stringify(data).slice(0, 400) : String(data).slice(0, 400);
-                const masked = safeHeaders.authorization ? safeHeaders.authorization.replace(/^Bearer\s+/i, "").replace(/^(.{6}).*(.{4})$/, "$1****$2") : "none";
-                console.error(`[proxy] 上游 ${response.status} ${method} ${target} key=${masked}: ${snippet}`);
+                console.error(`[proxy] 上游 ${response.status} ${method} ${target}${describeRequestModel(envelope.body)} key=${maskedKey}: ${snippetOf()}`);
+            } else {
+                // 2xx 也可能是「用不了」：中转站常把失败包在 200 里回（{"code":500,"message":"服务繁忙"}），
+                // 客户端只会看到「上游没有返回任何候选结果」。这里补一笔日志，下次有据可查（2026-09-19）。
+                const unusable = describeUnusableSuccess(target.pathname, data);
+                if (unusable) console.error(`[proxy] 上游 ${response.status} 但报文用不了（${unusable}）${method} ${target}${describeRequestModel(envelope.body)} key=${maskedKey}: ${snippetOf()}`);
             }
             // 上游产出即抢救：成品每个字节都经过这里，就地留给服务端，
             // 之后用户标签页死没死、上游直链过没过期，都不再影响交付（见 generation-rescue.server.ts）
@@ -256,6 +262,17 @@ function sanitizeMethod(method: unknown) {
     const normalized = String(method || "POST").toUpperCase();
     if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(normalized)) throw new Error("非法请求方法");
     return normalized;
+}
+
+/**
+ * 日志里的模型名（2026-09-19）。
+ * 起因：那天客户端报「上游没有返回任何候选结果」，翻代理日志只能看到 target=api.deepseek.com，
+ * 却不知道用的是哪个模型——同一个渠道下好几十个模型，等于白记。有 model 就带上，没有就留空。
+ */
+function describeRequestModel(body: unknown): string {
+    if (!body || typeof body !== "object") return "";
+    const model = (body as { model?: unknown }).model;
+    return typeof model === "string" && model.trim() ? ` model=${model.trim()}` : "";
 }
 
 function sanitizeHeaders(headers: unknown) {

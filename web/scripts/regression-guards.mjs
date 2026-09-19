@@ -733,6 +733,22 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(runForRelease.indexOf("await response.text()") < runForRelease.lastIndexOf("release();"), "读取报文正文必须发生在撤登记之前。");
 }
 
+// —— 「上游没有返回任何候选结果」必须说得出原因（2026-09-19）——
+// 老板报的就是这一句：既不说上游到底答了什么，也不说该重试还是该改配置；而服务端只记 4xx/5xx，
+// 那次调用在上游侧等于没发生过，谁都查不下去。现在这条链路必须做到三件事。
+{
+    const imageApi = read("src/services/api/image.ts");
+    assert(imageApi.includes("describeMissingCandidates"), "「没有候选」的文案必须带上可查的原因（finish_reason / 报文片段），不能只回一句请稍后重试。");
+    // 判定顺序：先确认真的没有候选，再看信封。反了会把 {"msg":"ok","choices":[…]} 这种成功应答当失败。
+    const normalized = imageApi.replace(/\r\n/g, "\n");
+    assert(
+        /const message = payload\.choices\?\.\[0\]\?\.message;\n\s*if \(!message\) \{\n(?:(?!\n\s*\}\n).)*responseErrorMessage\(payload\)/s.test(normalized),
+        "必须先确认没有候选、再看上游信封：顺序反了会把带 msg 的成功应答当成失败。",
+    );
+    assertIncludes("src/app/api/proxy/route.ts", "describeUnusableSuccess", "代理必须把「HTTP 2xx 但报文用不了」记进日志，否则客户端报错时服务端一个字都没留。");
+    assertIncludes("src/app/api/proxy/route.ts", "describeRequestModel", "代理日志要带模型名，否则同一个渠道下几十个模型，出事了不知道是哪个。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

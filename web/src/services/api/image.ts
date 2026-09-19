@@ -8,7 +8,7 @@ import { imageToDataUrl } from "@/services/image-storage";
 import type { ReferenceImage } from "@/types/image";
 import { proxyFetch, proxyFetchDeferrable, proxyFetchStream, readProxyOutcome } from "./proxy-client";
 import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskId, upstreamProviderFromBaseUrl } from "./image-task";
-import { composeUpstreamFailure, describeEnvelopeFailure, describeHttpStatus, describeNetworkFailure } from "@/lib/generation/upstream-error";
+import { composeUpstreamFailure, describeEnvelopeFailure, describeHttpStatus, describeMissingCandidates, describeNetworkFailure, upstreamErrorMessage } from "@/lib/generation/upstream-error";
 import { isAspectRejection, parseSupportedRatios, pickSupportedRatio } from "./image-ratio";
 import { buildReferenceGenerationBody, isEditsEndpointUnsupported, normalizeReferenceDataUrl } from "./image-reference";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
@@ -671,10 +671,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function responseErrorMessage(value: unknown) {
     if (!isRecord(value)) return "";
-    const error = isRecord(value.error) ? value.error : undefined;
     const response = isRecord(value.response) ? value.response : undefined;
     const responseError = response && isRecord(response.error) ? response.error : undefined;
-    return stringValue(value.msg) || stringValue(error?.message) || stringValue(responseError?.message);
+    // 字段表统一走 upstreamErrorMessage（msg / message / error_message / error / data 里的原因都认），
+    // 再补一层 {response:{error:{message}}} 这种双层信封
+    return upstreamErrorMessage(value) || stringValue(responseError?.message);
 }
 
 function stringValue(value: unknown) {
@@ -853,13 +854,18 @@ async function requestStreamingResponse(config: AiConfig, body: Record<string, u
     if (!response.ok) throw new Error(await readFetchError(response, "请求失败"));
     if (!response.body) {
         const payload = (await response.json()) as any;
-        if (payload.error?.message) throw new Error(payload.error.message);
-        const text = payload.choices?.[0]?.message?.content || "";
-        const toolCalls = (payload.choices?.[0]?.message?.tool_calls || []).map((tc: any) => ({
+        const choice = payload.choices?.[0];
+        const text = choice?.message?.content || "";
+        const toolCalls = (choice?.message?.tool_calls || []).map((tc: any) => ({
             id: tc.id,
             type: "function" as const,
             function: { name: tc.function.name, arguments: tc.function.arguments },
         }));
+        // 只有「什么都没拿到」时才去认信封里的错误，理由同 requestChatCompletionResponse
+        if (!text && !toolCalls.length) {
+            const failure = responseErrorMessage(payload);
+            if (failure) throw new Error(withUpstreamHint(failure));
+        }
         return { content: text, toolCalls };
     }
 
@@ -1033,10 +1039,17 @@ async function requestChatCompletionResponse(config: AiConfig, body: Record<stri
         headers: aiHeaders(config, "application/json"),
         body: toChatCompletionBody(config, body),
     });
-    const failure = responseErrorMessage(payload);
-    if (failure) throw new Error(withUpstreamHint(failure));
     const message = payload.choices?.[0]?.message;
-    if (!message) throw new Error("上游没有返回任何候选结果，请稍后重试。");
+    if (!message) {
+        // 判定顺序要紧：**先确认真的没有候选**，再看信封。
+        // 反过来（先看信封）会把 {"msg":"ok","choices":[…]} 这类成功应答当成失败——有的网关就爱在成功里塞 msg。
+        const failure = responseErrorMessage(payload);
+        if (failure) throw new Error(withUpstreamHint(failure));
+        // 上游一句话都没说：把 finish_reason 与报文片段带上。
+        // 过去这里只回一句「上游没有返回任何候选结果」，服务端也只记 4xx/5xx，等于查不下去（2026-09-19）。
+        const finishReason = (payload.choices?.[0] as { finish_reason?: string } | undefined)?.finish_reason;
+        throw new Error(withUpstreamHint(describeMissingCandidates(payload, { shape: describePayloadShape(payload), finishReason })));
+    }
     return {
         content: stripReasoning(typeof message.content === "string" ? message.content : ""),
         toolCalls: (message.tool_calls || [])

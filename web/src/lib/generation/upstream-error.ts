@@ -80,6 +80,96 @@ export function describeNetworkFailure(error: unknown): string {
     return "";
 }
 
+/**
+ * 从上游应答里取错误说明文案（各家中转站字段名不统一：msg / message / error_message / error 字符串或对象）。
+ *
+ * 与 services/api/image-task.ts 的 envelopeMessage 是同一张字段表：那边为了能被 Node 单测直接 import，
+ * 刻意零依赖、自己留了一份实现（本模块同样零依赖，但 image-task 是 services 层，反向依赖不合适）。
+ * 改字段表时两处一起改；这里多认一层 data 里的失败原因（任务制通道会放在那）。
+ */
+export function upstreamErrorMessage(payload: unknown): string {
+    if (!payload || typeof payload !== "object") return "";
+    const record = payload as Record<string, unknown>;
+    for (const value of [record.msg, record.message, record.error_message]) {
+        if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    const error = record.error;
+    if (typeof error === "string" && error.trim()) return error.trim();
+    if (error && typeof error === "object") {
+        const nested = error as Record<string, unknown>;
+        for (const value of [nested.message, nested.msg, nested.detail]) {
+            if (typeof value === "string" && value.trim()) return value.trim();
+        }
+    }
+    const data = Array.isArray(record.data) ? record.data[0] : record.data;
+    if (data && typeof data === "object") {
+        const inner = data as Record<string, unknown>;
+        for (const value of [inner.error, inner.fail_reason, inner.failure_reason, inner.reason, inner.message, inner.msg]) {
+            if (typeof value === "string" && value.trim()) return value.trim();
+        }
+    }
+    return "";
+}
+
+/** 报文片段：认不出结构时，至少把上游原话（截断）留出来，别让排查到此为止 */
+function rawSnippet(payload: unknown, limit = 200): string {
+    let text = "";
+    try {
+        text = typeof payload === "string" ? payload : JSON.stringify(payload);
+    } catch {
+        text = "";
+    }
+    if (!text) return "";
+    const compact = text.replace(/\s+/g, " ").trim();
+    return compact.length > limit ? `${compact.slice(0, limit)}…` : compact;
+}
+
+/**
+ * 「HTTP 200，但报文里没有候选结果」时的文案（带 tools 的对话轮次专用）。
+ *
+ * 2026-09-19 老板报「上游没有返回任何候选结果，请稍后重试」——这句话对排查毫无用处：
+ * 既不说上游到底答了什么，也不说该重试还是该改配置，服务端（只记录 4xx/5xx）更是一个字都没留。
+ * 中转站把失败包在 200 里回是常态（`{"code":500,"message":"服务繁忙"}` 这类），所以先认信封；
+ * 认不出来就把 finish_reason 与报文片段带上，让下一个人有东西可查。
+ */
+export function describeMissingCandidates(payload: unknown, options: { shape?: string; finishReason?: string } = {}): string {
+    const envelope = upstreamErrorMessage(payload);
+    if (envelope) return `上游没有返回任何候选结果：${envelope}；请稍后重试`;
+    const finish = typeof options.finishReason === "string" && options.finishReason.trim() ? options.finishReason.trim() : "";
+    const shape = typeof options.shape === "string" ? options.shape.trim() : "";
+    const snippet = rawSnippet(payload);
+    const detail = [finish ? `finish_reason=${finish}` : "", shape, snippet ? `报文片段：${snippet}` : ""].filter(Boolean).join("，");
+    return `上游没有返回任何候选结果${detail ? `（${detail}）` : ""}；请稍后重试`;
+}
+
+const SUCCESS_CODES = new Set(["0", "200", "201", "202", "204"]);
+
+/**
+ * 「HTTP 2xx，但报文其实用不了」的判定，专供代理路由记日志用。
+ *
+ * 2026-09-19：客户端报「上游没有返回任何候选结果」，而服务端的代理日志只记 4xx/5xx（见 route.ts），
+ * 于是那次调用在上游侧等于没发生过——查不下去。这里把「2xx 但信封看着是失败」的情况点出来，
+ * 让日志留下证据。返回空串 = 看不出问题（正常成功报文一律返回空串，不污染日志）。
+ */
+export function describeUnusableSuccess(pathname: string, payload: unknown): string {
+    if (!payload || typeof payload !== "object") return "";
+    const record = payload as Record<string, unknown>;
+    const choices = record.choices;
+    const isChat = pathname.includes("/chat/completions");
+    if (choices !== undefined) {
+        if (!Array.isArray(choices)) return "choices 不是数组";
+        if (isChat && choices.length === 0) return "choices 为空";
+        const first = choices[0];
+        if (isChat && choices.length > 0 && (!first || typeof first !== "object" || !(first as Record<string, unknown>).message)) return "choices 里没有 message";
+    } else if (isChat) {
+        return "没有 choices 字段";
+    }
+    const code = record.code;
+    if (code !== undefined && code !== null && !SUCCESS_CODES.has(String(code))) return `信封失败码 ${String(code)}`;
+    if (record.error) return "信封里带 error";
+    return "";
+}
+
 /** 上游信封里的失败码 + 响应结构摘要：`上游返回失败码 403（顶层{code,data}，data 数组1项）` */
 export function describeEnvelopeFailure(code: unknown, shape = ""): string {
     const value = typeof code === "number" ? String(code) : String(code ?? "").trim();
