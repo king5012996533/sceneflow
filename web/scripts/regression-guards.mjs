@@ -340,6 +340,13 @@ assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "参考素
 assertNotMatches("src/services/image-storage.ts", /startsWith\("data:"\)\) return url/, "参考图的 data URL 必须也过压缩闸：原样放行等于最常走的那条路没有闸。");
 assertIncludes("src/services/image-storage.ts", "REFERENCE_COMPRESS_THRESHOLD_BYTES", "体积闸要具名常量：data / blob / storageKey 三条来路共用同一套阈值。");
 assertIncludes("src/services/image-storage.ts", 'imageHasAlpha(ctx, width, height) ? "image/webp" : "image/jpeg"', "压图要保住透明底：jpeg 没有 alpha 通道，透明底参考图会被压成黑底。");
+// Next 的中间件默认只把请求体的前 10MB 交给路由（body-streams.js 的 DEFAULT_BODY_CLONE_SIZE_LIMIT），
+// 超过就截断——route 里 json()/formData() 解析失败，错却报到别处。中间件这一层必须是链路里最宽的，
+// 否则应用自设的上限（41MB 信封 / 32MB 代理 / 16MB Replicate）根本用不到。
+// 键名是 proxyClientMaxBodySize：middlewareClientMaxBodySize 已废弃且不在 NextConfig 类型里，写了会编译失败；
+// 值必须 ≥ nginx 的 client_max_body_size（50m），中间件才是链路里最宽的一层。
+assertIncludes("next.config.ts", 'proxyClientMaxBodySize: "52mb"', "中间件的请求体上限必须显式配置：默认 10MB 会静默截断大素材，让应用自己的上限形同虚设。");
+assertNotMatches("next.config.ts", /middlewareClientMaxBodySize\s*:/, "不得再写已废弃的 middlewareClientMaxBodySize（不在 NextConfig 类型里，且与 proxyClientMaxBodySize 互斥）。");
 
 // —— Aigccc / Seedance 2.0 网关接入 ——
 assertIncludes("src/stores/use-config-store.ts", '"aigccc"', "ApiCallFormat 必须支持 aigccc。");
