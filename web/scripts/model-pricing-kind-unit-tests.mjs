@@ -36,6 +36,10 @@ check("线上真实模型名：图片类", () => {
     assert.equal(inferPricingKind("qwen-image-3.0"), "image");
     assert.equal(inferPricingKind("seedream-5-0-pro"), "image");
     assert.equal(inferPricingKind("flux-2-pro"), "image");
+    // 2026-09-19 接 recraft 时发现：上游用 owner/name（recraft-ai/recraft-v4-pro），
+    // 关键词表漏了它 → 判成 text → 用户端价目表（/api/billing/packages 的 rateCard）整行漏掉这个模型。
+    assert.equal(inferPricingKind("recraft-ai/recraft-v4-pro"), "image");
+    assert.equal(inferPricingKind("recraft-ai/recraft-v3"), "image");
 });
 
 check("线上真实模型名：视频类", () => {

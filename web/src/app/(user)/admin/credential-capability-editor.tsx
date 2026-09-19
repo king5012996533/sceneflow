@@ -38,6 +38,8 @@ function modelFormatHint(provider?: string): string {
  */
 export function CredentialCapabilityEditor({ models, value, onChange, provider }: CredentialCapabilityEditorProps) {
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+    // 关掉开关不等于「删掉配置」：先把上一份 spec 收着，重新打开时原样退回（否则手滑一下就得从头标）
+    const [stashed, setStashed] = useState<CredentialCapabilitiesMap>({});
 
     if (!models.length) {
         return (
@@ -54,11 +56,14 @@ export function CredentialCapabilityEditor({ models, value, onChange, provider }
                 const enabled = Boolean(spec);
                 const open = Boolean(expanded[model]);
                 const toggle = () => setExpanded((prev) => ({ ...prev, [model]: !prev[model] }));
-                // 文本/音频等模型没有可标定参数，禁止开启能力开关（此前误开成图片能力的，允许关闭恢复）
-                const supportsCapability = Boolean(defaultCapabilityForModel(model));
+                // 文本/音频等模型没有可标定参数，禁止开启能力开关（此前误开成图片能力的，允许关闭恢复）。
+                // 已标定过的模型一律算「可标定」：库里存着 spec 就说明类型是管理员显式声明过的，
+                // 名字启发式认不出（recraft-ai/recraft-v4-pro 这类上游 owner/name）不该反过来把字段锁死。
+                const supportsCapability = enabled || Boolean(defaultCapabilityForModel(model));
                 const setEnabled = (checked: boolean) => {
                     if (checked && !supportsCapability) return;
-                    onChange({ ...value, [model]: checked ? initialSpecForModel(model) : undefined });
+                    if (!checked && value[model]) setStashed((prev) => ({ ...prev, [model]: value[model] }));
+                    onChange({ ...value, [model]: checked ? (stashed[model] ?? initialSpecForModel(model)) : undefined });
                     if (checked) setExpanded((prev) => ({ ...prev, [model]: true }));
                 };
                 return (

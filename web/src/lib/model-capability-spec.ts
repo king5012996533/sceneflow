@@ -309,6 +309,10 @@ export const DEFAULT_GENVIDEO_VIDEO_CAPABILITY: GenVideoVideoCapabilitySpec = {
 /**
  * 按模型名推断能力类型（与前端 use-config-store 的模型名启发式保持一致）。
  * 仅用于「预填默认」和「编辑默认选择」，推断不到时返回 null（文本/音频等暂不标定）。
+ *
+ * 上游用的是「owner/模型名」（Replicate）时没有通用后缀可认（如 recraft-ai/recraft-v4-pro），
+ * 只能逐个登记关键词；漏登记不会 500，但后台那行的标定字段会被判定成「无需标定」而锁死，
+ * 用户端价目表也会漏掉这个模型 —— 接新模型时先在这里与 model-pricing-kind.ts 各加一处。
  */
 export function inferModelKindByName(model: string): ModelCapabilityKind | null {
     const value = (model.includes("::") ? model.slice(model.indexOf("::") + 2) : model).toLowerCase();
@@ -330,6 +334,7 @@ export function inferModelKindByName(model: string): ModelCapabilityKind | null 
             value.includes("flux") ||
             value.includes("sdxl") ||
             value.includes("stable-diffusion") ||
+            value.includes("recraft") ||
             value.includes("midjourney"));
     if (isImage) return IMAGE_KIND;
     return null;

@@ -21,7 +21,7 @@ const VIDEO_CAPABILITY_KINDS = new Set(["video", "seedance-video", "minimax-vide
 
 const AUDIO_KEYWORDS = ["audio", "tts", "speech", "voice", "music", "sound"];
 const VIDEO_KEYWORDS = ["seedance", "video", "sora", "veo", "kling", "wan", "hailuo", "minimax", "h3"];
-const IMAGE_KEYWORDS = ["seedream", "gpt-image", "image", "dall-e", "dalle", "imagen", "flux", "sdxl", "stable-diffusion", "midjourney"];
+const IMAGE_KEYWORDS = ["seedream", "gpt-image", "image", "dall-e", "dalle", "imagen", "flux", "sdxl", "stable-diffusion", "recraft", "midjourney"];
 
 function bareModelName(model: string) {
     const value = String(model || "");
