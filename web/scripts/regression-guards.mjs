@@ -1027,6 +1027,11 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/lib/image-reference-prompt.ts", "IMAGE_REFERENCE_TOKEN_SOURCE", "图片编号词汇（@图片 N）必须同时暴露正则源：标记体检靠它从提示词里回读编号。");
     // 面板入口只在标定支持的模型上出现（对用户可见的能力，不能靠"试了才知道"）。
     assertIncludes("src/components/studio/studio-composer.tsx", "interactiveEditEnabled", "参考图上的「标注」入口必须由能力标定控制。");
+    // 「插到光标处」全靠这个 ref：声明了却忘了挂到 <textarea> 上，ref 恒为 null，
+    // 标记会无声地退化成"追加到句尾"（第一版就是这么错的），提示词读起来通顺但改错地方。
+    assertIncludes("src/components/studio/studio-composer.tsx", "ref={textareaRef}", "光标插入依赖的 textareaRef 必须真的挂在提示词输入框上（否则标记只能追加到句尾）。");
+    // 标注面板的提示行常驻：条件渲染会让弹窗变高、垂直居中上移，图上的坐标跟着挪位。
+    assertIncludes("src/components/image-marker-dialog.tsx", "<div className=\"min-h-4 text-xs text-amber-600\">{hint}</div>", "标注面板的提示行必须常驻且高度固定：条件渲染会导致弹窗重新居中，按下与松开落到两套坐标。");
 }
 
 if (failures.length) {

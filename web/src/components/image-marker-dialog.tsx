@@ -33,6 +33,9 @@ export type ImageMarkerDialogProps = {
 
 type Mode = "point" | "bbox";
 
+/** 图在视口里的渲染框：比例换算只需要 width/height，left/top 用来把鼠标位置换算成图内坐标 */
+type StageFrame = { left: number; top: number; width: number; height: number };
+
 export function ImageMarkerDialog({ open, onClose, reference, imageIndex, label, onInsert }: ImageMarkerDialogProps) {
     const [mode, setMode] = useState<Mode>("bbox");
     const [markers, setMarkers] = useState<ImageMarker[]>([]);
@@ -41,9 +44,10 @@ export function ImageMarkerDialog({ open, onClose, reference, imageIndex, label,
     const [hint, setHint] = useState("");
     const stageRef = useRef<HTMLDivElement | null>(null);
     const dragStart = useRef<{ x: number; y: number } | null>(null);
-    // 手势开始时把图的渲染尺寸量一次：换算用的是比例，渲染尺寸与原图尺寸等价，
-    // 但必须用**同一份**尺寸算按下与松开两个点，否则中途布局变一下框就歪了。
-    const dragStageSize = useRef<{ width: number; height: number } | null>(null);
+    // 手势开始时把图的渲染框量一次：换算用的是比例，渲染尺寸与原图尺寸等价，
+    // 但**按下与松开必须用同一份框**——弹窗是垂直居中的，内容一变高就整体上移，
+    // 中途重新量框会把「按下」和「松开」放进两套坐标，框就歪了（提示行出现/消失正是这种情况）。
+    const dragFrame = useRef<StageFrame | null>(null);
 
     // 换图 / 关面板时清空：标记是"针对某一张图"的，上一张图的框留在下一张上就是改错地方
     useEffect(() => {
@@ -54,53 +58,56 @@ export function ImageMarkerDialog({ open, onClose, reference, imageIndex, label,
         setKeepUnchanged(false);
     }, [reference?.id, open]);
 
-    const stageSize = useCallback((): { width: number; height: number } => {
+    const stageFrame = useCallback((): StageFrame | null => {
         const rect = stageRef.current?.getBoundingClientRect();
-        return { width: rect?.width ?? 0, height: rect?.height ?? 0 };
+        return rect ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height } : null;
     }, []);
 
-    const localPoint = useCallback((event: React.PointerEvent): { x: number; y: number } => {
-        const rect = stageRef.current?.getBoundingClientRect();
-        if (!rect) return { x: 0, y: 0 };
-        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    /** 鼠标位置 → 图内坐标（相对传入的那一份框，保证一次手势里用的是同一个坐标系） */
+    const localPoint = useCallback((event: React.PointerEvent, frame: StageFrame | null): { x: number; y: number } => {
+        if (!frame) return { x: 0, y: 0 };
+        return { x: event.clientX - frame.left, y: event.clientY - frame.top };
     }, []);
 
     const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         if (!reference) return;
         event.preventDefault();
+        const frame = stageFrame();
+        if (!frame) return;
         stageRef.current?.setPointerCapture(event.pointerId);
-        const point = localPoint(event);
+        const point = localPoint(event, frame);
         if (mode === "point") {
-            const marker = markerFromPoint(imageIndex, point, stageSize(), keepUnchanged);
+            const marker = markerFromPoint(imageIndex, point, frame, keepUnchanged);
             if (marker) setMarkers((value) => [...value, marker]);
             setHint("");
             return;
         }
         dragStart.current = point;
-        dragStageSize.current = stageSize();
+        dragFrame.current = frame;
         setDragging({ x1: point.x, y1: point.y, x2: point.x, y2: point.y });
         setHint("");
     };
 
     const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
         if (mode !== "bbox" || !dragStart.current) return;
-        const point = localPoint(event);
+        const point = localPoint(event, dragFrame.current);
         setDragging({ x1: dragStart.current.x, y1: dragStart.current.y, x2: point.x, y2: point.y });
     };
 
     const onPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
         if (mode !== "bbox" || !dragStart.current) return;
         const start = dragStart.current;
-        const size = dragStageSize.current ?? stageSize();
+        const frame = dragFrame.current ?? stageFrame();
         dragStart.current = null;
-        dragStageSize.current = null;
+        dragFrame.current = null;
         setDragging(null);
-        const end = localPoint(event);
+        if (!frame) return;
+        const end = localPoint(event, frame);
         if (isDragTooSmall(start, end)) {
             setHint("框太小了（小于 4 像素），已忽略；要选一个点请切到「点选」。");
             return;
         }
-        const marker = markerFromBox(imageIndex, { x1: start.x, y1: start.y, x2: end.x, y2: end.y }, size, keepUnchanged);
+        const marker = markerFromBox(imageIndex, { x1: start.x, y1: start.y, x2: end.x, y2: end.y }, frame, keepUnchanged);
         if (!marker) {
             setHint("这个框没有面积，已忽略：请拖出一个真正的区域。");
             return;
@@ -113,9 +120,9 @@ export function ImageMarkerDialog({ open, onClose, reference, imageIndex, label,
     const clear = () => setMarkers([]);
 
     const preview = useMemo(() => {
-        const size = dragStageSize.current;
-        if (!dragging || !size) return null;
-        return markerFromBox(imageIndex, dragging, size);
+        const frame = dragFrame.current;
+        if (!dragging || !frame) return null;
+        return markerFromBox(imageIndex, dragging, frame);
     }, [dragging, imageIndex]);
 
     /** 归一化值 → 百分比（网格 1000：x=500 就是图的 50% 处） */
@@ -212,7 +219,8 @@ export function ImageMarkerDialog({ open, onClose, reference, imageIndex, label,
                     </div>
                 </div>
 
-                {hint ? <div className="text-xs text-amber-600">{hint}</div> : null}
+                {/* 提示行常驻、高度固定：文案一出现弹窗就变高，垂直居中会让整张图上移，坐标跟着挪位 */}
+                <div className="min-h-4 text-xs text-amber-600">{hint}</div>
 
                 <ul className="space-y-1 text-xs text-[#5a5550]">
                     <li>· 标记会写成「{reference ? label(imageIndex) : "@图片 N"} &lt;bbox&gt;…&lt;/bbox&gt;」插进提示词，编号必须紧跟标记前面 —— 模型靠它判断改哪张图。</li>

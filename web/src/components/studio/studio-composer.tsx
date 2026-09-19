@@ -215,6 +215,7 @@ export function StudioComposer({
             )}
 
             <textarea
+                ref={textareaRef}
                 value={draft}
                 rows={3}
                 placeholder="描述一个画面，或继续编辑上一张图。Enter 发送，Shift+Enter 换行。"
