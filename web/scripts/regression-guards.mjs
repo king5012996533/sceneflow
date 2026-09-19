@@ -412,6 +412,18 @@ for (const route of walkFiles("src/app/api/internal").filter((path) => path.ends
     assert(read(route).includes("GENERATION_WORKER_SECRET"), `${route} 在 /api/internal 下必须自带 worker 密钥校验（中间件已放行这一整段路径）。`);
 }
 
+// —— Replicate 任务的取件（2026-09-19 事故：图片走 Replicate 渠道后任务永远卡在 running）——
+// 现象：预测在上游 10 秒就跑完了，库里 pollAttempts 始终为 0、status 永远 running ——
+// 没有任何入口调用过轮询器（internal/generation/poll 只写了路由，crontab 里从来没有这一条）。
+// 两层必须都在：事件流驱动（客户端在等结果时秒级出图）+ cron 兜底（页面关掉后仍能取回归档）。
+assertIncludes("src/lib/generation/replicate-poller.server.ts", "export async function pollReplicateJobById(", "轮询器必须提供单任务入口：cron 最快一分钟一轮，等结果的用户不能等那么久。");
+assertIncludes("src/lib/generation/replicate-poller.server.ts", "return pollReplicateJob(job as ReplicateJobRow)", "单任务入口必须与批量扫描共用同一份取件逻辑，不得各写一份（会重复取件/重复退款）。");
+assertIncludes("src/lib/generation/replicate-poller.server.ts", 'provider: "replicate"', "轮询只认领 provider=replicate 的任务：别的通道外链是客户端取件，轮询会在上游多建一次调用。");
+assertIncludes("src/app/api/generation/jobs/[id]/events/route.ts", "pollReplicateJobById(id)", "等结果的事件流必须驱动轮询，否则用户只能等 cron 兜底（一分钟）才看到图。");
+assertIncludes("src/app/api/generation/jobs/[id]/events/route.ts", "where: { id, userId: user.id }", "事件流只能读登录用户自己名下的任务。");
+assertNotMatches("src/app/api/generation/jobs/[id]/events/route.ts", /fetchSafely|api\.replicate\.com/, "取件逻辑只能有一份（replicate-poller.server.ts），事件流不得就地回源上游。");
+assertIncludes("src/app/api/internal/generation/poll/route.ts", "pollReplicateJobs", "内部轮询入口必须由服务器 crontab 定时调用（每分钟），页面关掉后仍要能把结果取回归档。");
+
 // —— 图片任务的上游留痕（2026-09-18 事故：全库 1900+ 条图片任务的 provider/model/externalId 全空）——
 // 任务卡在 running 时服务端既不知道用的哪个模型、也不知道上游任务号，只能退款了事、没法取件。
 assertIncludes("src/services/api/image.ts", "reportUpstreamTask(serverJobId", "图片任务拿到上游任务号后必须留痕，否则卡住时无从追账、也没法取件。");

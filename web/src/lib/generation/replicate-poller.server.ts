@@ -10,19 +10,61 @@ import { fetchSafely } from "@/lib/url-safety";
 const MAX_ATTEMPTS = 240;
 const MAX_ARCHIVE_BYTES = 100 * 1024 * 1024;
 
+/** 轮询器认领任务时需要的那几列（只列用到字段，避免整行透传给纯函数） */
+type ReplicateJobRow = {
+    id: string;
+    userId: string;
+    updatedAt: Date;
+    pollAttempts: number;
+    creditsCost: number;
+    requestKey: string;
+    providerModel: string | null;
+    externalGetUrl: string | null;
+    nextPollAt?: Date | null;
+};
+
 export async function pollReplicateJobs(limit = 10) {
     if (!prisma) return { processed: 0 };
     const now = new Date();
     const jobs = await (prisma.generationJob as any).findMany({ where: { provider: "replicate", status: "running", externalGetUrl: { not: null }, OR: [{ nextPollAt: null }, { nextPollAt: { lte: now } }] }, orderBy: { createdAt: "asc" }, take: limit });
     let processed = 0;
     for (const job of jobs) {
+        if (await pollReplicateJob(job as ReplicateJobRow)) processed += 1;
+    }
+    return { processed };
+}
+
+/**
+ * 单任务轮询 —— 客户端正在事件流上等结果时由事件流驱动（见 api/generation/jobs/[id]/events）。
+ *
+ * 为什么需要这个入口：cron 兜底最快也是一分钟一轮，用户在页面上等出图不能等那么久。
+ * 事件流本来就每 2 秒读一次任务行，顺手把轮询推一步，出图时间就贴近上游真实耗时。
+ * 与批量扫描共用同一份取件逻辑：乐观锁（updatedAt）+ nextPollAt 节流，
+ * 两个入口同时跑也不会对同一次预测重复取件。
+ *
+ * ⚠️ 只认领 provider=replicate 的任务 —— 别的通道（ai-genvideo 等）的外链是「客户端取件」，
+ * 轮询它们会在上游多建一次调用。
+ */
+export async function pollReplicateJobById(jobId: string) {
+    if (!prisma) return false;
+    const job = await (prisma.generationJob as any).findFirst({ where: { id: jobId, provider: "replicate", status: "running", externalGetUrl: { not: null } } });
+    if (!job) return false;
+    // 节流：批量扫描靠 where 过滤，单任务入口要自己让路，否则事件流每 2 秒都会打一次上游
+    if (job.nextPollAt && new Date(job.nextPollAt).getTime() > Date.now()) return false;
+    return pollReplicateJob(job as ReplicateJobRow);
+}
+
+async function pollReplicateJob(job: ReplicateJobRow): Promise<boolean> {
+    if (!prisma) return false;
+    {
+        const now = new Date();
         const lease = randomUUID();
         const pollingStatus = `polling:${lease}`;
         const claimed = await (prisma.generationJob as any).updateMany({
             where: { id: job.id, status: "running", updatedAt: job.updatedAt },
             data: { updatedAt: now, nextPollAt: new Date(now.getTime() + 60_000), pollAttempts: { increment: 1 }, externalStatus: pollingStatus },
         });
-        if (!claimed.count) continue;
+        if (!claimed.count) return false;
         try {
             const credential = await resolvePlatformCredential({ targetUrl: job.externalGetUrl!, provider: "replicate", model: job.providerModel || undefined });
             if (!credential) throw new Error("Replicate 平台凭证不可用");
@@ -78,7 +120,7 @@ export async function pollReplicateJobs(limit = 10) {
             } else {
                 await (prisma.generationJob as any).update({ where: { id: job.id }, data: { externalStatus: prediction.status || "processing", nextPollAt: new Date(Date.now() + 5_000) } });
             }
-            processed += 1;
+            return true;
         } catch (error) {
             await (prisma.generationJob as any)
                 .updateMany({
@@ -86,9 +128,9 @@ export async function pollReplicateJobs(limit = 10) {
                     data: { externalStatus: "poll_error", error: error instanceof Error ? error.message.slice(0, 1000) : "轮询失败", nextPollAt: new Date(Date.now() + 30_000) },
                 })
                 .catch(() => undefined);
+            return false;
         }
     }
-    return { processed };
 }
 
 function extractUrls(value: unknown, results: string[] = []): string[] {
