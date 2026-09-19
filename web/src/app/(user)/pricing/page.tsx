@@ -121,11 +121,11 @@ export default function PricingPage() {
                                 ))}
                             </div>
                             <p className="mt-4 text-[13px] leading-[1.8] text-[#726d67]">
-                                <b className="font-medium text-[#47423c]">长期有效：</b>充值积分不过期，可在套餐与画布内持续使用。
+                                <b className="whitespace-nowrap font-medium text-[#47423c]">长期有效：</b>充值积分不过期，可在套餐与画布内持续使用。
                                 <br />
-                                <b className="font-medium text-[#47423c]">扣费规则：</b>生成开始时预扣积分，同一任务不会重复扣费；任务一旦开跑，失败 / 取消也不退回（上游按「一次尝试」计费）。
+                                <b className="whitespace-nowrap font-medium text-[#47423c]">扣费规则：</b>生成开始时预扣积分，同一任务不会重复扣费；任务一旦开跑，失败 / 取消也不退回（上游按「一次尝试」计费）。
                                 <br />
-                                <b className="font-medium text-[#47423c]">成品保留：</b>上游已产出的成品会归档到「生成记录」，任务判失败或取消也能取。
+                                <b className="whitespace-nowrap font-medium text-[#47423c]">成品保留：</b>上游已产出的成品会归档到「生成记录」，任务判失败或取消也能取。
                             </p>
                         </div>
                     </div>
