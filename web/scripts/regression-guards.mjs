@@ -331,6 +331,15 @@ assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "composeUp
 assertIncludes("src/lib/generation/upstream-error.ts", "record.detail", "上游把原因放在顶层 detail 时也要读出来（Replicate 的失败报文就是这样，读不到就只剩「任务创建失败」）。");
 assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "出网通道不可用", "出网通道不通时必须在服务端日志里留下任务号与目标地址。");
 assertNotMatches("src/app/api/generation/jobs/[id]/replicate/route.ts", /status: response\.status \|\| 502/, "上游的 401/403 不得照抄成本路由的状态码（前端会当成登录过期），一律按 502 报上游失败。");
+// 2026-09-19：线上报「放两张参考图就 413」。两个根因，都得钉住：
+//   ① 这条路由把请求体上限写死 2MB（其它通道是 16MB/32MB，nginx 是 50m）——两张照片经 base64 就超；
+//   ② 参考图的 data URL 在 imageToDataUrl 里被原样放行，根本没走压缩闸，而参考图常常就是 data URL。
+assertNotMatches("src/app/api/generation/jobs/[id]/replicate/route.ts", /2 \* 1024 \* 1024/, "Replicate 通道的请求体上限不得再写死 2MB（两张参考图就被自己拒了，其它通道是 16/32MB）。");
+assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "Buffer.byteLength(payload", "请求体大小必须按字节算：中文 prompt 用 .length 是少算的，会长过 header 闸。");
+assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "参考素材过大", "413 必须给出体积、上限与下一步（减张数 / 换小图），不能只说「输入过大」。");
+assertNotMatches("src/services/image-storage.ts", /startsWith\("data:"\)\) return url/, "参考图的 data URL 必须也过压缩闸：原样放行等于最常走的那条路没有闸。");
+assertIncludes("src/services/image-storage.ts", "REFERENCE_COMPRESS_THRESHOLD_BYTES", "体积闸要具名常量：data / blob / storageKey 三条来路共用同一套阈值。");
+assertIncludes("src/services/image-storage.ts", 'imageHasAlpha(ctx, width, height) ? "image/webp" : "image/jpeg"', "压图要保住透明底：jpeg 没有 alpha 通道，透明底参考图会被压成黑底。");
 
 // —— Aigccc / Seedance 2.0 网关接入 ——
 assertIncludes("src/stores/use-config-store.ts", '"aigccc"', "ApiCallFormat 必须支持 aigccc。");
