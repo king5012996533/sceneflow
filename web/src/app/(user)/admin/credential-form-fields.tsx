@@ -1,7 +1,9 @@
 "use client";
 
-import { Input, InputNumber, Select } from "antd";
+import { useState } from "react";
+import { App, Button, Input, InputNumber, Select } from "antd";
 
+import { apiPath } from "@/lib/app-paths";
 import type { ModelCapabilitySpec } from "@/lib/model-capability-spec";
 import type { ModelPricing } from "@/lib/credit-pricing";
 import { CredentialCapabilityEditor, type CredentialCapabilitiesMap } from "./credential-capability-editor";
@@ -34,6 +36,8 @@ type CredentialFormFieldsProps = {
     onChange: (patch: Partial<CredentialFormState>) => void;
     /** 编辑模式：API Key 留空 = 不更换 */
     editMode: boolean;
+    /** 编辑已有凭证时的 id：Key 框留空时也能用它去拉上游模型列表 */
+    credentialId?: string;
 };
 
 /** 「绑定模型」输入框占位符：Replicate 等供应商的模型名有特殊格式，按供应商提示 */
@@ -84,9 +88,50 @@ export function pickPricing(modelsText: string, map: CredentialPricingMap): Reco
     return result;
 }
 
-export function CredentialFormFields({ form, onChange, editMode }: CredentialFormFieldsProps) {
+export function CredentialFormFields({ form, onChange, editMode, credentialId }: CredentialFormFieldsProps) {
+    const { message } = App.useApp();
     const set = (patch: Partial<CredentialFormState>) => onChange(patch);
     const models = parseModelList(form.models);
+    const [upstreamModels, setUpstreamModels] = useState<string[]>([]);
+    const [upstreamNote, setUpstreamNote] = useState("");
+    const [fetchingUpstream, setFetchingUpstream] = useState(false);
+
+    /**
+     * 用当前这把 Key 去问上游「你支持哪些模型 id」，再点选加入绑定模型。
+     * 模型名是上游的机器标识（DeepSeek 只认 deepseek-flash / deepseek-v4-pro），手写极易写成展示名，
+     * 落库后请求原样转发就会被上游 400 拒掉 —— 所以这里干脆不让手写。
+     */
+    async function fetchUpstreamModels() {
+        setFetchingUpstream(true);
+        setUpstreamNote("");
+        try {
+            const apiKey = form.apiKey.trim();
+            if (!apiKey && !credentialId) throw new Error("请先填写 API Key；编辑已有凭证时留空会沿用已保存的那把");
+            const res = await fetch(apiPath("/api/admin/credential-models"), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(apiKey ? { baseUrl: form.baseUrl, provider: form.provider, apiKey } : { id: credentialId }),
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.detail ? `${json.error}：${json.detail}` : json.error || "拉取上游模型失败");
+            const list = (json.models as Array<{ id: string }>).map((item) => item.id);
+            setUpstreamModels(list);
+            setUpstreamNote(`上游返回 ${list.length} 个模型（${json.endpoint}）；点一下加入 / 移出绑定模型。`);
+            message.success(`已拉取 ${list.length} 个上游模型`);
+        } catch (error) {
+            setUpstreamModels([]);
+            const text = error instanceof Error ? error.message : "拉取上游模型失败";
+            setUpstreamNote(text);
+            message.error(text);
+        } finally {
+            setFetchingUpstream(false);
+        }
+    }
+
+    function toggleModel(modelId: string) {
+        const next = models.includes(modelId) ? models.filter((item) => item !== modelId) : [...models, modelId];
+        set({ models: next.join(", ") });
+    }
 
     return (
         <div className="space-y-3 py-2">
@@ -107,8 +152,34 @@ export function CredentialFormFields({ form, onChange, editMode }: CredentialFor
                 <Input.Password value={form.apiKey} placeholder={editMode ? "留空则不更换（当前已加密存储）" : "上游 API Key（加密存储）"} onChange={(event) => set({ apiKey: event.target.value })} />
             </div>
             <div>
-                <div className="mb-1 text-sm text-[#332f2a]">绑定模型（逗号分隔；留空 = 全部）</div>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="text-sm text-[#332f2a]">绑定模型（逗号分隔；留空 = 全部）</span>
+                    <Button size="small" loading={fetchingUpstream} onClick={() => void fetchUpstreamModels()}>
+                        拉取上游模型
+                    </Button>
+                </div>
                 <Input value={form.models} placeholder={MODELS_PLACEHOLDER[form.provider] ?? MODELS_PLACEHOLDER_DEFAULT} onChange={(event) => set({ models: event.target.value })} />
+                <div className="mt-1 text-[11px] leading-4 text-[#726d67]">必须填上游认得的那串 id（如 deepseek-flash），填展示名（如 DeepSeek-V4.1-Flash）会被上游直接 400 拒掉。点「拉取上游模型」按名字点选最稳。</div>
+                {upstreamNote ? <div className="mt-1 text-[11px] leading-4 text-[#726d67]">{upstreamNote}</div> : null}
+                {upstreamModels.length ? (
+                    <div className="mt-1.5 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-[#e9e6e3] bg-white/60 p-2">
+                        {upstreamModels.map((modelId) => {
+                            const bound = models.includes(modelId);
+                            return (
+                                <button
+                                    key={modelId}
+                                    type="button"
+                                    onClick={() => toggleModel(modelId)}
+                                    className={`cursor-pointer rounded border px-1.5 py-0.5 font-mono text-[11px] ${bound ? "border-amber-200 bg-amber-50 text-amber-700" : "border-[#e2dfdc] bg-white text-[#5a5550] hover:border-[#c9c4bf]"}`}
+                                    title={bound ? "点击移出绑定模型" : "点击加入绑定模型"}
+                                >
+                                    {bound ? "✓ " : ""}
+                                    {modelId}
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : null}
             </div>
             <div>
                 <div className="mb-1 text-sm text-[#332f2a]">优先级（越大越优先，同供应商多 Key 时生效）</div>
@@ -119,7 +190,7 @@ export function CredentialFormFields({ form, onChange, editMode }: CredentialFor
                 <CredentialCapabilityEditor models={models} value={form.capabilities} provider={form.provider} onChange={(capabilities) => set({ capabilities })} />
             </div>
             <div>
-                <div className="mb-1 text-sm text-[#332f2a]">逐模型积分定价（图片按分辨率分档 / 视频按分辨率分档 / 音频每次 / 文本每次；未配置 = 全局默认 → 内置草案）</div>
+                <div className="mb-1 text-sm text-[#332f2a]">逐模型积分定价（按模型类型只显示该类型的价框：文本模型给文本价、图片模型给分辨率分档；未配置 = 全局默认 → 内置草案，可用「显示全部字段」展开其余类型）</div>
                 <CredentialPricingEditor models={models} value={form.pricing} capabilities={form.capabilities} onChange={(pricing) => set({ pricing })} />
             </div>
         </div>

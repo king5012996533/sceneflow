@@ -31,6 +31,7 @@
         "test:retention": "node scripts/generation-media-retention-unit-tests.mjs",
         "test:refund": "node scripts/generation-refund-policy-unit-tests.mjs",
         "test:resolution": "node scripts/image-resolution-unit-tests.mjs",
+        "test:pricingkind": "node scripts/model-pricing-kind-unit-tests.mjs",
         "test:upstream": "node scripts/upstream-error-unit-tests.mjs",
         "test:artifact": "node scripts/generation-artifact-unit-tests.mjs",
         "test:inflight": "node scripts/upstream-inflight-unit-tests.mjs",

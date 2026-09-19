@@ -249,7 +249,7 @@ export default function CredentialsTab() {
                 width={640}
                 styles={{ body: { maxHeight: "min(62vh, 560px)", overflowY: "auto", paddingRight: 4 } }}
             >
-                <CredentialFormFields form={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} editMode={Boolean(editing)} />
+                <CredentialFormFields form={form} onChange={(patch) => setForm((prev) => ({ ...prev, ...patch }))} editMode={Boolean(editing)} credentialId={editing?.id} />
             </Modal>
         </section>
     );

@@ -226,6 +226,22 @@ export async function listPlatformCredentials(): Promise<Array<Omit<CredentialRo
     });
 }
 
+/**
+ * 按 id 取单条凭证（含解密后的 Key），仅供服务端自己发起的出站调用使用（如「拉取上游模型名」）。
+ * 不要把这个返回值直接丢进任何 HTTP 响应体。
+ */
+export async function getPlatformCredentialSecret(id: string): Promise<ResolvedCredential | null> {
+    if (!prisma || !id) return null;
+    const row = (await prisma.providerCredential.findUnique({ where: { id } })) as unknown as CredentialRow | null;
+    if (!row) return null;
+    try {
+        return { id: row.id, name: row.name, provider: row.provider, baseUrl: row.baseUrl, apiKey: decryptCredentialKey(row.keyEnc) };
+    } catch (error) {
+        console.error(`[credential-store] 解密平台密钥失败（id=${id}）:`, (error as Error).message);
+        return null;
+    }
+}
+
 export async function createPlatformCredential(input: CredentialInput) {
     if (!prisma) throw new Error("数据库不可用");
     if (!input.apiKey.trim()) throw new Error("API Key 不能为空");
