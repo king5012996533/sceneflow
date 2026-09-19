@@ -3,11 +3,13 @@
  *
  * 起因（2026-09-18）：上游几乎每次都出图，我们的前端却常报失败，钱花出去了用户什么都没拿到，
  * 而且账目对不上 —— 到底有多少次是「上游给了成品、我们没收费」，谁也说不清。
- * 这里把一天的任务归成四本账，让「对不上」的部分变成可数的数字：
+ * 这里把一天的任务归成几本账，让「对不上」的部分变成可数的数字：
  *
  *   上游出图 · 已收费        正常生意
- *   上游出图 · 未收费        用户取消（保图不保账）＋ 我们故障后补认领（图给了，钱退了）
- *   上游失败 · 已退款        正常
+ *   上游出图 · 未收费        用户取消保图 ＋ 我们故障后补认领（2026-09-19 前的老口径，之后取消也照收）
+ *   上游失败 · 已收费        钱收了、图没给：2026-09-19 起失败不退款（见 generation-refund-policy），
+ *                            这一栏就是要盯的数字 —— 它涨上去，说明我们在拿「没生成」换钱
+ *   上游失败 · 已退款        只反映 2026-09-19 之前的历史（政策改后应当一直是 0）
  *   有成品却没留下            目标 0：每出现一次都是我们又把钱烧了（externalStatus='dropped' 标记）
  */
 
@@ -27,8 +29,10 @@ export type DailyReportStats = {
     upstreamOkNotCharged: number;
     /** 上面这一类里，属于「我们故障、事后认领」的部分（补认领） */
     upstreamOkNotChargedByOurFault: number;
-    /** 上游真失败、已退款 */
+    /** 上游真失败、已退款（2026-09-19 前的老口径，之后应恒为 0） */
     upstreamFailedRefunded: number;
+    /** 上游失败但照收积分（2026-09-19 起不退款）：用户付了钱，什么都没拿到 */
+    upstreamFailedCharged: number;
     /** 有成品却没能留下（目标 0） */
     artifactDropped: number;
     /** 收了费但本地没有成品（外部直链通道，或文本类），供核对，不是告警 */
@@ -44,13 +48,15 @@ export function buildDailyReport(stats: DailyReportStats): { subject: string; ma
     lines.push("");
     lines.push(`统计范围：最近 ${stats.windowHours} 小时（图片/视频任务），共 ${stats.total} 条。`);
     lines.push("");
-    lines.push("## 四本账");
+    lines.push("## 五本账");
     lines.push("");
     lines.push("| 口径 | 条数 | 说明 |");
     lines.push("| --- | --- | --- |");
     lines.push(`| 上游出图 · 已收费 | ${stats.upstreamOkCharged} | 正常生意 |`);
-    lines.push(`| 上游出图 · 未收费 | ${stats.upstreamOkNotCharged} | 用户取消保图 ${stats.upstreamOkNotCharged - stats.upstreamOkNotChargedByOurFault} ＋ 我们故障补认领 ${stats.upstreamOkNotChargedByOurFault} |`);
-    lines.push(`| 上游失败 · 已退款 | ${stats.upstreamFailedRefunded} | 正常 |`);
+    lines.push(`| 上游出图 · 未收费 | ${stats.upstreamOkNotCharged} | 用户取消保图 ${stats.upstreamOkNotCharged - stats.upstreamOkNotChargedByOurFault} ＋ 我们故障补认领 ${stats.upstreamOkNotChargedByOurFault}（老口径） |`);
+    const failedChargedNote = stats.upstreamFailedCharged ? `**钱收了、图没给 ${stats.upstreamFailedCharged} 次**` : "0";
+    lines.push(`| 上游失败 · 已收费 | ${stats.upstreamFailedCharged} | ${failedChargedNote}（2026-09-19 起失败不退款，这一栏就是它） |`);
+    lines.push(`| 上游失败 · 已退款 | ${stats.upstreamFailedRefunded} | 只反映 2026-09-19 之前的历史 |`);
     const droppedNote = stats.artifactDropped ? `**告警：又白烧了 ${stats.artifactDropped} 次**` : "目标值 0";
     lines.push(`| 有成品却没留下 | ${stats.artifactDropped} | ${droppedNote} |`);
     lines.push("");

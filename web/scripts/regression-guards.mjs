@@ -53,7 +53,27 @@ assertIncludes("src/services/api/proxy-client.ts", "status === 413", "proxy clie
 assertIncludes("src/lib/generation/generation-request.ts", "requestGeneratedImages", "generation requests must keep a unified app-facing entry.");
 assertIncludes("src/lib/generation/generation-request.ts", "runGuardedGeneration", "all unified generation requests must pass through the backend job guard.");
 assertIncludes("src/lib/generation/generation-jobs.server.ts", "pg_advisory_xact_lock", "generation quota and concurrency checks must serialize per user.");
-assertIncludes("src/lib/generation/generation-jobs.server.ts", "quotaRefunded", "failed generation jobs must refund reserved quota.");
+assertIncludes("src/lib/generation/generation-jobs.server.ts", "quotaRefunded", "生成任务必须记下「这笔到底退没退」，结算与对账都靠它。");
+// —— 生成积分退款政策（2026-09-19 起：失败/取消一律不退，就算什么都没生成也不退）——
+// 钱照收，就意味着「上游到底有没有产出」比以前更要紧：图必须尽量交到用户手上，
+// 而这正是下面归档/抢救/补取件那几条链路的活。政策本身只允许有一处开关，调用点不许各判各的。
+{
+    const policy = read("src/lib/generation/generation-refund-policy.ts");
+    assert(policy.includes("GENERATION_REFUNDS_ENABLED = false"), "2026-09-19 起生成失败/取消不退还积分（老板定的规则），开关不得被悄悄翻成 true。");
+    assert(policy.includes("export function shouldRefundGeneration("), "退款与否必须收成一个判定，调用点照它执行。");
+    assertNotMatches("src/lib/generation/generation-refund-policy.ts", /fetch\(|axios|prisma|import /, "退款政策必须是纯逻辑（不触网、不连库、无依赖），才能直接单测。");
+    for (const file of [
+        "src/lib/generation/generation-jobs.server.ts",
+        "src/lib/generation/generation-sweep.server.ts",
+        "src/lib/generation/replicate-poller.server.ts",
+    ]) {
+        assertIncludes(file, "shouldRefundGeneration(", `${file} 的退款必须走 generation-refund-policy，不得自己在结算处写死退或不退。`);
+    }
+    // 结算路径不得退回「失败即退」的旧写法（配额标记要跟退款事实一致）
+    assertNotMatches("src/lib/generation/generation-jobs.server.ts", /quotaRefunded: status !== "succeeded"/, "quotaRefunded 记的是「退没退」，不是「是不是失败」：政策改成不退之后，这个写法会把每一条失败都记成已退款。");
+    // 不退款之后，「收了钱却没给图」就成了必须天天看的数字
+    assertIncludes("src/lib/generation/generation-report.server.ts", "upstream_failed_charged", "日报要有一栏「上游失败 · 已收费」：不退款之后，这就是「钱收了、图没给」的计数。");
+}
 assertIncludes("src/app/api/proxy/route.ts", "requireCurrentUser", "the upstream proxy must reject anonymous callers.");
 assertIncludes("prisma/schema.prisma", "model GenerationJob", "generation lifecycle logs must remain persisted.");
 
@@ -557,7 +577,7 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
 
     const rescue = read("src/lib/generation/generation-rescue.server.ts");
     assert(rescue.includes("decideRescueAction("), "抢救侧必须用这条判定来决定能不能补认领，否则成品照样被丢掉。");
-    assert(/quotaRefunded: lateClaim/.test(rescue), "补认领不得改动退款事实：钱已经退出手，账要照实记。");
+    assert(/quotaRefunded: job\.quotaRefunded/.test(rescue), "补认领不得改动退款事实：原来退过的照旧记「已退」，没退过的（2026-09-19 起）不得被记成「已退」。");
 
     const guard = read("src/lib/generation/generation-guard.ts");
     assert(guard.includes("shouldAwaitUpstreamSettlement(") && guard.includes("isNetworkLayerFailure("), "客户端报网络层失败时也要等服务端出结论——这正是用户看到的「请求失败」。");
@@ -572,7 +592,7 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
 
     const rescue = read("src/lib/generation/generation-rescue.server.ts");
     assert(rescue.includes("decideRescueAction("), "抢救必须照决策执行，不得各写一套条件。");
-    assert(rescue.includes("keep-artifact"), "用户取消的任务要「保图不保账」：不得把上游已经画完的图丢掉。");
+    assert(rescue.includes("keep-artifact"), "用户取消的任务要把上游已经画完的图留下（退款政策归政策，图不能丢）。");
     assert(rescue.includes("没能留下"), "有成品却保不住的分支必须留痕：取消口子就是静默丢弃藏了几天。");
     assert(rescue.includes('externalStatus: "dropped"'), "丢弃要打标记，日报才能把「有成品却没留下」数出来。");
     // dropped 的口径只有「上游出了图、这条任务手上一份都没有」。

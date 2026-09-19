@@ -99,9 +99,9 @@ export type RescueAction = "claim" | "keep-artifact" | "skip";
 export function decideRescueAction(job: { status: string | null | undefined; finishedAt: Date | number | string | null | undefined }, now = Date.now()): RescueAction {
     // 任务还在跑：就地定论，成品到手即成功（照常收费）
     if (job.status === "running") return "claim";
-    // 客户端先跑了、我们按它的报告结成了失败：补认领（钱已退，不再重复收）
+    // 客户端先跑了、我们按它的报告结成了失败：补认领（成品归用户，那笔账退没退照原样记，不再改动）
     if (isLateRescueClaimable(job.status, job.finishedAt, now)) return "claim";
-    // 用户取消：保图不保账（退款照旧，图留给用户）
+    // 用户取消：图照留（预扣积分退不退看现行政策，2026-09-19 起不退，见 generation-refund-policy）
     if (isCanceledArtifactKeepable(job.status, job.finishedAt, now)) return "keep-artifact";
     return "skip";
 }

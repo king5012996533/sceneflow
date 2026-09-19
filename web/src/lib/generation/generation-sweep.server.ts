@@ -3,6 +3,7 @@ import { refundCredits } from "@/lib/credit-ledger";
 import { isSweepExcluded, resolveSweepWindow } from "./generation-stale";
 import { isRecoveryEligible } from "./generation-recovery";
 import { recoverStaleGenerationJob, type RecoveryOutcome } from "./generation-recovery.server";
+import { shouldRefundGeneration } from "./generation-refund-policy";
 
 /**
  * 超时任务的全局兜底清扫（2026-09-18 事故：7 条 running 挂着 24 积分没人退）。
@@ -16,7 +17,8 @@ import { recoverStaleGenerationJob, type RecoveryOutcome } from "./generation-re
  *   1) 只关 status=running 且已超时的任务，认领用条件更新（updateMany where status=running），
  *      并发的懒清扫 / 重复调用只有一个能把 running 改成 failed；
  *   2) 退款一律走 credit-ledger 的幂等退款（(userId, generation_job, requestKey, refund) 唯一），
- *      不自己改余额，也就不可能重复退；
+ *      不自己改余额，也就不可能重复退。退不退由 generation-refund-policy 定：
+ *      2026-09-19 起一律不退（上游已按这一次尝试计过费），代码保留以便政策回摆；
  *   3) 有服务端轮询器认领的任务跳过（isSweepExcluded），那种任务归轮询器自己的超时逻辑管。
  */
 
@@ -76,18 +78,21 @@ export async function sweepStaleGenerationJobs(input: { olderThanMs?: number | n
             }
         }
         try {
+            // 关账时退不退积分由现行政策定（2026-09-19 起：不退，见 generation-refund-policy）。
+            // quotaRefunded 记的是「这笔到底退没退」，不是「是不是失败」。
+            const refundOnClose = shouldRefundGeneration("failed") && job.creditsCost > 0;
             const closed = await prisma.$transaction(async (tx) => {
                 const claimed = await tx.generationJob.updateMany({
                     where: { id: job.id, status: "running" },
-                    data: { status: "failed", error: SWEEP_ERROR, quotaRefunded: true, finishedAt: new Date() },
+                    data: { status: "failed", error: SWEEP_ERROR, quotaRefunded: refundOnClose, finishedAt: new Date() },
                 });
                 if (!claimed.count) return false;
-                await refundCredits(tx, job.userId, job.creditsCost, job.requestKey, SWEEP_NOTE);
+                if (refundOnClose) await refundCredits(tx, job.userId, job.creditsCost, job.requestKey, SWEEP_NOTE);
                 return true;
             });
             if (!closed) continue;
             result.closed += 1;
-            result.refundedCredits += job.creditsCost;
+            if (refundOnClose) result.refundedCredits += job.creditsCost;
             result.jobs.push({
                 id: job.id,
                 userId: job.userId,

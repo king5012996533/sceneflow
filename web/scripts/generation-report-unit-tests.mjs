@@ -2,7 +2,8 @@
  * 生成链路每日对账的排版与归账单测（纯逻辑）。
  *
  * 目标：让「上游给了成品、我们没收费」和「有成品却没留下」这两类变成日报里可数的数字，
- * 而不是每次靠人翻日志猜。这里钉住四本账的口径与告警触发。
+ * 而不是每次靠人翻日志猜。2026-09-19 起失败也不退款，于是多了一类必须盯的数字：
+ * 「钱收了、图没给」。这里钉住五本账的口径与告警触发。
  *
  * 运行：npm run test:report
  */
@@ -37,17 +38,28 @@ const base = {
     upstreamOkNotCharged: 6,
     upstreamOkNotChargedByOurFault: 2,
     upstreamFailedRefunded: 12,
+    upstreamFailedCharged: 0,
     artifactDropped: 0,
     chargedWithoutLocalArtifact: 4,
     topFailures: [{ reason: "上游超时", count: 5 }],
 };
 
-check("四本账都在日报里，数字与入参一致", () => {
+check("五本账都在日报里，数字与入参一致", () => {
     const { markdown } = buildDailyReport(base);
     assert.match(markdown, /上游出图 · 已收费 \| 78/);
     assert.match(markdown, /上游出图 · 未收费 \| 6/);
+    assert.match(markdown, /上游失败 · 已收费 \| 0/);
     assert.match(markdown, /上游失败 · 已退款 \| 12/);
     assert.match(markdown, /有成品却没留下 \| 0/);
+});
+
+check("2026-09-19 起失败不退款：收了钱没给图的次数必须单独成栏并显眼", () => {
+    const { markdown } = buildDailyReport({ ...base, upstreamFailedCharged: 9, upstreamFailedRefunded: 0 });
+    assert.match(markdown, /上游失败 · 已收费 \| 9/);
+    assert.match(markdown, /钱收了、图没给 9 次/);
+    // 老口径那一栏还得在（历史记录照实显示），只是政策改后应当恒为 0
+    assert.match(markdown, /上游失败 · 已退款 \| 0/);
+    assert.match(markdown, /只反映 2026-09-19 之前的历史/);
 });
 
 check("未收费这一类要拆开：用户取消保图 vs 我们故障补认领，两者相加等于总数", () => {

@@ -20,6 +20,7 @@ type AggregateRow = {
     upstream_ok_not_charged: number;
     upstream_ok_not_charged_by_our_fault: number;
     upstream_failed_refunded: number;
+    upstream_failed_charged: number;
     artifact_dropped: number;
     charged_without_local_artifact: number;
 };
@@ -55,6 +56,7 @@ export async function generateDailyReport(options: { hours?: number; now?: Date 
                 count(*) filter (where has_artifact and (status = 'cancelled' or "quotaRefunded"))::int as upstream_ok_not_charged,
                 count(*) filter (where has_artifact and status = 'succeeded' and "quotaRefunded")::int as upstream_ok_not_charged_by_our_fault,
                 count(*) filter (where status = 'failed' and "quotaRefunded" and not has_artifact)::int as upstream_failed_refunded,
+                count(*) filter (where status = 'failed' and not "quotaRefunded" and not has_artifact)::int as upstream_failed_charged,
                 count(*) filter (where "externalStatus" = 'dropped')::int as artifact_dropped,
                 count(*) filter (where status = 'succeeded' and "quotaRefunded" = false and not has_artifact)::int as charged_without_local_artifact
          from j`,
@@ -84,6 +86,7 @@ export async function generateDailyReport(options: { hours?: number; now?: Date 
         upstreamOkNotCharged: num(row?.upstream_ok_not_charged),
         upstreamOkNotChargedByOurFault: num(row?.upstream_ok_not_charged_by_our_fault),
         upstreamFailedRefunded: num(row?.upstream_failed_refunded),
+        upstreamFailedCharged: num(row?.upstream_failed_charged),
         artifactDropped: num(row?.artifact_dropped),
         chargedWithoutLocalArtifact: num(row?.charged_without_local_artifact),
         topFailures: (failureRows ?? []).map((item) => ({ reason: item.reason, count: num(item.n) })),
@@ -102,7 +105,9 @@ export async function generateDailyReport(options: { hours?: number; now?: Date 
     const recipients = await listAdminEmails();
     const mailed = await mailReport(recipients, report.subject, report.markdown);
 
-    console.log(`[generation-report] ${stats.date} 对账：上游出图 ${stats.upstreamOkCharged + stats.upstreamOkNotCharged} 次（未收费 ${stats.upstreamOkNotCharged}）｜上游失败退款 ${stats.upstreamFailedRefunded}｜丢图 ${stats.artifactDropped}｜文件 ${filePath ?? "未落盘"}｜邮件 ${mailed}${recipients.length ? `（${recipients.join(",")}）` : "（无管理员收件人）"}`);
+    console.log(
+        `[generation-report] ${stats.date} 对账：上游出图 ${stats.upstreamOkCharged + stats.upstreamOkNotCharged} 次（未收费 ${stats.upstreamOkNotCharged}）｜上游失败·仍收费 ${stats.upstreamFailedCharged}｜上游失败·已退款 ${stats.upstreamFailedRefunded}｜丢图 ${stats.artifactDropped}｜文件 ${filePath ?? "未落盘"}｜邮件 ${mailed}${recipients.length ? `（${recipients.join(",")}）` : "（无管理员收件人）"}`,
+    );
     return { stats, filePath, recipients, mailed };
 }
 

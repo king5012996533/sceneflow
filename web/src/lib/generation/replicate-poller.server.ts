@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/ic-prisma";
 import { refundCredits } from "@/lib/credit-ledger";
 import { archiveGenerationMedia } from "./server-media-storage.server";
+import { resultMediaPath } from "./generation-result";
+import { shouldRefundGeneration } from "./generation-refund-policy";
 import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
 import { fetchSafely } from "@/lib/url-safety";
 
@@ -16,7 +18,10 @@ export async function pollReplicateJobs(limit = 10) {
     for (const job of jobs) {
         const lease = randomUUID();
         const pollingStatus = `polling:${lease}`;
-        const claimed = await (prisma.generationJob as any).updateMany({ where: { id: job.id, status: "running", updatedAt: job.updatedAt }, data: { updatedAt: now, nextPollAt: new Date(now.getTime() + 60_000), pollAttempts: { increment: 1 }, externalStatus: pollingStatus } });
+        const claimed = await (prisma.generationJob as any).updateMany({
+            where: { id: job.id, status: "running", updatedAt: job.updatedAt },
+            data: { updatedAt: now, nextPollAt: new Date(now.getTime() + 60_000), pollAttempts: { increment: 1 }, externalStatus: pollingStatus },
+        });
         if (!claimed.count) continue;
         try {
             const credential = await resolvePlatformCredential({ targetUrl: job.externalGetUrl!, provider: "replicate", model: job.providerModel || undefined });
@@ -24,7 +29,7 @@ export async function pollReplicateJobs(limit = 10) {
             if (!isCredentialTargetAllowed(credential.baseUrl, job.externalGetUrl!)) throw new Error("Replicate 轮询地址不在白名单内");
             const response = await fetchSafely(job.externalGetUrl!, { headers: { Authorization: `Bearer ${credential.apiKey}` }, signal: AbortSignal.timeout(30_000) });
             if (!response.ok) throw new Error(`Replicate polling failed: ${response.status}`);
-            const prediction = await response.json() as { status?: string; output?: unknown; error?: unknown };
+            const prediction = (await response.json()) as { status?: string; output?: unknown; error?: unknown };
             if (prediction.status === "succeeded") {
                 const urls = extractUrls(prediction.output);
                 const items = [];
@@ -43,17 +48,44 @@ export async function pollReplicateJobs(limit = 10) {
                     items.push({ archiveKey, mimeType, bytes: body.byteLength });
                 }
                 if (!items.length) throw new Error("Replicate 没有返回可归档结果");
-                await (prisma.generationJob as any).updateMany({ where: { id: job.id, status: "running", externalStatus: pollingStatus }, data: { status: "succeeded", resultData: { items }, resultUrl: `/canvas/api/generation/jobs/${job.id}/media/0`, externalStatus: prediction.status, finishedAt: new Date(), nextPollAt: null } });
+                // 取件地址与其它通道共用同一份构造（resultMediaPath）：别再手写带 /canvas 前缀的字符串，
+                // 那个前缀早就不存在了，写错了只有后台预览会破图
+                await (prisma.generationJob as any).updateMany({
+                    where: { id: job.id, status: "running", externalStatus: pollingStatus },
+                    data: { status: "succeeded", resultData: { items }, resultUrl: resultMediaPath(job.id, 0), externalStatus: prediction.status, finishedAt: new Date(), nextPollAt: null },
+                });
             } else if (prediction.status === "failed" || prediction.status === "canceled") {
-                await prisma.$transaction(async (tx) => { const closed = await (tx.generationJob as any).updateMany({ where: { id: job.id, status: "running", externalStatus: pollingStatus }, data: { status: prediction.status === "canceled" ? "cancelled" : "failed", error: String(prediction.error || "Replicate 任务失败"), externalStatus: prediction.status, quotaRefunded: true, finishedAt: new Date(), nextPollAt: null } }); if (closed.count) await refundCredits(tx, job.userId, job.creditsCost, job.requestKey, "Replicate 任务失败退款"); });
+                // 失败/取消照现行退款政策办（2026-09-19 起不退，见 generation-refund-policy）；
+                // quotaRefunded 记的是「这笔退没退」，不是「是不是失败」。
+                const status = prediction.status === "canceled" ? "cancelled" : "failed";
+                const refund = shouldRefundGeneration(status) && job.creditsCost > 0;
+                await prisma.$transaction(async (tx) => {
+                    const closed = await (tx.generationJob as any).updateMany({
+                        where: { id: job.id, status: "running", externalStatus: pollingStatus },
+                        data: { status, error: String(prediction.error || "Replicate 任务失败"), externalStatus: prediction.status, quotaRefunded: refund, finishedAt: new Date(), nextPollAt: null },
+                    });
+                    if (closed.count && refund) await refundCredits(tx, job.userId, job.creditsCost, job.requestKey, "Replicate 任务失败退款");
+                });
             } else if (job.pollAttempts + 1 >= MAX_ATTEMPTS) {
-                await prisma.$transaction(async (tx) => { const closed = await (tx.generationJob as any).updateMany({ where: { id: job.id, status: "running", externalStatus: pollingStatus }, data: { status: "failed", error: "Replicate 轮询超时", quotaRefunded: true, finishedAt: new Date(), nextPollAt: null } }); if (closed.count) await refundCredits(tx, job.userId, job.creditsCost, job.requestKey, "Replicate 轮询超时退款"); });
+                const refund = shouldRefundGeneration("failed") && job.creditsCost > 0;
+                await prisma.$transaction(async (tx) => {
+                    const closed = await (tx.generationJob as any).updateMany({
+                        where: { id: job.id, status: "running", externalStatus: pollingStatus },
+                        data: { status: "failed", error: "Replicate 轮询超时", quotaRefunded: refund, finishedAt: new Date(), nextPollAt: null },
+                    });
+                    if (closed.count && refund) await refundCredits(tx, job.userId, job.creditsCost, job.requestKey, "Replicate 轮询超时退款");
+                });
             } else {
                 await (prisma.generationJob as any).update({ where: { id: job.id }, data: { externalStatus: prediction.status || "processing", nextPollAt: new Date(Date.now() + 5_000) } });
             }
             processed += 1;
         } catch (error) {
-            await (prisma.generationJob as any).updateMany({ where: { id: job.id, status: "running", externalStatus: pollingStatus }, data: { externalStatus: "poll_error", error: error instanceof Error ? error.message.slice(0, 1000) : "轮询失败", nextPollAt: new Date(Date.now() + 30_000) } }).catch(() => undefined);
+            await (prisma.generationJob as any)
+                .updateMany({
+                    where: { id: job.id, status: "running", externalStatus: pollingStatus },
+                    data: { externalStatus: "poll_error", error: error instanceof Error ? error.message.slice(0, 1000) : "轮询失败", nextPollAt: new Date(Date.now() + 30_000) },
+                })
+                .catch(() => undefined);
         }
     }
     return { processed };

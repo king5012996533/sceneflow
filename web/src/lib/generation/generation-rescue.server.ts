@@ -29,8 +29,8 @@ const RESCUABLE_KINDS = new Set(["image", "video"]);
  * 从上游原始报文里抢救成品。返回是否成功认领（true = 这次报文里确实有成品、任务已改判成功）。
  * 认领是一次快写，归档在后台继续：调用方（代理路由）等的是认领，不是落盘。
  *
- * 用户取消的任务走「保图不保账」：不改状态、不再收费，只把成品归档留下
- * （原因见 generation-recovery 的 isCanceledArtifactKeepable）。
+ * 用户取消的任务走「保图路径」：不改状态、不额外收费，只把成品归档留下
+ * （原因见 generation-recovery 的 isCanceledArtifactKeepable；预扣积分按现行退款政策处理）。
  */
 export async function salvageGenerationArtifacts(input: { userId: string; jobId: string; payload: unknown; source: string }): Promise<boolean> {
     if (!prisma || !input.jobId) return false;
@@ -42,7 +42,7 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
 
     const job = await prisma.generationJob.findFirst({
         where: { id: input.jobId, userId: input.userId },
-        select: { id: true, kind: true, status: true, finishedAt: true, resultData: true },
+        select: { id: true, kind: true, status: true, finishedAt: true, resultData: true, quotaRefunded: true },
     });
     if (!job || !RESCUABLE_KINDS.has(job.kind)) return false;
 
@@ -72,9 +72,12 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
     // 先认领后归档：这笔账怎么结只看上游有没有产出，不看我们有没有落盘。
     if (action === "claim") {
         const lateClaim = job.status !== "running";
+        // 认领只改状态与成品归属，**不动钱**：这笔到底退没退照实记（quotaRefunded 原样带过来，
+        // 不按 lateClaim 反推）。2026-09-19 起失败/取消也不退款，反推会把「没退」记成「退过」——
+        // 记录页就会对用户显示一句根本没发生过的「已退还 N 积分」。
         const claimed = await prisma.generationJob.updateMany({
             where: { id: job.id, userId: input.userId, status: lateClaim ? "failed" : "running" },
-            data: { status: "succeeded", quotaRefunded: lateClaim, finishedAt: new Date(), ...(lateClaim ? { externalStatus: "recovered" } : {}) },
+            data: { status: "succeeded", quotaRefunded: job.quotaRefunded, finishedAt: new Date(), ...(lateClaim ? { externalStatus: "recovered" } : {}) },
         });
         if (!claimed.count) return false;
 
@@ -83,7 +86,7 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
         takeClientGaveUp(job.id);
 
         if (lateClaim) {
-            console.log(`[generation-rescue] 任务 ${job.id} 已按客户端原因结为失败并退款，上游成品随后到达：补认领为成功并归档（本次不向用户收费）`);
+            console.log(`[generation-rescue] 任务 ${job.id} 已按客户端原因结为失败${job.quotaRefunded ? "并已退款" : "（按现行政策未退款）"}，上游成品随后到达：补认领为成功并归档（这笔账不再改动）`);
         } else {
             console.log(`[generation-rescue] 任务 ${job.id} 上游已产出 ${sources.length} 份成品（${input.source}），改判成功并开始归档`);
         }
@@ -98,8 +101,9 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
     }
 
     // —— 保图路径：用户取消，上游停不下来照样出图（见 isCanceledArtifactKeepable）——
-    // 不改状态、不再收费（退款已经出手），只把成品留下：钱都付给上游了，扔掉是纯亏。
-    console.log(`[generation-rescue] 任务 ${job.id} 已被用户取消，上游仍产出 ${sources.length} 份成品：保图不保账，归档留存（本次不向用户收费）`);
+    // 不改状态、不额外收费，只把成品留下：钱已经付给上游了，扔掉是纯亏；预扣的那笔积分按现行政策
+    // 照收（2026-09-19 起取消也不退，见 generation-refund-policy）。
+    console.log(`[generation-rescue] 任务 ${job.id} 已被用户取消，上游仍产出 ${sources.length} 份成品：图照留、账照记，归档留存`);
     await prisma.generationJob.updateMany({ where: { id: job.id, userId: input.userId }, data: { externalStatus: "recovered" } }).catch(() => undefined);
     void archiveResultSources(job.id, sources)
         .then((items) => storeGenerationResults(input.userId, job.id, items))

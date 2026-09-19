@@ -8,6 +8,7 @@ import { getOperationNumber, getPricingDefaults } from "@/lib/operation-config";
 import { STALE_JOB_MS } from "./generation-stale";
 import { hasKeptArtifact, hasResendPending, readEnvelope, readResendState, resolveReplayConfig } from "./generation-envelope";
 import { isUpstreamCallInFlight, noteClientGaveUp, takeClientGaveUp } from "./upstream-inflight";
+import { shouldRefundGeneration } from "./generation-refund-policy";
 
 // 超时阈值与「超时后怎么关账」的规则收在 generation-stale.ts：懒清扫（本文件）与
 // 全局清扫（generation-sweep.server.ts）必须共用同一份数字，否则两套标准会漂移。
@@ -63,11 +64,14 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
             where: { userId, status: "running", startedAt: { lt: staleBefore } },
         });
         for (const staleJob of staleJobs) {
+            // 超时关闭也走现行退款政策（2026-09-19 起：不退，见 generation-refund-policy）。
+            // quotaRefunded 记的是「这笔到底退没退」，不是「是不是失败」，历史已退的不会被改写。
+            const refund = shouldRefundGeneration("failed") && !staleJob.quotaRefunded && staleJob.creditsCost > 0;
             await tx.generationJob.update({
                 where: { id: staleJob.id },
-                data: { status: "failed", error: "任务超时自动关闭", quotaRefunded: true, finishedAt: new Date() },
+                data: { status: "failed", error: "任务超时自动关闭", quotaRefunded: staleJob.quotaRefunded || refund, finishedAt: new Date() },
             });
-            await refundCredits(tx, userId, staleJob.creditsCost, staleJob.requestKey, "任务超时自动关闭");
+            if (refund) await refundCredits(tx, userId, staleJob.creditsCost, staleJob.requestKey, "任务超时自动关闭");
         }
 
         if (!isAdmin) {
@@ -129,7 +133,10 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
         // （app/api/proxy/route.ts）。上游随后带着成品回来时任务已经 failed，抢救只能空手而归：
         // 钱付了、图丢了、额度还退了。所以这里先不结账，只把「客户端已放弃」记在登记簿上，
         // 谁看见真相谁定论：上游出成品 → 抢救认领成功（积分照收，成品进归档）；
-        // 上游确认没成品 → 代理调用结束时代为结账退款（settleDeferredClientFailure）。
+        // 上游确认没成品 → 代理调用结束时代为结账（settleDeferredClientFailure）。
+        //
+        // 2026-09-19 起失败不再退款（见 generation-refund-policy），这段「等真相」的意义反而更重：
+        // 钱是照收的，那就更得把用户付了钱的那张图送到他手上。
         //
         // 「还在飞」只是第一种情形。第二种是**补发还有机会**（hasResendPending + 调用方声明这是
         // 客户端上报的失败）：部署重启之后进程内的在飞登记簿是空的（新进程什么都没登记），
@@ -147,8 +154,11 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
             return job;
         }
 
-        // 失败/取消/超时：退还积分（幂等，重复结算不会重复退）
-        if (status !== "succeeded" && !job.quotaRefunded && job.creditsCost > 0) {
+        // 失败/取消/超时：按现行退款政策结算。2026-09-19 起政策是「一律不退」——
+        // 上游按这一次尝试收过我们钱了，成品也往往还归档在我们手上，照退就是把成本全揽过来
+        // （见 generation-refund-policy）。退款调用留着，幂等由 credit-ledger 保证。
+        const refund = shouldRefundGeneration(status) && !job.quotaRefunded && job.creditsCost > 0;
+        if (refund) {
             await refundCredits(tx, userId, job.creditsCost, job.requestKey, `生成任务${status === "cancelled" ? "已取消" : "失败"}退款`);
         }
 
@@ -158,7 +168,7 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
                 status,
                 error: error?.slice(0, 1000),
                 resultUrl: resultUrl ?? undefined,
-                quotaRefunded: status !== "succeeded",
+                quotaRefunded: job.quotaRefunded || refund,
                 finishedAt: new Date(),
             },
         });
@@ -169,7 +179,8 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
  * 代理侧为「客户端已放弃、上游仍在飞」的任务代为结账。
  *
  * 只有真正看见上游结果的人才能定论，而这里就是那个时刻：调用已经结束、成品也没有被抢救认领，
- * 说明这一次上游确实什么都没给出来 —— 这时候才退款，不会冤枉任何一种「上游还在跑」的情形。
+ * 说明这一次上游确实什么都没给出来 —— 这时候才结账关掉，不会冤枉任何一种「上游还在跑」的情形。
+ * 至于关账时退不退积分，由当时的退款政策定（2026-09-19 起不退，见 generation-refund-policy）。
  *
  * 拿不准的一律不动：还有别的调用在飞、任务已经被认领（不再 running）、
  * 或者手上已经握着上游任务号（那属于「补取件」的活，generation-sweep 会按任务号去问上游要成品，
@@ -186,11 +197,11 @@ export async function settleDeferredClientFailure(userId: string, jobId: string)
     const job = await prisma.generationJob.findFirst({ where: { id: jobId, userId } });
     if (!job || job.status !== "running") return "none";
     if (job.externalId) return "kept";
-    // 还留着能补发的信封：这一段交给补发那条路走完（它拿不到成品时自己会结账退款）
+    // 还留着能补发的信封：这一段交给补发那条路走完（它拿不到成品时自己会结账）
     if (hasResendPendingForJob(job)) return "kept";
 
     await finishGenerationJob(userId, jobId, "failed", reason);
-    console.log(`[generation-settle] 任务 ${jobId} 上游调用已结束且未产出成品：按客户端原因结为失败并退款（${reason.slice(0, 60)}）`);
+    console.log(`[generation-settle] 任务 ${jobId} 上游调用已结束且未产出成品：按客户端原因结为失败并关账（退款政策：${shouldRefundGeneration("failed") ? "退" : "不退"}）（${reason.slice(0, 60)}）`);
     return "settled";
 }
 
