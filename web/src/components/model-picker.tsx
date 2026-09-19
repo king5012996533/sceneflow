@@ -59,7 +59,11 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
             </SelectTrigger>
             <SelectContent
                 data-canvas-no-zoom
-                className="z-[1200] w-80 max-w-[calc(100vw-24px)] rounded-xl border border-border/70 bg-popover p-1 shadow-xl"
+                // 宽度必须「至少等于触发器宽度」：面板内每行的最小宽度由 Radix 按触发器宽度写死
+                // （data-position=popper 的 min-w-(--radix-select-trigger-width)），面板比它窄时
+                // 每行右侧会被 overflow-x-hidden 裁掉 —— 移动端抽屉里触发器 353px、面板写死 320px，
+                // 结果就是模型名右边那截与能力标注一起被切。取两者较大值，再用视口收边。
+                className="z-[1200] w-[max(20rem,var(--radix-select-trigger-width))] max-w-[calc(100vw-24px)] rounded-xl border border-border/70 bg-popover p-1 shadow-xl"
                 position="popper"
                 align="start"
                 side="bottom"
@@ -102,7 +106,7 @@ function ModelLabel({ config, model, capability }: { config: AiConfig; model: st
     return (
         <span className="flex min-w-0 flex-1 items-center gap-2">
             <ModelIcon model={model} />
-            <span className="truncate">{modelOptionLabel(config, model)}</span>
+            <span className="min-w-0 truncate">{modelOptionLabel(config, model)}</span>
             {showUnsupportedTag ? (
                 <span className="ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] leading-none text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">{REFERENCE_UNSUPPORTED_TAG}</span>
             ) : null}
