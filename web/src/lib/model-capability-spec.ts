@@ -52,6 +52,20 @@ export type ImageCapabilitySpec = {
      * 与「透明底」互斥，不建议开放给用户。
      */
     outputFormats?: ImageOutputFormat[];
+    /**
+     * 只吃宽高比的模型：上游没有「分辨率 / 画质」这两轴，像素完全由它自己定。
+     *
+     * 典型是 Replicate 的 recraft-ai/recraft-v4-pro：入参只有 prompt / aspect_ratio / size，
+     * 而 size 明文写「设了 aspect_ratio 就被忽略」，出图固定约 2048px，也没有 quality 参数。
+     * 这种模型如果照旧走「1K/2K/4K + 画质（高级）」那一套，面板会给出两样假东西：
+     *   - 比例 chip 上的像素提示（1024² 这种）+ W/H 输入框——上游根本不看；
+     *   - 分辨率档位与画质档位——选了不起作用，却会按档位算价（选 4K 多扣钱等于白收）。
+     *
+     * 标了它 = 告诉面板：尺寸行只留宽高比（不显示像素、不给 W/H），
+     * 05 那一行只写「由上游定」不放档位，画质（高级）整块不出现，扣费走一口价（基础价）。
+     * 与 qualityTiers 的区别：qualityTiers 是「分辨率轴换成画质档」，这一项是「压根没有这一轴」。
+     */
+    aspectOnly?: boolean;
     /** 最大生成张数 1-15 */
     maxCount: number;
 };
@@ -386,6 +400,7 @@ export function normalizeImageCapability(spec: ImageCapabilitySpec): ImageCapabi
         resolutions: explicit ?? deriveResolutionTiers(spec.aspects as readonly string[]),
         qualityTiers: normalizeQualityTiers(spec.qualityTiers),
         outputFormats: normalizeOutputFormats(spec.outputFormats),
+        aspectOnly: spec.aspectOnly === true,
     };
 }
 
@@ -456,6 +471,7 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
             // 没标就整个字段不落库：留一个空数组会让「标了但没勾」和「没标」分不清
             ...(qualityTiers ? { qualityTiers } : {}),
             ...(outputFormats ? { outputFormats } : {}),
+            ...(value.aspectOnly === true ? { aspectOnly: true } : {}),
             maxCount: Math.max(1, Math.min(IMAGE_MAX_COUNT_LIMIT, Math.floor(Number(value.maxCount)) || DEFAULT_IMAGE_CAPABILITY.maxCount)),
         };
     }

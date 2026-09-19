@@ -278,6 +278,8 @@ assertIncludes("src/lib/model-capability-spec.ts", "sanitizeQualityCredits", "�
 // auto 是这批档位里最容易漏的一个：上游对 auto 的报价与 xhigh 相同，落回基础价就是每张赔 11 个积分
 assertIncludes("src/lib/credit-pricing.ts", "auto: 178", "成本估算表必须把 auto 按 $0.25 计（与 xhigh 同价），否则后台毛利页会把它算成最便宜那档。");
 assertIncludes("src/lib/credit-pricing.ts", "FLARE_QUALITY_COST_CENTS", "成本估算必须按画质档给（原先所有图片一律 30 分，后台毛利页两种方向都是错的）。");
+assertIncludes("src/lib/credit-pricing.ts", "FLAT_IMAGE_COST_CENTS", "一口价模型（如 recraft-v4-pro）必须单独登记成本，漏了会按默认 10 分估，对账低估 2 倍以上。");
+assertIncludes("src/lib/credit-pricing.ts", "recraft-v4-pro", "recraft-v4-pro 的单张成本必须是 $0.25（178 分）。");
 // —— 出图格式（2026-09-19：上游 output_format 是显式字段，用户可选 webp/png）——
 assertIncludes("src/lib/model-capability-spec.ts", "outputFormats?: ImageOutputFormat[]", "能力标定必须能标「这个模型支持哪些出图格式」，标了面板才出现格式行。");
 assertIncludes("src/lib/model-capability-spec.ts", "normalizeImageOutputFormat", "格式取值必须归一化：发一个上游不认的值就是 422，认不出来一律回 webp。");
@@ -288,6 +290,11 @@ assertIncludes("src/services/api/image.ts", "replicateOutputFormatPayload", "Rep
 assertIncludes("src/services/api/image.ts", 'outputFormat === "png" ? {} : { output_compression: 90 }', "png 是无损格式，不该带压缩率（带了对 webp/jpeg 才有意义）。");
 assertIncludes("src/stores/use-config-store.ts", "outputFormat", "config 必须持久化出图格式，否则刷新就丢。");
 assertIncludes("src/lib/generation/generation-config.ts", "normalizeImageOutputFormat(node?.metadata?.outputFormat", "节点元数据里的格式必须能回灌到请求（重试要按原格式复现）。");
+// 2026-09-19：接 recraft-v4-pro（上游只吃宽高比，像素写死）时发现两处会骗人/多扣钱的呈现。
+assertIncludes("src/lib/model-capability-spec.ts", "aspectOnly?: boolean", "能力标定必须能表达「这个模型只吃宽高比」（上游没有分辨率/画质参数）。");
+assertIncludes("src/components/image-settings-panel.tsx", "usesAspectOnly", "只吃宽高比的模型：面板不得显示像素数字、W/H 与分辨率/画质档位。");
+assertIncludes("src/components/image-settings-panel.tsx", "Math.min(quickCount, effectiveMaxCount)", "生成张数的快捷档位必须受能力标定的 maxCount 限制（否则用户能选 10 张、按 10 张扣费，而上游只回 1 张）。");
+assertIncludes("src/app/(user)/admin/model-capability-fields.tsx", "aspectOnly", "后台能力标定必须有「只吃宽高比」的开关，否则新模型只能靠改库。");
 // 2026-09-19：出网隧道断掉时，这条路由以前把 fetch 的异常冒成裸 500，前端只看到「Replicate 任务创建失败」，
 // 任务号也没进日志——隧道断了与上游拒绝长得一模一样。现在两条路分开报，失败文案必须带线索。
 assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "describeNetworkFailure(", "启动失败必须区分「连不上上游（出网通道）」与「上游拒绝」，网络层错误码要带出来。");

@@ -168,6 +168,16 @@ const FLARE_QUALITY_COST_CENTS: Partial<Record<ImageQuality, number>> = {
     auto: 178,
 };
 
+/**
+ * 不做画质档、一口价按张卖的模型（Replicate 上的固定价模型）单张成本，单位：分（人民币）。
+ *
+ * 来源：模型页公开价目表（per output image / 打包价），按 1 美元 ≈ 7.1 元折算：
+ *   recraft-ai/recraft-v4-pro —— $0.25/张（模型页写「40 张 10 美元」）→ 178 分。
+ * 这类模型没有档位可选（上游不认 quality），所以是一张成本；漏了它会被算成默认的 10 分，
+ * 后台「成本 / 毛利」与日报会低估 2 倍以上。
+ */
+const FLAT_IMAGE_COST_CENTS: ReadonlyArray<{ pattern: RegExp; cents: number }> = [{ pattern: /recraft-v4-pro/i, cents: 178 }];
+
 /** 平台单次生成的估算成本（分），供对账与定价校准（公开价粗估） */
 export function estimateGenerationCostCents(kind: GenerationKind, metadata?: GenerationMetadata): number | null {
     const model = modelName(metadata);
@@ -180,6 +190,8 @@ export function estimateGenerationCostCents(kind: GenerationKind, metadata?: Gen
                 const cost = FLARE_QUALITY_COST_CENTS[quality as ImageQuality];
                 if (typeof cost === "number") return cost;
             }
+            const flat = FLAT_IMAGE_COST_CENTS.find((item) => item.pattern.test(model));
+            if (flat) return flat.cents;
             if (model.includes("gpt-image") || model.includes("dall-e")) return 30;
             if (model.includes("minimax") || model.includes("hailuo") || model.includes("h3")) return 2;
             return 10;

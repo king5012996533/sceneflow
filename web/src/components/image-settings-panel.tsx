@@ -65,6 +65,13 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
      */
     const outputFormatOptions = imageCapability?.outputFormats?.length ? IMAGE_OUTPUT_FORMAT_OPTIONS.filter((item) => imageCapability.outputFormats!.includes(item.value)) : null;
     const usesOutputFormatRow = Boolean(outputFormatOptions);
+    /**
+     * 只吃宽高比的模型（后台标了 aspectOnly，见 model-capability-spec）：上游没有分辨率/画质这两轴，
+     * 像素由它自己定。面板只留宽高比，别给像素数字、别给 W/H、别给档位 —— 给了就是骗人（还按档位收费）。
+     */
+    const usesAspectOnly = Boolean(imageCapability?.aspectOnly);
+    /** 尺寸行「不给像素」的两种情形：画质档位轴（像素按 quality 走）与只吃宽高比 */
+    const hidesPixelSize = usesQualityAxis || usesAspectOnly;
     const outputFormat = normalizeImageOutputFormat(config.outputFormat);
     const allowedTiers = effectiveResolutions.map((item) => item.value);
     const effectiveMaxCount = imageCapability ? Math.max(1, Math.min(maxCount, imageCapability.maxCount)) : maxCount;
@@ -78,14 +85,14 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
     const activeTier = usesQualityAxis ? currentTier : allowedTiers.includes(currentTier) ? currentTier : nearestAllowedTier(currentTier, allowedTiers);
     const activeQualityTier = qualityTierOptions?.find((item) => item.value === quality);
     const perImageCredits = getGenerationCreditsCost("image", { model, size: activeSize, quality }, getPlatformPricing(model), getPricingDefaults());
-    // 收敛 0（画质档位轴专用）：这类模型没有「像素尺寸」这一轴，把遗留的像素值收敛回纯比例。
-    // 不收敛会连带算错价：扣费按 size 判档，像素值会让档位脱离画质（选了「最高」却按 1K 扣）。
+    // 收敛 0（画质档位轴 / 只吃宽高比的模型专用）：这类模型没有「像素尺寸」这一轴，
+    // 把遗留的像素值收敛回纯比例。不收敛会连带算错价：扣费按 size 判档，像素值会让档位脱离画质。
     useEffect(() => {
-        if (!usesQualityAxis) return;
+        if (!hidesPixelSize) return;
         const ratio = imageRatioOf(activeSize);
         const next = ratio === CUSTOM_IMAGE_RATIO ? "auto" : ratio;
         if (next !== activeSize) onConfigChange("size", next);
-    }, [usesQualityAxis, activeSize]);
+    }, [hidesPixelSize, activeSize]);
     // 收敛 1：档位不在标定里时只降不升地换档（不悄悄给用户涨价）
     useEffect(() => {
         if (!imageCapability || usesQualityAxis) return;
@@ -130,8 +137,8 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
             onConfigChange("size", "auto");
             return;
         }
-        // 画质档位轴的模型只发宽高比（像素由上游按 quality 决定），不能再写像素值
-        onConfigChange("size", usesQualityAxis ? value : (imageSizeForRatio(value, activeTier) ?? value));
+        // 画质档位轴 / 只吃宽高比的模型只发宽高比（像素由上游定），不能再写像素值
+        onConfigChange("size", hidesPixelSize ? value : (imageSizeForRatio(value, activeTier) ?? value));
     };
     const selectResolution = (tier: ImageResolutionTier) => {
         if (selectedRatio === CUSTOM_IMAGE_RATIO) {
@@ -194,12 +201,12 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
                             >
                                 <AspectIcon type={item.icon} width={item.width} height={item.height} color={selectedRatio === item.value ? theme.node.activeStroke : theme.node.text} />
                                 <span>{item.label}</span>
-                                <AspectSizeHint ratio={item.value} tier={usesQualityAxis ? null : activeTier} className="sf-mono text-[9px] leading-none opacity-55" />
+                                <AspectSizeHint ratio={item.value} tier={hidesPixelSize ? null : activeTier} className="sf-mono text-[9px] leading-none opacity-55" />
                             </button>
                         ))}
                     </div>
-                    {/* 画质档位轴的模型不显示 W/H：像素由上游按 quality 决定，我们能给的数字是假的 */}
-                    {usesQualityAxis ? null : (
+                    {/* 画质档位轴 / 只吃宽高比的模型不显示 W/H：像素由上游定，我们能给的数字是假的 */}
+                    {hidesPixelSize ? null : (
                         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
                             <DimensionInput prefix="W" value={dimensions.width} disabled={activeSize === "auto"} theme={theme} alignToStep={snapDimensionToStep} onChange={(value) => updateDimension("width", value)} />
                             <span className="text-lg opacity-45">↔</span>
@@ -216,7 +223,11 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
                             每张 {perImageCredits} 积分
                         </span>
                     </div>
-                    {qualityTierOptions ? (
+                    {usesAspectOnly ? (
+                        <div className="text-[11px] leading-4" style={{ color: theme.node.muted }}>
+                            这个模型没有分辨率档位：像素由它自己定（约 2048px 一级），这里只选宽高比。
+                        </div>
+                    ) : qualityTierOptions ? (
                         <>
                             <div className="grid grid-cols-3 gap-2.5">
                                 {qualityTierOptions.map((item) => (
@@ -246,7 +257,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
                         生成张数
                     </SettingTitle>
                     <div className="grid grid-cols-4 gap-2.5">
-                        {Array.from({ length: quickCount }, (_, index) => index + 1).map((value) => (
+                        {Array.from({ length: Math.max(1, Math.min(quickCount, effectiveMaxCount)) }, (_, index) => index + 1).map((value) => (
                             <OptionPill key={value} selected={count === value} theme={theme} onClick={() => onConfigChange("count", String(value))}>
                                 {value} 张
                             </OptionPill>
@@ -272,8 +283,9 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
                         </div>
                     </div>
                 ) : null}
-                {/* 画质档位轴的模型：画质已经升格成上面那一行主档位，这里不再重复一遍 */}
-                {usesQualityAxis ? null : (
+                {/* 画质档位轴的模型：画质已经升格成上面那一行主档位，这里不再重复一遍；
+                    只吃宽高比的模型上游不认 quality，也不该出现这一块 */}
+                {hidesPixelSize ? null : (
                     <details className="space-y-2.5">
                         <summary className="cursor-pointer list-none select-none">
                             <SettingTitle index={outputFormatOptions ? 8 : 7} en="QUALITY" color={theme.node.muted} faintColor={theme.node.faint}>

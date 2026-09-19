@@ -109,29 +109,50 @@ function ImageFields({ spec, onChange }: { spec: ImageCapabilitySpec; onChange: 
     const view = normalizeImageCapability(spec);
     const qualityTiers = view.qualityTiers ?? [];
     const usesQualityAxis = qualityTiers.length > 0;
+    const usesAspectOnly = view.aspectOnly === true;
     return (
         <div className="space-y-2.5">
+            <div className="rounded-lg border border-[#e9e6e3] bg-white/60 p-2.5">
+                <Checkbox
+                    checked={usesAspectOnly}
+                    onChange={(event) =>
+                        onChange({
+                            ...view,
+                            // 没勾就整字段不落库：留一个 false 会让「明确标了没有」和「没标」分不清
+                            ...(event.target.checked ? { aspectOnly: true } : { aspectOnly: undefined }),
+                        })
+                    }
+                >
+                    只吃宽高比（像素由上游模型自己定）
+                </Checkbox>
+                <div className="mt-1 text-[11px] leading-4 text-[#726d67]">
+                    勾上 = 用户面板的尺寸行只留宽高比（不显示像素数字、不给 W/H 输入），分辨率那一行只说明「由上游定」不放档位，画质（高级）整块不出现，扣费走一口价。 适用于上游压根没有分辨率/画质参数、像素写死的模型（例：Replicate 的
+                    recraft-ai/recraft-v4-pro 固定约 2048px）。有 quality 档位的模型请用上面的「画质档位」。
+                </div>
+            </div>
             <div>
                 <FieldLabel>尺寸（宽高比，含自定义）</FieldLabel>
                 <Checkbox.Group className="grid grid-cols-4 gap-x-3 gap-y-1" options={[...IMAGE_ASPECT_OPTIONS]} value={view.aspects} onChange={(values) => onChange({ ...view, aspects: values as ImageAspect[] })} />
             </div>
-            <div>
-                <FieldLabel>画质档位（模型用 quality 表达分辨率时勾这里）</FieldLabel>
-                <Checkbox.Group
-                    className="flex flex-wrap gap-x-4 gap-y-1"
-                    options={[...IMAGE_QUALITY_TIER_OPTIONS]}
-                    value={qualityTiers}
-                    onChange={(values) => {
-                        const picked = values as ImageQuality[];
-                        // qualities 与 qualityTiers 保持同一份清单：面板读档位轴，服务端校验读 qualities，两者不该各说各话
-                        onChange({ ...view, qualityTiers: picked, qualities: picked });
-                    }}
-                />
-                <div className="mt-1 text-[11px] leading-4 text-[#726d67]">
-                    例如 Replicate 的 gpt-image-2.5-flare（low/medium/high/xhigh/max/auto）。勾上 = 用户在生成设置面板看到的是这一行画质档位，且不再显示 1K/2K/4K 与像素尺寸（像素由上游按画质决定）。不勾 = 走下面的「分辨率」档位。
+            {usesAspectOnly ? null : (
+                <div>
+                    <FieldLabel>画质档位（模型用 quality 表达分辨率时勾这里）</FieldLabel>
+                    <Checkbox.Group
+                        className="flex flex-wrap gap-x-4 gap-y-1"
+                        options={[...IMAGE_QUALITY_TIER_OPTIONS]}
+                        value={qualityTiers}
+                        onChange={(values) => {
+                            const picked = values as ImageQuality[];
+                            // qualities 与 qualityTiers 保持同一份清单：面板读档位轴，服务端校验读 qualities，两者不该各说各话
+                            onChange({ ...view, qualityTiers: picked, qualities: picked });
+                        }}
+                    />
+                    <div className="mt-1 text-[11px] leading-4 text-[#726d67]">
+                        例如 Replicate 的 gpt-image-2.5-flare（low/medium/high/xhigh/max/auto）。勾上 = 用户在生成设置面板看到的是这一行画质档位，且不再显示 1K/2K/4K 与像素尺寸（像素由上游按画质决定）。不勾 = 走下面的「分辨率」档位。
+                    </div>
                 </div>
-            </div>
-            {usesQualityAxis ? null : (
+            )}
+            {usesQualityAxis || usesAspectOnly ? null : (
                 <div>
                     <FieldLabel>分辨率（不勾的档位用户面板上不会出现）</FieldLabel>
                     <Checkbox.Group className="flex flex-wrap gap-x-4 gap-y-1" options={[...IMAGE_RESOLUTION_OPTIONS]} value={view.resolutions} onChange={(values) => onChange({ ...view, resolutions: values as ImageResolutionTier[] })} />
