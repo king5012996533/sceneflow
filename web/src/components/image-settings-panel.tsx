@@ -34,15 +34,20 @@ type ImageSettingsPanelProps = {
     config: AiConfig;
     onConfigChange: (key: "quality" | "size" | "count", value: string) => void;
     theme: CanvasTheme;
+    /**
+     * 本次请求真正会用的图像模型（调用方最清楚：画布节点用 config.model，studio 用 config.imageModel）。
+     * 不传时按 config.model → config.imageModel 兜底。传错会导致「面板显示的单价/可选档位」与实际扣费不一致。
+     */
+    model?: string;
     showTitle?: boolean;
     className?: string;
     maxCount?: number;
     quickCount?: number;
 };
 
-export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5", maxCount = 15, quickCount = 10 }: ImageSettingsPanelProps) {
+export function ImageSettingsPanel({ config, onConfigChange, theme, model: modelProp, showTitle = true, className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5", maxCount = 15, quickCount = 10 }: ImageSettingsPanelProps) {
     const [snapDimensionToStep, setSnapDimensionToStep] = useState(true);
-    const model = modelOptionName(config.model || config.imageModel);
+    const model = modelOptionName(modelProp || config.model || config.imageModel);
     const spec = usePlatformCapability(model);
     // 平台能力标定：有标定则按标定过滤选项；无标定（或过滤后为空）退回内置默认
     const imageCapability: ImageCapabilityView | null = spec?.kind === "image" ? normalizeImageCapability(spec) : null;

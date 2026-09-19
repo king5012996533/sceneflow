@@ -87,7 +87,7 @@ export function StudioSettingsDrawer({ open, onClose, kind, config, stylePreset,
                     <section className="setting-section" style={{ borderBottom: 0, marginBottom: 0 }}>
                         <h3 className="setting-heading">生成参数</h3>
                         {kind === "image" ? (
-                            <ImageSettingsPanel config={config} onConfigChange={handleImageConfigChange} theme={canvasThemes.warm} showTitle={false} className="w-full space-y-4" />
+                            <ImageSettingsPanel config={config} model={model} onConfigChange={handleImageConfigChange} theme={canvasThemes.warm} showTitle={false} className="w-full space-y-4" />
                         ) : (
                             <VideoSettingsPanel config={config} onConfigChange={handleVideoConfigChange} theme={canvasThemes.warm} showTitle={false} className="w-full space-y-4" />
                         )}

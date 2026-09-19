@@ -243,6 +243,7 @@ assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", "capabilities=
 assertIncludes("src/components/image-settings-panel.tsx", "IMAGE_RESOLUTION_OPTIONS", "用户面板必须有「分辨率」一轴。");
 assertIncludes("src/components/image-settings-panel.tsx", "normalizeImageCapability", "用户面板必须走能力归一化（兼容旧标定形状）。");
 assertIncludes("src/components/image-settings-panel.tsx", "imageRatioOf", "用户面板判当前比例必须走 imageRatioOf：只认像素串的话，默认配置的 size=\"1:1\" 会被当成自定义像素，用户一点分辨率档位尺寸就被写成 auto（线上复现过）。");
+assertIncludes("src/components/studio/studio-settings-drawer.tsx", "model={model}", "studio 抽屉必须把当前模型传给图像设置面板：抽屉里切模型只改 imageModel，面板若按 config.model 取值会继续用旧模型算价（分辨率分档后会显示错价、档位/张数上限也会错）。");
 assertNotMatches("src/components/image-settings-panel.tsx", /selectedRatio\s*=\s*[^;]*ratioForImageSize/, "不得再用 ratioForImageSize 直接判当前比例（它只认像素串，会把比例串判成自定义像素）。");
 assertIncludes("src/constant/credits.tsx", "options?.size", "客户端积分预检必须带 size：不带会把 2K/4K 按 1K 价显示，预检与实扣不一致。");
 assertNotMatches("src/app/(user)/studio/page.tsx", /videoSizeToImageSize\s*\(/, "studio 不得再把像素尺寸压成比例：用户选的 2K/4K 会被降级，出图口径与面板选择不一致。");
