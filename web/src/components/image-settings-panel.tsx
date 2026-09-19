@@ -6,7 +6,7 @@ import { ConfigProvider, Switch } from "antd";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { getGenerationCreditsCost } from "@/lib/credit-pricing";
 import { CUSTOM_IMAGE_RATIO, IMAGE_RESOLUTION_OPTIONS, imageRatioOf, imageResolutionTier, imageSizeForRatio, nearestAllowedTier, parseImagePixelSize, synthesizeImagePixelSize, type ImageResolutionTier } from "@/lib/image-resolution";
-import { normalizeImageCapability, IMAGE_QUALITY_OPTIONS, IMAGE_QUALITY_TIER_OPTIONS, type ImageAspect, type ImageCapabilityView, type ImageQuality } from "@/lib/model-capability-spec";
+import { normalizeImageCapability, normalizeImageOutputFormat, IMAGE_OUTPUT_FORMAT_OPTIONS, IMAGE_QUALITY_OPTIONS, IMAGE_QUALITY_TIER_OPTIONS, type ImageAspect, type ImageCapabilityView, type ImageQuality } from "@/lib/model-capability-spec";
 import { getPlatformPricing, getPricingDefaults, usePlatformCapability } from "@/stores/platform-catalog-store";
 import { modelOptionName, type AiConfig } from "@/stores/use-config-store";
 
@@ -27,7 +27,7 @@ const aspectOptions = [
 
 type ImageSettingsPanelProps = {
     config: AiConfig;
-    onConfigChange: (key: "quality" | "size" | "count", value: string) => void;
+    onConfigChange: (key: "quality" | "size" | "count" | "outputFormat", value: string) => void;
     theme: CanvasTheme;
     /**
      * 本次请求真正会用的图像模型（调用方最清楚：画布节点用 config.model，studio 用 config.imageModel）。
@@ -59,6 +59,13 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
      */
     const qualityTierOptions = imageCapability?.qualityTiers?.length ? IMAGE_QUALITY_TIER_OPTIONS.filter((item) => imageCapability.qualityTiers!.includes(item.value)) : null;
     const usesQualityAxis = Boolean(qualityTierOptions);
+    /**
+     * 出图格式行：只有后台在能力标定里勾了 outputFormats 的模型才出现。
+     * 平台请求里 output_format 是我们显式带的字段，勾了才敢让用户换 —— 没勾的渠道认不认这个值我们不知道。
+     */
+    const outputFormatOptions = imageCapability?.outputFormats?.length ? IMAGE_OUTPUT_FORMAT_OPTIONS.filter((item) => imageCapability.outputFormats!.includes(item.value)) : null;
+    const usesOutputFormatRow = Boolean(outputFormatOptions);
+    const outputFormat = normalizeImageOutputFormat(config.outputFormat);
     const allowedTiers = effectiveResolutions.map((item) => item.value);
     const effectiveMaxCount = imageCapability ? Math.max(1, Math.min(maxCount, imageCapability.maxCount)) : maxCount;
     const quality = config.quality || "auto";
@@ -110,6 +117,13 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
         if (!allowed.length || allowed.includes(quality as ImageQuality)) return;
         onConfigChange("quality", allowed[0] || "auto");
     }, [spec, quality]);
+    // 格式收敛：换了模型后本地存的格式可能不在这个模型的标定里（例如从 png 换到只支持 webp 的渠道）
+    useEffect(() => {
+        if (!outputFormatOptions) return;
+        const allowed = outputFormatOptions.map((item) => item.value);
+        if (allowed.includes(outputFormat as (typeof allowed)[number])) return;
+        onConfigChange("outputFormat", allowed[0] || "webp");
+    }, [spec, outputFormat]);
     const dimensions = readSizeDimensions(activeSize, selectedAspect || aspectOptions[0]);
     const selectAspect = (value: string) => {
         if (value === "auto") {
@@ -240,11 +254,29 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
                         <CountInput value={count} max={effectiveMaxCount} theme={theme} onChange={(value) => onConfigChange("count", String(value || 1))} />
                     </div>
                 </div>
+                {/* 出图格式：只有能力标定里勾了 outputFormats 的模型才出现这一行 */}
+                {outputFormatOptions ? (
+                    <div className="space-y-2.5">
+                        <SettingTitle index={7} en="FORMAT" color={theme.node.muted} faintColor={theme.node.faint}>
+                            格式
+                        </SettingTitle>
+                        <div className="grid grid-cols-3 gap-2.5">
+                            {outputFormatOptions.map((item) => (
+                                <OptionPill key={item.value} title={item.hint} selected={outputFormat === item.value} theme={theme} onClick={() => onConfigChange("outputFormat", item.value)}>
+                                    {item.label}
+                                </OptionPill>
+                            ))}
+                        </div>
+                        <div className="text-[11px] leading-4" style={{ color: theme.node.muted }}>
+                            {outputFormatOptions.find((item) => item.value === outputFormat)?.hint || ""}
+                        </div>
+                    </div>
+                ) : null}
                 {/* 画质档位轴的模型：画质已经升格成上面那一行主档位，这里不再重复一遍 */}
                 {usesQualityAxis ? null : (
                     <details className="space-y-2.5">
                         <summary className="cursor-pointer list-none select-none">
-                            <SettingTitle index={7} en="QUALITY" color={theme.node.muted} faintColor={theme.node.faint}>
+                            <SettingTitle index={outputFormatOptions ? 8 : 7} en="QUALITY" color={theme.node.muted} faintColor={theme.node.faint}>
                                 画质（高级）
                             </SettingTitle>
                         </summary>

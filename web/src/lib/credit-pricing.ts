@@ -11,7 +11,8 @@
  * 本模块为纯函数（无 DB/服务端依赖），客户端预检、成本展示与服务端扣费共用。
  */
 
-import { applyImageResolutionPricing, imageResolutionTier } from "@/lib/image-resolution";
+import { applyImageQualityPricing, applyImageResolutionPricing, imageResolutionTier } from "@/lib/image-resolution";
+import type { ImageQuality } from "@/lib/model-capability-spec";
 
 export type GenerationKind = "image" | "video" | "audio" | "text" | "tool";
 
@@ -23,6 +24,18 @@ export type ModelPricing = {
     imageCredits2k?: number;
     /** 每张 4K 图片扣积分（留空 = 沿用 imageCredits） */
     imageCredits4k?: number;
+    /**
+     * 画质档位轴模型的逐档价（键 = 上游 quality 取值）。只对「标了 qualityTiers」的模型生效。
+     *
+     * 为什么需要它：上游六个画质档的成本跨度是 50 倍（$0.012 → $0.50），
+     * 而 1K/2K/4K 三个桶最多只能表达三档，硬塞进去必然有的档位赔钱
+     * （实测：极高 $0.25、最高 $0.50、自动也是 $0.25，全都挤在「4K 桶」里按最贵的收还不够）。
+     *
+     * 口径：低档 = 基础价 imageCredits；本表里**填了的档位按本表扣**，没填的档位回落到基础价。
+     * 只要本表存在（哪怕只填一档），该模型就整条走画质档计价，不再看 2K/4K 桶 ——
+     * 免得后台看不见的桶在背后生效，对不上账。
+     */
+    imageQualityCredits?: Partial<Record<ImageQuality, number>>;
     /** 每条视频扣积分（按条计费，与时长无关）。统一档，兼容旧配置；配了分档时被分档覆盖 */
     videoCredits?: number;
     /** 每条标准分辨率视频扣积分（768P/720p/480p 等），优先于 videoCredits */
@@ -58,6 +71,13 @@ export function modelName(metadata?: GenerationMetadata): string {
     return generationModel(metadata).toLowerCase();
 }
 
+/** 图片基础档的内置草案价（后台没配任何价时的兜底，与过去的分支完全一致） */
+function imageBaseDraftCredits(model: string): number {
+    if (model.includes("gpt-image") || model.includes("dall-e")) return 10;
+    if (model.includes("minimax") || model.includes("hailuo") || model.includes("h3")) return 1;
+    return 2;
+}
+
 function isHighQuality(metadata?: GenerationMetadata): boolean {
     const vquality = String(metadata?.vquality || "");
     // 仅看视频分辨率字段判定高清档（2K / 1080p / 显式 high）。
@@ -71,21 +91,33 @@ function isHighQuality(metadata?: GenerationMetadata): boolean {
  * 单次生成消耗积分（admin 跳过计费，调用方自行处理）。
  * 取值优先级：configured（后台逐模型定价）> defaults（后台全局默认）> 内置草案。
  * 视频按条计费：每条固定积分，与时长无关。
- * 图片按分辨率档位（1K/2K/4K）计费：档位由 metadata 的 size/quality 判定（见 image-resolution.ts），
- * 2K/4K 未单独定价时沿用 1K 基础价 —— 后台不配 = 行为与过去完全一致。
+ * 图片两条口径：
+ *   - 画质档位轴模型（配了 imageQualityCredits）：按用户选的 quality 逐档扣，未填的档位回落基础价；
+ *   - 其余模型：按分辨率档位（1K/2K/4K）扣，档位由 metadata 的 size/quality 判定（见 image-resolution.ts），
+ *     2K/4K 未单独定价时沿用 1K 基础价 —— 后台不配 = 行为与过去完全一致。
  */
 export function getGenerationCreditsCost(kind: GenerationKind, metadata?: GenerationMetadata, configured?: ModelPricing, defaults?: PricingDefaults): number {
     const model = modelName(metadata);
     switch (kind) {
         case "image": {
+            const quality = String(metadata?.quality ?? "")
+                .trim()
+                .toLowerCase();
+            // 画质档位轴：逐档价优先，未填的档位回落基础价（低档本身就是基础价）
+            const tierPrices = configured?.imageQualityCredits;
+            if (tierPrices && Object.keys(tierPrices).length) {
+                let qualityBase: number;
+                if (configured?.imageCredits !== undefined) qualityBase = configured.imageCredits;
+                else if (defaults?.imageCredits !== undefined) qualityBase = defaults.imageCredits;
+                else qualityBase = imageBaseDraftCredits(model);
+                return applyImageQualityPricing(quality, tierPrices, qualityBase);
+            }
             // 分辨率分档：先取基础价（= 1K 价，逐模型 > 全局默认 > 内置草案），再套 2K/4K 专价
             const tier = imageResolutionTier(String(metadata?.size ?? ""), String(metadata?.quality ?? ""));
             let baseCredits: number;
             if (configured?.imageCredits !== undefined) baseCredits = configured.imageCredits;
             else if (defaults?.imageCredits !== undefined) baseCredits = defaults.imageCredits;
-            else if (model.includes("gpt-image") || model.includes("dall-e")) baseCredits = 10;
-            else if (model.includes("minimax") || model.includes("hailuo") || model.includes("h3")) baseCredits = 1;
-            else baseCredits = 2;
+            else baseCredits = imageBaseDraftCredits(model);
             return applyImageResolutionPricing(tier, configured, baseCredits);
         }
         case "video": {
@@ -119,11 +151,35 @@ export function getGenerationCreditsCost(kind: GenerationKind, metadata?: Genera
     }
 }
 
+/**
+ * 上游按画质档计价的模型（Replicate 的 gpt-image-2.5-flare）的单张成本，单位：分（人民币）。
+ *
+ * 来源：模型页公开价目表（per output image），按 1 美元 ≈ 7.1 元折算 ——
+ * low $0.012 / medium $0.047 / high $0.128 / xhigh $0.25 / max $0.50，
+ * 而 **auto 与 xhigh 同价（$0.25）**：上游把「自动」也按这个价收。
+ * 不按档估的话后台「成本 / 毛利」那一页会严重失真（原先是所有图片一律 30 分）。
+ */
+const FLARE_QUALITY_COST_CENTS: Partial<Record<ImageQuality, number>> = {
+    low: 9,
+    medium: 33,
+    high: 91,
+    xhigh: 178,
+    max: 355,
+    auto: 178,
+};
+
 /** 平台单次生成的估算成本（分），供对账与定价校准（公开价粗估） */
 export function estimateGenerationCostCents(kind: GenerationKind, metadata?: GenerationMetadata): number | null {
     const model = modelName(metadata);
     switch (kind) {
         case "image": {
+            if (/gpt-image-2\.5-flare/.test(model)) {
+                const quality = String(metadata?.quality ?? "")
+                    .trim()
+                    .toLowerCase();
+                const cost = FLARE_QUALITY_COST_CENTS[quality as ImageQuality];
+                if (typeof cost === "number") return cost;
+            }
             if (model.includes("gpt-image") || model.includes("dall-e")) return 30;
             if (model.includes("minimax") || model.includes("hailuo") || model.includes("h3")) return 2;
             return 10;

@@ -5,6 +5,7 @@ import { createJSONStorage, persist, type StateStorage } from "zustand/middlewar
 import { nanoid } from "nanoid";
 
 import { scopedStorageKey } from "@/lib/user-data-scope";
+import { normalizeImageOutputFormat } from "@/lib/model-capability-spec";
 import type { PlatformCatalogModel } from "@/stores/platform-catalog-store";
 
 export type ApiCallFormat = "openai" | "gemini" | "replicate" | "minimax" | "aigccc" | "genvideo";
@@ -47,6 +48,11 @@ export type AiConfig = {
     quality: string;
     size: string;
     count: string;
+    /**
+     * 出图文件格式（上游 output_format）。只在「模型能力标定里勾了 outputFormats」的模型上出现选择行；
+     * 默认 webp（也是上游默认，体积比 png 小一个量级）。空/未标定 = 用 webp。
+     */
+    outputFormat: string;
     canvasImageCount: string;
 };
 
@@ -97,6 +103,7 @@ export const defaultConfig: AiConfig = {
     quality: "auto",
     size: "1:1",
     count: "1",
+    outputFormat: "webp",
     canvasImageCount: "3",
 };
 
@@ -370,6 +377,7 @@ export const useConfigStore = create<ConfigStore>()(
                         videoGenerateAudio: config.videoGenerateAudio || "true",
                         videoWatermark: config.videoWatermark || "false",
                         videoDraft: config.videoDraft || "true",
+                        outputFormat: normalizeImageOutputFormat(config.outputFormat),
                         canvasImageCount: config.canvasImageCount || "3",
                         imageModels: Array.isArray(persistedConfig.imageModels) ? normalizeModelList(config.imageModels, channels) : filterModelsByCapability(models, "image"),
                         videoModels: Array.isArray(persistedConfig.videoModels) ? normalizeModelList(config.videoModels, channels) : filterModelsByCapability(models, "video"),

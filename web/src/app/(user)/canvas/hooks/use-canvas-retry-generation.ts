@@ -3,24 +3,14 @@
 import { useCallback } from "react";
 import { requestGeneratedText, requestGeneratedVideo, persistGeneratedVideo, requestGeneratedAudio, persistGeneratedAudio, requestGeneratedImages } from "@/lib/generation/generation-request";
 import { uploadImage } from "@/services/image-storage";
+import { normalizeImageOutputFormat } from "@/lib/model-capability-spec";
 import type { AiConfig } from "@/stores/use-config-store";
 import { NODE_DEFAULT_SIZE } from "../constants";
 import { CanvasNodeType } from "../types";
 import type { CanvasNodeData, CanvasNodeMetadata } from "../types";
 import type { NodeGenerationContext } from "../components/canvas-node-generation";
 import { buildNodeResponseMessages } from "../components/canvas-node-generation";
-import {
-    NODE_STATUS_LOADING,
-    NODE_STATUS_SUCCESS,
-    NODE_STATUS_ERROR,
-    VIDEO_NODE_MAX_WIDTH,
-    VIDEO_NODE_MAX_HEIGHT,
-    imageMetadata,
-    videoMetadata,
-    audioMetadata,
-    buildImageGenerationMetadata,
-    buildAudioGenerationMetadata,
-} from "../utils/canvas-utils";
+import { NODE_STATUS_LOADING, NODE_STATUS_SUCCESS, NODE_STATUS_ERROR, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT, imageMetadata, videoMetadata, audioMetadata, buildImageGenerationMetadata, buildAudioGenerationMetadata } from "../utils/canvas-utils";
 import { fitNodeSize } from "../utils/canvas-node-size";
 import { canvasGenerationErrorToast, formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
 import type { ReferenceImage } from "@/types/image";
@@ -76,6 +66,8 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
                           model: savedImageMetadata.model || effectiveConfig.imageModel || effectiveConfig.model,
                           quality: savedImageMetadata.quality || effectiveConfig.quality,
                           size: savedImageMetadata.size || effectiveConfig.size,
+                          // 格式跟原节点走：重试不该把用户选的 png 悄悄变回 webp
+                          outputFormat: normalizeImageOutputFormat(savedImageMetadata.outputFormat || effectiveConfig.outputFormat),
                           count: "1",
                       } as AiConfig)
                     : ({ ...buildGenCfg(sourceNode, node.type === CanvasNodeType.Text ? "text" : node.type === CanvasNodeType.Video ? "video" : node.type === CanvasNodeType.Audio ? "audio" : "image"), count: "1" } as AiConfig);
@@ -95,13 +87,7 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
             const generationType = savedImageMetadata?.generationType;
             const useReferenceImages = generationType ? generationType === "edit" : Boolean(context?.referenceImages.length);
             const retryReferenceImages =
-                hasSavedImageMetadata && savedImageMetadata
-                    ? await resolveReferences(savedImageMetadata)
-                    : useReferenceImages
-                      ? context?.referenceImages.length
-                          ? context.referenceImages
-                          : sourceReferenceImages(batchRoot || sourceNode)
-                      : [];
+                hasSavedImageMetadata && savedImageMetadata ? await resolveReferences(savedImageMetadata) : useReferenceImages ? (context?.referenceImages.length ? context.referenceImages : sourceReferenceImages(batchRoot || sourceNode)) : [];
             if (useReferenceImages && !retryReferenceImages) {
                 message.error("参考图片已丢失，无法继续重试");
                 setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, status: NODE_STATUS_ERROR, errorDetails: "参考图片已丢失，无法继续重试" } } : item)));
@@ -124,18 +110,47 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
                 if (node.type === CanvasNodeType.Text) {
                     if (!context) return;
                     let streamed = "";
-                    const answer = await requestGeneratedText({ config: generationConfig, messages: buildNodeResponseMessages({ ...context, prompt }), onDelta: (text) => {
-                        streamed = text;
-                        setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, type: CanvasNodeType.Text, metadata: { ...item.metadata, content: text, status: NODE_STATUS_LOADING } } : item)));
-                    }, options: { signal: controller.signal } });
+                    const answer = await requestGeneratedText({
+                        config: generationConfig,
+                        messages: buildNodeResponseMessages({ ...context, prompt }),
+                        onDelta: (text) => {
+                            streamed = text;
+                            setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, type: CanvasNodeType.Text, metadata: { ...item.metadata, content: text, status: NODE_STATUS_LOADING } } : item)));
+                        },
+                        options: { signal: controller.signal },
+                    });
                     setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, type: CanvasNodeType.Text, metadata: { ...item.metadata, content: answer || streamed, prompt, status: NODE_STATUS_SUCCESS } } : item)));
                     return;
                 }
 
                 if (node.type === CanvasNodeType.Video) {
-                    const video = await persistGeneratedVideo(await requestGeneratedVideo({ config: generationConfig, prompt, references: retryImages, videoReferences: context?.referenceVideos || [], audioReferences: context?.referenceAudios || [], options: { signal: controller.signal } }));
+                    const video = await persistGeneratedVideo(
+                        await requestGeneratedVideo({ config: generationConfig, prompt, references: retryImages, videoReferences: context?.referenceVideos || [], audioReferences: context?.referenceAudios || [], options: { signal: controller.signal } }),
+                    );
                     const videoSize = fitNodeSize(video.width || node.width, video.height || node.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
-                    setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, width: videoSize.width, height: videoSize.height, position: { x: item.position.x + item.width / 2 - videoSize.width / 2, y: item.position.y + item.height / 2 - videoSize.height / 2 }, metadata: { ...item.metadata, ...videoMetadata(video), prompt, model: generationConfig.model, size: generationConfig.size, seconds: generationConfig.videoSeconds, vquality: generationConfig.vquality, generateAudio: generationConfig.videoGenerateAudio, watermark: generationConfig.videoWatermark } } : item)));
+                    setNodes((prev) =>
+                        prev.map((item) =>
+                            item.id === node.id
+                                ? {
+                                      ...item,
+                                      width: videoSize.width,
+                                      height: videoSize.height,
+                                      position: { x: item.position.x + item.width / 2 - videoSize.width / 2, y: item.position.y + item.height / 2 - videoSize.height / 2 },
+                                      metadata: {
+                                          ...item.metadata,
+                                          ...videoMetadata(video),
+                                          prompt,
+                                          model: generationConfig.model,
+                                          size: generationConfig.size,
+                                          seconds: generationConfig.videoSeconds,
+                                          vquality: generationConfig.vquality,
+                                          generateAudio: generationConfig.videoGenerateAudio,
+                                          watermark: generationConfig.videoWatermark,
+                                      },
+                                  }
+                                : item,
+                        ),
+                    );
                     return;
                 }
 
@@ -156,12 +171,12 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
                     prev.map((item) =>
                         item.id === node.id
                             ? {
-                                ...item,
-                                type: CanvasNodeType.Image,
-                                width: imageSize.width,
-                                height: imageSize.height,
-                                metadata: { ...item.metadata, ...imageMetadata(uploadedImage), prompt, ...generationMetadata },
-                            }
+                                  ...item,
+                                  type: CanvasNodeType.Image,
+                                  width: imageSize.width,
+                                  height: imageSize.height,
+                                  metadata: { ...item.metadata, ...imageMetadata(uploadedImage), prompt, ...generationMetadata },
+                              }
                             : item,
                     ),
                 );

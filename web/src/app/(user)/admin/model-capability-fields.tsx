@@ -18,6 +18,7 @@ import {
     IMAGE_MAX_COUNT_LIMIT,
     IMAGE_QUALITY_OPTIONS,
     IMAGE_QUALITY_TIER_OPTIONS,
+    IMAGE_OUTPUT_FORMAT_OPTIONS,
     MINIMAX_DURATION_OPTIONS,
     MINIMAX_RATIO_OPTIONS,
     MINIMAX_RESOLUTION_OPTIONS,
@@ -33,6 +34,7 @@ import {
     normalizeImageCapability,
     type ImageAspect,
     type ImageCapabilitySpec,
+    type ImageOutputFormat,
     type ImageQuality,
     type MiniMaxDuration,
     type MiniMaxRatio,
@@ -136,6 +138,22 @@ function ImageFields({ spec, onChange }: { spec: ImageCapabilitySpec; onChange: 
                     <div className="mt-1 text-[11px] leading-4 text-[#726d67]">各档位的积分在下方「逐模型积分定价 → 图片生成」里分别设置。</div>
                 </div>
             )}
+            <div>
+                <FieldLabel>输出格式（不勾 = 用户面板不出现这一行）</FieldLabel>
+                <Checkbox.Group
+                    className="flex flex-wrap gap-x-4 gap-y-1"
+                    options={[...IMAGE_OUTPUT_FORMAT_OPTIONS]}
+                    value={view.outputFormats ?? []}
+                    onChange={(values) => {
+                        const picked = values as ImageOutputFormat[];
+                        onChange({ ...view, outputFormats: picked.length ? picked : undefined });
+                    }}
+                />
+                <div className="mt-1 text-[11px] leading-4 text-[#726d67]">
+                    Replicate 的 gpt-image-2.5-flare 支持 webp / png / jpeg（默认 webp）。建议只勾 WebP 和 PNG：webp 体积最小，png 无损且能装透明底；jpeg 没有 alpha 通道，与透明底互斥。注意：只有 Replicate 渠道（走
+                    /api/generation/jobs/…/replicate）会用用户选的值，其它渠道的请求里不带 output_format 字段。
+                </div>
+            </div>
             <div className="flex items-center gap-3">
                 <FieldLabel>最大生成张数</FieldLabel>
                 <InputNumber min={1} max={IMAGE_MAX_COUNT_LIMIT} value={spec.maxCount} onChange={(value) => onChange({ ...view, maxCount: Math.max(1, Math.min(IMAGE_MAX_COUNT_LIMIT, Math.floor(Number(value)) || 1)) })} />

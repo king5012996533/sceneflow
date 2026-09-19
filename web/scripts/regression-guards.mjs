@@ -266,9 +266,28 @@ assertIncludes("src/components/image-settings-panel.tsx", "qualityTierOptions", 
 assertIncludes("src/components/image-settings-panel.tsx", 'onConfigChange("quality", item.value)', "画质档位必须写进 config.quality（写进 size 就变成像素档，发的还是老参数）。");
 assertIncludes("src/components/image-settings-panel.tsx", "usesQualityAxis", "画质档位轴必须能整轴替掉分辨率档位并收起像素输入（像素由上游按 quality 决定，写数字是骗用户）。");
 assertIncludes("src/app/(user)/admin/model-capability-fields.tsx", "IMAGE_QUALITY_TIER_OPTIONS", "后台能力标定必须能勾画质档位轴（只能在代码里写死的话，换模型就得改代码）。");
-assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "IMAGE_QUALITY_TIER_PRICING", "画质档位轴的模型定价必须换名成「低/中/高及以上」，否则后台以为在配像素档、实际扣的是画质档的价。");
+assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "qualityTierPriceFields", "画质档位轴的模型必须逐档定价（上游六档成本跨度 50 倍，三个像素桶装不下，必然有档位赔钱）。");
+assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "imageQualityCredits", "逐档价必须落进 imageQualityCredits，否则后台填了也没人读。");
 assertIncludes("src/lib/image-resolution.ts", 'xhigh: "4k"', "xhigh/max 必须归到最高价桶：落回 1K 桶等于「用户选最贵画质、我们按最便宜价扣」。");
 assertIncludes("src/lib/image-resolution.ts", 'max: "4k"', "xhigh/max 必须归到最高价桶（同上）。");
+// —— 逐画质档定价（2026-09-19 第二轮：上游 flate 六档 $0.012…$0.50，auto 也是 $0.25）——
+assertIncludes("src/lib/image-resolution.ts", "applyImageQualityPricing", "逐档计价必须是一个可被 node 单测直接加载的纯函数，不能埋在 credit-pricing 的别名里。");
+assertIncludes("src/lib/credit-pricing.ts", "applyImageQualityPricing", "扣费必须真的走逐档计价，否则后台配了新价也扣不着。");
+assertIncludes("src/lib/credit-pricing.ts", "imageQualityCredits", "ModelPricing 必须带逐档价表（pricing 是 Json 字段，不用改表结构）。");
+assertIncludes("src/lib/model-capability-spec.ts", "sanitizeQualityCredits", "后台保存逐档价必须经服务端清洗（只留合法档位、≥0 整数）。");
+// auto 是这批档位里最容易漏的一个：上游对 auto 的报价与 xhigh 相同，落回基础价就是每张赔 11 个积分
+assertIncludes("src/lib/credit-pricing.ts", "auto: 178", "成本估算表必须把 auto 按 $0.25 计（与 xhigh 同价），否则后台毛利页会把它算成最便宜那档。");
+assertIncludes("src/lib/credit-pricing.ts", "FLARE_QUALITY_COST_CENTS", "成本估算必须按画质档给（原先所有图片一律 30 分，后台毛利页两种方向都是错的）。");
+// —— 出图格式（2026-09-19：上游 output_format 是显式字段，用户可选 webp/png）——
+assertIncludes("src/lib/model-capability-spec.ts", "outputFormats?: ImageOutputFormat[]", "能力标定必须能标「这个模型支持哪些出图格式」，标了面板才出现格式行。");
+assertIncludes("src/lib/model-capability-spec.ts", "normalizeImageOutputFormat", "格式取值必须归一化：发一个上游不认的值就是 422，认不出来一律回 webp。");
+assertIncludes("src/lib/model-capability-spec.ts", "IMAGE_OUTPUT_FORMAT_OPTIONS", "格式选项必须有单一清单（后台与面板共用）。");
+assertIncludes("src/components/image-settings-panel.tsx", "outputFormatOptions", "用户面板必须按能力标定显示格式行（没标 = 不显示，行为与过去一致）。");
+assertIncludes("src/components/image-settings-panel.tsx", 'onConfigChange("outputFormat"', "格式选择必须写进 config.outputFormat，否则选了也不生效。");
+assertIncludes("src/services/api/image.ts", "replicateOutputFormatPayload", "Replicate 请求必须按用户选的格式发 output_format（写死 webp 等于面板在骗人）。");
+assertIncludes("src/services/api/image.ts", 'outputFormat === "png" ? {} : { output_compression: 90 }', "png 是无损格式，不该带压缩率（带了对 webp/jpeg 才有意义）。");
+assertIncludes("src/stores/use-config-store.ts", "outputFormat", "config 必须持久化出图格式，否则刷新就丢。");
+assertIncludes("src/lib/generation/generation-config.ts", "normalizeImageOutputFormat(node?.metadata?.outputFormat", "节点元数据里的格式必须能回灌到请求（重试要按原格式复现）。");
 
 // —— Aigccc / Seedance 2.0 网关接入 ——
 assertIncludes("src/stores/use-config-store.ts", '"aigccc"', "ApiCallFormat 必须支持 aigccc。");

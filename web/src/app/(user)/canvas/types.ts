@@ -74,6 +74,8 @@ export type CanvasNodeMetadata = {
     model?: string;
     size?: string;
     quality?: string;
+    /** 出图格式（上游 output_format）：webp / png / jpeg；未设置 = 按渠道默认（webp） */
+    outputFormat?: string;
     count?: number;
     seconds?: string;
     vquality?: string;

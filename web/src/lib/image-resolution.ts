@@ -276,3 +276,23 @@ export function applyImageResolutionPricing(tier: ImageResolutionTier, pricing: 
     const valid = typeof tierCredits === "number" && Number.isFinite(tierCredits) && tierCredits >= 0;
     return Math.max(0, Math.floor(valid ? (tierCredits as number) : baseCredits));
 }
+
+/** 逐画质档定价表（键 = 上游 quality 取值；低档一般不出现，它就是基础价） */
+export type ImageQualityPricing = Partial<Record<string, number>>;
+
+/**
+ * 画质档位轴模型的逐档计价：命中的档位价优先，没命中走基础价。
+ *
+ * 为什么要逐档：上游六个画质档的成本跨度 50 倍（$0.012 → $0.50），
+ * 而 1K/2K/4K 只有三个桶，硬塞必然有档位赔钱（极高/最高/自动 都是这个下场）。
+ * 本函数放在 image-resolution 里（与分档计价同一处）是为了让 node 单测能直接跑。
+ * 取值口径与分辨率分档一致：脏值（负数/NaN）按「没配」处理，宁可走基础价也不白送。
+ */
+export function applyImageQualityPricing(quality: string, pricing: ImageQualityPricing | undefined, baseCredits: number): number {
+    const value = String(quality ?? "")
+        .trim()
+        .toLowerCase();
+    const exact = value && pricing ? pricing[value] : undefined;
+    const valid = typeof exact === "number" && Number.isFinite(exact) && exact >= 0;
+    return Math.max(0, Math.floor(valid ? (exact as number) : baseCredits));
+}

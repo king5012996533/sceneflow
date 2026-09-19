@@ -71,6 +71,8 @@ export function buildImageGenerationMetadata(type: CanvasImageGenerationType, co
         model: config.model,
         size: config.size,
         quality: config.quality,
+        // 出图格式跟着节点走：重试 / 重新生成时按原格式复现，不会悄悄变回 webp
+        outputFormat: config.outputFormat,
         count,
         references: references.map(referenceUrl).filter((url): url is string => Boolean(url)),
     };

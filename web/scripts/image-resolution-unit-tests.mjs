@@ -15,6 +15,7 @@ import assert from "node:assert";
 import {
     CUSTOM_IMAGE_RATIO,
     IMAGE_RESOLUTION_TIERS,
+    applyImageQualityPricing,
     applyImageResolutionPricing,
     baseImageAspect,
     deriveResolutionTiers,
@@ -259,6 +260,32 @@ check("画质档位轴：选「最高」按 4K 桶扣，不会按基础价卖（
 check("画质档位轴：像素串优先于画质档（面板若还留着像素值，不能靠画质档把价改高）", () => {
     assert.strictEqual(imageResolutionTier("1024x1024", "max"), "1k");
     assert.strictEqual(imageResolutionTier("3840x2160", "low"), "4k");
+});
+
+// ---------- 逐画质档定价（六个档位各一个价：上游成本跨度 50 倍，三个桶装不下） ----------
+
+check("逐档定价：填了的档位按本档价扣，没填的回落基础价", () => {
+    const prices = { medium: 6, xhigh: 30, max: 60, auto: 30 };
+    assert.strictEqual(applyImageQualityPricing("low", prices, 2), 2); // 低档 = 基础价，不在表里
+    assert.strictEqual(applyImageQualityPricing("medium", prices, 2), 6);
+    assert.strictEqual(applyImageQualityPricing("high", prices, 2), 2); // 没填 = 基础价
+    assert.strictEqual(applyImageQualityPricing("xhigh", prices, 2), 30);
+    assert.strictEqual(applyImageQualityPricing("max", prices, 2), 60);
+    assert.strictEqual(applyImageQualityPricing("auto", prices, 2), 30); // 自动必须单独定价（上游按 xhigh 收）
+});
+
+check("逐档定价：取值大小写/空白不影响命中，认不出的画质回基础价", () => {
+    assert.strictEqual(applyImageQualityPricing(" MAX ", { max: 60 }, 2), 60);
+    assert.strictEqual(applyImageQualityPricing("最高", { max: 60 }, 2), 2);
+    assert.strictEqual(applyImageQualityPricing("", { max: 60 }, 2), 2);
+    assert.strictEqual(applyImageQualityPricing("max", undefined, 7), 7);
+});
+
+check("逐档定价：脏值（负数/NaN/小数）按「没配」处理并取整，不能白送也不能多收", () => {
+    assert.strictEqual(applyImageQualityPricing("max", { max: -5 }, 4), 4);
+    assert.strictEqual(applyImageQualityPricing("max", { max: Number.NaN }, 4), 4);
+    assert.strictEqual(applyImageQualityPricing("max", { max: 8.6 }, 4), 8);
+    assert.strictEqual(applyImageQualityPricing("max", { max: 0 }, 4), 0); // 明确配 0 = 免费，这是配置意图
 });
 
 console.log(`\n图片分辨率分档单测：${passed} 通过 / ${failures.length} 失败`);

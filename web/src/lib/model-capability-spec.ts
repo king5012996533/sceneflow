@@ -18,6 +18,8 @@ import { IMAGE_BASE_ASPECTS, IMAGE_RESOLUTION_TIERS, deriveResolutionTiers, norm
 /** 出图保真度档（上游 quality 参数）。low/medium/high 是三档老词汇，xhigh/max 是顶档（Replicate gpt-image-2.5-flare 有六档） */
 export type ImageQuality = "auto" | "high" | "medium" | "low" | "xhigh" | "max";
 export type ImageAspect = "1:1" | "3:2" | "2:3" | "4:3" | "3:4" | "16:9" | "9:16" | "1:1-2k" | "16:9-2k" | "9:16-2k" | "16:9-4k" | "9:16-4k" | "auto";
+/** 出图文件格式（上游 output_format）。webp 最省，png 无损且支持透明底，jpeg 无 alpha 通道 */
+export type ImageOutputFormat = "webp" | "png" | "jpeg";
 
 export type ImageCapabilitySpec = {
     kind: "image";
@@ -34,11 +36,22 @@ export type ImageCapabilitySpec = {
      * 标了它 = 告诉面板「这个模型的『分辨率』就是画质档」：
      *   - 用户面板把 1K/2K/4K 那一行整行换成这里的档位，选项写进 config.quality（而不是像素尺寸）；
      *   - 尺寸只留宽高比，不再显示像素值与 W/H 输入（像素由上游按 quality 决定，我们给不出准确数字）；
-     *   - 后台定价按「基础 / 中 / 高及以上」三个桶收，见 image-resolution.ts 的 QUALITY_TIERS。
+     *   - 后台定价按画质档逐档收（低 = 基础价，其余档位见 ModelPricing.imageQualityCredits）。
      *
      * 不标（undefined / 空）= 沿用原有「分辨率档位」口径，其它渠道行为完全不变。
      */
     qualityTiers?: ImageQuality[];
+    /**
+     * 支持出图格式（上游 output_format 参数）。标了才在用户面板出现「格式」这一行。
+     *
+     * 为什么不给所有模型都显示：平台请求里 output_format 是我们显式带上的字段，不传就用上游默认，
+     * 大多数渠道只有 webp/png 两种甚至完全不认这个字段。所以「能不能选格式」按模型标定，
+     * 不标 = 面板不出现这一行、行为与过去完全一致。
+     *
+     * webp = 体积最小（1024² 约 26–33 万字节）；png = 无损、支持透明底；jpeg = 无 alpha 通道，
+     * 与「透明底」互斥，不建议开放给用户。
+     */
+    outputFormats?: ImageOutputFormat[];
     /** 最大生成张数 1-15 */
     maxCount: number;
 };
@@ -130,6 +143,17 @@ export const IMAGE_QUALITY_TIER_OPTIONS: ReadonlyArray<{ value: ImageQuality; la
     { value: "xhigh", label: "极高", hint: "更高的细节与保真" },
     { value: "max", label: "最高", hint: "最高保真，最慢最贵" },
     { value: "auto", label: "自动", hint: "由模型自行决定" },
+];
+
+/**
+ * 出图格式选项。第一项是平台默认（也是上游默认）：webp —— 1024² 实测 26–33 万字节，
+ * 比 png 小一个量级，浏览器显示完全一致。
+ * jpeg 留在清单里只是给后台留个口子（例如以后接只认 jpg 的老工具），默认不给用户开。
+ */
+export const IMAGE_OUTPUT_FORMAT_OPTIONS: ReadonlyArray<{ value: ImageOutputFormat; label: string; hint: string }> = [
+    { value: "webp", label: "WebP", hint: "体积最小，网页/画布显示与 png 无差别" },
+    { value: "png", label: "PNG", hint: "无损，支持透明底；文件更大" },
+    { value: "jpeg", label: "JPEG", hint: "无透明通道，与「透明底」互斥" },
 ];
 
 /** 宽高比选项（后台能力标定用；分辨率是独立一轴，不写在这里） */
@@ -356,7 +380,36 @@ function pickNumbers<T extends number>(input: unknown, allowed: readonly T[]): T
 export function normalizeImageCapability(spec: ImageCapabilitySpec): ImageCapabilityView {
     const aspects = stripAspectSuffixes(spec.aspects as readonly string[]) as ImageAspect[];
     const explicit = Array.isArray(spec.resolutions) && spec.resolutions.length ? normalizeResolutionTiers(spec.resolutions) : null;
-    return { ...spec, aspects, resolutions: explicit ?? deriveResolutionTiers(spec.aspects as readonly string[]), qualityTiers: normalizeQualityTiers(spec.qualityTiers) };
+    return {
+        ...spec,
+        aspects,
+        resolutions: explicit ?? deriveResolutionTiers(spec.aspects as readonly string[]),
+        qualityTiers: normalizeQualityTiers(spec.qualityTiers),
+        outputFormats: normalizeOutputFormats(spec.outputFormats),
+    };
+}
+
+/**
+ * 出图格式归一化：只留合法取值、按 IMAGE_OUTPUT_FORMAT_OPTIONS 的顺序去重排序。
+ * 空/缺 = 该模型不开放格式选择（返回 undefined，面板不出现这一行）。
+ */
+export function normalizeOutputFormats(input: unknown): ImageOutputFormat[] | undefined {
+    if (!Array.isArray(input)) return undefined;
+    const picked = new Set(input.map((item) => String(item).trim().toLowerCase()));
+    const formats = IMAGE_OUTPUT_FORMAT_OPTIONS.map((item) => item.value).filter((value) => picked.has(value));
+    return formats.length ? formats : undefined;
+}
+
+/**
+ * 单个格式取值的归一化：认不出来就回默认值 webp。
+ * 请求体里 output_format 是我们显式发的字段，发一个上游不认的值会被直接 422 ——
+ * 所以任何来自本地存储 / 节点元数据的值都在这里收口。
+ */
+export function normalizeImageOutputFormat(input: unknown, fallback: ImageOutputFormat = "webp"): ImageOutputFormat {
+    const value = String(input ?? "")
+        .trim()
+        .toLowerCase();
+    return IMAGE_OUTPUT_FORMAT_OPTIONS.some((item) => item.value === value) ? (value as ImageOutputFormat) : fallback;
 }
 
 /**
@@ -394,6 +447,7 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
         const pickedAspects = pickStrings(value.aspects, IMAGE_ASPECT_VALUES);
         const resolutions = Array.isArray(value.resolutions) && value.resolutions.length ? normalizeResolutionTiers(value.resolutions) : deriveResolutionTiers(pickedAspects);
         const qualityTiers = normalizeQualityTiers(value.qualityTiers);
+        const outputFormats = normalizeOutputFormats(value.outputFormats);
         return {
             kind,
             qualities: pickStrings(value.qualities, IMAGE_QUALITY_VALUES),
@@ -401,6 +455,7 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
             resolutions,
             // 没标就整个字段不落库：留一个空数组会让「标了但没勾」和「没标」分不清
             ...(qualityTiers ? { qualityTiers } : {}),
+            ...(outputFormats ? { outputFormats } : {}),
             maxCount: Math.max(1, Math.min(IMAGE_MAX_COUNT_LIMIT, Math.floor(Number(value.maxCount)) || DEFAULT_IMAGE_CAPABILITY.maxCount)),
         };
     }
@@ -446,6 +501,22 @@ function toPricingNumber(value: unknown): number | undefined {
     return num;
 }
 
+/**
+ * 逐档价清洗：只留画质档位轴认识的那几档（低档不在这里 —— 它就是基础价 imageCredits）。
+ * 一档都没填 = 返回 undefined，整个字段不落库（回到「全按基础价扣」的老口径）。
+ */
+export function sanitizeQualityCredits(input: unknown): Partial<Record<ImageQuality, number>> | undefined {
+    if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+    const value = input as Record<string, unknown>;
+    const result: Partial<Record<ImageQuality, number>> = {};
+    for (const tier of IMAGE_QUALITY_TIER_OPTIONS) {
+        if (tier.value === "low") continue;
+        const credits = toPricingNumber(value[tier.value]);
+        if (credits !== undefined) result[tier.value] = credits;
+    }
+    return Object.keys(result).length ? result : undefined;
+}
+
 export function sanitizePricing(input: unknown): CredentialPricing | undefined {
     if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
     const result: CredentialPricing = {};
@@ -461,6 +532,9 @@ export function sanitizePricing(input: unknown): CredentialPricing | undefined {
         if (imageCredits2k !== undefined) pricing.imageCredits2k = imageCredits2k;
         const imageCredits4k = toPricingNumber(value.imageCredits4k);
         if (imageCredits4k !== undefined) pricing.imageCredits4k = imageCredits4k;
+        // 画质档位轴的逐档价（低档不在这里，它是 imageCredits 基础价）
+        const qualityCredits = sanitizeQualityCredits(value.imageQualityCredits);
+        if (qualityCredits) pricing.imageQualityCredits = qualityCredits;
         const videoCredits = toPricingNumber(value.videoCredits);
         if (videoCredits !== undefined) pricing.videoCredits = videoCredits;
         const videoCreditsStandard = toPricingNumber(value.videoCreditsStandard);

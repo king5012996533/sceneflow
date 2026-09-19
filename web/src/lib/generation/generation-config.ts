@@ -1,4 +1,5 @@
 import { boolConfig, isSeedanceVideoConfig, normalizeSeedanceRatio, normalizeSeedanceResolution } from "@/lib/seedance-video";
+import { normalizeImageOutputFormat } from "@/lib/model-capability-spec";
 import { defaultConfig, type AiConfig } from "@/stores/use-config-store";
 
 export type GenerationMode = "text" | "image" | "video" | "audio";
@@ -7,6 +8,7 @@ type GenerationConfigNode = {
     metadata?: {
         model?: string;
         quality?: string;
+        outputFormat?: string;
         size?: string;
         count?: number;
         seconds?: string;
@@ -31,6 +33,7 @@ export function buildNodeGenerationConfig(config: AiConfig, node: GenerationConf
         audioModel: mode === "audio" ? selectedModel : config.audioModel,
         textModel: mode === "text" ? selectedModel : config.textModel,
         quality: node?.metadata?.quality || config.quality || defaultConfig.quality,
+        outputFormat: normalizeImageOutputFormat(node?.metadata?.outputFormat || config.outputFormat || defaultConfig.outputFormat),
         size: node?.metadata?.size || config.size || defaultConfig.size,
         videoSeconds: node?.metadata?.seconds || config.videoSeconds || defaultConfig.videoSeconds,
         vquality: node?.metadata?.vquality || config.vquality || defaultConfig.vquality,

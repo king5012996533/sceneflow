@@ -5,7 +5,7 @@ import { InputNumber, Switch } from "antd";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 import type { ModelPricing } from "@/lib/credit-pricing";
-import { IMAGE_KIND, normalizeImageCapability, type ModelCapabilitySpec } from "@/lib/model-capability-spec";
+import { IMAGE_KIND, IMAGE_QUALITY_TIER_OPTIONS, normalizeImageCapability, type ImageQuality, type ModelCapabilitySpec } from "@/lib/model-capability-spec";
 import type { ImageResolutionTier } from "@/lib/image-resolution";
 import { inferPricingKind, PRICING_KIND_LABEL, type PricingKind } from "@/lib/model-pricing-kind";
 
@@ -21,31 +21,49 @@ type CredentialPricingEditorProps = {
     capabilities?: Record<string, ModelCapabilitySpec | undefined>;
 };
 
-const PRICING_FIELDS: Array<{ key: keyof ModelPricing; label: string; hint: string }> = [
+/** 单个数字价字段的键（imageQualityCredits 是一张表，不走这一套） */
+type NumericPricingKey = Exclude<keyof ModelPricing, "imageQualityCredits">;
+
+const PRICING_FIELDS: Array<{ key: NumericPricingKey; label: string; hint: string }> = [
     { key: "audioCredits", label: "音频生成（每次）", hint: "留空 = 内置 1 积分" },
     { key: "textCredits", label: "文本 / 工具（每次）", hint: "留空 = 内置 0 积分（不扣）" },
 ];
 
 /** 图片分档定价：1K 是基础价，2K/4K 留空 = 沿用 1K 价（后台不配 = 与过去完全一致） */
-const IMAGE_TIERS: Array<{ key: keyof ModelPricing; tier: ImageResolutionTier; label: string; hint: string }> = [
+const IMAGE_TIERS: Array<{ key: NumericPricingKey; tier: ImageResolutionTier; label: string; hint: string }> = [
     { key: "imageCredits", tier: "1k", label: "1K（基础档）", hint: "留空 = 内置草案（大多模型 2 积分）" },
     { key: "imageCredits2k", tier: "2k", label: "2K", hint: "留空 = 按 1K 价扣" },
     { key: "imageCredits4k", tier: "4k", label: "4K", hint: "留空 = 按 1K 价扣" },
 ];
 
 /**
- * 画质档位轴的模型（标了 qualityTiers）价格桶换名：这些模型没有 1K/2K/4K 像素档，
- * 价格按用户选的画质档走 —— 低=基础 / 中=2K 桶 / 高及以上=4K 桶（映射见 image-resolution 的 QUALITY_TIERS）。
- * 不改名的话后台会以为自己配的是像素档，实际扣的是画质档的价。
+ * 画质档位轴的模型（标了 qualityTiers）按「画质档」逐档定价，不再用 1K/2K/4K 三个像素桶。
+ *
+ * 起因（2026-09-19 老板反馈「最高档 0.5 美金一张，低的 0.01」）：上游六个档的成本跨度是 50 倍，
+ * 三个桶最多表达三档，挤在一起必然有档位赔钱（实测「极高 / 最高 / 自动」全落在 4K 桶里，
+ * 按最贵那档收都不够成本）。所以改成逐档一个价框：低 = 基础价 imageCredits，
+ * 其余写进 imageQualityCredits，未填的档位回落基础价。
  */
-const IMAGE_QUALITY_TIER_PRICING: Array<{ key: keyof ModelPricing; tier: ImageResolutionTier; label: string; hint: string }> = [
-    { key: "imageCredits", tier: "1k", label: "低（基础档）", hint: "用户选「低 / 自动」按此价" },
-    { key: "imageCredits2k", tier: "2k", label: "中", hint: "用户选「中」按此价；留空 = 按基础价扣" },
-    { key: "imageCredits4k", tier: "4k", label: "高 / 极高 / 最高", hint: "用户选「高」及以上按此价；留空 = 按基础价扣" },
-];
+const IMAGE_QUALITY_COST_REFERENCE: Partial<Record<ImageQuality, string>> = {
+    low: "$0.012",
+    medium: "$0.047",
+    high: "$0.128",
+    xhigh: "$0.25",
+    max: "$0.50",
+    auto: "$0.25（与「极高」同价）",
+};
+
+/** 该模型要配哪几档价：只列它在能力标定里勾了的档位 */
+function qualityTierPriceFields(tiers: ImageQuality[]): Array<{ quality: ImageQuality; label: string; hint: string }> {
+    return IMAGE_QUALITY_TIER_OPTIONS.filter((item) => tiers.includes(item.value)).map((item) => ({
+        quality: item.value,
+        label: item.value === "low" ? `${item.label}（基础档）` : item.label,
+        hint: item.value === "low" ? "也是其它档位没填时的兜底价" : "留空 = 按「低」档价扣",
+    }));
+}
 
 /** 视频分档定价：高清档（2K/1080p）与标准档（768P/720p 等）分开配置 */
-const VIDEO_TIERS: Array<{ key: keyof ModelPricing; label: string; hint: string }> = [
+const VIDEO_TIERS: Array<{ key: NumericPricingKey; label: string; hint: string }> = [
     { key: "videoCreditsStandard", label: "标准档（768P/720p）", hint: "如 20：768P 等标准分辨率每条扣 20" },
     { key: "videoCreditsHigh", label: "高清档（2K/1080p）", hint: "如 40：2K 等高清分辨率每条扣 40" },
 ];
@@ -105,10 +123,11 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
         return view.qualityTiers?.length ? null : view.resolutions;
     };
 
-    /** 该模型是不是画质档位轴（价格桶要跟着换名） */
-    const usesQualityAxis = (model: string): boolean => {
+    /** 该模型是不是画质档位轴；是则返回它标定的档位（价格要逐档配，不再用像素桶） */
+    const qualityAxisTierList = (model: string): ImageQuality[] => {
         const spec = capabilities?.[model];
-        return Boolean(spec && spec.kind === IMAGE_KIND && normalizeImageCapability(spec).qualityTiers?.length);
+        if (!spec || spec.kind !== IMAGE_KIND) return [];
+        return normalizeImageCapability(spec).qualityTiers ?? [];
     };
 
     if (!models.length) {
@@ -122,7 +141,7 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
         if (checked) setExpanded((prev) => ({ ...prev, [model]: true }));
     };
 
-    const setField = (model: string, key: keyof ModelPricing, num: number | null) => {
+    const setField = (model: string, key: NumericPricingKey, num: number | null) => {
         if (num === null || num === undefined) {
             const current = value[model] ? { ...value[model] } : {};
             delete current[key];
@@ -138,8 +157,29 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
         onChange({ ...value, [model]: { ...(value[model] || {}), [key]: Math.max(0, Math.floor(num)) } });
     };
 
+    /** 画质档位轴的逐档价：低档走基础价 imageCredits，其余写进 imageQualityCredits */
+    const setQualityTierPrice = (model: string, quality: ImageQuality, num: number | null) => {
+        if (quality === "low") {
+            setField(model, "imageCredits", num);
+            return;
+        }
+        const current = { ...(value[model] || {}) };
+        const table = { ...(current.imageQualityCredits || {}) };
+        if (num === null || num === undefined) delete table[quality];
+        else table[quality] = Math.max(0, Math.floor(num));
+        if (Object.keys(table).length) current.imageQualityCredits = table;
+        else delete current.imageQualityCredits;
+        if (!Object.keys(current).length) {
+            const next = { ...value };
+            delete next[model];
+            onChange(next);
+            return;
+        }
+        onChange({ ...value, [model]: current });
+    };
+
     /** 渲染一组定价字段：同组字段都写在同一个 pricing 对象上 */
-    const renderGroup = (model: string, kind: PricingKind, pricing: ModelPricing | undefined, group: PricingGroupId, allowedTiers: ImageResolutionTier[] | null, qualityAxis: boolean) => {
+    const renderGroup = (model: string, kind: PricingKind, pricing: ModelPricing | undefined, group: PricingGroupId, allowedTiers: ImageResolutionTier[] | null, qualityAxisTiers: ImageQuality[]) => {
         if (group === "textAudio") {
             return (
                 <div key={group} className="rounded-lg border border-[#e9e6e3] bg-white/60 p-2.5">
@@ -161,12 +201,44 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
             );
         }
         if (group === "image") {
-            const tierFields = qualityAxis ? IMAGE_QUALITY_TIER_PRICING : IMAGE_TIERS;
+            if (qualityAxisTiers.length) {
+                const tierFields = qualityTierPriceFields(qualityAxisTiers);
+                return (
+                    <div key={group} className="rounded-lg border border-[#e9e6e3] bg-white/60 p-2.5">
+                        <div className="mb-1.5 text-xs text-[#332f2a]">图片生成（每张，按画质档逐档定价）</div>
+                        <div className="grid grid-cols-3 gap-3">
+                            {tierFields.map((item) => {
+                                const cost = IMAGE_QUALITY_COST_REFERENCE[item.quality];
+                                return (
+                                    <div key={item.quality}>
+                                        <div className="mb-1 text-xs text-[#332f2a]">{item.label}</div>
+                                        <InputNumber
+                                            className="w-full"
+                                            min={0}
+                                            precision={0}
+                                            placeholder="留空 = 按基础档"
+                                            value={item.quality === "low" ? (pricing?.imageCredits ?? null) : (pricing?.imageQualityCredits?.[item.quality] ?? null)}
+                                            onChange={(num) => setQualityTierPrice(model, item.quality, num)}
+                                        />
+                                        <div className="mt-0.5 text-[11px] text-[#726d67]">
+                                            {item.hint}
+                                            {cost ? <span className="ml-1 text-[#a49f9a]">上游 {cost}/张</span> : null}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-1.5 text-[11px] leading-4 text-[#726d67]">
+                            逐档只影响扣费，不影响上游出图。参考「1 积分 = 0.1 元」时各档成本约：低 0.9 / 中 3.3 / 高 9.1 / 极高 17.8 / 最高 35.5 / 自动 17.8 积分（按 1 美元 ≈ 7.1 元折算）——低于成本的档位每出一张图都在赔钱，改价前先对一眼。
+                        </div>
+                    </div>
+                );
+            }
             return (
                 <div key={group} className="rounded-lg border border-[#e9e6e3] bg-white/60 p-2.5">
-                    <div className="mb-1.5 text-xs text-[#332f2a]">{qualityAxis ? "图片生成（每张，按画质档分档）" : GROUP_TITLE.image}</div>
+                    <div className="mb-1.5 text-xs text-[#332f2a]">{GROUP_TITLE.image}</div>
                     <div className="grid grid-cols-3 gap-3">
-                        {tierFields.map((item) => {
+                        {IMAGE_TIERS.map((item) => {
                             const unsupported = allowedTiers ? !allowedTiers.includes(item.tier) : false;
                             return (
                                 <div key={item.key}>
@@ -180,9 +252,7 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
                             );
                         })}
                     </div>
-                    <div className="mt-1.5 text-[11px] leading-4 text-[#726d67]">
-                        {qualityAxis ? "分档只影响扣费，不影响上游出图：用户选「中」按 2K 桶扣、选「高」及以上按 4K 桶扣。" : "分档只影响扣费，不影响上游出图：用户选 2K/4K 才按对应档位扣。参考倍率 2K ≈ 1.5–2×、4K ≈ 3–4× 基础价。"}
-                    </div>
+                    <div className="mt-1.5 text-[11px] leading-4 text-[#726d67]">分档只影响扣费，不影响上游出图：用户选 2K/4K 才按对应档位扣。参考倍率 2K ≈ 1.5–2×、4K ≈ 3–4× 基础价。</div>
                 </div>
             );
         }
@@ -210,7 +280,7 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
                 const enabled = Boolean(pricing);
                 const open = Boolean(expanded[model]);
                 const allowedTiers = capabilityTiers(model);
-                const qualityAxis = usesQualityAxis(model);
+                const qualityAxisTiers = qualityAxisTierList(model);
                 const kind = inferPricingKind(model, capabilities?.[model]?.kind);
                 const primaryGroups = primaryGroupsForKind(kind);
                 const allOpen = Boolean(showAllFields[model]);
@@ -230,7 +300,7 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
                             <div className="border-t border-[#e2dfdc] px-3 py-3">
                                 {enabled ? (
                                     <div className="space-y-2">
-                                        {shownGroups.map((group) => renderGroup(model, kind, pricing, group, allowedTiers, qualityAxis))}
+                                        {shownGroups.map((group) => renderGroup(model, kind, pricing, group, allowedTiers, qualityAxisTiers))}
                                         <button
                                             type="button"
                                             className="cursor-pointer text-[11px] text-[#726d67] underline decoration-dotted underline-offset-2 hover:text-[#332f2a]"

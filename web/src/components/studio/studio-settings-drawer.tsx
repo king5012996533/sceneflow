@@ -32,7 +32,7 @@ export function StudioSettingsDrawer({ open, onClose, kind, config, stylePreset,
     const model = kind === "image" ? config.imageModel : config.videoModel;
     const handleModelChange = (next: string) => onModelChange(next);
 
-    const handleImageConfigChange = (key: "quality" | "size" | "count", value: string) => onConfigChange(key, value);
+    const handleImageConfigChange = (key: "quality" | "size" | "count" | "outputFormat", value: string) => onConfigChange(key, value);
     const handleVideoConfigChange = (key: "vquality" | "size" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark" | "videoDraft", value: string) => onConfigChange(key, value);
 
     useEffect(() => {

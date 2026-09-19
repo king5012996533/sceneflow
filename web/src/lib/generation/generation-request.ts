@@ -1,6 +1,7 @@
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
 import { requestEdit, requestGeneration, requestImageQuestion, requestToolResponse, type AiTextMessage, type ResponseFunctionTool, type ResponseInputMessage, type ResponseToolCall, type ToolResponseResult } from "@/services/api/image";
 import { createVideoGenerationTask, pollVideoGenerationTask, requestVideoGeneration, storeGeneratedVideo, type VideoGenerationTask, type VideoGenerationTaskState } from "@/services/api/video";
+import { normalizeImageOutputFormat } from "@/lib/model-capability-spec";
 import type { AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -143,6 +144,8 @@ function generationMetadata(config: AiConfig, prompt: string, referenceCount: nu
         videoModel: config.videoModel,
         size: config.size,
         quality: config.quality,
+        // 出图格式落进任务元数据：记录页与「按原参数重放」都读它
+        outputFormat: normalizeImageOutputFormat(config.outputFormat),
         videoSeconds: config.videoSeconds,
         vquality: config.vquality,
         referenceCount,

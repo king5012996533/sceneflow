@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
+import { normalizeImageOutputFormat } from "@/lib/model-capability-spec";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { buildImageReferencePromptText } from "@/lib/image-reference-prompt";
@@ -204,6 +205,23 @@ function withImageSizeInstruction(prompt: string, size: string, requestSize?: st
     if (aspect) parts.push(`宽高比 ${aspect}`);
     if (requestSize) parts.push(`输出尺寸 ${requestSize}px`);
     return `${parts.join("，")}。不要改成竖图、横图或其他比例。\n\n${prompt}`;
+}
+
+/**
+ * Replicate 出图格式参数。
+ *
+ * output_format 是我们显式发出去的字段（上游默认也是 webp，但默认值只在你不传时才生效），
+ * 所以「跟上游默认不一致」本身不会出错；会出错的是发一个枚举外的值（上游直接 422），
+ * 因此用户选的值一律经 normalizeImageOutputFormat 收口，认不出来就回 webp。
+ *
+ * output_compression 只对 webp / jpeg 有意义：png 是无损格式，带压缩率没有作用（也省得让人误会画质被压过）。
+ */
+function replicateOutputFormatPayload(configured?: string): Record<string, unknown> {
+    const outputFormat = normalizeImageOutputFormat(configured);
+    return {
+        output_format: outputFormat,
+        ...(outputFormat === "png" ? {} : { output_compression: 90 }),
+    };
 }
 
 function gcd(a: number, b: number): number {
@@ -1201,9 +1219,8 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                     background: "auto",
                     moderation: "auto",
                     aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
-                    output_format: "webp",
+                    ...replicateOutputFormatPayload(config.outputFormat),
                     number_of_images: n,
-                    output_compression: 90,
                 },
                 options,
                 serverJobId,
@@ -1274,9 +1291,8 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                     moderation: "auto",
                     aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
                     input_images: await Promise.all(references.map((image) => imageToDataUrl(image))),
-                    output_format: "webp",
+                    ...replicateOutputFormatPayload(config.outputFormat),
                     number_of_images: n,
-                    output_compression: 90,
                 },
                 options,
                 serverJobId,
