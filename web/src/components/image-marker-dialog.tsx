@@ -145,13 +145,17 @@ export function ImageMarkerDialog({ open, onClose, reference, imageIndex, label,
             centered
             width={880}
             footer={
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                     {/* 读数常驻定高、单行截断：文案一换行弹窗就变高，垂直居中会让图整体挪位（打一个标跳一下）。
-                        网格口径写在下方提示里，这里只留读数，窄屏截断也不会把坐标截掉。 */}
-                    <div className="min-h-4 min-w-0 flex-1 truncate text-xs text-[#726d67]">
-                        当前读数：<span className="sf-mono">{readout}</span>
+                        手机上读数和两个按钮挤在一行会把坐标截掉，所以窄屏拆成上下两行；
+                        坐标永远排在说明前面，真被截也只截掉后面的说明。 */}
+                    <div className="flex min-h-4 min-w-0 items-center gap-1 text-xs text-[#726d67]">
+                        <span data-marker-readout className="sf-mono shrink-0 text-[#332f2a]">
+                            {readout}
+                        </span>
+                        <span className="truncate">· 按官方口径归一化到 1000×1000 网格（左上 0,0）</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                         <Button onClick={onClose}>取消</Button>
                         <Button type="primary" aria-label="插入标记" disabled={!markers.length} onClick={insert}>
                             插入到提示词（{markers.length}）
