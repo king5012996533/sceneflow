@@ -146,8 +146,10 @@ export function ImageMarkerDialog({ open, onClose, reference, imageIndex, label,
             width={880}
             footer={
                 <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs text-[#726d67]">
-                        坐标按官方口径归一化到 1000×1000（左上 0,0，右下 999,999）：<span className="sf-mono">{readout}</span>
+                    {/* 读数常驻定高、单行截断：文案一换行弹窗就变高，垂直居中会让图整体挪位（打一个标跳一下）。
+                        网格口径写在下方提示里，这里只留读数，窄屏截断也不会把坐标截掉。 */}
+                    <div className="min-h-4 min-w-0 flex-1 truncate text-xs text-[#726d67]">
+                        当前读数：<span className="sf-mono">{readout}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button onClick={onClose}>取消</Button>
@@ -223,6 +225,7 @@ export function ImageMarkerDialog({ open, onClose, reference, imageIndex, label,
                 <div className="min-h-4 text-xs text-amber-600">{hint}</div>
 
                 <ul className="space-y-1 text-xs text-[#5a5550]">
+                    <li>· 坐标按官方口径归一化到 1000×1000 网格：左上 0,0，右下 999,999。</li>
                     <li>· 标记会写成「{reference ? label(imageIndex) : "@图片 N"} &lt;bbox&gt;…&lt;/bbox&gt;」插进提示词，编号必须紧跟标记前面 —— 模型靠它判断改哪张图。</li>
                     <li>· 一个框里有多个主体时，请在句子里点名（例如「把 @图片 1 &lt;bbox&gt;…&lt;/bbox&gt; 里的沙发换成藤椅」）。</li>
                     <li>· 要保持不变的对象也要框出来，并勾上「这个区域保持不变」。</li>

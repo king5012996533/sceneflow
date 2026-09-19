@@ -918,6 +918,22 @@
     color: var(--accent-deep);
     background: rgba(255, 253, 249, 0.92);
 }
+/* 触屏设备：17px 的圆钮手指点不中（实测命中区只有 17×17，远低于可点按尺寸）。
+   只放大命中区、并让芯片跟着长一点，免得两个按钮在 46px 高的芯片里挤在一起；桌面样式不动。 */
+@media (hover: none), (pointer: coarse) {
+    .sf-workbench .attachment-chip {
+        width: 64px;
+        height: 52px;
+    }
+    .sf-workbench .attachment-chip button {
+        width: 26px;
+        height: 26px;
+    }
+    .sf-workbench .attachment-chip button svg {
+        width: 14px;
+        height: 14px;
+    }
+}
 .sf-workbench .composer textarea {
     width: 100%;
     min-height: 88px;
