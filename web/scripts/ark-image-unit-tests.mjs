@@ -32,6 +32,7 @@ import {
     isArkImageBaseUrl,
     isArkImageChannel,
 } from "../src/lib/ark-image.ts";
+import { IMAGE_BASE_ASPECTS, imageSizeForRatio } from "../src/lib/image-resolution.ts";
 
 /** 上游两个模型的 id（pro 的 id 里带 `pro`，lite 的 id 不带 —— 尺寸边界就是按这个认的） */
 const PRO = "doubao-seedream-5-0-pro-260628";
@@ -209,6 +210,19 @@ check("size 落到 body 里：按 body 里那个 model 算（同一个尺寸，�
     assert.equal(buildArkImageBody({ model: LITE, prompt: "p", size: "3840x2160" }).size, "3840x2160");
     assert.equal(buildArkImageBody({ model: PRO, prompt: "p", size: "3840x2160" }).size, "2K");
     assert.equal("size" in buildArkImageBody({ model: PRO, prompt: "p" }), false);
+});
+
+check("新档位（pro 1.5K / lite 3K）：像素值必须原样发给上游，不能被顶成档位标签", () => {
+    // 会被顶成标签 = 上游按它自己的档位出图 → 用户选的宽高比丢掉（想画竖版却拿到方图）。
+    // 这两档的像素值是按「落在该模型的接受区间内」挑的（见 image-resolution.ts 的 CANONICAL_SIZES /
+    // TIER_BASE_PIXELS），这里拿真实的区间常量把它们钉住。
+    for (const ratio of IMAGE_BASE_ASPECTS) {
+        if (ratio === "auto") continue;
+        const half = imageSizeForRatio(ratio, "1.5k");
+        assert.equal(arkImageUpstreamSize(half, PRO), half, `pro 1.5K 的 ${ratio}（${half}）被顶成档位标签，画幅会丢`);
+        const three = imageSizeForRatio(ratio, "3k");
+        assert.equal(arkImageUpstreamSize(three, LITE), three, `lite 3K 的 ${ratio}（${three}）被顶成档位标签，画幅会丢`);
+    }
 });
 
 console.log("使用限制与计费口径");

@@ -14,6 +14,7 @@ import assert from "node:assert";
 
 import {
     CUSTOM_IMAGE_RATIO,
+    IMAGE_BASE_ASPECTS,
     IMAGE_RESOLUTION_TIERS,
     applyImageQualityPricing,
     applyImageResolutionPricing,
@@ -286,6 +287,78 @@ check("逐档定价：脏值（负数/NaN/小数）按「没配」处理并取�
     assert.strictEqual(applyImageQualityPricing("max", { max: Number.NaN }, 4), 4);
     assert.strictEqual(applyImageQualityPricing("max", { max: 8.6 }, 4), 8);
     assert.strictEqual(applyImageQualityPricing("max", { max: 0 }, 4), 0); // 明确配 0 = 免费，这是配置意图
+});
+
+// ---------- 方舟五档（1.5K / 3K）：面积分不开，靠反查表判档 ----------
+
+check("五档：面板产出的像素值两两不重复（撞车 = 两档判成同一档、按错价收钱）", () => {
+    const seen = new Map();
+    for (const ratio of IMAGE_BASE_ASPECTS) {
+        if (ratio === "auto") continue;
+        for (const tier of IMAGE_RESOLUTION_TIERS) {
+            const size = imageSizeForRatio(ratio, tier);
+            const previous = seen.get(size);
+            assert.ok(!previous, `${ratio} @ ${tier} 与 ${previous} 是同一组像素 ${size}（1.5K/2K 尤其容易撞，必须显式给定值）`);
+            seen.set(size, `${ratio} @ ${tier}`);
+        }
+    }
+});
+
+check("五档：1.5K / 3K 的像素必须判回自己那一档（面积分不开，只能靠反查）", () => {
+    // 1.5K 的 3:2（1872x1248 = 2.34MP）比 2K 的 16:9（2048x1152 = 2.36MP）还密，面积必然判错
+    assert.strictEqual(resolutionTierFromPixels(1872, 1248), "2k"); // 面积口径确实会误判成 2K（记录在案）
+    assert.strictEqual(imageResolutionTier("1872x1248"), "1.5k"); // 反查表把它救回来
+    assert.strictEqual(imageResolutionTier("1936x1088"), "1.5k");
+    assert.strictEqual(imageResolutionTier("2048x1152"), "2k"); // 2K 不受影响
+    assert.strictEqual(resolutionTierFromPixels(2640, 1760), "2k"); // 3K 的面积也落在老 2K 区间
+    assert.strictEqual(imageResolutionTier("2640x1760"), "3k");
+    assert.strictEqual(imageResolutionTier("2736x1536"), "3k");
+    assert.strictEqual(imageResolutionTier("2160x2160"), "3k"); // 3K 方形，别与 2K 方形（2048x2048）混
+    assert.strictEqual(imageResolutionTier("2048x2048"), "2k");
+    assert.strictEqual(imageResolutionTier("3840x2160"), "4k");
+});
+
+check("五档：反查表只认自己产出的值，用户自定义像素仍走面积分档", () => {
+    assert.strictEqual(imageResolutionTier("1900x1200"), "2k"); // 2.28MP，自定义像素 → 面积
+    assert.strictEqual(imageResolutionTier("800x600"), "1k");
+    assert.strictEqual(imageResolutionTier("5000x4000"), "4k");
+});
+
+check("五档：pro 1.5K 的像素必须压在官方 ¥0.30 分界（261 万）以内，否则 6 积分就赔钱", () => {
+    for (const ratio of IMAGE_BASE_ASPECTS) {
+        if (ratio === "auto") continue;
+        const dimensions = parseImagePixelSize(imageSizeForRatio(ratio, "1.5k"));
+        const pixels = dimensions.width * dimensions.height;
+        assert.ok(pixels <= 2_610_000, `${ratio} @ 1.5k 是 ${pixels} 像素，越过 261 万就要按 ¥0.60 结算，6 积分不够成本`);
+    }
+});
+
+check("五档：lite 3K 的像素必须够到 lite 的像素下限（369 万），否则上游会顶成档位标签、画幅被丢掉", () => {
+    for (const ratio of IMAGE_BASE_ASPECTS) {
+        if (ratio === "auto") continue;
+        const dimensions = parseImagePixelSize(imageSizeForRatio(ratio, "3k"));
+        const pixels = dimensions.width * dimensions.height;
+        assert.ok(pixels >= 3_686_400, `${ratio} @ 3k 只有 ${pixels} 像素，低于 lite 下限（上游会改按档位标签出图、宽高比不受控）`);
+    }
+});
+
+check("五档定价：1.5K / 3K 可单独定价，不填就与基础价一致（官方口径：pro 1K 与 1.5K 同价、lite 一口价）", () => {
+    // 不填 = 沿用基础价：pro（基础 6、2K 12）在 1.5K 上就该收 6
+    assert.strictEqual(applyImageResolutionPricing("1.5k", { imageCredits: 6, imageCredits2k: 12 }, 6), 6);
+    assert.strictEqual(applyImageResolutionPricing("3k", { imageCredits: 6 }, 6), 6);
+    // 填了 = 按专价（后台以后想单独定价也能配）
+    assert.strictEqual(applyImageResolutionPricing("1.5k", { imageCredits: 6, imageCredits15k: 9 }, 6), 9);
+    assert.strictEqual(applyImageResolutionPricing("3k", { imageCredits: 6, imageCredits3k: 10 }, 6), 10);
+    // 互不串档
+    assert.strictEqual(applyImageResolutionPricing("1k", { imageCredits15k: 9 }, 6), 6);
+    assert.strictEqual(applyImageResolutionPricing("2k", { imageCredits15k: 9 }, 6), 6);
+});
+
+check("五档定价：脏值（负数/NaN）按没配处理，1.5K/3K 不能靠脏值白送", () => {
+    assert.strictEqual(applyImageResolutionPricing("1.5k", { imageCredits15k: -1 }, 6), 6);
+    assert.strictEqual(applyImageResolutionPricing("1.5k", { imageCredits15k: Number.NaN }, 6), 6);
+    assert.strictEqual(applyImageResolutionPricing("3k", { imageCredits3k: -1 }, 6), 6);
+    assert.strictEqual(applyImageResolutionPricing("3k", { imageCredits3k: 0 }, 6), 0); // 明确配 0 = 免费，是配置意图
 });
 
 console.log(`\n图片分辨率分档单测：${passed} 通过 / ${failures.length} 失败`);

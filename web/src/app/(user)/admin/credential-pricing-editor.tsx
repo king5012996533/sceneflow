@@ -29,10 +29,12 @@ const PRICING_FIELDS: Array<{ key: NumericPricingKey; label: string; hint: strin
     { key: "textCredits", label: "文本 / 工具（每次）", hint: "留空 = 内置 0 积分（不扣）" },
 ];
 
-/** 图片分档定价：1K 是基础价，2K/4K 留空 = 沿用 1K 价（后台不配 = 与过去完全一致） */
+/** 图片分档定价：1K 是基础价，其余档留空 = 沿用 1K 价（后台不配 = 与过去完全一致） */
 const IMAGE_TIERS: Array<{ key: NumericPricingKey; tier: ImageResolutionTier; label: string; hint: string }> = [
     { key: "imageCredits", tier: "1k", label: "1K（基础档）", hint: "留空 = 内置草案（大多模型 2 积分）" },
+    { key: "imageCredits15k", tier: "1.5k", label: "1.5K", hint: "留空 = 按 1K 价扣（方舟 pro 官方与 1K 同价）" },
     { key: "imageCredits2k", tier: "2k", label: "2K", hint: "留空 = 按 1K 价扣" },
+    { key: "imageCredits3k", tier: "3k", label: "3K", hint: "留空 = 按 1K 价扣（方舟 lite 一口价）" },
     { key: "imageCredits4k", tier: "4k", label: "4K", hint: "留空 = 按 1K 价扣" },
 ];
 

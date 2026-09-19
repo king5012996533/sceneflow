@@ -27,7 +27,7 @@ export type ImageCapabilitySpec = {
     qualities: ImageQuality[];
     /** 支持的宽高比（纯比例；分辨率不写在这里，见 resolutions） */
     aspects: ImageAspect[];
-    /** 支持的分辨率档位（1k/2k/4k）。旧配置缺这一项时由 normalizeImageCapability 从 aspects 后缀推导 */
+    /** 支持的分辨率档位（1k/1.5k/2k/3k/4k）。旧配置缺这一项时由 normalizeImageCapability 从 aspects 后缀推导 */
     resolutions?: ImageResolutionTier[];
     /**
      * 画质档位轴：模型用 quality 直接表达出图保真度/分辨率时标这一项
@@ -581,8 +581,12 @@ export function sanitizePricing(input: unknown): CredentialPricing | undefined {
         const pricing: ModelPricing = {};
         const imageCredits = toPricingNumber(value.imageCredits);
         if (imageCredits !== undefined) pricing.imageCredits = imageCredits;
+        const imageCredits15k = toPricingNumber(value.imageCredits15k);
+        if (imageCredits15k !== undefined) pricing.imageCredits15k = imageCredits15k;
         const imageCredits2k = toPricingNumber(value.imageCredits2k);
         if (imageCredits2k !== undefined) pricing.imageCredits2k = imageCredits2k;
+        const imageCredits3k = toPricingNumber(value.imageCredits3k);
+        if (imageCredits3k !== undefined) pricing.imageCredits3k = imageCredits3k;
         const imageCredits4k = toPricingNumber(value.imageCredits4k);
         if (imageCredits4k !== undefined) pricing.imageCredits4k = imageCredits4k;
         // 画质档位轴的逐档价（低档不在这里，它是 imageCredits 基础价）

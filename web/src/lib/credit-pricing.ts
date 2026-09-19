@@ -20,8 +20,12 @@ export type GenerationKind = "image" | "video" | "audio" | "text" | "tool";
 export type ModelPricing = {
     /** 每张图片扣积分（= 1K 基础档；未配 2K/4K 专价时，所有档位都按这个价） */
     imageCredits?: number;
+    /** 每张 1.5K 图片扣积分（留空 = 沿用 imageCredits。方舟 pro 的 1K 与 1.5K 官方同价，默认不必填） */
+    imageCredits15k?: number;
     /** 每张 2K 图片扣积分（留空 = 沿用 imageCredits） */
     imageCredits2k?: number;
+    /** 每张 3K 图片扣积分（留空 = 沿用 imageCredits。方舟 lite 一口价，默认不必填） */
+    imageCredits3k?: number;
     /** 每张 4K 图片扣积分（留空 = 沿用 imageCredits） */
     imageCredits4k?: number;
     /**

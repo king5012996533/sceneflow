@@ -13,11 +13,21 @@
 // ⚠️ 不要用「最长边」分档：面板上普通 16:9 是 1824x1024（长边 1824），按最长边会被算成 2K，用户选个
 // 普通 16:9 就被按 2K 扣费。按面积算：1824x1024=1.87MP→1K、2048x2048=4.19MP→2K、3840x2160=8.29MP→4K。
 //
+// ⚠️ 五档词汇表（1K/1.5K/2K/3K/4K，方舟 Seedream 的官方档位）下**面积分不开**：
+//   pro 1.5K 的 3:2 是 1872x1248（2.34MP），比 pro 2K 的 16:9（2048x1152，2.36MP）还密；
+//   lite 3K 的 16:9 是 2880x1620（4.67MP），正好落在老的「2K 区间」里。
+// 只按面积判，1.5K 会被按 2K 收（12 积分 —— 官方这一档是 ¥0.30，该收 6），3K 同理。
+// 所以判定顺序改成两步：
+//   1. 像素串能对上本文件这套表（CANONICAL_SIZES / synthesizeImagePixelSize 的产物）→ 就是表里那一档；
+//   2. 对不上（用户自定义像素 / 无法归类的老数据）→ 回落面积分档。
+// 表是这些像素值的唯一来源，所以反查是精确的；单测钉住了「任意比例×档位的像素值两两不重复」——
+// 以后谁往表里加一组撞车的值会直接测失败，而不是悄悄按错档收钱。
+//
 // 本模块为纯函数（无 DB / 网络 / React 依赖），客户端预检、后台编辑与服务端扣费共用。
 
-export type ImageResolutionTier = "1k" | "2k" | "4k";
+export type ImageResolutionTier = "1k" | "1.5k" | "2k" | "3k" | "4k";
 
-export const IMAGE_RESOLUTION_TIERS: readonly ImageResolutionTier[] = ["1k", "2k", "4k"];
+export const IMAGE_RESOLUTION_TIERS: readonly ImageResolutionTier[] = ["1k", "1.5k", "2k", "3k", "4k"];
 
 /**
  * 支持的宽高比词汇（纯比例；分辨率是独立一轴，不写在比例里）。
@@ -29,12 +39,20 @@ export type ImageBaseAspect = (typeof IMAGE_BASE_ASPECTS)[number];
 /** 档位选项（后台能力标定 / 逐模型定价 / 用户面板共用） */
 export const IMAGE_RESOLUTION_OPTIONS: ReadonlyArray<{ value: ImageResolutionTier; label: string; hint: string }> = [
     { value: "1k", label: "1K", hint: "基础档（短边约 1024）" },
+    { value: "1.5k", label: "1.5K", hint: "进阶档（短边约 1536，方舟 pro）" },
     { value: "2k", label: "2K", hint: "高清档（短边约 1536 / 方形 2048）" },
+    { value: "3k", label: "3K", hint: "超清档（短边约 2160，方舟 lite）" },
     { value: "4k", label: "4K", hint: "超清档（长边 3840）" },
 ];
 
-/** 档位 → 上游 quality 参数（与 services/api/image.ts 的 QUALITY_ALIASES 同一套取值） */
-const TIER_QUALITY: Record<ImageResolutionTier, string> = { "1k": "low", "2k": "medium", "4k": "high" };
+/**
+ * 档位 → 上游 quality 参数（与 services/api/image.ts 的 QUALITY_ALIASES 同一套取值）。
+ *
+ * 1.5k / 3k 是方舟专有档，方舟这条路径**不发 quality**（它按 size 的像素值/档位标签出图），
+ * 所以这两条只是为了让函数在五档词汇表下保持完备；真有别的渠道开放这两档时，
+ * 会按 medium / high 派发（上游的 quality 梯子没有 1.5K 这一级）。
+ */
+const TIER_QUALITY: Record<ImageResolutionTier, string> = { "1k": "low", "1.5k": "medium", "2k": "medium", "3k": "high", "4k": "high" };
 
 /**
  * 上游 quality 取值 → 档位（1k/2k/4k 别名与 low/medium/high、standard/hd 同义）。
@@ -48,9 +66,11 @@ const QUALITY_TIERS: Record<string, ImageResolutionTier> = {
     "1k": "1k",
     low: "1k",
     standard: "1k",
+    "1.5k": "1.5k",
     "2k": "2k",
     medium: "2k",
     hd: "2k",
+    "3k": "3k",
     "4k": "4k",
     high: "4k",
     xhigh: "4k",
@@ -61,15 +81,24 @@ const QUALITY_TIERS: Record<string, ImageResolutionTier> = {
 const TIER_2K_MIN_PIXELS = 2_200_000;
 const TIER_4K_MIN_PIXELS = 6_000_000;
 
-/** 各比例在 1K/2K/4K 下的定值像素（沿用面板既有取值，保证老选择渲染结果不变） */
+/**
+ * 各比例在 1K/1.5K/2K/3K/4K 下的定值像素（沿用面板既有取值，保证老选择渲染结果不变）。
+ *
+ * 只有「同一比例下必须钉死、否则会和别的档撞车」的组合才写在这里，其余交给 synthesizeImagePixelSize：
+ *   - 16:9 / 9:16 的 1.5K 必须显式给：按短边 1536 合成会得到 2048x1152，与 2K 的定值**一模一样**
+ *     （用户在 1.5K 与 2K 之间选，拿到的图毫无差别），所以取 1K 与 2K 长边的几何中点 1936x1088；
+ *   - 16:9 / 9:16 的 3K 显式给 2736x1536（= 1K 定值 1824x1024 的 1.5 倍，两边都是 16 的倍数），
+ *     与 4K 的 3840x2160 拉开距离；单按短边 2160 合成会得到 2880x1620，1620 不是 16 的倍数
+ *     （上游普遍要求 16 的倍数，单测也钉着这条）。
+ */
 const CANONICAL_SIZES: Record<string, Partial<Record<ImageResolutionTier, string>>> = {
     "1:1": { "1k": "1024x1024", "2k": "2048x2048" },
     "3:2": { "1k": "1536x1024" },
     "2:3": { "1k": "1024x1536" },
     "4:3": { "1k": "1360x1024" },
     "3:4": { "1k": "1024x1360" },
-    "16:9": { "1k": "1824x1024", "2k": "2048x1152", "4k": "3840x2160" },
-    "9:16": { "1k": "1024x1824", "2k": "1152x2048", "4k": "2160x3840" },
+    "16:9": { "1k": "1824x1024", "1.5k": "1936x1088", "2k": "2048x1152", "3k": "2736x1536", "4k": "3840x2160" },
+    "9:16": { "1k": "1024x1824", "1.5k": "1088x1936", "2k": "1152x2048", "3k": "1536x2736", "4k": "2160x3840" },
 };
 
 /** 解析 "1024x1024"；不是像素串返回 null */
@@ -91,6 +120,24 @@ export function resolutionTierFromPixels(width: number, height: number): ImageRe
     return "1k";
 }
 
+/**
+ * 像素串 → 档位，**只认本文件这套表产出的值**（精确匹配）；不是表里的值（用户自定义像素）返回 undefined。
+ * 五档词汇表下这是唯一可靠的判档方式：1.5K 与 2K 的像素面积区间是重叠的，面积分不开（见文件头 ⚠️）。
+ */
+export function tierFromKnownSize(size?: string): ImageResolutionTier | undefined {
+    const value = String(size ?? "")
+        .trim()
+        .toLowerCase();
+    if (!value) return undefined;
+    for (const ratio of IMAGE_BASE_ASPECTS) {
+        if (ratio === "auto") continue;
+        for (const tier of IMAGE_RESOLUTION_TIERS) {
+            if (imageSizeForRatio(ratio, tier)?.toLowerCase() === value) return tier;
+        }
+    }
+    return undefined;
+}
+
 /** 上游 quality 参数 → 档位；auto/未知返回 undefined */
 export function resolutionTierFromQuality(quality?: string): ImageResolutionTier | undefined {
     const value = String(quality ?? "")
@@ -108,7 +155,11 @@ export function isImageRatio(size?: string): boolean {
  */
 export function imageResolutionTier(size?: string, quality?: string): ImageResolutionTier {
     const dimensions = parseImagePixelSize(size);
-    if (dimensions) return resolutionTierFromPixels(dimensions.width, dimensions.height);
+    if (dimensions) {
+        // 面板写出来的像素值就是本文件这套表算出来的 → 先反查表；
+        // 反查不到（用户自定义像素）才回落面积分档。理由见文件头 ⚠️。
+        return tierFromKnownSize(size) ?? resolutionTierFromPixels(dimensions.width, dimensions.height);
+    }
     // 比例串：像素由 quality 决定（上游按 quality 换算），所以档位跟着 quality 走
     if (isImageRatio(size)) return resolutionTierFromQuality(quality) ?? "1k";
     // auto / 空：上游默认小图，按最低档算，避免多扣
@@ -138,8 +189,15 @@ export function hasCanonicalImageSize(ratio: string, tier: ImageResolutionTier):
     return canonicalImageSize(ratio, tier) !== null;
 }
 
-/** 档位 → 上游 quality 换像素时用的基准边（与 services/api/image.ts 的 QUALITY_BASE 同源：low/medium/high = 1024/2048/2880） */
-const TIER_BASE_PIXELS: Record<ImageResolutionTier, number> = { "1k": 1024, "2k": 2048, "4k": 2880 };
+/**
+ * 档位 → 上游 quality 换像素时用的基准边（与 services/api/image.ts 的 QUALITY_BASE 同源：low/medium/high = 1024/2048/2880）
+ *
+ * 1.5K 取 1024×1.5 = 1536、3K 取 2880×0.75 = 2160：
+ *   - 1.5K 合成出来正好是方舟 pro 官方的 1.5K —— 3:2 = 1872x1248、16:9 用定值 1936x1088；
+ *   - 3K 合成出来（1:1 = 2160x2160、3:2 = 2640x1760、4:3 = 2480x1856，都在 4.6MP 上下；16:9 走定值
+ *     2736x1536）稳稳落在 lite 的像素接受区间（3.69MP–16.78MP）里，不会被上游按档位标签顶掉画幅。
+ */
+const TIER_BASE_PIXELS: Record<ImageResolutionTier, number> = { "1k": 1024, "1.5k": 1536, "2k": 2048, "3k": 2160, "4k": 2880 };
 const PIXEL_STEP = 16;
 
 /**
@@ -261,17 +319,22 @@ export function deriveResolutionTiers(aspects: readonly string[]): ImageResoluti
 
 /** 分辨率分档定价所需字段（ModelPricing 的子集，避免这里依赖 credit-pricing 造成运行时循环） */
 export type ImageTierPricing = {
+    imageCredits15k?: number;
     imageCredits2k?: number;
+    imageCredits3k?: number;
     imageCredits4k?: number;
 };
 
 /**
- * 在「基础价」之上套用分辨率分档：2K/4K 配了专价就用专价，没配就沿用基础价。
+ * 在「基础价」之上套用分辨率分档：配了专价就用专价，没配就沿用基础价。
  * 优先级 = 档位专价 > 基础价（基础价本身已按「逐模型 > 全局默认 > 内置草案」取好）。
  * 放在本模块是为了让分档规则可被 node 单测直接加载（credit-pricing 带别名/依赖，跑不起来）。
+ *
+ * 1.5K / 3K 的官方口径与相邻档同价（pro 的 1K 与 1.5K 都是 ¥0.30；lite 的 2K/3K/4K 一口价 ¥0.22），
+ * 所以后台不填这两个字段就是「与基础价一致」，要单独定价再填。
  */
 export function applyImageResolutionPricing(tier: ImageResolutionTier, pricing: ImageTierPricing | undefined, baseCredits: number): number {
-    const tierCredits = tier === "4k" ? pricing?.imageCredits4k : tier === "2k" ? pricing?.imageCredits2k : undefined;
+    const tierCredits = tier === "4k" ? pricing?.imageCredits4k : tier === "3k" ? pricing?.imageCredits3k : tier === "2k" ? pricing?.imageCredits2k : tier === "1.5k" ? pricing?.imageCredits15k : undefined;
     // 脏值（负数/NaN）按「没配」处理走基础价 —— 宁可少收错也不能白送
     const valid = typeof tierCredits === "number" && Number.isFinite(tierCredits) && tierCredits >= 0;
     return Math.max(0, Math.floor(valid ? (tierCredits as number) : baseCredits));
