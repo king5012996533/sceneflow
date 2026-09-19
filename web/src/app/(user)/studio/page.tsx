@@ -17,7 +17,7 @@ import { getGenerationCreditsCost } from "@/lib/credit-pricing";
 import { buildVideoGenerationConfig } from "@/lib/generation/generation-config";
 import { InsufficientCreditsError } from "@/lib/generation/generation-guard";
 import { SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
-import { detectStudioKind, imageSizeToVideoSize, videoSizeToImageSize } from "@/lib/studio/detect-kind";
+import { detectStudioKind, imageSizeToVideoSize } from "@/lib/studio/detect-kind";
 import { executeStudioInstruction, pollVideoTask } from "@/lib/studio/execute";
 import { deleteSession, readSession, readSessionMetas, saveSession, type StudioSessionMeta } from "@/lib/studio/session-store";
 import { applyStylePreset } from "@/lib/studio/style-presets";
@@ -359,8 +359,21 @@ export default function StudioPage() {
     const effectiveKind = modeOverride === "auto" ? detectedKind : modeOverride;
     const activeModel = effectiveKind === "image" ? effectiveConfig.imageModel || effectiveConfig.model : effectiveConfig.videoModel || effectiveConfig.model;
     const creditCost = useMemo(
-        () => getGenerationCreditsCost(effectiveKind, { model: activeModel, [effectiveKind === "image" ? "imageModel" : "videoModel"]: activeModel, videoSeconds: effectiveConfig.videoSeconds, vquality: effectiveKind === "video" ? effectiveConfig.vquality : undefined }, getPlatformPricing(activeModel), getPricingDefaults()),
-        [activeModel, effectiveConfig.videoSeconds, effectiveConfig.vquality, effectiveKind],
+        () =>
+            getGenerationCreditsCost(
+                effectiveKind,
+                {
+                    model: activeModel,
+                    [effectiveKind === "image" ? "imageModel" : "videoModel"]: activeModel,
+                    size: effectiveKind === "image" ? effectiveConfig.size : undefined,
+                    quality: effectiveKind === "image" ? effectiveConfig.quality : undefined,
+                    videoSeconds: effectiveConfig.videoSeconds,
+                    vquality: effectiveKind === "video" ? effectiveConfig.vquality : undefined,
+                },
+                getPlatformPricing(activeModel),
+                getPricingDefaults(),
+            ),
+        [activeModel, effectiveConfig.size, effectiveConfig.quality, effectiveConfig.videoSeconds, effectiveConfig.vquality, effectiveKind],
     );
 
     const buildInstructionConfig = useCallback(
@@ -368,8 +381,9 @@ export default function StudioPage() {
             const model = kind === "image" ? effectiveConfig.imageModel || effectiveConfig.model : effectiveConfig.videoModel || effectiveConfig.model;
             const base = { ...effectiveConfig, model };
             if (kind === "image") {
-                const size = /^\d+x\d+$/.test(base.size || "") ? videoSizeToImageSize(base.size) : base.size;
-                return { ...base, size, count: "1" };
+                // 像素尺寸原样保留：之前这里把像素压成比例（videoSizeToImageSize），用户在面板选的
+                // 「2K/4K」到了上游就退化成普通比例，出图口径与选择不一致（分档计价也据此判定档位）。
+                return { ...base, count: "1" };
             }
             return buildVideoGenerationConfig(base, model);
         },
@@ -390,7 +404,19 @@ export default function StudioPage() {
             message.warning("暂无可用模型，请联系管理员在后台配置平台模型");
             return;
         }
-        const required = getGenerationCreditsCost(kind, { model, [kind === "image" ? "imageModel" : "videoModel"]: model, videoSeconds: effectiveConfig.videoSeconds, vquality: kind === "video" ? effectiveConfig.vquality : undefined }, getPlatformPricing(model), getPricingDefaults());
+        const required = getGenerationCreditsCost(
+            kind,
+            {
+                model,
+                [kind === "image" ? "imageModel" : "videoModel"]: model,
+                size: kind === "image" ? effectiveConfig.size : undefined,
+                quality: kind === "image" ? effectiveConfig.quality : undefined,
+                videoSeconds: effectiveConfig.videoSeconds,
+                vquality: kind === "video" ? effectiveConfig.vquality : undefined,
+            },
+            getPlatformPricing(model),
+            getPricingDefaults(),
+        );
         if (user?.role !== "admin" && creditBalance !== null && creditBalance < required) {
             quotaModalRef.current?.open({ balance: creditBalance, required });
             return;
