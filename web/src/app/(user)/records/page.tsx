@@ -209,10 +209,10 @@ function RecordCard({ record }: { record: GenerationRecord }) {
             </div>
 
             {/* 成品在手上的任务不该挂红字警告：图都给了，再写一句「失败/取消」只会让人以为白花钱。
-                扣没扣费照实说：2026-09-19 之前失败/取消是退积分的，之后的记录一律照收——
-                这句话按 quotaRefunded 走，历史记录不会跟着新政策一起被改写。 */}
+                扣没扣费照实说：2026-09-19 之前失败/取消是退积分的（历史记录照旧显示「未扣费」），
+                之后一律照收；管理员账号本来就不计费，也要说成「未扣费」。 */}
             {record.media.length && record.status !== "succeeded" ? (
-                <p className="mt-3 text-xs leading-relaxed text-[#726d67]">上游其实已经画完，图已为你保留，{record.quotaRefunded ? "本次未扣费。" : "本次照常计费。"}</p>
+                <p className="mt-3 text-xs leading-relaxed text-[#726d67]">上游其实已经画完，图已为你保留，{record.creditsCost > 0 && !record.quotaRefunded ? "本次照常计费。" : "本次未扣费。"}</p>
             ) : record.status !== "succeeded" && record.error ? (
                 <p className="mt-3 line-clamp-3 text-xs leading-relaxed text-[#a3342c]">{record.error}</p>
             ) : null}
