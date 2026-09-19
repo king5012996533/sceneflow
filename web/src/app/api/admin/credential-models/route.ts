@@ -31,7 +31,12 @@ function collectModelIds(payload: unknown): string[] {
             }
             if (item && typeof item === "object") {
                 const record = item as Record<string, unknown>;
-                const raw = record.id ?? record.model ?? record.name ?? record.slug;
+                // Replicate 这类上游把仓库拆成 owner + name 两个字段（没有 id）。
+                // 只取 name 会得到 "flux-schnell" 这种半截名字，粘进模型列表后请求必然 404，
+                // 所以这里拼回 owner/name；有 id 的上游照旧以 id 为准。
+                const owner = typeof record.owner === "string" ? record.owner.trim() : "";
+                const repo = typeof record.name === "string" ? record.name.trim() : "";
+                const raw = record.id ?? record.model ?? record.slug ?? (owner && repo ? `${owner}/${repo}` : repo);
                 const value = typeof raw === "string" ? raw.trim() : "";
                 if (value) ids.add(value);
             }
@@ -43,6 +48,8 @@ function collectModelIds(payload: unknown): string[] {
     } else if (payload && typeof payload === "object") {
         const record = payload as Record<string, unknown>;
         pushFromList(record.data);
+        // Replicate 的列表信封是 { results: [...], next, previous }，不是 data
+        pushFromList(record.results);
         pushFromList(record.models);
         pushFromList(record.model_list);
         // 有些网关按类型分组：{ data: { chat: [...], image: [...] } }

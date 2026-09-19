@@ -225,6 +225,13 @@ assertIncludes("src/app/api/platform/catalog/route.ts", "pricing", "平台目录
 assertIncludes("src/stores/platform-catalog-store.ts", "getPlatformPricing", "客户端必须能按模型取后台定价。");
 assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "videoCreditsStandard", "后台必须提供逐模型定价编辑器（含视频分档）。");
 assertIncludes("src/app/(user)/admin/credential-form-fields.tsx", "pickPricing", "后台表单必须提供 pickPricing。");
+// 「拉取上游模型」必须认得各家不同的列表信封：Replicate 用 { results: [{owner, name}] }，
+// 不认就会显示 0 个模型；只取 name 又会拼出 "flux-schnell" 这种半截名字（贴进列表必 404）。
+assertIncludes("src/app/api/admin/credential-models/route.ts", "record.results", "拉取上游模型要认 Replicate 的 results 信封。");
+assert(
+    /owner && repo \? `\$\{owner\}\/\$\{repo\}` : repo/.test(read("src/app/api/admin/credential-models/route.ts")),
+    "Replicate 的模型名必须拼回 owner/name，否则拉回来的是半截名字。",
+);
 
 // —— 图片按分辨率分档定价（2026-09-19：过去所有分辨率一个价，2K/4K 按 1K 卖，越卖越亏）——
 // 后台按「尺寸 × 分辨率 × 张数」标定，价格按分辨率分档；口径必须处处一致，否则会出现
