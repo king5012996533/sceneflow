@@ -747,6 +747,14 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     );
     assertIncludes("src/app/api/proxy/route.ts", "describeUnusableSuccess", "代理必须把「HTTP 2xx 但报文用不了」记进日志，否则客户端报错时服务端一个字都没留。");
     assertIncludes("src/app/api/proxy/route.ts", "describeRequestModel", "代理日志要带模型名，否则同一个渠道下几十个模型，出事了不知道是哪个。");
+    // 模型名必须在请求体被释放之前取出来：route.ts 为了省内存会把 envelope.body 置空，
+    // 拿到上游响应后再读就已经是 undefined 了（2026-09-19 线上日志实测：只有 target 没有 model）。
+    const proxyRoute = read("src/app/api/proxy/route.ts");
+    assert(
+        proxyRoute.indexOf("requestModel = describeRequestModel(envelope.body)") >= 0 && proxyRoute.indexOf("requestModel = describeRequestModel(envelope.body)") < proxyRoute.indexOf("envelope.body = undefined;"),
+        "模型名要在 envelope.body 被置空之前取出来，否则日志里只剩 target。",
+    );
+    assertNotMatches("src/app/api/proxy/route.ts", /console\.(log|error)\(`\[proxy\][^`]*\$\{describeRequestModel\(envelope\.body\)\}/, "日志里不要现读 envelope.body（那时它已被置空），用提前取好的 requestModel。");
 }
 
 if (failures.length) {

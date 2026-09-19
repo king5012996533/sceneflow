@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
 
     // 标记本次是否由我们自己的超时中止（区别于网络错误等），用于给客户端返回可操作的中文说明
     let timedOut = false;
+    // 日志用的模型名（` model=xxx`）：请求体很快会被释放，得在释放前取好，且超时分支里也要能用
+    let requestModel = "";
     const startedAt = Date.now();
 
     try {
@@ -80,7 +82,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
         }
         const keySource: KeySource = "platform";
-        console.log(`[proxy] key-source=${keySource} target=${target.hostname}${target.pathname}${describeRequestModel(envelope.body)}`);
+        // 模型名要先取出来：下面为了省内存会把 envelope.body 置空（见 90 行附近的注释），
+        // 等拿到上游响应再读就已经是 undefined 了 —— 2026-09-19 线上实测踩到，日志里只有 target 没有 model。
+        requestModel = describeRequestModel(envelope.body);
+        console.log(`[proxy] key-source=${keySource} target=${target.hostname}${target.pathname}${requestModel}`);
 
         const upstreamBody = buildUpstreamBody(envelope.body, envelope.bodyBase64, safeHeaders);
         const isRawUpload = typeof envelope.bodyBase64 === "string" && (envelope.bodyBase64 as string).length > 0;
@@ -210,12 +215,12 @@ export async function POST(req: NextRequest) {
             const snippetOf = () => (typeof data === "object" && data !== null ? JSON.stringify(data).slice(0, 400) : String(data).slice(0, 400));
             const maskedKey = safeHeaders.authorization ? safeHeaders.authorization.replace(/^Bearer\s+/i, "").replace(/^(.{6}).*(.{4})$/, "$1****$2") : "none";
             if (response.status >= 400) {
-                console.error(`[proxy] 上游 ${response.status} ${method} ${target}${describeRequestModel(envelope.body)} key=${maskedKey}: ${snippetOf()}`);
+                console.error(`[proxy] 上游 ${response.status} ${method} ${target}${requestModel} key=${maskedKey}: ${snippetOf()}`);
             } else {
                 // 2xx 也可能是「用不了」：中转站常把失败包在 200 里回（{"code":500,"message":"服务繁忙"}），
                 // 客户端只会看到「上游没有返回任何候选结果」。这里补一笔日志，下次有据可查（2026-09-19）。
                 const unusable = describeUnusableSuccess(target.pathname, data);
-                if (unusable) console.error(`[proxy] 上游 ${response.status} 但报文用不了（${unusable}）${method} ${target}${describeRequestModel(envelope.body)} key=${maskedKey}: ${snippetOf()}`);
+                if (unusable) console.error(`[proxy] 上游 ${response.status} 但报文用不了（${unusable}）${method} ${target}${requestModel} key=${maskedKey}: ${snippetOf()}`);
             }
             // 上游产出即抢救：成品每个字节都经过这里，就地留给服务端，
             // 之后用户标签页死没死、上游直链过没过期，都不再影响交付（见 generation-rescue.server.ts）
@@ -239,7 +244,7 @@ export async function POST(req: NextRequest) {
     } catch (err: unknown) {
         // 我们自己的超时中止：上游（通常是中转站）可能已收单并扣费、仍在生成，只是响应超过了时限
         if (timedOut) {
-            console.error(`[proxy] 上游超时中止 elapsed=${Math.round((Date.now() - startedAt) / 1000)}s`);
+            console.error(`[proxy] 上游超时中止 elapsed=${Math.round((Date.now() - startedAt) / 1000)}s${requestModel ? `（${requestModel.trim()}）` : ""}`);
             return NextResponse.json({ error: `上游处理超时（超过 ${PROXY_TIMEOUT_MS / 60000} 分钟），请求已中止。任务可能仍在上游运行并已计费，请稍后到中转站后台确认任务状态；如已出图/出片，把上游任务 ID 反馈给我们以便找回结果。` }, { status: 504 });
         }
         const message = err instanceof Error ? err.message : "代理请求失败";
