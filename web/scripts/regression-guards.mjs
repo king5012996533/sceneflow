@@ -932,6 +932,12 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertNotMatches("src/app/(user)/studio/page.tsx", /effectiveKind === "image" \? useImageModelSupportsReferences\(/, "参考图判定 hook 不能条件调用（模式切换会让 hook 数量变化）。");
     assertIncludes("src/components/studio/studio-composer.tsx", "composer-notice", "关掉入口时必须同时显示原因，不能让用户对着一排灰按钮猜。");
     assertIncludes("src/components/studio/studio-composer.tsx", "disabled={sending || !referenceImagesEnabled}", "图片类入口要真的禁用，而不只是加个 title。");
+    // 选择器里也要标出来：用户是先挑模型再挂图的，只在选中后提示等于让人白白走一遍回头路。
+    // 共用同一个 ModelPicker → studio 参数抽屉与画布节点面板一次都覆盖到。
+    assertIncludes("src/components/model-picker.tsx", "REFERENCE_UNSUPPORTED_TAG", "模型下拉列表要在模型名后面标出「暂不支持图生图」，不能等选中后才说。");
+    assertMatchesNormalized("src/components/model-picker.tsx", /capability === "image" && !imageModelSupportsReferences\(model\)/, "标注只能给「图片模式 + 确实不吃参考图」的模型加：否则视频/文本模型会被误标。");
+    // 文案只留一份在 lib 里：选择器里再写一遍字符串，改文案时必然漏掉一处。
+    assertNotMatches("src/components/model-picker.tsx", /暂不支持图生图/, "标注文案要引用 REFERENCE_UNSUPPORTED_TAG，不得在选择器里另写一份字符串。");
     assertIncludes("src/app/(user)/studio/workbench.css", ".sf-workbench .composer-notice", "说明条的样式要在 workbench.css 里（组件内联 style 会漏掉 SSR 直出）。");
     // 画布：连上来的图片不再当参考图用（否则提示词里会出现「@图片 1」，等于告诉用户参考图生效了）。
     assertIncludes("src/app/(user)/canvas/hooks/use-canvas-image-generation.ts", "imageModelSupportsReferences", "画布出图也要按模型判定参考图，不能只改用户端面板。");

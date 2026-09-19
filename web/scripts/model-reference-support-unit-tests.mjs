@@ -13,7 +13,7 @@
  */
 import assert from "node:assert";
 
-import { REFERENCE_UNSUPPORTED_HINT, modelNameSupportsReferences, resolveReferenceSupport, stripModelChannelPrefix } from "../src/lib/model-reference-support.ts";
+import { REFERENCE_UNSUPPORTED_HINT, REFERENCE_UNSUPPORTED_TAG, modelNameSupportsReferences, resolveReferenceSupport, stripModelChannelPrefix } from "../src/lib/model-reference-support.ts";
 
 let passed = 0;
 const failures = [];
@@ -68,6 +68,14 @@ check("缺省即支持（名单外的一律放行，避免误伤）", () => {
 check("提示文案不为空（界面直接显示给用户）", () => {
     assert.equal(typeof REFERENCE_UNSUPPORTED_HINT, "string");
     assert.ok(REFERENCE_UNSUPPORTED_HINT.includes("不支持参考图"), "文案要说清是不支持参考图");
+});
+
+// 模型选择器里跟在模型名后面的短标注：用户挑模型时就该看见，不必先选错再被拦。
+check("选择器标注与说明文案分工明确（短标注 = 挑模型时看，长文案 = 选中后看）", () => {
+    assert.equal(typeof REFERENCE_UNSUPPORTED_TAG, "string");
+    assert.ok(REFERENCE_UNSUPPORTED_TAG.includes("图生图"), "标注要用用户自己的说法「图生图」");
+    assert.ok(REFERENCE_UNSUPPORTED_TAG.length <= 12, "标注必须短到能塞进下拉列表一行而不挤掉模型名");
+    assert.notEqual(REFERENCE_UNSUPPORTED_TAG, REFERENCE_UNSUPPORTED_HINT);
 });
 
 console.log("resolveReferenceSupport（后台标定 vs 名字名单）");

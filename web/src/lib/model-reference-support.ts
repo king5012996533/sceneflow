@@ -50,3 +50,12 @@ export function resolveReferenceSupport(model: string, declared?: boolean | null
 
 /** 参考图入口被关掉时给用户看的说明（后台编辑器与用户端共用同一份文案） */
 export const REFERENCE_UNSUPPORTED_HINT = "该模型不支持参考图：它只认文字描述，参考图不会被用上。请换一个支持参考图的模型。";
+
+/**
+ * 模型选择器里跟在模型名后面的短标注。
+ *
+ * 与 REFERENCE_UNSUPPORTED_HINT 分工不同：说明文案出现在「已经选中之后」，而这条要出现在
+ * 「正在挑模型」的下拉列表里 —— 用户不必先选错、挂上图、再被提示拦住。措辞用「图生图」，
+ * 因为那是用户对这件事的叫法（参考图 = 图生图的输入）。
+ */
+export const REFERENCE_UNSUPPORTED_TAG = "暂不支持图生图";

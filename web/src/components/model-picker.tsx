@@ -4,7 +4,9 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { Cpu } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { REFERENCE_UNSUPPORTED_TAG } from "@/lib/model-reference-support";
 import { cn } from "@/lib/utils";
+import { imageModelSupportsReferences } from "@/stores/platform-catalog-store";
 import { modelOptionLabel, modelOptionName, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 
 type ModelPickerProps = {
@@ -68,7 +70,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
                 {options.length ? (
                     options.map((model) => (
                         <SelectItem key={model} value={model} textValue={modelOptionLabel(config, model)}>
-                            <ModelLabel config={config} model={model} />
+                            <ModelLabel config={config} model={model} capability={capability} />
                         </SelectItem>
                     ))
                 ) : (
@@ -87,11 +89,23 @@ function emptyModelLabel(config: AiConfig, capability?: ModelCapability) {
     return "暂无可用模型，请联系管理员在后台配置平台模型";
 }
 
-function ModelLabel({ config, model }: { config: AiConfig; model: string }) {
+/**
+ * 一行模型：图标 + 名字 +（图片模式下）能力标注。
+ *
+ * 为什么要在挑模型时就标出来：这类模型（Replicate 的 recraft 系）上游根本没有图像入参，
+ * 却会对多余的字段静默忽略 —— 用户挂上参考图、照常出图、照常扣费，只是图与参考图无关。
+ * 全部拦截逻辑在 lib/model-reference-support.ts，这里只负责让用户提前看见，别先选错再被提示。
+ */
+function ModelLabel({ config, model, capability }: { config: AiConfig; model: string; capability?: ModelCapability }) {
+    // 只标图片模型：视频/音频/文本模型不吃参考图是另一套能力，标了反而误导。
+    const showUnsupportedTag = capability === "image" && !imageModelSupportsReferences(model);
     return (
-        <span className="flex min-w-0 items-center gap-2">
+        <span className="flex min-w-0 flex-1 items-center gap-2">
             <ModelIcon model={model} />
             <span className="truncate">{modelOptionLabel(config, model)}</span>
+            {showUnsupportedTag ? (
+                <span className="ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] leading-none text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">{REFERENCE_UNSUPPORTED_TAG}</span>
+            ) : null}
         </span>
     );
 }
