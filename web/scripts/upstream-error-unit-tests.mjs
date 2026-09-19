@@ -109,6 +109,9 @@ check("信封文案：各家中转站的字段名都要认（msg / message / err
     assert.strictEqual(upstreamErrorMessage({ error: { detail: "no quota" } }), "no quota");
     assert.strictEqual(upstreamErrorMessage({ data: { fail_reason: "内容审核未通过" } }), "内容审核未通过");
     assert.strictEqual(upstreamErrorMessage({ data: [{ reason: "上游超时" }] }), "上游超时");
+    // Replicate 的失败报文没有 error 字段，原因在顶层 detail（2026-09-19 的 401 就长这样）
+    assert.strictEqual(upstreamErrorMessage({ title: "Unauthenticated", detail: "You did not pass a valid authentication token" }), "You did not pass a valid authentication token");
+    assert.strictEqual(upstreamErrorMessage({ detail: "  " }), "");
 });
 
 check("信封文案：正常的成功应答必须读不出错误，别把成功当失败", () => {

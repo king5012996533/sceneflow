@@ -292,6 +292,7 @@ assertIncludes("src/lib/generation/generation-config.ts", "normalizeImageOutputF
 // 任务号也没进日志——隧道断了与上游拒绝长得一模一样。现在两条路分开报，失败文案必须带线索。
 assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "describeNetworkFailure(", "启动失败必须区分「连不上上游（出网通道）」与「上游拒绝」，网络层错误码要带出来。");
 assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "composeUpstreamFailure(", "启动失败的文案必须走 upstream-error 的统一口径（状态码 + 上游原话）。");
+assertIncludes("src/lib/generation/upstream-error.ts", "record.detail", "上游把原因放在顶层 detail 时也要读出来（Replicate 的失败报文就是这样，读不到就只剩「任务创建失败」）。");
 assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "出网通道不可用", "出网通道不通时必须在服务端日志里留下任务号与目标地址。");
 assertNotMatches("src/app/api/generation/jobs/[id]/replicate/route.ts", /status: response\.status \|\| 502/, "上游的 401/403 不得照抄成本路由的状态码（前端会当成登录过期），一律按 502 报上游失败。");
 

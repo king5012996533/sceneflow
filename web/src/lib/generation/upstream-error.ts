@@ -108,6 +108,10 @@ export function upstreamErrorMessage(payload: unknown): string {
             if (typeof value === "string" && value.trim()) return value.trim();
         }
     }
+    // Replicate 一类上游把原因放在顶层 detail（`{"title":"Unauthenticated","detail":"You did not pass a valid authentication token"}`），
+    // 没有 error 字段。2026-09-19 就是这条报文被读成空，前端只看到「Replicate 任务创建失败」，
+    // 明明上游已经把「没带有效令牌」写在脸上了。放最后，别抢前面更明确的字段。
+    if (typeof record.detail === "string" && record.detail.trim()) return record.detail.trim();
     return "";
 }
 
