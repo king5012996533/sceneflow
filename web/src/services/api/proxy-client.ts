@@ -50,7 +50,13 @@ export async function proxyFetch<T = unknown>(options: ProxyRequestOptions): Pro
         return res.blob() as Promise<T>;
     }
 
-    return (await readProxyOutcome<T>(res)) as T;
+    // 关键：把上游报文本身交回调用方，不能把整个 { deferred, data } 交出去。
+    // 2026-09-19 线上：这条 return 写成 `as T` 直接把结局对象当报文返回，于是所有非流式调用方
+    // 都读不到字段 —— 对话轮次读 choices 读空（报「上游没有返回任何候选结果」）、
+    // 视频/任务制通道读 task_id 读空；只有图片路径因为恰好往 payload.data 里再挖一层才没暴露。
+    const outcome = await readProxyOutcome<T>(res);
+    if (outcome.deferred) throw new Error("服务端接管了这次调用（本次调用未声明可延后，属异常路径）");
+    return outcome.data;
 }
 
 /**

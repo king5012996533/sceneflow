@@ -757,6 +757,16 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertNotMatches("src/app/api/proxy/route.ts", /console\.(log|error)\(`\[proxy\][^`]*\$\{describeRequestModel\(envelope\.body\)\}/, "日志里不要现读 envelope.body（那时它已被置空），用提前取好的 requestModel。");
 }
 
+// —— 代理客户端必须把上游报文解包交回（2026-09-19 线上事故）——
+// proxyFetch 一度把「调用结局对象」{ deferred, data } 整个当报文返回，于是所有非流式调用方都读空字段：
+// 对话轮次读 choices 读空（报「上游没有返回任何候选结果」）、视频/任务制通道读 task_id 读空。
+// 单测见 scripts/proxy-client-unit-tests.mjs，这里再加一道源码级断言，防止有人图省事又写回一行强转。
+{
+    const proxyClient = read("src/services/api/proxy-client.ts").replace(/\r\n/g, "\n");
+    assertNotMatches("src/services/api/proxy-client.ts", /return \(await readProxyOutcome<T>\(res\)\) as T;/, "proxyFetch 不得把结局对象当报文返回（调用方会读空 choices / code / task_id）。");
+    assert(/const outcome = await readProxyOutcome<T>\(res\);[\s\S]{0,260}?return outcome\.data;/.test(proxyClient), "proxyFetch 必须交回 outcome.data（上游报文本身）。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

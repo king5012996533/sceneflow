@@ -21,6 +21,7 @@
         "test:scheduler": "node scripts/run-state-unit-tests.mjs && node scripts/run-control-unit-tests.mjs",
         "test:error": "node scripts/canvas-error-unit-tests.mjs",
         "test:proxy": "node scripts/outbound-proxy-unit-tests.mjs",
+        "test:proxyclient": "node scripts/proxy-client-unit-tests.mjs",
         "test:imagetask": "node scripts/image-task-unit-tests.mjs",
         "test:ratio": "node scripts/image-ratio-unit-tests.mjs",
         "test:cache": "node scripts/asset-cache-unit-tests.mjs",
