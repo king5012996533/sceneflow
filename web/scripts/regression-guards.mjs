@@ -315,7 +315,8 @@ assertIncludes("src/app/(user)/admin/model-capability-fields.tsx", "aspectOnly",
 // 关键词表漏登记不会报错，只会静默地：①后台那一行的标定字段被判成「无需标定」锁死（连「只吃宽高比」都点不到）
 // ②用户端价目表（/api/billing/packages → rateCard）整行漏掉这个模型。接新上游模型时必须两处都加。
 assertIncludes("src/lib/model-capability-spec.ts", 'value.includes("recraft")', "recraft 这类 owner/模型名 的图片模型必须登记进名字启发式，否则后台标定字段被锁死。");
-assertIncludes("src/lib/model-pricing-kind.ts", '"recraft"', "关键词表两处同步（model-pricing-kind.ts 漏了的话，用户端价目表会漏掉这个模型）。");
+assertIncludes("src/lib/model-pricing-kind.ts", '"recraft"', "关键词表三处同步（model-pricing-kind.ts 漏了的话，用户端价目表会漏掉这个模型）。");
+assertIncludes("src/stores/use-config-store.ts", 'value.includes("recraft")', "关键词表三处同步（前端启发式是「没标定能力」时的兜底分类，漏了会落进文本模型、图片模型选择器里看不到）。");
 assertIncludes("src/app/(user)/admin/credential-capability-editor.tsx", "enabled || Boolean(defaultCapabilityForModel(model))", "已标定过的模型必须一律可编辑：名字启发式认不出来不该反过来把标定字段锁死。");
 assertIncludes("src/app/(user)/admin/credential-capability-editor.tsx", "stashed[model]", "关掉「能力标定」开关不能把已填的配置扔掉：重新打开要原样退回。");
 // 2026-09-19：出网隧道断掉时，这条路由以前把 fetch 的异常冒成裸 500，前端只看到「Replicate 任务创建失败」，

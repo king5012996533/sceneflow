@@ -197,6 +197,7 @@ function isImageModelName(model: string) {
             value.includes("flux") ||
             value.includes("sdxl") ||
             value.includes("stable-diffusion") ||
+            value.includes("recraft") ||
             value.includes("midjourney"))
     );
 }
