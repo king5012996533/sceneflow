@@ -404,7 +404,12 @@ function CountInput({ value, max, theme, onChange }: { value: number; max: numbe
                 className="sf-mono min-w-0 flex-1 bg-transparent px-3 text-center font-semibold outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 style={{ color: theme.node.text, WebkitTextFillColor: theme.node.text }}
                 value={value || ""}
-                onChange={(event) => onChange(Number(event.target.value) || null)}
+                onChange={(event) => {
+                    // 必须在这里夹住上限：input 的 max 属性只约束步进箭头，手打「99」照样能提交。
+                    // 夹不住就是「按 99 张扣费、上游只回 maxCount 张」——固定出单张的模型（recraft）必中招。
+                    const next = Math.floor(Number(event.target.value));
+                    onChange(Number.isFinite(next) && next > 0 ? Math.min(next, max) : null);
+                }}
                 onMouseDown={(event) => event.stopPropagation()}
             />
         </label>
