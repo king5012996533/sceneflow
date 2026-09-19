@@ -1362,8 +1362,11 @@
         width: 27px;
         height: 27px;
     }
+    /* 窄屏下别给 workspace 再撑一次 100dvh：外壳（.app-shell）本来就只有「视口 − 顶部导航」那么高，
+       再撑一遍会让整列比视口高出 60~70px，被根节点 overflow:hidden 吃掉的那一段正好是输入区底部
+       （实测 390x844 时发送按钮落在 y≈851，既看不见也滚不出来）。flex:1 + min-height:0 交给外壳算即可。 */
     .sf-workbench .workspace {
-        min-height: calc(100dvh - 62px);
+        min-height: 0;
     }
     .sf-workbench .conversation-scroll {
         padding: 24px 16px 160px;
