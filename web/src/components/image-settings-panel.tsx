@@ -175,14 +175,18 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
                         <SettingTitle index={4} en="SIZE" color={theme.node.muted} faintColor={theme.node.faint}>
                             尺寸
                         </SettingTitle>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium" style={{ color: theme.node.muted }}>
-                                16倍数对齐
-                            </span>
-                            <span title="输入完成后自动向上补成 16 的倍数" onMouseDown={(event) => event.stopPropagation()}>
-                                <Switch size="small" checked={snapDimensionToStep} onChange={setSnapDimensionToStep} />
-                            </span>
-                        </div>
+                        {/* 这个开关只作用于 W/H 输入框（补成 16 的倍数）；W/H 不显示时它没有任何作用对象，
+                            留着就是个点了没反应的假控件 */}
+                        {hidesPixelSize ? null : (
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium" style={{ color: theme.node.muted }}>
+                                    16倍数对齐
+                                </span>
+                                <span title="输入完成后自动向上补成 16 的倍数" onMouseDown={(event) => event.stopPropagation()}>
+                                    <Switch size="small" checked={snapDimensionToStep} onChange={setSnapDimensionToStep} />
+                                </span>
+                            </div>
+                        )}
                     </div>
                     <div className="grid grid-cols-4 gap-2.5">
                         {effectiveAspects.map((item) => (

@@ -20,6 +20,11 @@ function assertNotMatches(path, pattern, message) {
     assert(!pattern.test(read(path)), message || `${path} should not match ${pattern}`);
 }
 
+/** 跨行断言：先归一到 LF 再匹配，避免 checkout 带出 CRLF 时守卫误报 */
+function assertMatchesNormalized(path, pattern, message) {
+    assert(pattern.test(read(path).replace(/\r\n/g, "\n")), message || `${path} should match ${pattern}`);
+}
+
 function assertNotExists(path, message) {
     assert(!existsSync(join(root, path)), message || `${path} should not exist`);
 }
@@ -294,6 +299,11 @@ assertIncludes("src/lib/generation/generation-config.ts", "normalizeImageOutputF
 assertIncludes("src/lib/model-capability-spec.ts", "aspectOnly?: boolean", "能力标定必须能表达「这个模型只吃宽高比」（上游没有分辨率/画质参数）。");
 assertIncludes("src/components/image-settings-panel.tsx", "usesAspectOnly", "只吃宽高比的模型：面板不得显示像素数字、W/H 与分辨率/画质档位。");
 assertIncludes("src/components/image-settings-panel.tsx", "Math.min(quickCount, effectiveMaxCount)", "生成张数的快捷档位必须受能力标定的 maxCount 限制（否则用户能选 10 张、按 10 张扣费，而上游只回 1 张）。");
+assertMatchesNormalized(
+    "src/components/image-settings-panel.tsx",
+    /hidesPixelSize \? null : \(\n\s*<div className="flex items-center gap-2">/,
+    "「16倍数对齐」开关只作用于 W/H，W/H 隐藏时必须一起隐藏（否则是点了没反应的假控件）。",
+);
 assertIncludes("src/app/(user)/admin/model-capability-fields.tsx", "aspectOnly", "后台能力标定必须有「只吃宽高比」的开关，否则新模型只能靠改库。");
 // 2026-09-19：出网隧道断掉时，这条路由以前把 fetch 的异常冒成裸 500，前端只看到「Replicate 任务创建失败」，
 // 任务号也没进日志——隧道断了与上游拒绝长得一模一样。现在两条路分开报，失败文案必须带线索。
