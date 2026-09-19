@@ -7,6 +7,7 @@ import { InsufficientCreditsError } from "@/lib/generation/generation-guard";
 import type { InsufficientCreditsModalHandle } from "@/components/credits/insufficient-credits-modal";
 import { uploadImage } from "@/services/image-storage";
 import type { AiConfig } from "@/stores/use-config-store";
+import { imageModelSupportsReferences } from "@/stores/platform-catalog-store";
 import { canvasGenerationErrorToast, formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
 import { NODE_DEFAULT_SIZE, getNodeSpec } from "../constants";
 import { CanvasNodeType } from "../types";
@@ -76,7 +77,10 @@ export function useCanvasImageGeneration(options: UseCanvasImageGenerationOption
                 isImageNode && sourceNode?.metadata?.content
                     ? [{ id: sourceNode.id, name: `${sourceNode.title || sourceNode.id}.png`, type: sourceNode.metadata.mimeType || "image/png", dataUrl: sourceNode.metadata.content, storageKey: sourceNode.metadata.storageKey }]
                     : [];
-            const referenceImages = sourceReference.length ? sourceReference : generationContext.referenceImages;
+            // 模型不吃参考图（Replicate 的 recraft 系）时，连上来的图片就不再当参考图用：
+            // 上游只会静默忽略它，却照样按参考图生图收钱；提示词里还会出现「参考图片编号：@图片 1」，
+            // 等于告诉用户参考图生效了。节点面板会同时提示上游图片不会被使用。
+            const referenceImages = imageModelSupportsReferences(generationConfig.model || generationConfig.imageModel) ? (sourceReference.length ? sourceReference : generationContext.referenceImages) : [];
             const generationType = referenceImages.length ? ("edit" as const) : ("generation" as const);
             const generationMetadata = buildImageGenerationMetadata(generationType, generationConfig, count, referenceImages);
             const parentConfig = NODE_DEFAULT_SIZE[isConfigNode ? CanvasNodeType.Config : isImageNode ? CanvasNodeType.Image : CanvasNodeType.Text];

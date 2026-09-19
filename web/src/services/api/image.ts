@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
+import { imageModelSupportsReferences } from "@/stores/platform-catalog-store";
 import { normalizeImageOutputFormat } from "@/lib/model-capability-spec";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
@@ -222,6 +223,17 @@ function replicateOutputFormatPayload(configured?: string): Record<string, unkno
         output_format: outputFormat,
         ...(outputFormat === "png" ? {} : { output_compression: 90 }),
     };
+}
+
+/**
+ * Replicate 的参考图入参。**模型不吃参考图时整字段不发**：上游对不认识的输入字段是静默忽略的，
+ * 发过去既不会报错也不会起作用，用户却会以为参考图生效了、并为一张与参考图无关的图付钱
+ * （2026-09-19 实测 recraft-ai/recraft-v4-pro：带 1 张参考图，29 秒 succeeded，成图与参考图无关）。
+ * 判定见 lib/model-reference-support.ts；界面侧同时把参考图入口关掉，这里是最后一道收口。
+ */
+async function replicateInputImagesPayload(model: string, references: ReferenceImage[]): Promise<Record<string, unknown>> {
+    if (!references.length || !imageModelSupportsReferences(model)) return {};
+    return { input_images: await Promise.all(references.map((image) => imageToDataUrl(image))) };
 }
 
 function gcd(a: number, b: number): number {
@@ -1290,7 +1302,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                     background: "auto",
                     moderation: "auto",
                     aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
-                    input_images: await Promise.all(references.map((image) => imageToDataUrl(image))),
+                    ...(await replicateInputImagesPayload(requestConfig.model, references)),
                     ...replicateOutputFormatPayload(config.outputFormat),
                     number_of_images: n,
                 },

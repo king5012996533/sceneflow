@@ -17,6 +17,7 @@ import { getGenerationCreditsCost } from "@/lib/credit-pricing";
 import { buildVideoGenerationConfig } from "@/lib/generation/generation-config";
 import { InsufficientCreditsError } from "@/lib/generation/generation-guard";
 import { SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
+import { REFERENCE_UNSUPPORTED_HINT } from "@/lib/model-reference-support";
 import { detectStudioKind, imageSizeToVideoSize } from "@/lib/studio/detect-kind";
 import { executeStudioInstruction, pollVideoTask } from "@/lib/studio/execute";
 import { deleteSession, readSession, readSessionMetas, saveSession, type StudioSessionMeta } from "@/lib/studio/session-store";
@@ -25,7 +26,7 @@ import type { StudioMessage, StudioSession, StudioStylePresetId } from "@/lib/st
 import { sceneflowTheme } from "@/lib/sceneflow-theme";
 import { uploadImage } from "@/services/image-storage";
 import { uploadMediaFile } from "@/services/file-storage";
-import { getPlatformPricing, getPricingDefaults } from "@/stores/platform-catalog-store";
+import { getPlatformPricing, getPricingDefaults, useImageModelSupportsReferences } from "@/stores/platform-catalog-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -280,12 +281,42 @@ export default function StudioPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // ===== 模式判定与参考图可用性 =====
+    // 这段必须排在下面的「添加参考素材」回调之前：那几个回调的依赖数组里要用 referenceImagesSupported，
+    // 而依赖数组是渲染时求值的，晚于它的 const 会踩暂时性死区（ReferenceError）。
+    const detectedKind = useMemo(() => detectStudioKind(draft, references, videoReferences, audioReferences), [draft, references, videoReferences, audioReferences]);
+    const effectiveKind = modeOverride === "auto" ? detectedKind : modeOverride;
+    const activeModel = effectiveKind === "image" ? effectiveConfig.imageModel || effectiveConfig.model : effectiveConfig.videoModel || effectiveConfig.model;
+    /**
+     * 参考图入口是否可用。判据是**本次真正会用的模型**吃不吃参考图（能力标定优先，见 platform-catalog-store）：
+     * 上游对多余的输入字段是静默忽略的，发给不支持参考图的模型只会得到一张与参考图无关的图，钱照扣。
+     * 视频模式不受这条限制：视频模型的参考图（Seedance 等）是另一套能力，不在本次标定范围内。
+     *
+     * hook 必须无条件调用（模式在图片/视频之间来回切时 hook 数量不能变）；视频模型不在参考图名单里，
+     * 所以照常传模型名也不会误判。
+     */
+    const activeModelSupportsReferences = useImageModelSupportsReferences(activeModel);
+    const referenceImagesSupported = effectiveKind === "image" ? activeModelSupportsReferences : true;
+
+    /**
+     * 切到不吃参考图的模型时，把已经挂上的参考图清掉并说明原因。
+     * 不清的话会留下一个「看起来挂着参考图、实际会被上游忽略」的状态 —— 用户付了钱却拿到无关的图。
+     */
+    useEffect(() => {
+        if (referenceImagesSupported || !references.length) return;
+        setReferences([]);
+        message.warning(REFERENCE_UNSUPPORTED_HINT);
+    }, [message, referenceImagesSupported, references.length]);
+
     // ===== 参考素材 =====
     const addReferenceFiles = useCallback(
         async (files: File[]) => {
             const unsupported = files.filter((file) => !file.type.startsWith("image/") && !file.type.startsWith("video/") && !isSupportedAudioFile(file));
             if (unsupported.length) message.warning("已忽略不支持的参考素材，请使用图片、mp4/mov 视频或 mp3/wav 音频");
-            const imageFiles = files.filter((file) => file.type.startsWith("image/") && file.size <= SEEDANCE_REFERENCE_LIMITS.imageMaxBytes).slice(0, SEEDANCE_REFERENCE_LIMITS.images - references.length);
+            // 模型不吃参考图时把图片挑出来单独拦：视频/音频照样能加（那是另一条通道的能力）
+            const pickedImageFiles = files.filter((file) => file.type.startsWith("image/"));
+            const imageFiles = referenceImagesSupported ? pickedImageFiles.filter((file) => file.size <= SEEDANCE_REFERENCE_LIMITS.imageMaxBytes).slice(0, SEEDANCE_REFERENCE_LIMITS.images - references.length) : [];
+            if (!referenceImagesSupported && pickedImageFiles.length) message.warning(REFERENCE_UNSUPPORTED_HINT);
             const videoFiles = files.filter((file) => file.type.startsWith("video/") && file.size <= SEEDANCE_REFERENCE_LIMITS.videoMaxBytes).slice(0, SEEDANCE_REFERENCE_LIMITS.videos - videoReferences.length);
             const audioFiles = files.filter((file) => isSupportedAudioFile(file) && file.size <= SEEDANCE_REFERENCE_LIMITS.audioMaxBytes).slice(0, SEEDANCE_REFERENCE_LIMITS.audios - audioReferences.length);
             if (files.some((file) => file.type.startsWith("image/") && file.size > SEEDANCE_REFERENCE_LIMITS.imageMaxBytes)) message.warning("已忽略超过 30MB 的参考图");
@@ -318,10 +349,14 @@ export default function StudioPage() {
             setVideoReferences((value) => [...value, ...nextVideoReferences].slice(0, SEEDANCE_REFERENCE_LIMITS.videos));
             setAudioReferences((value) => [...value, ...nextAudioReferences].slice(0, SEEDANCE_REFERENCE_LIMITS.audios));
         },
-        [audioReferences, message, references.length, videoReferences.length],
+        [audioReferences, message, references.length, referenceImagesSupported, videoReferences.length],
     );
 
     const addReferencesFromClipboard = useCallback(async () => {
+        if (!referenceImagesSupported) {
+            message.warning(REFERENCE_UNSUPPORTED_HINT);
+            return;
+        }
         try {
             const items = await navigator.clipboard.read();
             const blobs = await Promise.all(items.flatMap((item) => item.types.filter((type) => type.startsWith("image/")).map((type) => item.getType(type))));
@@ -340,24 +375,30 @@ export default function StudioPage() {
         } catch {
             message.error("剪切板里没有可读取的图片");
         }
-    }, [message, references.length]);
+    }, [message, references.length, referenceImagesSupported]);
 
-    const insertPickedAsset = useCallback(async (payload: InsertAssetPayload) => {
-        if (payload.kind === "text") {
-            setDraft(payload.content);
-        } else if (payload.kind === "image") {
-            const stored = await uploadImage(payload.dataUrl);
-            setReferences((value) => [...value, { id: nanoid(), name: payload.title, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey }].slice(0, SEEDANCE_REFERENCE_LIMITS.images));
-        } else if (payload.kind === "video") {
-            setVideoReferences((value) => [...value, { id: nanoid(), name: payload.title, type: "video/mp4", url: payload.url, storageKey: payload.storageKey, width: payload.width, height: payload.height }].slice(0, SEEDANCE_REFERENCE_LIMITS.videos));
-        }
-        setAssetPickerOpen(false);
-    }, []);
+    const insertPickedAsset = useCallback(
+        async (payload: InsertAssetPayload) => {
+            if (payload.kind === "text") {
+                setDraft(payload.content);
+            } else if (payload.kind === "image") {
+                if (!referenceImagesSupported) {
+                    // 素材库这条路也要拦：否则用户选中模型后仍能从库里挂上参考图，白花钱
+                    message.warning(REFERENCE_UNSUPPORTED_HINT);
+                    setAssetPickerOpen(false);
+                    return;
+                }
+                const stored = await uploadImage(payload.dataUrl);
+                setReferences((value) => [...value, { id: nanoid(), name: payload.title, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey }].slice(0, SEEDANCE_REFERENCE_LIMITS.images));
+            } else if (payload.kind === "video") {
+                setVideoReferences((value) => [...value, { id: nanoid(), name: payload.title, type: "video/mp4", url: payload.url, storageKey: payload.storageKey, width: payload.width, height: payload.height }].slice(0, SEEDANCE_REFERENCE_LIMITS.videos));
+            }
+            setAssetPickerOpen(false);
+        },
+        [message, referenceImagesSupported],
+    );
 
-    // ===== 模式判定与积分 =====
-    const detectedKind = useMemo(() => detectStudioKind(draft, references, videoReferences, audioReferences), [draft, references, videoReferences, audioReferences]);
-    const effectiveKind = modeOverride === "auto" ? detectedKind : modeOverride;
-    const activeModel = effectiveKind === "image" ? effectiveConfig.imageModel || effectiveConfig.model : effectiveConfig.videoModel || effectiveConfig.model;
+    // ===== 积分 =====
     const creditCost = useMemo(
         () =>
             getGenerationCreditsCost(
@@ -399,6 +440,12 @@ export default function StudioPage() {
         }
         if (!activeSessionIdRef.current) return;
         const kind = modeOverride === "auto" ? detectStudioKind(text, references, videoReferences, audioReferences) : modeOverride;
+        // 兜底：正常情况下参考图入口已经关掉了，走到这里说明状态是从会话/其他地方带进来的，不能带着发出去
+        if (kind === "image" && references.length && !referenceImagesSupported) {
+            message.warning(REFERENCE_UNSUPPORTED_HINT);
+            setReferences([]);
+            return;
+        }
         const model = kind === "image" ? effectiveConfig.imageModel || effectiveConfig.model : effectiveConfig.videoModel || effectiveConfig.model;
         if (!isAiConfigReady(effectiveConfig, model)) {
             message.warning("暂无可用模型，请联系管理员在后台配置平台模型");
@@ -454,7 +501,24 @@ export default function StudioPage() {
             setSending(false);
             await saveCurrentSession();
         }
-    }, [appendMessages, buildInstructionConfig, creditBalance, draft, effectiveConfig, isAiConfigReady, message, modeOverride, references, resetDraft, saveCurrentSession, updateMessage, user?.role, videoReferences, audioReferences]);
+    }, [
+        appendMessages,
+        buildInstructionConfig,
+        creditBalance,
+        draft,
+        effectiveConfig,
+        isAiConfigReady,
+        message,
+        modeOverride,
+        references,
+        referenceImagesSupported,
+        resetDraft,
+        saveCurrentSession,
+        updateMessage,
+        user?.role,
+        videoReferences,
+        audioReferences,
+    ]);
 
     // ===== 结果操作 =====
     const useResultAsReference = useCallback(
@@ -646,6 +710,8 @@ export default function StudioPage() {
                                     onAttachImages={(files) => void addReferenceFiles(files)}
                                     onAttachVideos={(files) => void addReferenceFiles(files)}
                                     onAttachAudios={(files) => void addReferenceFiles(files)}
+                                    referenceImagesEnabled={referenceImagesSupported}
+                                    referenceImagesHint={REFERENCE_UNSUPPORTED_HINT}
                                     onPasteClipboard={() => void addReferencesFromClipboard()}
                                     onOpenAssetPicker={() => setAssetPickerOpen(true)}
                                     onOpenPromptDialog={() => setPromptDialogOpen(true)}

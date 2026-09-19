@@ -8,7 +8,7 @@ import { ModelPicker } from "@/components/model-picker";
 import { defaultConfig, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { CreditSymbol, estimatedRequestCost } from "@/constant/credits";
 import { canvasThemes } from "@/lib/canvas-theme";
-import { usePlatformCapability } from "@/stores/platform-catalog-store";
+import { usePlatformCapability, useImageModelSupportsReferences } from "@/stores/platform-catalog-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasImageSettingsPopover } from "./canvas-image-settings-popover";
 import { CanvasAudioSettingsPopover, type CanvasAudioSettingKey } from "./canvas-audio-settings-popover";
@@ -33,6 +33,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
     // 张数按模型标定夹（不能只夹 15）：这个数字乘进预估积分，硬夹 15 会让 recraft
     // 这类固定出单张的模型显示成 120 积分（40×3），用户以为买 3 张、实际只拿 1 张。
     const capability = usePlatformCapability(config.model);
+    const referencesSupported = useImageModelSupportsReferences(config.model);
     const maxCount = mode === "image" && capability?.kind === "image" ? Math.max(1, Math.min(15, capability.maxCount)) : 15;
     const count = Math.max(1, Math.min(maxCount, Math.floor(Math.abs(Number(config.count)) || 1)));
     const credits = estimatedRequestCost(mode, config.model, {
@@ -109,6 +110,14 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
                     组装提示词
                 </button>
             </div>
+
+            {mode === "image" && !referencesSupported && inputSummary.imageCount > 0 ? (
+                // 图上连着的图片不算数：模型不吃参考图，上游只会静默忽略，钱照扣。
+                // 光把「参考图 N 张」显示出来就成了误导，所以这里明说它不会被使用。
+                <div className="mb-2 rounded-md border px-2 py-1.5 text-[11px] leading-4" style={chipStyle} onMouseDown={(event) => event.stopPropagation()}>
+                    该模型不支持参考图：上游连着的 {inputSummary.imageCount} 张图片这次不会被使用（它只认文字描述）。请换用支持参考图的模型。
+                </div>
+            ) : null}
 
             <div className={`mb-2 grid min-w-0 cursor-default items-center gap-2 ${mode === "image" || mode === "video" || mode === "audio" ? "grid-cols-[minmax(0,1fr)_148px]" : "grid-cols-1"}`} onMouseDown={(event) => event.stopPropagation()}>
                 <ModelPicker className="canvas-compact-control h-10" config={config} value={config.model} onChange={(model) => onConfigChange(node.id, { model })} capability={mode} fullWidth />

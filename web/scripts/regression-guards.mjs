@@ -889,6 +889,50 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(cloudSync.includes('type: "projects"'), "备份信封要带 type=projects。");
 }
 
+// —— 不吃参考图的模型（Replicate recraft 系）：入口、上下文、报文三层都要收口 ——
+// 2026-09-19 实测：recraft-ai/recraft-v4-pro 的入参只有 prompt / aspect_ratio / size，没有图像字段。
+// 上游对多余的输入字段是**静默忽略**而不是报错，所以旧行为是「照发 input_images、任务照常成功、
+// 积分照扣，只是参考图完全没被用上」——用户以为在做参考图生图，拿到的是一张无关的图。
+// 这种错不会以报错形式暴露，只能靠客户端拦，因此三层都得有断言兜住。
+{
+    assertIncludes("src/lib/model-reference-support.ts", "REFERENCE_UNSUPPORTED_HINT", "参考图不支持时必须有一份给用户看的说明文案（用户端与后台共用）。");
+    assertIncludes("src/lib/model-reference-support.ts", '"recraft"', "不支持参考图的名字名单必须留着 recraft（上游没有图像入参）。");
+    // 缺省即支持：名单以外的一律放行，否则一有误判就会把正常模型的参考图入口也关掉。
+    assertIncludes("src/lib/model-reference-support.ts", "if (!value) return true;", "判定必须是「缺省支持」，空模型名不能反过来把入口关掉。");
+    // 能力标定：只有「明确不支持」才落库 false，老配置不受影响。
+    assertIncludes("src/lib/model-capability-spec.ts", "references?: boolean", "能力标定必须能表达「这个模型不吃参考图」，否则后台无法为上游新增的图像入参解禁。");
+    assertIncludes("src/lib/model-capability-spec.ts", "references: spec.references !== false", "参考图能力缺省必须是支持（老配置没这个字段，不能因此被关掉入口）。");
+    assertIncludes("src/lib/model-capability-spec.ts", "value.references === false ? { references: false } : {}", "只有明确标成 false 才落库，避免把「没标定」写成「不支持」。");
+    assertIncludes("src/stores/platform-catalog-store.ts", "export function imageModelSupportsReferences", "用户端要有统一的参考图判定入口（非 hook，供请求构造用）。");
+    assertIncludes("src/stores/platform-catalog-store.ts", "export function useImageModelSupportsReferences", "用户端要有统一的参考图判定入口（hook，供渲染用）。");
+    // 报文层：不吃参考图的模型不再发 input_images。
+    assertIncludes("src/services/api/image.ts", "replicateInputImagesPayload", "Replicate 的参考图入参必须走统一收口函数（模型不吃参考图时整字段不发）。");
+    // input_images 只允许出现在这个收口函数里面：外面还有一处就是「无条件发送」的老写法。
+    {
+        const imageApi = read("src/services/api/image.ts");
+        const helperStart = imageApi.indexOf("async function replicateInputImagesPayload");
+        const helperEnd = imageApi.indexOf("\n}\n", helperStart);
+        const siteCount = (imageApi.match(/input_images:/g) || []).length;
+        assert(helperStart >= 0 && helperEnd > helperStart, "找不到 replicateInputImagesPayload 的函数体，无法确认 input_images 的收口位置。");
+        assert(siteCount === 1, `image.ts 里 input_images 只该出现在 replicateInputImagesPayload 内（当前 ${siteCount} 处）。`);
+        assert(imageApi.indexOf("input_images:") > helperStart && imageApi.indexOf("input_images:") < helperEnd, "input_images 必须写在带判定的收口函数里，否则模型不吃参考图时照样会发出去（上游静默忽略，用户白付钱）。");
+        assert(/imageModelSupportsReferences\(model\)/.test(imageApi.slice(helperStart, helperEnd)), "收口函数要按模型判定参考图支持，不能只判有没有传图。");
+    }
+    // 用户端面板：三个图片入口关掉 + 写明原因，切模型时清掉已挂的参考图。
+    assertIncludes("src/app/(user)/studio/page.tsx", "referenceImagesEnabled={referenceImagesSupported}", "模型不吃参考图时，参考图入口必须关掉（不能只靠提示词）。");
+    assertIncludes("src/app/(user)/studio/page.tsx", "setReferences([]);\n        message.warning(REFERENCE_UNSUPPORTED_HINT);", "切到不吃参考图的模型时要把已挂的参考图清掉并说明原因。");
+    // hook 必须无条件调用：写成 `effectiveKind === "image" ? useXxx(...) : true` 时，
+    // 图片/视频来回切会改变 hook 数量，React 直接抛「Rendered fewer hooks than expected」。
+    assertNotMatches("src/app/(user)/studio/page.tsx", /effectiveKind === "image" \? useImageModelSupportsReferences\(/, "参考图判定 hook 不能条件调用（模式切换会让 hook 数量变化）。");
+    assertIncludes("src/components/studio/studio-composer.tsx", "composer-notice", "关掉入口时必须同时显示原因，不能让用户对着一排灰按钮猜。");
+    assertIncludes("src/components/studio/studio-composer.tsx", "disabled={sending || !referenceImagesEnabled}", "图片类入口要真的禁用，而不只是加个 title。");
+    assertIncludes("src/app/(user)/studio/workbench.css", ".sf-workbench .composer-notice", "说明条的样式要在 workbench.css 里（组件内联 style 会漏掉 SSR 直出）。");
+    // 画布：连上来的图片不再当参考图用（否则提示词里会出现「@图片 1」，等于告诉用户参考图生效了）。
+    assertIncludes("src/app/(user)/canvas/hooks/use-canvas-image-generation.ts", "imageModelSupportsReferences", "画布出图也要按模型判定参考图，不能只改用户端面板。");
+    assertIncludes("src/app/(user)/canvas/hooks/use-canvas-retry-generation.ts", "imageModelSupportsReferences", "画布重试同样要按模型判定参考图（重试是最容易漏的一条路）。");
+    assertIncludes("src/app/(user)/canvas/components/canvas-config-node-panel.tsx", "referencesSupported", "画布节点面板要提示「上游连着的图片这次不会被使用」，否则「参考图 N 张」是在骗人。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

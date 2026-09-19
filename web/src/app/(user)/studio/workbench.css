@@ -848,6 +848,27 @@
 .sf-workbench .attachment-tray.has-items {
     display: flex;
 }
+/* 当前模型不吃参考图时的说明条：参考图入口已被禁用，这里写明原因，不能让用户对着一排灰按钮猜 */
+.sf-workbench .composer-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 10px 12px 0;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--paper-deep);
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+.sf-workbench .composer-notice svg {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    margin-top: 2px;
+    color: var(--accent-deep);
+}
 .sf-workbench .attachment-chip {
     position: relative;
     width: 58px;

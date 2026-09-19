@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, AudioLines, Clapperboard, Clipboard, ImagePlus, Library, NotebookTabs, X } from "lucide-react";
+import { ArrowUp, AudioLines, Clapperboard, Clipboard, ImagePlus, Info, Library, NotebookTabs, X } from "lucide-react";
 import { useRef } from "react";
 
 import { getStylePreset } from "@/lib/studio/style-presets";
@@ -39,6 +39,14 @@ type StudioComposerProps = {
     onRemoveReference: (index: number) => void;
     onRemoveVideoReference: (index: number) => void;
     onRemoveAudioReference: (index: number) => void;
+    /**
+     * 参考图入口是否可用。当前模型不吃参考图时为 false：三个图片类入口禁用并显示原因。
+     * 上游对多余的输入字段是静默忽略的（不发报错），所以只能在这里拦，否则用户会为一张
+     * 与参考图无关的图付钱（见 lib/model-reference-support.ts）。
+     */
+    referenceImagesEnabled?: boolean;
+    /** referenceImagesEnabled 为 false 时显示的原因文案 */
+    referenceImagesHint?: string;
 };
 
 export function StudioComposer({
@@ -64,6 +72,8 @@ export function StudioComposer({
     onRemoveReference,
     onRemoveVideoReference,
     onRemoveAudioReference,
+    referenceImagesEnabled = true,
+    referenceImagesHint = "",
 }: StudioComposerProps) {
     const imageInputRef = useRef<HTMLInputElement>(null);
     const videoInputRef = useRef<HTMLInputElement>(null);
@@ -152,6 +162,13 @@ export function StudioComposer({
                 </div>
             ) : null}
 
+            {referenceImagesEnabled ? null : (
+                <div className="composer-notice" role="status">
+                    <Info />
+                    <span>{referenceImagesHint}</span>
+                </div>
+            )}
+
             <textarea
                 value={draft}
                 rows={3}
@@ -176,7 +193,15 @@ export function StudioComposer({
                         ))}
                     </div>
                     <div className="asset-actions">
-                        <button type="button" className="asset-button" data-asset="image" aria-label="添加图片" onClick={() => imageInputRef.current?.click()} disabled={sending}>
+                        <button
+                            type="button"
+                            className="asset-button"
+                            data-asset="image"
+                            aria-label="添加图片"
+                            title={referenceImagesEnabled ? undefined : referenceImagesHint}
+                            onClick={() => imageInputRef.current?.click()}
+                            disabled={sending || !referenceImagesEnabled}
+                        >
                             <ImagePlus />
                         </button>
                         <button type="button" className="asset-button" data-asset="video" aria-label="添加视频" onClick={() => videoInputRef.current?.click()} disabled={sending}>
@@ -185,10 +210,26 @@ export function StudioComposer({
                         <button type="button" className="asset-button" data-asset="audio" aria-label="添加音频" onClick={() => audioInputRef.current?.click()} disabled={sending}>
                             <AudioLines />
                         </button>
-                        <button type="button" className="asset-button" data-asset="clipboard" aria-label="从剪贴板添加" onClick={onPasteClipboard} disabled={sending}>
+                        <button
+                            type="button"
+                            className="asset-button"
+                            data-asset="clipboard"
+                            aria-label="从剪贴板添加"
+                            title={referenceImagesEnabled ? undefined : referenceImagesHint}
+                            onClick={onPasteClipboard}
+                            disabled={sending || !referenceImagesEnabled}
+                        >
                             <Clipboard />
                         </button>
-                        <button type="button" className="asset-button" data-asset="library" aria-label="从素材库添加" onClick={onOpenAssetPicker} disabled={sending}>
+                        <button
+                            type="button"
+                            className="asset-button"
+                            data-asset="library"
+                            aria-label="从素材库添加"
+                            title={referenceImagesEnabled ? undefined : referenceImagesHint}
+                            onClick={onOpenAssetPicker}
+                            disabled={sending || !referenceImagesEnabled}
+                        >
                             <Library />
                         </button>
                         <button type="button" className="asset-button" data-asset="prompt" aria-label="打开提示词库" onClick={onOpenPromptDialog} disabled={sending}>

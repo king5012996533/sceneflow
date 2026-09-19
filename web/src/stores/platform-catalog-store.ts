@@ -6,6 +6,7 @@ import { create } from "zustand";
 import { apiPath } from "@/lib/app-paths";
 import type { ModelCapabilitySpec } from "@/lib/model-capability-spec";
 import type { ModelPricing, PricingDefaults } from "@/lib/credit-pricing";
+import { modelNameSupportsReferences } from "@/lib/model-reference-support";
 import { modelOptionName } from "@/stores/use-config-store";
 
 /**
@@ -107,4 +108,25 @@ export function usePlatformCapability(model: string): ModelCapabilitySpec | unde
         if (Date.now() - lastAttemptAt > CATALOG_TTL_MS) void usePlatformCatalogStore.getState().load();
     }, [lastAttemptAt]);
     return byModel[modelOptionName(model)];
+}
+
+/**
+ * 该模型是否接受参考图。后台标定优先，未标定/目录未加载时按名字兜底
+ * （名单在 lib/model-reference-support.ts，与 defaultCapabilityForModel 同源）。
+ *
+ * 缺省 = 接受：只有明确登记为「不吃参考图」的模型（Replicate 的 recraft 系）才返回 false，
+ * 因此这里返回 false 时，界面必须把参考图入口关掉并写明原因 —— 上游对多余的字段是静默忽略的，
+ * 发了也只会得到一张与参考图无关的图，而钱照扣。
+ */
+export function imageModelSupportsReferences(model: string): boolean {
+    const spec = getPlatformCapability(model);
+    if (spec?.kind === "image") return spec.references !== false;
+    return modelNameSupportsReferences(model);
+}
+
+/** Hook 读取（面板渲染用）：与 imageModelSupportsReferences 同一口径 */
+export function useImageModelSupportsReferences(model: string): boolean {
+    const spec = usePlatformCapability(model);
+    if (spec?.kind === "image") return spec.references !== false;
+    return modelNameSupportsReferences(model);
 }

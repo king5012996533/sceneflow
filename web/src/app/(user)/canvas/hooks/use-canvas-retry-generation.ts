@@ -14,6 +14,7 @@ import { NODE_STATUS_LOADING, NODE_STATUS_SUCCESS, NODE_STATUS_ERROR, VIDEO_NODE
 import { fitNodeSize } from "../utils/canvas-node-size";
 import { canvasGenerationErrorToast, formatCanvasGenerationErrorDetails } from "../utils/canvas-generation-error";
 import type { ReferenceImage } from "@/types/image";
+import { imageModelSupportsReferences } from "@/stores/platform-catalog-store";
 
 type UseCanvasRetryGenerationOptions = {
     reserveCanvasGenerationQuota: (count?: number) => Promise<void>;
@@ -85,7 +86,9 @@ export function useCanvasRetryGeneration(options: UseCanvasRetryGenerationOption
             }
 
             const generationType = savedImageMetadata?.generationType;
-            const useReferenceImages = generationType ? generationType === "edit" : Boolean(context?.referenceImages.length);
+            // 模型不吃参考图时不再按「参考图生图」重试：上游会忽略参考图，钱照扣（见 lib/model-reference-support.ts）
+            const referencesSupported = imageModelSupportsReferences(generationConfig.model || generationConfig.imageModel);
+            const useReferenceImages = referencesSupported && (generationType ? generationType === "edit" : Boolean(context?.referenceImages.length));
             const retryReferenceImages =
                 hasSavedImageMetadata && savedImageMetadata ? await resolveReferences(savedImageMetadata) : useReferenceImages ? (context?.referenceImages.length ? context.referenceImages : sourceReferenceImages(batchRoot || sourceNode)) : [];
             if (useReferenceImages && !retryReferenceImages) {

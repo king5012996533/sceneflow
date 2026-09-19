@@ -13,6 +13,7 @@
 
 import type { CredentialPricing, ModelPricing } from "@/lib/credit-pricing";
 import { IMAGE_BASE_ASPECTS, IMAGE_RESOLUTION_TIERS, deriveResolutionTiers, normalizeResolutionTiers, stripAspectSuffixes, type ImageResolutionTier } from "@/lib/image-resolution";
+import { modelNameSupportsReferences } from "@/lib/model-reference-support";
 
 // ---------- 图片 ----------
 /** 出图保真度档（上游 quality 参数）。low/medium/high 是三档老词汇，xhigh/max 是顶档（Replicate gpt-image-2.5-flare 有六档） */
@@ -67,6 +68,19 @@ export type ImageCapabilitySpec = {
      * 与 qualityTiers 的区别：qualityTiers 是「分辨率轴换成画质档」，这一项是「压根没有这一轴」。
      */
     aspectOnly?: boolean;
+    /**
+     * 是否接受参考图（图生图 / 参考图生图）。**只有明确「不接受」才落 false，缺省 = 接受**。
+     *
+     * 典型是 Replicate 的 recraft 系（recraft-v4-pro / v4 / v3 / recraft-20b）：入参只有
+     * prompt / aspect_ratio / size，没有任何图像字段。上游对多余的输入字段是**忽略**而非报错，
+     * 于是参考图照发、任务照样成功、照样扣费，只是参考图完全没被用上 —— 用户以为在做参考图生图，
+     * 拿到的却是与参考图无关的图（2026-09-19 线上实测确认）。
+     *
+     * 标了它 = 用户面板把「添加图片 / 从剪贴板添加 / 从素材库添加」三个入口关掉并写明原因，
+     * 画布节点面板提示上游图片不会被使用，且构造请求时不再把它当参考图（不发 input_images）。
+     * 判定默认值取自 model-reference-support.ts 的名字名单，后台可逐模型覆盖。
+     */
+    references?: boolean;
     /** 最大生成张数 1-15 */
     maxCount: number;
 };
@@ -347,7 +361,16 @@ export function defaultCapabilityForModel(model: string): ModelCapabilitySpec | 
         return { kind, resolutions: [...DEFAULT_SEEDANCE_VIDEO_CAPABILITY.resolutions], ratios: [...DEFAULT_SEEDANCE_VIDEO_CAPABILITY.ratios], durations: [...DEFAULT_SEEDANCE_VIDEO_CAPABILITY.durations], audio: true, watermark: true };
     }
     if (kind === IMAGE_KIND) {
-        return { kind, qualities: [...DEFAULT_IMAGE_CAPABILITY.qualities], aspects: [...DEFAULT_IMAGE_CAPABILITY.aspects], resolutions: [...IMAGE_RESOLUTION_TIERS], maxCount: DEFAULT_IMAGE_CAPABILITY.maxCount };
+        // 参考图默认值按名字名单给：recraft 这类上游没有图像入参的模型必须默认关掉，
+        // 否则后台预填、用户面板兜底都会显示成「支持参考图」，用户挂了也白挂（上游只会忽略）。
+        return {
+            kind,
+            qualities: [...DEFAULT_IMAGE_CAPABILITY.qualities],
+            aspects: [...DEFAULT_IMAGE_CAPABILITY.aspects],
+            resolutions: [...IMAGE_RESOLUTION_TIERS],
+            maxCount: DEFAULT_IMAGE_CAPABILITY.maxCount,
+            ...(modelNameSupportsReferences(model) ? {} : { references: false }),
+        };
     }
     if (kind === GENERIC_VIDEO_KIND) {
         return { kind, clarity: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.clarity], sizes: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.sizes], seconds: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.seconds] };
@@ -407,6 +430,8 @@ export function normalizeImageCapability(spec: ImageCapabilitySpec): ImageCapabi
         qualityTiers: normalizeQualityTiers(spec.qualityTiers),
         outputFormats: normalizeOutputFormats(spec.outputFormats),
         aspectOnly: spec.aspectOnly === true,
+        // 缺省 = 支持参考图（老配置没这个字段，行为与过去完全一致；只有明确关掉才是 false）
+        references: spec.references !== false,
     };
 }
 
@@ -478,6 +503,8 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
             ...(qualityTiers ? { qualityTiers } : {}),
             ...(outputFormats ? { outputFormats } : {}),
             ...(value.aspectOnly === true ? { aspectOnly: true } : {}),
+            // 同 aspectOnly：只有「明确不支持参考图」才落库，缺省即支持（老配置不受影响）
+            ...(value.references === false ? { references: false } : {}),
             maxCount: Math.max(1, Math.min(IMAGE_MAX_COUNT_LIMIT, Math.floor(Number(value.maxCount)) || DEFAULT_IMAGE_CAPABILITY.maxCount)),
         };
     }
