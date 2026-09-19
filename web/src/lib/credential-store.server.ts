@@ -127,6 +127,32 @@ export async function resolveConfiguredPricing(model: string): Promise<ModelPric
 }
 
 /**
+ * 按模型取后台标定的「单次最多出几张」（只认图片模型）。
+ *
+ * 张数是直接乘进扣费的（creditsCost × count），而 count 由客户端发上来。面板那边虽然按
+ * maxCount 收着选，但拦不住「换个模型直接点生成、压根没打开参数面板」这条路径——
+ * 画布节点的默认张数是 3，换成 recraft（固定出单张）就是按 3 张扣钱、只回 1 张。
+ * 匹配与定价/代理同一套规则（enabled 凭证，priority desc → createdAt asc）。
+ * 没标定、或标定不是图片模型时返回 null，调用方保持原样不做限制。
+ */
+export async function resolveConfiguredImageMaxCount(model: string): Promise<number | null> {
+    if (!prisma || !model) return null;
+    const credentials = (await prisma.providerCredential.findMany({
+        where: { enabled: true },
+        orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+    })) as unknown as CredentialRow[];
+    for (const credential of credentials) {
+        if (!modelMatches(credential.models, model)) continue;
+        const capability = ((credential.capabilities ?? {}) as CredentialCapabilities)[model] as { kind?: string; maxCount?: number } | undefined;
+        // 只有图片模型才有「一次几张」这回事；视频/音频的 maxCount 不适用于这里的乘算
+        if (!capability || capability.kind !== "image") return null;
+        const maxCount = Math.floor(Number(capability.maxCount));
+        return Number.isFinite(maxCount) && maxCount >= 1 ? maxCount : null;
+    }
+    return null;
+}
+
+/**
  * 按目标地址匹配平台凭证。
  * 匹配策略：先按 host 匹配；多个候选时用 provider 提示消歧，再用 model 过滤；
  * 都不满足时回退到 host 匹配的最高优先级凭证。找不到返回 null。

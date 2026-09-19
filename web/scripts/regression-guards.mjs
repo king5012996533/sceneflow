@@ -225,6 +225,8 @@ assertIncludes("src/lib/credit-pricing.ts", "videoCreditsStandard", "定价表�
 assertIncludes("src/lib/credit-pricing.ts", "isHighQuality", "视频高清档必须只按 vquality 判定（读 metadata.quality 会让 768P 误按高清扣费）。");
 assertIncludes("src/lib/credential-store.server.ts", "resolveConfiguredPricing", "服务端必须能按模型解析后台逐模型定价。");
 assertIncludes("src/lib/generation/generation-jobs.server.ts", "resolveConfiguredPricing", "扣费必须接入后台逐模型定价（未配置退回内置草案）。");
+assertIncludes("src/lib/credential-store.server.ts", "resolveConfiguredImageMaxCount", "服务端必须能按模型解析标定的最大张数。");
+assertIncludes("src/lib/generation/generation-jobs.server.ts", "Math.min(requestedCount, capabilityMaxCount)", "扣费前必须按模型标定夹住张数：count 来自客户端且直接乘进扣费，只靠面板拦不住「换模型直接点生成」。");
 assertIncludes("src/app/api/admin/credentials/route.ts", "sanitizePricing", "后台定价落库前必须清洗。");
 assertIncludes("src/app/api/platform/catalog/route.ts", "pricing", "平台目录必须下发逐模型定价（供前端预检/成本展示）。");
 assertIncludes("src/stores/platform-catalog-store.ts", "getPlatformPricing", "客户端必须能按模型取后台定价。");

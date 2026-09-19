@@ -2,7 +2,7 @@ import { prisma } from "@/lib/ic-prisma";
 import { Prisma } from "@/generated/ic-prisma/client";
 import { deductCredits, ensureDailyCreditGrant, refundCredits } from "@/lib/credit-ledger";
 import { estimateGenerationCostCents, generationModel, getGenerationCreditsCost, type GenerationKind } from "@/lib/credit-pricing";
-import { resolveConfiguredPricing } from "@/lib/credential-store.server";
+import { resolveConfiguredImageMaxCount, resolveConfiguredPricing } from "@/lib/credential-store.server";
 import { normalizeGenerationMetadata } from "@/lib/generation/generation-config";
 import { getOperationNumber, getPricingDefaults } from "@/lib/operation-config";
 import { STALE_JOB_MS } from "./generation-stale";
@@ -32,7 +32,7 @@ type BeginGenerationInput = {
 export async function beginGenerationJob(userId: string, input: BeginGenerationInput) {
     if (!prisma) throw new Error("Database unavailable");
 
-    const count = Math.max(1, Math.min(50, Math.floor(Number(input.count) || 1)));
+    const requestedCount = Math.max(1, Math.min(50, Math.floor(Number(input.count) || 1)));
     const existing = await prisma.generationJob.findUnique({ where: { requestKey: input.requestKey } });
     if (existing) {
         if (existing.userId !== userId) throw new Error("请求标识已被占用");
@@ -44,6 +44,10 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
     // 积分制：非 admin 按「模型 × 类型」扣积分；定价三层：后台逐模型配置 > 运营配置全局默认 > 内置草案
     // （图片每张 / 视频每条 / 音频每次 / 文本每次）。计费前先把客户端 metadata 按服务端口径规范化（时长 clamp、模型去空白），计费与落库都基于规范化结果（H-6 服务端确权）
     const normalizedMetadata = normalizeGenerationMetadata(input.metadata) as Record<string, unknown> | undefined;
+    // 张数按模型标定的上限夹一次：count 由客户端发来、直接乘进扣费，面板那句「只显示 1 张」拦不住
+    // 「换了模型直接点生成、没打开参数面板」这条路径（画布节点默认 3 张 = 3 倍钱换 1 张图）。
+    const capabilityMaxCount = input.kind === "image" ? await resolveConfiguredImageMaxCount(generationModel(normalizedMetadata)) : null;
+    const count = capabilityMaxCount ? Math.min(requestedCount, capabilityMaxCount) : requestedCount;
     const configuredPricing = !isAdmin ? await resolveConfiguredPricing(generationModel(normalizedMetadata)) : null;
     const pricingDefaults = !isAdmin ? await getPricingDefaults() : undefined;
     const creditsCost = !isAdmin ? getGenerationCreditsCost(input.kind, normalizedMetadata, configuredPricing ?? undefined, pricingDefaults) : 0;
