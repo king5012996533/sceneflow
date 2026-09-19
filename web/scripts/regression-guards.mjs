@@ -945,6 +945,44 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/app/(user)/canvas/components/canvas-config-node-panel.tsx", "referencesSupported", "画布节点面板要提示「上游连着的图片这次不会被使用」，否则「参考图 N 张」是在骗人。");
 }
 
+// —— 方舟（豆包 Seedream）图片通道：请求体形状按上游参数表整形 ——
+// 2026-09-19 接 Seedream 5.0 pro / lite。方舟长着 OpenAI 的形状，参数表却不一样：
+//   ① 参考图字段叫 image（不是 image_urls）—— 发错是**静默忽略**，照样出图照样计费，成图与参考图无关；
+//   ② 没有 n / quality —— 我们通用体恒定带这两个字段（上游严格校验 → 400）；
+//   ③ 不显式关 watermark 就会带「AI生成」角标（比别的渠道多一个）；
+//   ④ 没有 /images/edits 端点 —— 参考图必须走生成端点，multipart 编辑链路在它上面是 404。
+// 整形规则只许有一处（lib/ark-image.ts），两条调用路径都引用它。
+{
+    assertIncludes("src/lib/ark-image.ts", "export function buildArkImageBody", "方舟请求体的拼装必须收在一个纯函数里（别再散回两条调用路径）。");
+    assertIncludes("src/lib/ark-image.ts", 'ARK_IMAGE_REFERENCE_FIELD = "image"', "方舟的参考图字段名是 image；写成 image_urls 会被上游静默忽略，用户白付钱。");
+    assertIncludes("src/lib/ark-image.ts", "ARK_IMAGE_WATERMARK = false", "方舟不显式关水印就会给输出图加「AI生成」角标（与别的渠道口径不一致）。");
+    assertNotMatches("src/lib/ark-image.ts", /^import /m, "ark-image.ts 必须零 import：scripts 里的单测是拿 node 直跑 .ts，解析不了 @/ 别名。");
+    assertIncludes("src/lib/ark-image.ts", "ARK_IMAGE_MAX_OUTPUTS = 1", "方舟图片通道一次只出一张（组图是另一个参数，pro 不支持）。");
+    // 字段名与「不该发的参数」只查请求体拼装函数的函数体：注释里会提到 image_urls / quality
+    // （那是在解释为什么不能发），文件级正则会把解释文字一起误判。
+    {
+        const ark = read("src/lib/ark-image.ts");
+        const start = ark.indexOf("export function buildArkImageBody");
+        const end = ark.indexOf("\n}\n", start);
+        assert(start >= 0 && end > start, "找不到 buildArkImageBody 的函数体，无法确认它发的字段名对不对。");
+        const body = ark.slice(start, end);
+        assert(!/image_urls/.test(body), "方舟的参考图字段名是 image：写成 image_urls 会被上游静默忽略（不报错、不出效果、照样收费）。");
+        assert(!/\bn\s*:|quality/.test(body), "方舟没有 n / quality 参数：这两个字段一旦回到请求体里，上游会直接 400。");
+        assert(/watermark:\s*ARK_IMAGE_WATERMARK/.test(body), "水印开关要显式发出去，不能依赖上游默认值。");
+    }
+    // 方舟渠道不许再走 multipart 编辑端点（那是对「编辑端点不吃这个模型」的重投，方舟是 404，救不回来）。
+    assertIncludes("src/services/api/image.ts", "isArkImageChannel(requestConfig)", "参考图生图必须先认出方舟渠道并改走生成端点 + image。");
+    {
+        const imageApi = read("src/services/api/image.ts");
+        const editsSubmit = imageApi.indexOf('formData.set("_proxy_url"');
+        const arkGuard = imageApi.indexOf("if (isArkImageChannel(requestConfig)) {");
+        assert(arkGuard >= 0 && editsSubmit > arkGuard, "方舟分支必须拦在 multipart 编辑端点之前，否则参考图会打到方舟不存在的 /images/edits（404）。");
+    }
+    assertIncludes("src/services/api/image.ts", "ARK_IMAGE_MASK_UNSUPPORTED", "带蒙版的编辑对方舟是无解（没有 mask 入参）：必须明确报错，不能发出去被静默忽略。");
+    // 扣费口径：请求体里没有张数，计费那边就必须把 Ark 渠道夹到 1（否则「按 4 张扣钱、只回 1 张」）。
+    assertIncludes("src/lib/credential-store.server.ts", "isArkImageBaseUrl(credential.baseUrl)) return ARK_IMAGE_MAX_OUTPUTS", "方舟渠道的 maxCount 必须在服务端夹到 1：张数是直接乘进扣费的。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

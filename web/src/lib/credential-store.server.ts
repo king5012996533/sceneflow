@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 
 import { prisma } from "@/lib/ic-prisma";
 import { isHostOrSubdomain } from "@/lib/url-safety";
+import { ARK_IMAGE_MAX_OUTPUTS, isArkImageBaseUrl } from "@/lib/ark-image";
 import type { CredentialCapabilities } from "@/lib/model-capability-spec";
 import type { CredentialPricing, ModelPricing } from "@/lib/credit-pricing";
 
@@ -146,6 +147,11 @@ export async function resolveConfiguredImageMaxCount(model: string): Promise<num
         const capability = ((credential.capabilities ?? {}) as CredentialCapabilities)[model] as { kind?: string; maxCount?: number } | undefined;
         // 只有图片模型才有「一次几张」这回事；视频/音频的 maxCount 不适用于这里的乘算
         if (!capability || capability.kind !== "image") return null;
+        // 方舟（豆包 Seedream）图片通道一次只回一张：请求体里根本不发张数（它没这个参数，
+        // 组图是 sequential_image_generation，pro 不支持、本轮也没接）。所以不管后台把
+        // maxCount 标成几，这里都得夹到 1 —— 标成 4 就是「按 4 张扣钱、只回 1 张」。
+        // 哪天接上组图，把这一行去掉即可（口径见 lib/ark-image.ts 的 ARK_IMAGE_MAX_OUTPUTS）。
+        if (isArkImageBaseUrl(credential.baseUrl)) return ARK_IMAGE_MAX_OUTPUTS;
         const maxCount = Math.floor(Number(capability.maxCount));
         return Number.isFinite(maxCount) && maxCount >= 1 ? maxCount : null;
     }

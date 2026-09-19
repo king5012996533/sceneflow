@@ -13,6 +13,7 @@ import { envelopeMessage, isSuccessCode, parseImageTaskState, pickSubmittedTaskI
 import { composeUpstreamFailure, describeEnvelopeFailure, describeHttpStatus, describeMissingCandidates, describeNetworkFailure, upstreamErrorMessage } from "@/lib/generation/upstream-error";
 import { isAspectRejection, parseSupportedRatios, pickSupportedRatio } from "./image-ratio";
 import { buildReferenceGenerationBody, isEditsEndpointUnsupported, normalizeReferenceDataUrl } from "./image-reference";
+import { ARK_IMAGE_MASK_UNSUPPORTED, ARK_IMAGE_PATH, arkReferenceCountError, buildArkImageBody, isArkImageChannel } from "@/lib/ark-image";
 import { archivedMediaUrls, startServerReplicateJob } from "@/lib/generation/server-replicate-client";
 import { awaitServerRunImages, ServerRunError } from "@/lib/generation/server-run-client";
 import { reportGenerationResult, reportUpstreamTask } from "@/lib/generation/server-upstream-client";
@@ -1241,18 +1242,24 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
             throw new Error(readAxiosError(error, "请求失败"));
         }
     }
-    const url = aiApiUrl(requestConfig, "/images/generations");
+    const url = aiApiUrl(requestConfig, ARK_IMAGE_PATH);
     const headers = aiHeaders(requestConfig, "application/json");
+    // 方舟（豆包 Seedream）单独一套请求体：它没有 n / quality（通用体恒定带这两个字段 → 400），
+    // 参考图字段名也不同，且不显式关水印就会带「AI生成」角标。口径与理由见 lib/ark-image.ts。
+    const arkImage = isArkImageChannel(requestConfig);
     // 画幅默认发像素尺寸（多数通道要的就是它）；只有上游明确说「只认比例串」时才改发比例重投
-    const body = (aspectRatio?: string) => ({
-        model: requestConfig.model,
-        prompt: withSystemPrompt(requestConfig, requestPrompt),
-        n,
-        ...(quality ? { quality } : {}),
-        ...(aspectRatio ? { aspect_ratio: aspectRatio } : requestSize ? { size: requestSize } : {}),
-        ...(isOpenAiApi(requestConfig) ? { response_format: "b64_json" } : {}),
-        ...(isOpenAiApi(requestConfig) ? { output_format: IMAGE_OUTPUT_FORMAT } : {}),
-    });
+    const body = (aspectRatio?: string) =>
+        arkImage
+            ? buildArkImageBody({ model: requestConfig.model, prompt: withSystemPrompt(requestConfig, requestPrompt), size: requestSize, outputFormat: config.outputFormat })
+            : {
+                  model: requestConfig.model,
+                  prompt: withSystemPrompt(requestConfig, requestPrompt),
+                  n,
+                  ...(quality ? { quality } : {}),
+                  ...(aspectRatio ? { aspect_ratio: aspectRatio } : requestSize ? { size: requestSize } : {}),
+                  ...(isOpenAiApi(requestConfig) ? { response_format: "b64_json" } : {}),
+                  ...(isOpenAiApi(requestConfig) ? { output_format: IMAGE_OUTPUT_FORMAT } : {}),
+              };
     try {
         let payload: ImageApiResponse;
         try {
@@ -1309,6 +1316,27 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                 options,
                 serverJobId,
             );
+        } catch (error) {
+            throw new Error(readAxiosError(error, "请求失败"));
+        }
+    }
+    // 方舟没有 /images/edits 端点（下面那条 multipart 链路在它上面是 404，不是「编辑端点不吃这个模型」，
+    // 所以 image-reference.ts 的重投也救不回来）：参考图直接走生成端点 + image 字段。见 lib/ark-image.ts。
+    if (isArkImageChannel(requestConfig)) {
+        if (mask) throw new Error(ARK_IMAGE_MASK_UNSUPPORTED);
+        try {
+            const images = await Promise.all(references.map(async (image) => normalizeReferenceDataUrl(await imageToDataUrl(image))));
+            const referenceError = arkReferenceCountError(images);
+            if (referenceError) throw new Error(referenceError);
+            const outcome = await proxyFetchDeferrable<ImageApiResponse>({
+                url: aiApiUrl(requestConfig, ARK_IMAGE_PATH),
+                method: "POST",
+                headers: aiHeaders(requestConfig, "application/json"),
+                jobId: serverJobId,
+                body: buildArkImageBody({ model: requestConfig.model, prompt: withSystemPrompt(requestConfig, requestPrompt), size: requestSize, images, outputFormat: config.outputFormat }),
+            });
+            if (outcome.deferred) return await awaitServerRunImages(outcome.jobId, options?.signal);
+            return await resolveImageSubmission(requestConfig, outcome.data || {}, options, serverJobId);
         } catch (error) {
             throw new Error(readAxiosError(error, "请求失败"));
         }
