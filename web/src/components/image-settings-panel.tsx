@@ -229,7 +229,7 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
                     </div>
                     {usesAspectOnly ? (
                         <div className="text-[11px] leading-4" style={{ color: theme.node.muted }}>
-                            这个模型没有分辨率档位：像素由它自己定（约 2048px 一级），这里只选宽高比。
+                            这个模型没有分辨率档位：像素由它自己按比例定，约 400 万像素级（9:16 实测出 1536×2688），这里只选宽高比。
                         </div>
                     ) : qualityTierOptions ? (
                         <>

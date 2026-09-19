@@ -56,7 +56,8 @@ export type ImageCapabilitySpec = {
      * 只吃宽高比的模型：上游没有「分辨率 / 画质」这两轴，像素完全由它自己定。
      *
      * 典型是 Replicate 的 recraft-ai/recraft-v4-pro：入参只有 prompt / aspect_ratio / size，
-     * 而 size 明文写「设了 aspect_ratio 就被忽略」，出图固定约 2048px，也没有 quality 参数。
+     * 而 size 明文写「设了 aspect_ratio 就被忽略」，出图约 400 万像素级（9:16 实测 1536×2688，
+     * 1:1 按模型页约 2048×2048），也没有 quality 参数。
      * 这种模型如果照旧走「1K/2K/4K + 画质（高级）」那一套，面板会给出两样假东西：
      *   - 比例 chip 上的像素提示（1024² 这种）+ W/H 输入框——上游根本不看；
      *   - 分辨率档位与画质档位——选了不起作用，却会按档位算价（选 4K 多扣钱等于白收）。

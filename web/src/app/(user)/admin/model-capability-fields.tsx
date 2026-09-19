@@ -127,7 +127,7 @@ function ImageFields({ spec, onChange }: { spec: ImageCapabilitySpec; onChange: 
                 </Checkbox>
                 <div className="mt-1 text-[11px] leading-4 text-[#726d67]">
                     勾上 = 用户面板的尺寸行只留宽高比（不显示像素数字、不给 W/H 输入），分辨率那一行只说明「由上游定」不放档位，画质（高级）整块不出现，扣费走一口价。 适用于上游压根没有分辨率/画质参数、像素写死的模型（例：Replicate 的
-                    recraft-ai/recraft-v4-pro 固定约 2048px）。有 quality 档位的模型请用上面的「画质档位」。
+                    recraft-ai/recraft-v4-pro，约 400 万像素级）。有 quality 档位的模型请用上面的「画质档位」。
                 </div>
             </div>
             <div>
