@@ -51,11 +51,23 @@ const STATIC_PREFIXES = [
 
 const NOINDEX_HEADER = "noindex, nofollow";
 
-/** 把请求重写到目标路径（保留查询串）。 */
+/**
+ * 归一化标记：本次请求的 /canvas 前缀已经处理过了。
+ *
+ * 为什么必须有它：`next dev` 会对 rewrite 出来的路径再跑一次中间件（线上只跑一次）。
+ * 别名链是两跳的 —— 旧画布库 /canvas/canvas → /canvas，而 /canvas 本身又是旧落地页别名 → /。
+ * 少了这个标记，第二趟会把刚归一化好的 /canvas 再当成旧路径折叠成 /，
+ * 结果本地访问 /canvas/canvas 永远看到营销落地页，画布库进不去。
+ */
+const ALIAS_MARKER = "x-ic-alias-applied";
+
+/** 把请求重写到目标路径（保留查询串），并打上归一化标记。 */
 function rewritten(request: NextRequest, target: string) {
     const url = request.nextUrl.clone();
     url.pathname = target;
-    return NextResponse.rewrite(url);
+    const headers = new Headers(request.headers);
+    headers.set(ALIAS_MARKER, "1");
+    return NextResponse.rewrite(url, { request: { headers } });
 }
 
 export function middleware(request: NextRequest) {
@@ -63,7 +75,8 @@ export function middleware(request: NextRequest) {
 
     // 应用已从 basePath "/canvas" 迁移为无前缀路由。旧 /canvas/... 外链在这里先归一化，
     // 再按归一化后的路径统一判断公开/静态/鉴权，最后重写到目标路由。
-    const alias = aliasOldUrl(pathname);
+    // 已归一化过的请求（dev 下 rewrite 会再进一次中间件）不再重复归一化，否则两跳别名会被连坐。
+    const alias = request.headers.get(ALIAS_MARKER) ? null : aliasOldUrl(pathname);
     const path = alias ?? pathname;
 
     // 落地页公开
