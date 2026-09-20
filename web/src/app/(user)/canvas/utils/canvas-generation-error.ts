@@ -37,6 +37,17 @@ export function summarizeCanvasGenerationError(message?: string | null): CanvasG
         };
     }
 
+    // 平台渠道凭证失效（上游 401/403，服务端已把它翻成「渠道正在维护」）必须排在 502 / isAuthError 之前：
+    // 这两条都会命中它（响应体里带 502、上游原话里带 401），而它们的口径是「让用户去查 Base URL / API Key」——
+    // 用户既看不到也改不了平台那把钥匙，照着提示排查只会白费劲（线上真实反馈：同一个人连撞两次）。
+    if (isPlatformChannelDown(text)) {
+        return {
+            title: "该模型所在渠道维护中",
+            hint: "上游平台凭证失效，我们已收到告警并通知管理员；这次不会扣积分。请稍后重试，或先换用其它模型。",
+            requestId,
+        };
+    }
+
     if (lower.includes("502") || lower.includes("bad gateway")) {
         return {
             title: "后端代理请求失败",
@@ -166,6 +177,17 @@ function isSafetyError(text: string, lower: string) {
 
 function isAuthError(text: string, lower: string) {
     return lower.includes("api key") || lower.includes("unauthorized") || lower.includes("forbidden") || lower.includes("401") || lower.includes("403") || text.includes("鉴权失败");
+}
+
+/**
+ * 「平台渠道维护中」——服务端在凭证类失败（401/403）与渠道熔断时回的固定话术
+ * （唯一来源：lib/credential-health.ts 的 channelMaintenanceMessage）。
+ *
+ * 只认这一句的特征词，不按状态码猜：同样带 401 的还有「用户自带 Key 填错了」这类，
+ * 那种确实该提示去检查 Key。所以判据是平台侧写了什么，而不是上游回了什么码。
+ */
+function isPlatformChannelDown(text: string) {
+    return text.includes("上游凭证失效") || text.includes("渠道正在维护");
 }
 
 function isQuotaError(text: string, lower: string) {

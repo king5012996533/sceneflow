@@ -1,4 +1,5 @@
-import { isCredentialTargetAllowed, platformAuthHeaders, resolvePlatformCredential, type ResolvedCredential } from "@/lib/credential-store.server";
+import { isCredentialTargetAllowed, platformAuthHeaders, resolvePlatformCredential, resolvePlatformCredentialDetailed, type ResolvedCredential } from "@/lib/credential-store.server";
+import { channelMaintenanceMessage } from "@/lib/credential-health";
 
 /**
  * 上游请求的统一鉴权（服务端）。
@@ -54,6 +55,24 @@ export async function authorizeUpstreamRequest(input: { headers: Record<string, 
     }
 
     return { headers, provider: String(credential.provider || providerHint || ""), model: modelHint, credential };
+}
+
+/**
+ * authorizeUpstreamRequest 返回 null 时，说清「为什么」——两种原因对用户的意义完全不同。
+ *
+ * - 没配这个渠道 = 我们自己的配置缺失（用户照着任何提示都做不了什么）；
+ * - 渠道在熔断窗口内 = 上游凭证失效，是可等待的（稍后重试 / 换模型），而且**现在就要说实话**，
+ *   不能让用户看到「目标地址不在已注册渠道白名单内」这种内部话术（2026-09-20 Replicate 那次
+ *   就是这样：真实原因是平台令牌被吊销，用户看到的是「请检查 Base URL、API Key」）。
+ *
+ * 只在解析失败这条冷路径上多查一次库；正常请求不受影响。
+ */
+export async function explainUpstreamAuthorizationFailure(input: { targetUrl: string; providerHint?: unknown; modelHint?: unknown }): Promise<string | null> {
+    const providerHint = typeof input.providerHint === "string" ? input.providerHint : undefined;
+    const modelHint = typeof input.modelHint === "string" ? input.modelHint : undefined;
+    const resolution = await resolvePlatformCredentialDetailed({ targetUrl: input.targetUrl, provider: providerHint, model: modelHint });
+    if (resolution.ok || resolution.reason !== "maintenance") return null;
+    return channelMaintenanceMessage(modelHint);
 }
 
 /**

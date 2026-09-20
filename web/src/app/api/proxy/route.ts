@@ -4,7 +4,8 @@ import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
 import { salvageGenerationArtifacts } from "@/lib/generation/generation-rescue.server";
 import { settleDeferredClientFailure } from "@/lib/generation/generation-jobs.server";
 import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
-import { authorizeUpstreamRequest, pickContentType, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
+import { authorizeUpstreamRequest, explainUpstreamAuthorizationFailure, pickContentType, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
+import { recordCredentialUpstreamStatus } from "@/lib/credential-health.server";
 import { authorizeProxyUpstreamCall } from "@/lib/generation/proxy-access.server";
 import { readModelFromBody } from "@/lib/generation/upstream-endpoint-policy";
 import { readUsageFromPayload, teeStreamForUsage } from "@/lib/generation/upstream-usage";
@@ -83,6 +84,10 @@ export async function POST(req: NextRequest) {
         // 只做同源校验、不做路径前缀限制（各渠道端点拼接规则不同，见 isCredentialTargetAllowed）。
         // 无凭证（未注册 host）或跨源目标直接拒绝，避免把请求发往任意地址。
         if (!authorization) {
+            // 熔断窗口内的渠道也要说清是「维护中」：这类失败发生在凭证解析这一步，
+            // 用户看到「白名单内」只会更糊涂（真实原因在上游那把钥匙上，我们改不了他的界面能改话术）。
+            const maintenance = await explainUpstreamAuthorizationFailure({ targetUrl: target.toString(), providerHint: sfProvider, modelHint: sfModel });
+            if (maintenance) return NextResponse.json({ error: maintenance }, { status: 503 });
             return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
         }
 
@@ -201,6 +206,10 @@ export async function POST(req: NextRequest) {
             });
             // 请求体已发出（收到响应头即已写完），上游请求体缓冲可以释放
             upstreamBody.value = undefined;
+
+            // 渠道健康：401/403 记一次凭证类失败、2xx 记成功（其余状态码不参与判定，见 credential-health.ts）。
+            // 旁路统计，永不抛 —— 它坏掉不该影响正常请求。
+            void recordCredentialUpstreamStatus(authorization.credential?.id, response.status, sfModel);
 
             // 流式透传（SSE / 文本流）：把上游 body 流原样转给客户端
             if (envelope.stream === true) {

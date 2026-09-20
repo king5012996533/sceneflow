@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
 import { isSameOriginRequest } from "@/lib/auth";
-import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
+import { isCredentialTargetAllowed, resolvePlatformCredentialDetailed } from "@/lib/credential-store.server";
 import { prisma } from "@/lib/ic-prisma";
 import { bindExternalGenerationJob } from "@/lib/generation/generation-jobs.server";
 import { composeUpstreamFailure, describeHttpStatus, describeNetworkFailure, upstreamErrorMessage } from "@/lib/generation/upstream-error";
+import { channelMaintenanceMessage, isCredentialAuthStatus } from "@/lib/credential-health";
+import { recordCredentialUpstreamStatus } from "@/lib/credential-health.server";
 import { fetchSafely } from "@/lib/url-safety";
 
 export const runtime = "nodejs";
@@ -48,8 +50,15 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         console.error("[generation/replicate] 输入过大", job.id, `${(payloadBytes / 1024 / 1024).toFixed(1)}MB`);
         return NextResponse.json({ error: describeTooLarge(payloadBytes) }, { status: 413 });
     }
-    const credential = await resolvePlatformCredential({ provider: "replicate", model });
-    if (!credential) return NextResponse.json({ error: "Replicate 平台凭证不可用" }, { status: 503 });
+    const resolution = await resolvePlatformCredentialDetailed({ provider: "replicate", model });
+    if (!resolution.ok) {
+        // 「渠道正在维护」与「没配这个渠道」要分开：前者是用户可行动的（稍后再试/换模型），
+        // 后者是我们自己的配置缺失。都回 503，但文案不同（见 credential-health.ts）。
+        const message = resolution.reason === "maintenance" ? channelMaintenanceMessage(model) : "Replicate 平台凭证不可用";
+        if (resolution.reason === "maintenance") console.error("[generation/replicate] 渠道熔断中，拒绝建单", job.id, resolution.downNames.join(","), model);
+        return NextResponse.json({ error: message }, { status: 503 });
+    }
+    const credential = resolution.credential;
     const target = `${credential.baseUrl.replace(/\/+$/, "")}/models/${encodeURIComponent(model.split("/")[0])}/${encodeURIComponent(model.split("/")[1])}/predictions`;
     if (!isCredentialTargetAllowed(credential.baseUrl, target)) return NextResponse.json({ error: "Replicate 渠道地址不在白名单内" }, { status: 403 });
     let response: Response;
@@ -64,11 +73,18 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         return NextResponse.json({ error: composeUpstreamFailure([`连不上 Replicate（${reason}）`, "出网通道可能不通，请稍后重试"], "Replicate 连接失败") }, { status: 502 });
     }
     const prediction = (await response.json().catch(() => null)) as { id?: string; status?: string; urls?: { get?: string }; error?: unknown } | null;
+    // 渠道健康：401/403 累积失败、成功则清零（阈值与窗口见 credential-health.ts）
+    void recordCredentialUpstreamStatus(credential.id, response.status, model);
     if (!response.ok || !prediction?.id || !prediction.urls?.get) {
         // 上游的 401/403 不能照抄成我们的 401：前端会把它当成「登录过期」。
         // 失败原因走 upstream-error 的口径，把状态码与上游原话一并带上。
         const upstream = upstreamErrorMessage(prediction);
-        const message = composeUpstreamFailure([upstream ? `Replicate 拒绝本次任务：${upstream}` : "", response.ok ? "上游没有返回任务号" : describeHttpStatus(response.status, "Replicate 任务创建失败")], "Replicate 任务创建失败");
+        // 凭证类失败（401/403）是平台侧的问题：用户改不了那把钥匙，所以给面向用户的话（渠道维护中、
+        // 已通知管理员），上游原话只作为排障细节附在后面；其余失败保持原来的口径。
+        const authFailed = isCredentialAuthStatus(response.status);
+        const message = authFailed
+            ? composeUpstreamFailure([channelMaintenanceMessage(model), upstream ? `上游原话：${upstream}` : "", describeHttpStatus(response.status, "Replicate 建单失败")], "Replicate 任务创建失败")
+            : composeUpstreamFailure([upstream ? `Replicate 拒绝本次任务：${upstream}` : "", response.ok ? "上游没有返回任务号" : describeHttpStatus(response.status, "Replicate 任务创建失败")], "Replicate 任务创建失败");
         console.error("[generation/replicate] 启动失败", job.id, response.status, message);
         return NextResponse.json({ error: message }, { status: 502 });
     }

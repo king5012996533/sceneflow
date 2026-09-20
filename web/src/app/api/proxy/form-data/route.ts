@@ -4,7 +4,8 @@ import { assertAllowedProxyUrl, fetchSafely } from "@/lib/url-safety";
 import { salvageGenerationArtifacts } from "@/lib/generation/generation-rescue.server";
 import { settleDeferredClientFailure } from "@/lib/generation/generation-jobs.server";
 import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
-import { authorizeUpstreamRequest, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
+import { authorizeUpstreamRequest, explainUpstreamAuthorizationFailure, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
+import { recordCredentialUpstreamStatus } from "@/lib/credential-health.server";
 import { authorizeProxyUpstreamCall } from "@/lib/generation/proxy-access.server";
 import { canRunOnServer, resolveServerRunPolicy, shouldPersistEnvelope, type UpstreamEnvelope } from "@/lib/generation/generation-envelope";
 import { findRunnableGenerationJob, startServerRun } from "@/lib/generation/generation-run.server";
@@ -54,6 +55,9 @@ export async function POST(req: NextRequest) {
         const authorization = await authorizeUpstreamRequest({ headers: safeHeaders, targetUrl: target.toString(), providerHint: sfProvider, modelHint: sfModel });
         // 代理白名单：只放行已注册渠道（目标与凭证同源），无凭证或跨源目标直接拒绝
         if (!authorization) {
+            // 与 JSON 代理同一口径：熔断窗口内要说「渠道维护中」，其余才是「不在白名单内」
+            const maintenance = await explainUpstreamAuthorizationFailure({ targetUrl: target.toString(), providerHint: sfProvider, modelHint: sfModel });
+            if (maintenance) return NextResponse.json({ error: maintenance }, { status: 503 });
             return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
         }
 
@@ -174,6 +178,8 @@ export async function POST(req: NextRequest) {
             });
             // 请求体已发出（收到响应头即已写完），尽早解除引用：慢中转单次生成最长等 15 分钟
             bodyBuffer = Buffer.alloc(0);
+            // 渠道健康：401/403 记一次凭证类失败、2xx 记成功（其余状态码不参与判定，见 credential-health.ts）
+            void recordCredentialUpstreamStatus(authorization.credential?.id, response.status, sfModel);
             const data = await response.json().catch(async () => ({ error: await response.text().catch(() => "") }));
             // 与 JSON 代理的「[proxy] 上游 <status>」对齐。本路由是参考图生图（/images/edits）主路径，
             // 原先只记目标 host、不记上游状态码，4xx/5xx 完全不留痕：2026-09-18 那三次图生图秒失败

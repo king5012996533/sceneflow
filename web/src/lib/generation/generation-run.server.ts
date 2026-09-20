@@ -10,7 +10,7 @@ import { TERMINAL_SKIP_REASONS, hasKeptArtifact, decideResend, isEnvelopeReplaya
 import { dropUpstreamEnvelope, loadUpstreamEnvelope, readEnvelopeBody, recordResendAttempt } from "./generation-spool.server";
 import { salvageGenerationArtifacts } from "./generation-rescue.server";
 import { beginUpstreamCall, inflightJobCount, isUpstreamCallInFlight } from "./upstream-inflight";
-import { authorizeUpstreamRequest } from "./upstream-auth.server";
+import { authorizeUpstreamRequest, explainUpstreamAuthorizationFailure } from "./upstream-auth.server";
 
 /**
  * 上游信封的执行引擎（服务端）。
@@ -95,6 +95,15 @@ async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; so
 
     const authorization = await authorizeUpstreamRequest({ headers, targetUrl: envelope.url, providerHint: envelope.provider, modelHint: envelope.model });
     if (!authorization) {
+        // 熔断窗口内的渠道：任务失败原因要写成用户能看懂、也能行动的那句话（换模型/稍后重试），
+        // 而不是「未注册渠道或缺少凭证」——后者会让用户以为是我们配置漏了。
+        const maintenance = await explainUpstreamAuthorizationFailure({ targetUrl: envelope.url, providerHint: envelope.provider, modelHint: envelope.model });
+        if (maintenance) {
+            console.warn(`[generation-run] 任务 ${job.id} 的渠道在熔断窗口内，放弃执行（${envelope.url}）`);
+            // 结账时写进任务失败原因的是 snippet（见 settleAttempt → upstreamErrorMessage），
+            // 所以这句话必须同时落在 snippet 上，否则用户端看到的还是「上游返回 503：无说明」。
+            return { kind: "rejected", status: 503, message: maintenance, snippet: maintenance };
+        }
         console.warn(`[generation-run] 任务 ${job.id} 的信封指向未注册渠道或缺少凭证，放弃执行（${envelope.url}）`);
         return { kind: "network-error", message: "未注册渠道或缺少凭证" };
     }

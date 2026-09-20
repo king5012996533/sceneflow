@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/current-user";
+import { prisma } from "@/lib/ic-prisma";
+import { clearCredentialCircuit } from "@/lib/credential-health.server";
 import { createPlatformCredential, deletePlatformCredential, listPlatformCredentials, updatePlatformCredential } from "@/lib/credential-store.server";
 import { sanitizeCapabilities, sanitizePricing } from "@/lib/model-capability-spec";
 
 // admin 平台密钥管理（ProviderCredential）
-// GET  → 列表（Key 脱敏）
+// GET  → 列表（Key 脱敏，含渠道健康字段）
 // POST → 新增
-// PATCH → 更新（apiKey 可选，留空不换）
+// PATCH → 更新（apiKey 可选，留空不换；换 Key 会自动解除熔断）
+//         { id, resetHealth: true } = 「立即重试」，手动解除熔断不等窗口到期
 // DELETE → 删除
 
 export async function GET(req: NextRequest) {
@@ -64,6 +67,15 @@ export async function PATCH(req: NextRequest) {
         const body = await req.json();
         const id = String(body.id || "");
         if (!id) return NextResponse.json({ error: "缺少 id" }, { status: 400 });
+
+        // 「立即重试」：把熔断窗口收掉，不等它自然到期。
+        // 换好 Key 之后立刻放行一次真实调用，成则清零、败则重新开窗（判定在 credential-health.server.ts）。
+        if (body.resetHealth === true) {
+            if (!prisma) return NextResponse.json({ error: "数据库暂不可用" }, { status: 503 });
+            await clearCredentialCircuit(id);
+            const credential = await prisma.providerCredential.findUniqueOrThrow({ where: { id } });
+            return NextResponse.json({ credential: { ...credential, keyEnc: undefined } });
+        }
 
         const patch: Parameters<typeof updatePlatformCredential>[1] = {};
         if (body.name !== undefined) patch.name = String(body.name);

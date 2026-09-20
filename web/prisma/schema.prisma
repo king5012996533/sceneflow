@@ -223,11 +223,21 @@ model ProviderCredential {
   pricing      Json?                        // 逐模型积分定价（图片每张 / 视频每条 / 音频每次 / 文本每次），key=模型名；缺省 = 全局默认 → 内置草案
   enabled     Boolean  @default(true)
   priority    Int      @default(0)           // 同 provider 多 Key 时的优先级（越大越优先）
+  // 渠道健康（熔断）：只在「凭证类」失败（401/403）时累积，成功一次清零。
+  // 连击到阈值就开窗（healthDownUntil），窗口内该凭证不参与解析 —— 免得用户反复撞一把废钥匙；
+  // 窗口到期自动半开重试（真实流量即探针），再失败就再开一窗，不需要人工清理。
+  healthFailStreak     Int       @default(0) // 连续凭证类失败次数
+  healthLastStatus     Int?                  // 最近一次失败的上游状态码（排障用）
+  healthLastFailureAt  DateTime?
+  healthLastSuccessAt  DateTime?
+  healthDownUntil      DateTime?             // 熔断窗口截止时间；null = 未熔断
+  healthNote           String?               // 熔断原因（后台展示）
   createdById String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([provider, enabled])
+  @@index([enabled, healthDownUntil])
 }
 
 model OperationConfig {

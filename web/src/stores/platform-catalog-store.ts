@@ -26,6 +26,14 @@ export type PlatformCatalogModel = {
     capabilities: ModelCapabilitySpec | null;
     /** 后台逐模型积分定价（null = 未配置，扣费走内置草案） */
     pricing?: ModelPricing | null;
+    /**
+     * 该模型所在渠道是否可用。false = 这个模型的全部渠道都在熔断窗口里（上游凭证失效），
+     * 选择器要置灰并说明原因，别让用户点进去撞一次 502。
+     * 缺省（老接口/旧缓存）视为可用，行为与改动前一致。
+     */
+    available?: boolean;
+    /** 不可用原因（面向用户的话，如「该模型所在渠道正在维护」） */
+    unavailableReason?: string | null;
 };
 
 type PlatformCatalogStore = {
@@ -109,6 +117,50 @@ export function usePlatformCapability(model: string): ModelCapabilitySpec | unde
         if (Date.now() - lastAttemptAt > CATALOG_TTL_MS) void usePlatformCatalogStore.getState().load();
     }, [lastAttemptAt]);
     return byModel[modelOptionName(model)];
+}
+
+/**
+ * 该模型所在渠道现在能不能用（渠道熔断 = 凭证失效，见 lib/credential-health.ts）。
+ *
+ * 目录里查不到这个模型（自带 Key / 未标定）时返回可用 —— 置灰只在有明确依据时才发生。
+ * 判定收口在 modelAvailabilityFrom：选择器要一次算一批选项，逐模型调 hook 会在循环里调 hook。
+ */
+export function modelAvailabilityFrom(models: PlatformCatalogModel[], model: string): { available: boolean; reason: string | null } {
+    const hit = models.find((item) => item.model === modelOptionName(model));
+    if (!hit || hit.available !== false) return { available: true, reason: null };
+    return { available: false, reason: hit.unavailableReason || "该模型所在渠道正在维护，请稍后重试或先换用其它模型。" };
+}
+
+export function getPlatformModelAvailability(model: string): { available: boolean; reason: string | null } {
+    const state = usePlatformCatalogStore.getState();
+    if (Date.now() - state.lastAttemptAt > CATALOG_TTL_MS) {
+        setTimeout(() => void usePlatformCatalogStore.getState().load(), 0);
+    }
+    return modelAvailabilityFrom(state.models, model);
+}
+
+/** Hook 读取（面板渲染用）：与 getPlatformModelAvailability 同一口径 */
+export function usePlatformModelAvailability(model: string): { available: boolean; reason: string | null } {
+    const models = usePlatformCatalogStore((s) => s.models);
+    const lastAttemptAt = usePlatformCatalogStore((s) => s.lastAttemptAt);
+    useEffect(() => {
+        if (Date.now() - lastAttemptAt > CATALOG_TTL_MS) void usePlatformCatalogStore.getState().load();
+    }, [lastAttemptAt]);
+    return modelAvailabilityFrom(models, model);
+}
+
+/**
+ * Hook 读取：目录原始列表。
+ * 选择器要为一整批选项算可用性，不能逐项调 hook（循环里调 hook），所以订阅列表后自己调
+ * modelAvailabilityFrom —— 这样目录一加载完，已被渲染出来的置灰状态也会跟着刷新。
+ */
+export function usePlatformCatalogModels(): PlatformCatalogModel[] {
+    const models = usePlatformCatalogStore((s) => s.models);
+    const lastAttemptAt = usePlatformCatalogStore((s) => s.lastAttemptAt);
+    useEffect(() => {
+        if (Date.now() - lastAttemptAt > CATALOG_TTL_MS) void usePlatformCatalogStore.getState().load();
+    }, [lastAttemptAt]);
+    return models;
 }
 
 /**

@@ -1171,6 +1171,73 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/app/api/admin/costs/route.ts", "costCents: { not: null }", "成本页仍按「有成本」过滤：所以估算侧不许留 null。");
 }
 
+// —— 渠道健康（熔断）：平台凭证失效要自己现形，而不是让用户反复撞墙 ——
+{
+    // 1) 口径只有 401/403：把 400/429/5xx 也算进来的话，一次内容审核失败就能把整条渠道掐掉
+    assertMatchesNormalized(
+        "src/lib/credential-health.ts",
+        /export function isCredentialAuthStatus\(status: number\): boolean \{\s*\n\s*return status === 401 \|\| status === 403;/,
+        "只有 401/403 算凭证类失败（单测 test:credentialhealth 钉住这条）。",
+    );
+    // 2) 熔断是「窗口」不是「永久」：到期自动半开，否则换好钥匙还得有人记得来解锁
+    assertIncludes("src/lib/credential-health.ts", "CREDENTIAL_CIRCUIT_WINDOW_MS", "熔断必须有明确窗口，不许写成永久停用。");
+    assertIncludes("src/lib/credential-health.ts", "export function manualHealthResetPatch", "后台「立即重试」需要手动解除熔断的入口。");
+    // 3) 解析凭证时必须跳过熔断中的凭证，并把「维护中」与「没配这个渠道」分开
+    assertIncludes("src/lib/credential-store.server.ts", "resolvePlatformCredentialDetailed", "解析收口要能区分「没有渠道」与「渠道维护中」，调用方据此给不同的话术。");
+    assertMatchesNormalized(
+        "src/lib/credential-store.server.ts",
+        /const usable = all\.filter\(\(credential\) => !isCredentialCircuitOpen\(credential\)\)/,
+        "熔断窗口内的凭证不得参与解析（否则熔断只是一行装饰）。",
+    );
+    // 4) 三条拿到上游响应的路径都要记成败：漏掉哪条，那条渠道就永远不会熔断
+    assertIncludes("src/app/api/proxy/route.ts", "recordCredentialUpstreamStatus", "JSON 代理路径要记渠道成败。");
+    assertIncludes("src/app/api/proxy/form-data/route.ts", "recordCredentialUpstreamStatus", "form-data 代理路径要记渠道成败。");
+    assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "recordCredentialUpstreamStatus", "Replicate 建单路径要记渠道成败（线上就是这里出的问题）。");
+    // 5) 换 Key 要顺手解除熔断：管理员来改 Key 正是因为上一把坏了，不该还让他等窗口到点
+    assertMatchesNormalized(
+        "src/lib/credential-store.server.ts",
+        /data\.keyEnc = encryptCredentialKey\([\s\S]{0,400}?Object\.assign\(data, nextHealthAfterSuccess\(\{\}\)\)/,
+        "更新凭证时换了 Key 就要清零健康状态，否则新钥匙还要背旧账最长半小时。",
+    );
+    assertIncludes("src/app/api/admin/credentials/route.ts", "resetHealth", "后台需要「立即重试」接口（手动解除熔断）。");
+    // 5b) 熔断渠道被解析拒绝时，用户拿到的话术也必须区分开：三条上游路径都要走同一个解释函数，
+    //     否则线上表现是「平台令牌被吊销 → 用户看到『目标地址不在已注册渠道白名单内』」。
+    assertIncludes("src/lib/generation/upstream-auth.server.ts", "explainUpstreamAuthorizationFailure", "解析失败原因要能区分「没配渠道」与「渠道维护中」。");
+    assertIncludes("src/app/api/proxy/route.ts", "explainUpstreamAuthorizationFailure", "JSON 代理路径的拒绝话术要区分维护中。");
+    assertIncludes("src/app/api/proxy/form-data/route.ts", "explainUpstreamAuthorizationFailure", "form-data 代理路径的拒绝话术要区分维护中。");
+    assertIncludes("src/lib/generation/generation-run.server.ts", "explainUpstreamAuthorizationFailure", "信封重放路径的失败原因要区分维护中。");
+    assertMatchesNormalized(
+        "src/lib/generation/generation-run.server.ts",
+        /kind: "rejected", status: 503, message: maintenance, snippet: maintenance/,
+        "熔断时失败原因写进任务记录的是 snippet（settleAttempt → upstreamErrorMessage），两处都要带上那句话。",
+    );
+    // 6) 用户端模型目录要标出不可用，且只在这张模型「全部渠道都熔断」时才标
+    assertIncludes("src/app/api/platform/catalog/route.ts", "computeModelAvailability", "目录要按「是否还有一张没熔断的凭证认领这个模型」判定可用性（规则收在 credential-health.ts，路由与核对共用一份）。");
+    assertIncludes("src/components/model-picker.tsx", "disabled={!availability.available}", "模型选择器要把熔断渠道上的模型置灰。");
+    assertIncludes("src/app/(user)/canvas/components/canvas-agent-model-picker.tsx", "disabled={!availability.available}", "Agent 面板的文本模型选择器同样要置灰（一次失败就是整轮对话中断）。");
+    // 7) 面向用户的文案不得叫用户去查 Base URL / API Key —— 这正是 2026-09-20 那次误报的根源。
+    //    渠道维护分支还必须排在 502 与鉴权分支之前：那两条都会命中它（响应体里同时带 502 和上游 401 原话）。
+    const errorModule = read("src/app/(user)/canvas/utils/canvas-generation-error.ts");
+    const maintenanceBranch = errorModule.indexOf("if (isPlatformChannelDown(text))");
+    const gatewayBranch = errorModule.indexOf('lower.includes("502")');
+    const authBranch = errorModule.indexOf("if (isAuthError(text, lower))");
+    assert(
+        maintenanceBranch > 0 && maintenanceBranch < gatewayBranch && maintenanceBranch < authBranch,
+        "「渠道维护中」必须排在 502 与鉴权失败之前判定，否则平台凭证失效仍会显示成「模型鉴权失败，请检查 Base URL」。",
+    );
+    // 只检查渠道维护那一条 hint 本身（同一文件其它分支的 hint 里出现 Base URL 是合理的：
+    // 用户自带 Key 填错时确实该去检查 Key）
+    const maintenanceHint = errorModule.match(/title: "该模型所在渠道维护中",\s*\n\s*hint: "([^"]+)"/)?.[1] ?? "";
+    assert(maintenanceHint.length > 0, "渠道维护分支的文案要能取到（用户可行动的那句话）。");
+    for (const forbidden of ["Base URL", "API Key", "密钥"]) {
+        assert(
+            !maintenanceHint.includes(forbidden),
+            `渠道维护的用户提示里不许出现「${forbidden}」—— 这就是 2026-09-20 那次误报的根源：${maintenanceHint}`,
+        );
+    }
+    assert(maintenanceHint.includes("不会扣积分"), "渠道维护提示要明确这次不扣分（用户最关心的就是这个）。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

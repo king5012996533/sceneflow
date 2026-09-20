@@ -4,9 +4,10 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { Cpu } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { CHANNEL_DOWN_TAG } from "@/lib/credential-health";
 import { REFERENCE_UNSUPPORTED_TAG } from "@/lib/model-reference-support";
 import { cn } from "@/lib/utils";
-import { imageModelSupportsReferences } from "@/stores/platform-catalog-store";
+import { imageModelSupportsReferences, modelAvailabilityFrom, usePlatformCatalogModels } from "@/stores/platform-catalog-store";
 import { modelOptionLabel, modelOptionName, selectableModelsByCapability, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 
 type ModelPickerProps = {
@@ -23,7 +24,9 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
     const pickerId = useId();
     const [open, setOpen] = useState(false);
     const options = useMemo(() => Array.from(new Set(selectableModelsByCapability(config, capability).filter((model): model is string => Boolean(model)))), [capability, config]);
+    const catalogModels = usePlatformCatalogModels();
     const current = value || "";
+    const currentAvailability = modelAvailabilityFrom(catalogModels, current);
 
     useEffect(() => {
         const closeOtherPicker = (event: Event) => {
@@ -52,7 +55,7 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
                 )}
                 onMouseDown={(event) => event.stopPropagation()}
                 onPointerDown={(event) => event.stopPropagation()}
-                title={current ? modelOptionLabel(config, current) : placeholder}
+                title={current ? `${modelOptionLabel(config, current)}${currentAvailability.available ? "" : `｜${currentAvailability.reason}`}` : placeholder}
             >
                 <ModelIcon model={current} />
                 <span className="canvas-model-picker-text min-w-0 flex-1 truncate text-left">{current ? modelOptionLabel(config, current) : placeholder}</span>
@@ -72,11 +75,14 @@ export function ModelPicker({ config, value, onChange, capability, className, fu
                 onMouseDown={(event) => event.stopPropagation()}
             >
                 {options.length ? (
-                    options.map((model) => (
-                        <SelectItem key={model} value={model} textValue={modelOptionLabel(config, model)}>
-                            <ModelLabel config={config} model={model} capability={capability} />
-                        </SelectItem>
-                    ))
+                    options.map((model) => {
+                        const availability = modelAvailabilityFrom(catalogModels, model);
+                        return (
+                            <SelectItem key={model} value={model} disabled={!availability.available} textValue={modelOptionLabel(config, model)}>
+                                <ModelLabel config={config} model={model} capability={capability} reason={availability.reason} />
+                            </SelectItem>
+                        );
+                    })
                 ) : (
                     <SelectItem value="__empty__" disabled>
                         {emptyModelLabel(config, capability)}
@@ -94,20 +100,25 @@ function emptyModelLabel(config: AiConfig, capability?: ModelCapability) {
 }
 
 /**
- * 一行模型：图标 + 名字 +（图片模式下）能力标注。
+ * 一行模型：图标 + 名字 +（图片模式下）能力标注 / 渠道状态。
  *
- * 为什么要在挑模型时就标出来：这类模型（Replicate 的 recraft 系）上游根本没有图像入参，
- * 却会对多余的字段静默忽略 —— 用户挂上参考图、照常出图、照常扣费，只是图与参考图无关。
- * 全部拦截逻辑在 lib/model-reference-support.ts，这里只负责让用户提前看见，别先选错再被提示。
+ * 为什么要在挑模型时就标出来：
+ * - 参考图：这类模型（Replicate 的 recraft 系）上游根本没有图像入参，却会对多余的字段静默忽略 ——
+ *   用户挂上参考图、照常出图、照常扣费，只是图与参考图无关。
+ * - 渠道维护：该模型的全部渠道都在熔断窗口里（上游凭证失效），点进去只会撞一次失败。
+ * 全部拦截逻辑在 lib/model-reference-support.ts 与 lib/credential-health.ts，这里只负责让用户提前看见。
  */
-function ModelLabel({ config, model, capability }: { config: AiConfig; model: string; capability?: ModelCapability }) {
+function ModelLabel({ config, model, capability, reason }: { config: AiConfig; model: string; capability?: ModelCapability; reason?: string | null }) {
     // 只标图片模型：视频/音频/文本模型不吃参考图是另一套能力，标了反而误导。
     const showUnsupportedTag = capability === "image" && !imageModelSupportsReferences(model);
+    const down = Boolean(reason);
     return (
-        <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="flex min-w-0 flex-1 items-center gap-2" title={reason || undefined}>
             <ModelIcon model={model} />
             <span className="min-w-0 truncate">{modelOptionLabel(config, model)}</span>
-            {showUnsupportedTag ? (
+            {down ? (
+                <span className="ml-auto shrink-0 rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] leading-none text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">{CHANNEL_DOWN_TAG}</span>
+            ) : showUnsupportedTag ? (
                 <span className="ml-auto shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] leading-none text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">{REFERENCE_UNSUPPORTED_TAG}</span>
             ) : null}
         </span>

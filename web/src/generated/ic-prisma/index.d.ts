@@ -15383,10 +15383,14 @@ export namespace Prisma {
 
   export type ProviderCredentialAvgAggregateOutputType = {
     priority: number | null
+    healthFailStreak: number | null
+    healthLastStatus: number | null
   }
 
   export type ProviderCredentialSumAggregateOutputType = {
     priority: number | null
+    healthFailStreak: number | null
+    healthLastStatus: number | null
   }
 
   export type ProviderCredentialMinAggregateOutputType = {
@@ -15397,6 +15401,12 @@ export namespace Prisma {
     keyEnc: string | null
     enabled: boolean | null
     priority: number | null
+    healthFailStreak: number | null
+    healthLastStatus: number | null
+    healthLastFailureAt: Date | null
+    healthLastSuccessAt: Date | null
+    healthDownUntil: Date | null
+    healthNote: string | null
     createdById: string | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -15410,6 +15420,12 @@ export namespace Prisma {
     keyEnc: string | null
     enabled: boolean | null
     priority: number | null
+    healthFailStreak: number | null
+    healthLastStatus: number | null
+    healthLastFailureAt: Date | null
+    healthLastSuccessAt: Date | null
+    healthDownUntil: Date | null
+    healthNote: string | null
     createdById: string | null
     createdAt: Date | null
     updatedAt: Date | null
@@ -15426,6 +15442,12 @@ export namespace Prisma {
     pricing: number
     enabled: number
     priority: number
+    healthFailStreak: number
+    healthLastStatus: number
+    healthLastFailureAt: number
+    healthLastSuccessAt: number
+    healthDownUntil: number
+    healthNote: number
     createdById: number
     createdAt: number
     updatedAt: number
@@ -15435,10 +15457,14 @@ export namespace Prisma {
 
   export type ProviderCredentialAvgAggregateInputType = {
     priority?: true
+    healthFailStreak?: true
+    healthLastStatus?: true
   }
 
   export type ProviderCredentialSumAggregateInputType = {
     priority?: true
+    healthFailStreak?: true
+    healthLastStatus?: true
   }
 
   export type ProviderCredentialMinAggregateInputType = {
@@ -15449,6 +15475,12 @@ export namespace Prisma {
     keyEnc?: true
     enabled?: true
     priority?: true
+    healthFailStreak?: true
+    healthLastStatus?: true
+    healthLastFailureAt?: true
+    healthLastSuccessAt?: true
+    healthDownUntil?: true
+    healthNote?: true
     createdById?: true
     createdAt?: true
     updatedAt?: true
@@ -15462,6 +15494,12 @@ export namespace Prisma {
     keyEnc?: true
     enabled?: true
     priority?: true
+    healthFailStreak?: true
+    healthLastStatus?: true
+    healthLastFailureAt?: true
+    healthLastSuccessAt?: true
+    healthDownUntil?: true
+    healthNote?: true
     createdById?: true
     createdAt?: true
     updatedAt?: true
@@ -15478,6 +15516,12 @@ export namespace Prisma {
     pricing?: true
     enabled?: true
     priority?: true
+    healthFailStreak?: true
+    healthLastStatus?: true
+    healthLastFailureAt?: true
+    healthLastSuccessAt?: true
+    healthDownUntil?: true
+    healthNote?: true
     createdById?: true
     createdAt?: true
     updatedAt?: true
@@ -15581,6 +15625,12 @@ export namespace Prisma {
     pricing: JsonValue | null
     enabled: boolean
     priority: number
+    healthFailStreak: number
+    healthLastStatus: number | null
+    healthLastFailureAt: Date | null
+    healthLastSuccessAt: Date | null
+    healthDownUntil: Date | null
+    healthNote: string | null
     createdById: string | null
     createdAt: Date
     updatedAt: Date
@@ -15616,6 +15666,12 @@ export namespace Prisma {
     pricing?: boolean
     enabled?: boolean
     priority?: boolean
+    healthFailStreak?: boolean
+    healthLastStatus?: boolean
+    healthLastFailureAt?: boolean
+    healthLastSuccessAt?: boolean
+    healthDownUntil?: boolean
+    healthNote?: boolean
     createdById?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -15632,6 +15688,12 @@ export namespace Prisma {
     pricing?: boolean
     enabled?: boolean
     priority?: boolean
+    healthFailStreak?: boolean
+    healthLastStatus?: boolean
+    healthLastFailureAt?: boolean
+    healthLastSuccessAt?: boolean
+    healthDownUntil?: boolean
+    healthNote?: boolean
     createdById?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -15648,6 +15710,12 @@ export namespace Prisma {
     pricing?: boolean
     enabled?: boolean
     priority?: boolean
+    healthFailStreak?: boolean
+    healthLastStatus?: boolean
+    healthLastFailureAt?: boolean
+    healthLastSuccessAt?: boolean
+    healthDownUntil?: boolean
+    healthNote?: boolean
     createdById?: boolean
     createdAt?: boolean
     updatedAt?: boolean
@@ -15664,12 +15732,18 @@ export namespace Prisma {
     pricing?: boolean
     enabled?: boolean
     priority?: boolean
+    healthFailStreak?: boolean
+    healthLastStatus?: boolean
+    healthLastFailureAt?: boolean
+    healthLastSuccessAt?: boolean
+    healthDownUntil?: boolean
+    healthNote?: boolean
     createdById?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type ProviderCredentialOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "provider" | "baseUrl" | "keyEnc" | "models" | "capabilities" | "pricing" | "enabled" | "priority" | "createdById" | "createdAt" | "updatedAt", ExtArgs["result"]["providerCredential"]>
+  export type ProviderCredentialOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "provider" | "baseUrl" | "keyEnc" | "models" | "capabilities" | "pricing" | "enabled" | "priority" | "healthFailStreak" | "healthLastStatus" | "healthLastFailureAt" | "healthLastSuccessAt" | "healthDownUntil" | "healthNote" | "createdById" | "createdAt" | "updatedAt", ExtArgs["result"]["providerCredential"]>
 
   export type $ProviderCredentialPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "ProviderCredential"
@@ -15685,6 +15759,12 @@ export namespace Prisma {
       pricing: Prisma.JsonValue | null
       enabled: boolean
       priority: number
+      healthFailStreak: number
+      healthLastStatus: number | null
+      healthLastFailureAt: Date | null
+      healthLastSuccessAt: Date | null
+      healthDownUntil: Date | null
+      healthNote: string | null
       createdById: string | null
       createdAt: Date
       updatedAt: Date
@@ -16121,6 +16201,12 @@ export namespace Prisma {
     readonly pricing: FieldRef<"ProviderCredential", 'Json'>
     readonly enabled: FieldRef<"ProviderCredential", 'Boolean'>
     readonly priority: FieldRef<"ProviderCredential", 'Int'>
+    readonly healthFailStreak: FieldRef<"ProviderCredential", 'Int'>
+    readonly healthLastStatus: FieldRef<"ProviderCredential", 'Int'>
+    readonly healthLastFailureAt: FieldRef<"ProviderCredential", 'DateTime'>
+    readonly healthLastSuccessAt: FieldRef<"ProviderCredential", 'DateTime'>
+    readonly healthDownUntil: FieldRef<"ProviderCredential", 'DateTime'>
+    readonly healthNote: FieldRef<"ProviderCredential", 'String'>
     readonly createdById: FieldRef<"ProviderCredential", 'String'>
     readonly createdAt: FieldRef<"ProviderCredential", 'DateTime'>
     readonly updatedAt: FieldRef<"ProviderCredential", 'DateTime'>
@@ -20817,6 +20903,12 @@ export namespace Prisma {
     pricing: 'pricing',
     enabled: 'enabled',
     priority: 'priority',
+    healthFailStreak: 'healthFailStreak',
+    healthLastStatus: 'healthLastStatus',
+    healthLastFailureAt: 'healthLastFailureAt',
+    healthLastSuccessAt: 'healthLastSuccessAt',
+    healthDownUntil: 'healthDownUntil',
+    healthNote: 'healthNote',
     createdById: 'createdById',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
@@ -21988,6 +22080,12 @@ export namespace Prisma {
     pricing?: JsonNullableFilter<"ProviderCredential">
     enabled?: BoolFilter<"ProviderCredential"> | boolean
     priority?: IntFilter<"ProviderCredential"> | number
+    healthFailStreak?: IntFilter<"ProviderCredential"> | number
+    healthLastStatus?: IntNullableFilter<"ProviderCredential"> | number | null
+    healthLastFailureAt?: DateTimeNullableFilter<"ProviderCredential"> | Date | string | null
+    healthLastSuccessAt?: DateTimeNullableFilter<"ProviderCredential"> | Date | string | null
+    healthDownUntil?: DateTimeNullableFilter<"ProviderCredential"> | Date | string | null
+    healthNote?: StringNullableFilter<"ProviderCredential"> | string | null
     createdById?: StringNullableFilter<"ProviderCredential"> | string | null
     createdAt?: DateTimeFilter<"ProviderCredential"> | Date | string
     updatedAt?: DateTimeFilter<"ProviderCredential"> | Date | string
@@ -22004,6 +22102,12 @@ export namespace Prisma {
     pricing?: SortOrderInput | SortOrder
     enabled?: SortOrder
     priority?: SortOrder
+    healthFailStreak?: SortOrder
+    healthLastStatus?: SortOrderInput | SortOrder
+    healthLastFailureAt?: SortOrderInput | SortOrder
+    healthLastSuccessAt?: SortOrderInput | SortOrder
+    healthDownUntil?: SortOrderInput | SortOrder
+    healthNote?: SortOrderInput | SortOrder
     createdById?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -22023,6 +22127,12 @@ export namespace Prisma {
     pricing?: JsonNullableFilter<"ProviderCredential">
     enabled?: BoolFilter<"ProviderCredential"> | boolean
     priority?: IntFilter<"ProviderCredential"> | number
+    healthFailStreak?: IntFilter<"ProviderCredential"> | number
+    healthLastStatus?: IntNullableFilter<"ProviderCredential"> | number | null
+    healthLastFailureAt?: DateTimeNullableFilter<"ProviderCredential"> | Date | string | null
+    healthLastSuccessAt?: DateTimeNullableFilter<"ProviderCredential"> | Date | string | null
+    healthDownUntil?: DateTimeNullableFilter<"ProviderCredential"> | Date | string | null
+    healthNote?: StringNullableFilter<"ProviderCredential"> | string | null
     createdById?: StringNullableFilter<"ProviderCredential"> | string | null
     createdAt?: DateTimeFilter<"ProviderCredential"> | Date | string
     updatedAt?: DateTimeFilter<"ProviderCredential"> | Date | string
@@ -22039,6 +22149,12 @@ export namespace Prisma {
     pricing?: SortOrderInput | SortOrder
     enabled?: SortOrder
     priority?: SortOrder
+    healthFailStreak?: SortOrder
+    healthLastStatus?: SortOrderInput | SortOrder
+    healthLastFailureAt?: SortOrderInput | SortOrder
+    healthLastSuccessAt?: SortOrderInput | SortOrder
+    healthDownUntil?: SortOrderInput | SortOrder
+    healthNote?: SortOrderInput | SortOrder
     createdById?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -22063,6 +22179,12 @@ export namespace Prisma {
     pricing?: JsonNullableWithAggregatesFilter<"ProviderCredential">
     enabled?: BoolWithAggregatesFilter<"ProviderCredential"> | boolean
     priority?: IntWithAggregatesFilter<"ProviderCredential"> | number
+    healthFailStreak?: IntWithAggregatesFilter<"ProviderCredential"> | number
+    healthLastStatus?: IntNullableWithAggregatesFilter<"ProviderCredential"> | number | null
+    healthLastFailureAt?: DateTimeNullableWithAggregatesFilter<"ProviderCredential"> | Date | string | null
+    healthLastSuccessAt?: DateTimeNullableWithAggregatesFilter<"ProviderCredential"> | Date | string | null
+    healthDownUntil?: DateTimeNullableWithAggregatesFilter<"ProviderCredential"> | Date | string | null
+    healthNote?: StringNullableWithAggregatesFilter<"ProviderCredential"> | string | null
     createdById?: StringNullableWithAggregatesFilter<"ProviderCredential"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"ProviderCredential"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"ProviderCredential"> | Date | string
@@ -23407,6 +23529,12 @@ export namespace Prisma {
     pricing?: NullableJsonNullValueInput | InputJsonValue
     enabled?: boolean
     priority?: number
+    healthFailStreak?: number
+    healthLastStatus?: number | null
+    healthLastFailureAt?: Date | string | null
+    healthLastSuccessAt?: Date | string | null
+    healthDownUntil?: Date | string | null
+    healthNote?: string | null
     createdById?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -23423,6 +23551,12 @@ export namespace Prisma {
     pricing?: NullableJsonNullValueInput | InputJsonValue
     enabled?: boolean
     priority?: number
+    healthFailStreak?: number
+    healthLastStatus?: number | null
+    healthLastFailureAt?: Date | string | null
+    healthLastSuccessAt?: Date | string | null
+    healthDownUntil?: Date | string | null
+    healthNote?: string | null
     createdById?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -23439,6 +23573,12 @@ export namespace Prisma {
     pricing?: NullableJsonNullValueInput | InputJsonValue
     enabled?: BoolFieldUpdateOperationsInput | boolean
     priority?: IntFieldUpdateOperationsInput | number
+    healthFailStreak?: IntFieldUpdateOperationsInput | number
+    healthLastStatus?: NullableIntFieldUpdateOperationsInput | number | null
+    healthLastFailureAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthLastSuccessAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthDownUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdById?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -23455,6 +23595,12 @@ export namespace Prisma {
     pricing?: NullableJsonNullValueInput | InputJsonValue
     enabled?: BoolFieldUpdateOperationsInput | boolean
     priority?: IntFieldUpdateOperationsInput | number
+    healthFailStreak?: IntFieldUpdateOperationsInput | number
+    healthLastStatus?: NullableIntFieldUpdateOperationsInput | number | null
+    healthLastFailureAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthLastSuccessAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthDownUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdById?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -23471,6 +23617,12 @@ export namespace Prisma {
     pricing?: NullableJsonNullValueInput | InputJsonValue
     enabled?: boolean
     priority?: number
+    healthFailStreak?: number
+    healthLastStatus?: number | null
+    healthLastFailureAt?: Date | string | null
+    healthLastSuccessAt?: Date | string | null
+    healthDownUntil?: Date | string | null
+    healthNote?: string | null
     createdById?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
@@ -23487,6 +23639,12 @@ export namespace Prisma {
     pricing?: NullableJsonNullValueInput | InputJsonValue
     enabled?: BoolFieldUpdateOperationsInput | boolean
     priority?: IntFieldUpdateOperationsInput | number
+    healthFailStreak?: IntFieldUpdateOperationsInput | number
+    healthLastStatus?: NullableIntFieldUpdateOperationsInput | number | null
+    healthLastFailureAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthLastSuccessAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthDownUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdById?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -23503,6 +23661,12 @@ export namespace Prisma {
     pricing?: NullableJsonNullValueInput | InputJsonValue
     enabled?: BoolFieldUpdateOperationsInput | boolean
     priority?: IntFieldUpdateOperationsInput | number
+    healthFailStreak?: IntFieldUpdateOperationsInput | number
+    healthLastStatus?: NullableIntFieldUpdateOperationsInput | number | null
+    healthLastFailureAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthLastSuccessAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthDownUntil?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    healthNote?: NullableStringFieldUpdateOperationsInput | string | null
     createdById?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -24699,6 +24863,12 @@ export namespace Prisma {
     pricing?: SortOrder
     enabled?: SortOrder
     priority?: SortOrder
+    healthFailStreak?: SortOrder
+    healthLastStatus?: SortOrder
+    healthLastFailureAt?: SortOrder
+    healthLastSuccessAt?: SortOrder
+    healthDownUntil?: SortOrder
+    healthNote?: SortOrder
     createdById?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -24706,6 +24876,8 @@ export namespace Prisma {
 
   export type ProviderCredentialAvgOrderByAggregateInput = {
     priority?: SortOrder
+    healthFailStreak?: SortOrder
+    healthLastStatus?: SortOrder
   }
 
   export type ProviderCredentialMaxOrderByAggregateInput = {
@@ -24716,6 +24888,12 @@ export namespace Prisma {
     keyEnc?: SortOrder
     enabled?: SortOrder
     priority?: SortOrder
+    healthFailStreak?: SortOrder
+    healthLastStatus?: SortOrder
+    healthLastFailureAt?: SortOrder
+    healthLastSuccessAt?: SortOrder
+    healthDownUntil?: SortOrder
+    healthNote?: SortOrder
     createdById?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -24729,6 +24907,12 @@ export namespace Prisma {
     keyEnc?: SortOrder
     enabled?: SortOrder
     priority?: SortOrder
+    healthFailStreak?: SortOrder
+    healthLastStatus?: SortOrder
+    healthLastFailureAt?: SortOrder
+    healthLastSuccessAt?: SortOrder
+    healthDownUntil?: SortOrder
+    healthNote?: SortOrder
     createdById?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
@@ -24736,6 +24920,8 @@ export namespace Prisma {
 
   export type ProviderCredentialSumOrderByAggregateInput = {
     priority?: SortOrder
+    healthFailStreak?: SortOrder
+    healthLastStatus?: SortOrder
   }
 
   export type OperationConfigCountOrderByAggregateInput = {

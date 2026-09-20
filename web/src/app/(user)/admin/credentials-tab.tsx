@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { App, Button, Modal, Space, Switch, Table, Tag, Tooltip } from "antd";
-import { KeyRound, Pencil, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { KeyRound, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 
 import { apiPath } from "@/lib/app-paths";
+import { CREDENTIAL_FAILURE_THRESHOLD, describeCredentialHealth } from "@/lib/credential-health";
 import type { ModelCapabilitySpec } from "@/lib/model-capability-spec";
 import type { ModelPricing } from "@/lib/credit-pricing";
 import { CredentialFormFields, parseModelList, pickCapabilities, pickPricing, type CredentialFormState } from "./credential-form-fields";
@@ -20,8 +21,34 @@ type Credential = {
     pricing?: Record<string, ModelPricing>;
     enabled: boolean;
     priority: number;
+    /** 渠道健康（熔断）：只在凭证类失败 401/403 时累积，成功一次清零 */
+    healthFailStreak?: number | null;
+    healthLastStatus?: number | null;
+    healthLastFailureAt?: string | null;
+    healthLastSuccessAt?: string | null;
+    healthDownUntil?: string | null;
+    healthNote?: string | null;
     createdAt: string;
     updatedAt: string;
+};
+
+/** DB 里是 ISO 字符串，判定只看「窗口是否还没到期」，所以这里转成 Date 再交给纯逻辑。 */
+function healthOf(row: Credential) {
+    const at = (value?: string | null) => (value ? new Date(value) : null);
+    return describeCredentialHealth({
+        healthFailStreak: row.healthFailStreak ?? 0,
+        healthLastStatus: row.healthLastStatus ?? null,
+        healthLastFailureAt: at(row.healthLastFailureAt),
+        healthLastSuccessAt: at(row.healthLastSuccessAt),
+        healthDownUntil: at(row.healthDownUntil),
+        healthNote: row.healthNote ?? null,
+    });
+}
+
+const HEALTH_STYLE: Record<string, { color: string; text: string }> = {
+    ok: { color: "green", text: "#3f7d4e" },
+    failing: { color: "orange", text: "#a5651f" },
+    down: { color: "red", text: "#b23c3c" },
 };
 
 const EMPTY_FORM: CredentialFormState = {
@@ -156,6 +183,8 @@ export default function CredentialsTab() {
         });
     }
 
+    const downCount = credentials.filter((row) => healthOf(row).state === "down").length;
+
     return (
         <section className="rounded-2xl border border-[#e2dfdc] bg-[#ffffff] p-5 shadow-[0_8px_20px_rgba(35,28,20,0.05)]">
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -175,6 +204,11 @@ export default function CredentialsTab() {
             <p className="mb-4 text-xs leading-5 text-[#726d67]">
                 平台统一配置上游 API Key（AES-256-GCM 加密存储，明文永不进客户端）。代理按目标地址匹配注入；多个凭证按优先级取用。逐模型「能力标定」与前端画质 / 分辨率 / 比例 / 时长等参数一一对应，改完约 60 秒内生效（客户端目录缓存）。
             </p>
+            {downCount ? (
+                <p className="mb-4 rounded-lg border border-[#f0d9d9] bg-[#fdf5f5] px-3 py-2 text-xs leading-5 text-[#8f3b3b]">
+                    有 {downCount} 个渠道因上游鉴权失败被自动暂停（连续 {CREDENTIAL_FAILURE_THRESHOLD} 次 401/403）：这些渠道上的模型对用户已置灰，不会被扣分。换好 Key 保存后会自动解除；窗口未到期也可点该行「立即重试」。
+                </p>
+            ) : null}
 
             <Table<Credential>
                 rowKey="id"
@@ -182,6 +216,7 @@ export default function CredentialsTab() {
                 loading={loading}
                 dataSource={credentials}
                 pagination={false}
+                rowClassName={(row) => (healthOf(row).state === "down" ? "bg-[#fdf5f5]" : "")}
                 locale={{ emptyText: "暂无平台密钥，点击右上角「添加密钥」配置第一个。" }}
                 columns={[
                     { title: "名称", dataIndex: "name", render: (value: string) => <span className="font-medium">{value}</span> },
@@ -214,6 +249,23 @@ export default function CredentialsTab() {
                     },
                     { title: "优先级", dataIndex: "priority", width: 70 },
                     {
+                        // 渠道健康：熔断过的渠道即使 enabled 打开也不参与解析（见 lib/credential-health.ts），
+                        // 不标出来就会出现「开关是开的、用户却选不到这个模型」这种看不懂的状态。
+                        title: "健康",
+                        dataIndex: "healthFailStreak",
+                        width: 110,
+                        render: (_: unknown, row) => {
+                            const health = healthOf(row);
+                            return (
+                                <Tooltip title={health.detail}>
+                                    <Tag color={HEALTH_STYLE[health.state].color} className="m-0 cursor-help">
+                                        {health.label}
+                                    </Tag>
+                                </Tooltip>
+                            );
+                        },
+                    },
+                    {
                         title: "启用",
                         dataIndex: "enabled",
                         width: 80,
@@ -222,17 +274,25 @@ export default function CredentialsTab() {
                     {
                         title: "操作",
                         key: "actions",
-                        width: 120,
-                        render: (_, row) => (
-                            <Space size={4}>
-                                <Tooltip title="编辑（含能力标定）">
-                                    <Button size="small" icon={<Pencil className="size-3.5" />} onClick={() => openEdit(row)} />
-                                </Tooltip>
-                                <Tooltip title="删除">
-                                    <Button size="small" danger icon={<Trash2 className="size-3.5" />} onClick={() => void remove(row.id, row.name)} />
-                                </Tooltip>
-                            </Space>
-                        ),
+                        width: 150,
+                        render: (_, row) => {
+                            const health = healthOf(row);
+                            return (
+                                <Space size={4}>
+                                    <Tooltip title="编辑（含能力标定）">
+                                        <Button size="small" icon={<Pencil className="size-3.5" />} onClick={() => openEdit(row)} />
+                                    </Tooltip>
+                                    {health.state !== "ok" ? (
+                                        <Tooltip title="立即重试：解除熔断，下一次调用即验证">
+                                            <Button size="small" icon={<RotateCcw className="size-3.5" />} onClick={() => void patch(row.id, { resetHealth: true }, `已解除「${row.name}」的熔断，下一次调用即验证`)} />
+                                        </Tooltip>
+                                    ) : null}
+                                    <Tooltip title="删除">
+                                        <Button size="small" danger icon={<Trash2 className="size-3.5" />} onClick={() => void remove(row.id, row.name)} />
+                                    </Tooltip>
+                                </Space>
+                            );
+                        },
                     },
                 ]}
             />

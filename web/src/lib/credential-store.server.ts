@@ -5,6 +5,7 @@ import { isHostOrSubdomain } from "@/lib/url-safety";
 import { ARK_IMAGE_MAX_OUTPUTS, isArkImageBaseUrl } from "@/lib/ark-image";
 import type { CredentialCapabilities } from "@/lib/model-capability-spec";
 import type { CredentialPricing, ModelPricing } from "@/lib/credit-pricing";
+import { isCredentialCircuitOpen, nextHealthAfterSuccess } from "@/lib/credential-health";
 
 /**
  * 平台统一管理的上游 API 密钥库。
@@ -27,6 +28,13 @@ type CredentialRow = {
     priority: number;
     createdAt: Date;
     updatedAt: Date;
+    // 渠道健康（熔断）：见 credential-health.ts。窗口未到期的凭证不参与解析。
+    healthFailStreak?: number | null;
+    healthLastStatus?: number | null;
+    healthLastFailureAt?: Date | null;
+    healthLastSuccessAt?: Date | null;
+    healthDownUntil?: Date | null;
+    healthNote?: string | null;
 };
 
 /** 匹配结果：返回解密后的 Key 与凭证信息 */
@@ -162,44 +170,70 @@ export async function resolveConfiguredImageMaxCount(model: string): Promise<num
  * 按目标地址匹配平台凭证。
  * 匹配策略：先按 host 匹配；多个候选时用 provider 提示消歧，再用 model 过滤；
  * 都不满足时回退到 host 匹配的最高优先级凭证。找不到返回 null。
+ *
+ * 2026-09-20 起：熔断窗口内的凭证不参与匹配（见 credential-health.ts）。要区分
+ * 「没有这个渠道」和「渠道正在维护」的调用方用 resolvePlatformCredentialDetailed ——
+ * 前者是配置缺失，后者要给用户「稍后重试/换模型」的可行动提示。
  */
 export async function resolvePlatformCredential(options: { targetUrl?: string; provider?: string; model?: string }): Promise<ResolvedCredential | null> {
-    if (!prisma) return null;
+    const result = await resolvePlatformCredentialDetailed(options);
+    return result.ok ? result.credential : null;
+}
+
+export type PlatformCredentialResolution = { ok: true; credential: ResolvedCredential } | { ok: false; reason: "none" | "maintenance"; /** 熔断中的渠道名（提供给告警文案与排障） */ downNames: string[] };
+
+export async function resolvePlatformCredentialDetailed(options: { targetUrl?: string; provider?: string; model?: string }): Promise<PlatformCredentialResolution> {
+    if (!prisma) return { ok: false, reason: "none", downNames: [] };
     const { targetUrl, provider, model } = options;
 
-    const credentials = (await prisma.providerCredential.findMany({
+    const all = (await prisma.providerCredential.findMany({
         where: { enabled: true },
         orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
     })) as unknown as CredentialRow[];
 
-    const hostMatched = targetUrl ? credentials.filter((credential) => hostMatches(credential.baseUrl, targetUrl)) : [];
-    const providerMatched = !hostMatched.length && provider ? credentials.filter((credential) => credential.provider === provider) : [];
-    const matched = hostMatched.length ? hostMatched : providerMatched;
-    if (!matched.length) return null;
+    const usable = all.filter((credential) => !isCredentialCircuitOpen(credential));
+    const down = all.filter((credential) => isCredentialCircuitOpen(credential));
 
-    // provider 提示消歧（提示与凭证标签不一致时忽略提示，不硬过滤）
-    let candidates = matched;
-    if (provider) {
-        const withProvider = matched.filter((credential) => credential.provider === provider);
-        if (withProvider.length) candidates = withProvider;
+    const pick = (credentials: CredentialRow[]): CredentialRow | null => {
+        const hostMatched = targetUrl ? credentials.filter((credential) => hostMatches(credential.baseUrl, targetUrl)) : [];
+        const providerMatched = !hostMatched.length && provider ? credentials.filter((credential) => credential.provider === provider) : [];
+        const matched = hostMatched.length ? hostMatched : providerMatched;
+        if (!matched.length) return null;
+
+        // provider 提示消歧（提示与凭证标签不一致时忽略提示，不硬过滤）
+        let candidates = matched;
+        if (provider) {
+            const withProvider = matched.filter((credential) => credential.provider === provider);
+            if (withProvider.length) candidates = withProvider;
+        }
+
+        // model 过滤（凭证绑定了模型列表时才生效）
+        const withModel = candidates.filter((credential) => modelMatches(credential.models, model));
+        if (withModel.length) candidates = withModel;
+
+        return candidates[0] ?? null;
+    };
+
+    const best = pick(usable);
+    if (!best) {
+        // 被熔断的那张本来就是这次要用的 → 报「维护中」，让调用方给出可行动提示而不是「凭证不可用」
+        const downMatch = pick(down);
+        return downMatch ? { ok: false, reason: "maintenance", downNames: [downMatch.name] } : { ok: false, reason: "none", downNames: [] };
     }
-
-    // model 过滤（凭证绑定了模型列表时才生效）
-    const withModel = candidates.filter((credential) => modelMatches(credential.models, model));
-    if (withModel.length) candidates = withModel;
-
-    const best = candidates[0];
     try {
         return {
-            id: best.id,
-            name: best.name,
-            provider: best.provider,
-            baseUrl: best.baseUrl,
-            apiKey: decryptCredentialKey(best.keyEnc),
+            ok: true,
+            credential: {
+                id: best.id,
+                name: best.name,
+                provider: best.provider,
+                baseUrl: best.baseUrl,
+                apiKey: decryptCredentialKey(best.keyEnc),
+            },
         };
     } catch (error) {
         console.error(`[credential-store] 解密平台密钥失败（id=${best.id}）:`, (error as Error).message);
-        return null;
+        return { ok: false, reason: "none", downNames: [] };
     }
 }
 
@@ -303,7 +337,13 @@ export async function updatePlatformCredential(id: string, patch: Partial<Omit<C
     if (patch.pricing !== undefined) data.pricing = patch.pricing ?? {};
     if (patch.enabled !== undefined) data.enabled = patch.enabled;
     if (patch.priority !== undefined) data.priority = patch.priority;
-    if (patch.apiKey !== undefined && patch.apiKey.trim()) data.keyEnc = encryptCredentialKey(patch.apiKey.trim());
+    if (patch.apiKey !== undefined && patch.apiKey.trim()) {
+        data.keyEnc = encryptCredentialKey(patch.apiKey.trim());
+        // 换了钥匙就立刻解除熔断：管理员来改 Key 正是因为上一把坏了，而熔断窗口最长半小时；
+        // 不在这里清，他改完还得盯着一行「已熔断」等窗口到点（或者去点「立即重试」）。
+        // 清空后由下一次真实调用判定成败——真实流量即探针。
+        Object.assign(data, nextHealthAfterSuccess({}));
+    }
     if (Object.keys(data).length === 0) return prisma.providerCredential.findUniqueOrThrow({ where: { id } });
     return prisma.providerCredential.update({ where: { id }, data });
 }

@@ -4,6 +4,7 @@ import { requireCurrentUser } from "@/lib/current-user";
 import { prisma } from "@/lib/ic-prisma";
 import type { CredentialCapabilities, ModelCapabilitySpec } from "@/lib/model-capability-spec";
 import type { ModelPricing, PricingDefaults } from "@/lib/credit-pricing";
+import { channelMaintenanceMessage, computeModelAvailability } from "@/lib/credential-health";
 import { getPricingDefaults } from "@/lib/operation-config";
 
 export const runtime = "nodejs";
@@ -26,11 +27,15 @@ export async function GET(req: NextRequest) {
         const credentials = await prisma.providerCredential.findMany({
             where: { enabled: true },
             orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
-            select: { provider: true, baseUrl: true, models: true, capabilities: true, pricing: true },
+            select: { id: true, name: true, provider: true, baseUrl: true, models: true, capabilities: true, pricing: true, healthDownUntil: true, healthNote: true },
         });
 
+        // 渠道健康：某个模型的全部渠道都在熔断窗口里 → 该模型不可用，前端置灰。
+        // 只要还有一张没熔断的凭证认领这个模型，就仍然可用（解析时会跳过熔断的那张）。
+        const availability = computeModelAvailability(credentials);
+
         const seen = new Set<string>();
-        const models: Array<{ model: string; provider: string; baseUrl: string; capabilities: ModelCapabilitySpec | null; pricing: ModelPricing | null }> = [];
+        const models: Array<{ model: string; provider: string; baseUrl: string; capabilities: ModelCapabilitySpec | null; pricing: ModelPricing | null; available: boolean; unavailableReason: string | null }> = [];
         for (const credential of credentials) {
             const caps = (credential.capabilities ?? {}) as CredentialCapabilities;
             const pricingByModel = (credential.pricing ?? {}) as Record<string, ModelPricing>;
@@ -38,12 +43,15 @@ export async function GET(req: NextRequest) {
                 const model = String(rawModel).trim();
                 if (!model || seen.has(model)) continue;
                 seen.add(model);
+                const available = availability.get(model)?.available ?? true;
                 models.push({
                     model,
                     provider: credential.provider,
                     baseUrl: credential.baseUrl,
                     capabilities: caps[model] ?? null,
                     pricing: pricingByModel[model] ?? null,
+                    available,
+                    unavailableReason: available ? null : channelMaintenanceMessage(model),
                 });
             }
         }

@@ -283,6 +283,12 @@ exports.Prisma.ProviderCredentialScalarFieldEnum = {
   pricing: 'pricing',
   enabled: 'enabled',
   priority: 'priority',
+  healthFailStreak: 'healthFailStreak',
+  healthLastStatus: 'healthLastStatus',
+  healthLastFailureAt: 'healthLastFailureAt',
+  healthLastSuccessAt: 'healthLastSuccessAt',
+  healthDownUntil: 'healthDownUntil',
+  healthNote: 'healthNote',
   createdById: 'createdById',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

@@ -96,6 +96,42 @@ check("鉴权失败：仍归「模型鉴权失败」", () => {
     assert.equal(summarizeCanvasGenerationError("401 Unauthorized: invalid api key").title, "模型鉴权失败");
 });
 
+console.log("\n生成失败分类：平台渠道凭证失效（2026-09-20 Replicate 令牌被吊销那条线上反馈）");
+
+// 服务端在凭证类失败时回的原样文案（唯一来源：lib/credential-health.ts 的 channelMaintenanceMessage，
+// 拼进 composeUpstreamFailure 后就是下面这种形态：渠道维护说明 + 上游原话 + 状态码）。
+const CHANNEL_DOWN =
+    "模型「prunaai/p-video」所在渠道正在维护（上游凭证失效），已通知管理员，请稍后重试或先换用其它模型。；上游原话：You did not pass a valid authentication token；Replicate 建单失败（HTTP 401）";
+
+check("平台渠道失效：显示「该模型所在渠道维护中」，而不是「模型鉴权失败」", () => {
+    const view = summarizeCanvasGenerationError(CHANNEL_DOWN);
+    assert.equal(view.title, "该模型所在渠道维护中");
+});
+
+check("提示里不许再叫用户去查 Base URL / API Key（他看不到也改不了，正是这次误报的根源）", () => {
+    const view = summarizeCanvasGenerationError(CHANNEL_DOWN);
+    for (const forbidden of ["Base URL", "API Key", "密钥"]) {
+        assert.ok(!view.hint.includes(forbidden), `提示里不该出现「${forbidden}」：${view.hint}`);
+    }
+    assert.ok(view.hint.includes("不会扣积分"), `要说明这次不扣分：${view.hint}`);
+    assert.ok(view.hint.includes("换用其它模型"), `要给出可行动的下一步：${view.hint}`);
+});
+
+check("渠道维护判定要压过 502 分支与鉴权分支（响应体里同时带 502 与上游 401 原话）", () => {
+    const view = summarizeCanvasGenerationError(`502 Bad Gateway：${CHANNEL_DOWN}`);
+    assert.equal(view.title, "该模型所在渠道维护中");
+});
+
+check("熔断窗口内直接拒绝（503 + 同一句话术）：同样归到渠道维护", () => {
+    const view = summarizeCanvasGenerationError("模型「openai/gpt-image-2.5-flare」所在渠道正在维护（上游凭证失效），已通知管理员，请稍后重试或先换用其它模型。");
+    assert.equal(view.title, "该模型所在渠道维护中");
+});
+
+check("用户自带 Key 填错（真·鉴权问题）：仍然提示去检查 Key，不能被渠道维护吞掉", () => {
+    assert.equal(summarizeCanvasGenerationError("401 Unauthorized: invalid api key").title, "模型鉴权失败");
+    assert.equal(summarizeCanvasGenerationError("鉴权失败：请检查 API Key").title, "模型鉴权失败");
+});
+
 check("空错误：仍走通用兜底", () => {
     const view = summarizeCanvasGenerationError("");
     assert.equal(view.title, "生成失败");
