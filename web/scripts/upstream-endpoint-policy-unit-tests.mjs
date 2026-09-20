@@ -126,9 +126,22 @@ check("Replicate / Gemini 的路径模型与任务模型同族判定", () => {
     assert.strictEqual(isModelBoundToJob("ch1::gemini-3-pro-image", "models/gemini-3-pro-image"), true);
 });
 
+check("上游改写过的模型名仍判为同族（2026-09-20 线上回归：MiniMax 视频被误 403）", () => {
+    // MiniMax 渠道允许把模型名设成 `H3`，发往上游时被 minimaxModelName 改写成 `MiniMax-H3`；
+    // 任务元数据记的是 `H3`。按字面比较会把这条链路整条 403（上线当天真发生了）。
+    assert.strictEqual(isModelBoundToJob("H3", "MiniMax-H3"), true);
+    assert.strictEqual(isModelBoundToJob("MiniMax-H3", "H3"), true);
+    assert.strictEqual(isModelBoundToJob("ch1::H3", "MiniMax-H3"), true);
+    // 大小写与分隔符差异同样不该判成不匹配
+    assert.strictEqual(isModelBoundToJob("ch1::hailuo-02", "Hailuo02"), true);
+    assert.strictEqual(isModelBoundToJob("ch1::seedream-4.0", "seedream4.0"), true);
+});
+
 check("模型确实不同时判为不匹配", () => {
     assert.strictEqual(isModelBoundToJob("ch1::seedream-4.0", "gpt-5.6-terra"), false);
     assert.strictEqual(isModelBoundToJob("ch1::seedream-4.0::pro", "seedream-4.0::lite"), false, "同模型的选项不同也算不匹配（不同档位是不同价钱）");
+    assert.strictEqual(isModelBoundToJob("ch1::MiniMax-H3", "MiniMax-H3-HD"), false, "只是前缀相同、帧率档位不同，不算同族");
+    assert.strictEqual(isModelBoundToJob("ch1::flux-1.1-pro", "flux-1.1"), false, "同一个模型名被截断不算同族");
 });
 
 check("任一侧取不到模型名时放行（绑定只管模型，任务门闸另算）", () => {

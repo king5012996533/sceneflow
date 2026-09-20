@@ -114,21 +114,38 @@ function modelKey(model: unknown): string {
 }
 
 /**
+ * 比较用的紧凑键：去掉所有非字母数字的分隔符。
+ *
+ * 各家上游对同一个模型的写法不一样，连我们自己的代码都会做一次改写：
+ * MiniMax 渠道允许用户把模型名设成 `H3`，而发往上游时必须写成 `MiniMax-H3`
+ * （见 video.ts 的 minimaxModelName）—— 于是任务元数据里记的是 `H3`、请求体里发的是
+ * `MiniMax-H3`。2026-09-20 上线当天线上就因此 403，MiniMax 视频整条不可用。
+ * Replicate 的 `owner/name` 与裸名、Gemini 的 `models/x` 与 `x` 也都属于这类写法差异。
+ */
+function compactModelKey(model: unknown): string {
+    return modelKey(model).replace(/[^a-z0-9]/g, "");
+}
+
+/**
  * 生成任务与上游请求的模型绑定。
  *
  * 任务号是生成类调用的通行证，但任务号本身不限制「打哪个模型」——
  * 一张图的积分买到的是「一条 running 任务」，若不管模型，攻击者可以拿它去打渠道里任意贵的模型。
- * 这里要求请求里的模型与任务记录里的模型「同族」：比较键相等，或一方是另一方的路径后缀
- * （Replicate 的 `owner/name` 与裸名、Gemini 的 `models/x` 与 `x` 都属于这类写法差异）。
+ * 这里要求请求里的模型与任务记录里的模型「同族」：紧凑比较键相等，或一方是另一方的后缀
+ * （Replicate 的 `owner/name` 与裸名、Gemini 的 `models/x` 与 `x`、MiniMax 的 `H3` 与
+ * `MiniMax-H3` 都属于这类写法差异 —— 最后一条是上线当天线上真踩到的）。
  *
- * 偏容错是刻意的：误判成「不匹配」会 403 掉付费用户的正常生成，而放宽一点只是允许同一模型族的写法差异。
+ * 偏容错是刻意的：误判成「不匹配」会 403 掉付费用户的正常生成（上线当天已经因此把一个渠道
+ * 整条打断），而放宽一点只是允许同一模型族的写法差异。
  * 任一侧取不到模型名时一律放行 —— 这一层只管「绑没绑住模型」，任务门闸本身不受影响。
+ * 已知的不完备处：GenVideo 与 Aigccc 的建单请求体里根本没有模型字段（模型由渠道侧决定），
+ * 这两条链路上模型绑定等于不生效；真要收紧得先让它们把模型声明出来。
  */
 export function isModelBoundToJob(jobModel: unknown, requestModel: unknown): boolean {
-    const job = modelKey(jobModel);
-    const request = modelKey(requestModel);
+    const job = compactModelKey(jobModel);
+    const request = compactModelKey(requestModel);
     if (!job || !request) return true;
-    return job === request || job.endsWith(`/${request}`) || request.endsWith(`/${job}`);
+    return job === request || job.endsWith(request) || request.endsWith(job);
 }
 
 /** 从请求体里读模型名（JSON 信封用；form-data 走单独的入参） */
