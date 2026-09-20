@@ -276,6 +276,11 @@ export function CanvasLocalAgentPanel({ snapshot, canUndoOps, collapsed, embedde
             setAgentState({ activity: payload.name === "canvas_apply_ops" ? "执行画布操作" : "读取画布", waiting: true });
             addEventLog(toolName(payload.name), payload, payload);
             const result = payload.name === "canvas_apply_ops" ? onApplyOpsRef.current(input.ops || []) : snapshotRef.current;
+            // 锁必须在这里放，不能等到回报结果之后：bridge 一收到结果，下一笔工具调用随时会到达，
+            // 而那时锁还攥在本实例手里，同一 id 的申请会被判成「自己重复启动」而退回，
+            // 表现为连写时随机丢笔（理由文案是「这个运行已经在跑了」）。写入本身是同步的，写完后画布已安全。
+            // finally 里的释放保留作兜底，release 是幂等的。
+            if (claim?.ok) claim.release();
             await postToolResult(endpoint, token, clientIdRef.current, { requestId: payload.requestId, result });
             if (payload.name === "canvas_apply_ops") void postState(endpoint, token, clientIdRef.current, result as CanvasAgentSnapshot);
             setAgentState({ activity: "工具完成", waiting: true });
