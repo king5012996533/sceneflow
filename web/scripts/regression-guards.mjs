@@ -59,12 +59,13 @@ assertIncludes("src/lib/generation/generation-request.ts", "requestGeneratedImag
 assertIncludes("src/lib/generation/generation-request.ts", "runGuardedGeneration", "all unified generation requests must pass through the backend job guard.");
 assertIncludes("src/lib/generation/generation-jobs.server.ts", "pg_advisory_xact_lock", "generation quota and concurrency checks must serialize per user.");
 assertIncludes("src/lib/generation/generation-jobs.server.ts", "quotaRefunded", "生成任务必须记下「这笔到底退没退」，结算与对账都靠它。");
-// —— 生成积分退款政策（2026-09-19 起：失败/取消一律不退，就算什么都没生成也不退）——
-// 钱照收，就意味着「上游到底有没有产出」比以前更要紧：图必须尽量交到用户手上，
-// 而这正是下面归档/抢救/补取件那几条链路的活。政策本身只允许有一处开关，调用点不许各判各的。
+// —— 生成积分退款政策（2026-09-20 起：失败/取消要退，成品已归档的那一次除外）——
+// 政策本身只允许有一处开关，调用点不许各判各的；而且每个结算点都必须把「成品有没有归档」
+// 带进判定 —— 只看状态就退，会把已经交到用户手上的成品连钱一起退掉。
 {
     const policy = read("src/lib/generation/generation-refund-policy.ts");
-    assert(policy.includes("GENERATION_REFUNDS_ENABLED = false"), "2026-09-19 起生成失败/取消不退还积分（老板定的规则），开关不得被悄悄翻成 true。");
+    assert(policy.includes("GENERATION_REFUNDS_ENABLED = true"), "2026-09-20 起生成失败/取消要退还积分（老板改的口径）：开关翻回 false 等于又开始收「什么都没生成」的钱。");
+    assert(policy.includes("hasArtifact"), "退款判定必须带上「成品是否已归档」这个例外：只看状态会把交出去的成品连钱一起退掉。");
     assert(policy.includes("export function shouldRefundGeneration("), "退款与否必须收成一个判定，调用点照它执行。");
     assertNotMatches("src/lib/generation/generation-refund-policy.ts", /fetch\(|axios|prisma|import /, "退款政策必须是纯逻辑（不触网、不连库、无依赖），才能直接单测。");
     for (const file of [
@@ -73,11 +74,12 @@ assertIncludes("src/lib/generation/generation-jobs.server.ts", "quotaRefunded", 
         "src/lib/generation/replicate-poller.server.ts",
     ]) {
         assertIncludes(file, "shouldRefundGeneration(", `${file} 的退款必须走 generation-refund-policy，不得自己在结算处写死退或不退。`);
+        assertIncludes(file, "hasKeptArtifact(", `${file} 的退款判定必须带上「成品有没有归档」（hasKeptArtifact）：否则归档过的成品会被连钱一起退掉。`);
     }
     // 结算路径不得退回「失败即退」的旧写法（配额标记要跟退款事实一致）
-    assertNotMatches("src/lib/generation/generation-jobs.server.ts", /quotaRefunded: status !== "succeeded"/, "quotaRefunded 记的是「退没退」，不是「是不是失败」：政策改成不退之后，这个写法会把每一条失败都记成已退款。");
-    // 不退款之后，「收了钱却没给图」就成了必须天天看的数字
-    assertIncludes("src/lib/generation/generation-report.server.ts", "upstream_failed_charged", "日报要有一栏「上游失败 · 已收费」：不退款之后，这就是「钱收了、图没给」的计数。");
+    assertNotMatches("src/lib/generation/generation-jobs.server.ts", /quotaRefunded: status !== "succeeded"/, "quotaRefunded 记的是「退没退」，不是「是不是失败」：写死成 status 会让「成品已归档所以不退」的那一次被记成已退款。");
+    // 收了钱却不给图的次数仍是必须天天看的数字（退款之后它同时是退款量）
+    assertIncludes("src/lib/generation/generation-report.server.ts", "upstream_failed_charged", "日报要有一栏「上游失败 · 已收费」：这就是「钱收了、图没给」的计数。");
 }
 assertIncludes("src/app/api/proxy/route.ts", "requireCurrentUser", "the upstream proxy must reject anonymous callers.");
 assertIncludes("prisma/schema.prisma", "model GenerationJob", "generation lifecycle logs must remain persisted.");
@@ -368,11 +370,12 @@ assertIncludes("src/lib/model-pricing-kind.ts", '"recraft"', "关键词表三处
 assertIncludes("src/stores/use-config-store.ts", 'value.includes("recraft")', "关键词表三处同步（前端启发式是「没标定能力」时的兜底分类，漏了会落进文本模型、图片模型选择器里看不到）。");
 assertIncludes("src/app/(user)/admin/credential-capability-editor.tsx", "enabled || Boolean(defaultCapabilityForModel(model))", "已标定过的模型必须一律可编辑：名字启发式认不出来不该反过来把标定字段锁死。");
 assertIncludes("src/app/(user)/admin/credential-capability-editor.tsx", "stashed[model]", "关掉「能力标定」开关不能把已填的配置扔掉：重新打开要原样退回。");
-// 2026-09-19：退款政策已关闭（GENERATION_REFUNDS_ENABLED = false，见 generation-refund-policy.ts），
-// 但定价页还在承诺「生成失败自动原路退回」——页面在承诺一件不会发生的事，用户会拿着截图来要账。
-// 文案改成如实口径；哪天政策重新打开，这两条会一起拦下来，提醒回来把文案改回去。
-assertNotMatches("src/app/(user)/pricing/page.tsx", /原路退回/, "退款已关闭，定价页不得再承诺「失败自动原路退回」。");
-assertIncludes("src/app/(user)/pricing/page.tsx", "失败 / 取消也不退", "定价页必须如实写明「任务一旦开跑就不退积分」。");
+// 2026-09-20：退款政策重新打开（GENERATION_REFUNDS_ENABLED = true，见 generation-refund-policy.ts），
+// 定价页必须如实承诺「失败/取消退回积分」——页面的账要和结算处一致，
+// 既不能再写「也不退」（用户会以为自己白花钱），也不能退回「原路退回」那种含糊措辞
+// （订单退款的通道是人工确认，跟这里的积分退回不是一回事，写混了会引来要账的截图）。
+assertNotMatches("src/app/(user)/pricing/page.tsx", /也不退/, "退款已打开，定价页不得再写「失败/取消也不退」。");
+assertIncludes("src/app/(user)/pricing/page.tsx", "积分会自动退回", "定价页必须如实写明「生成失败或取消，积分会自动退回」。" );
 // 2026-09-19：出网隧道断掉时，这条路由以前把 fetch 的异常冒成裸 500，前端只看到「Replicate 任务创建失败」，
 // 任务号也没进日志——隧道断了与上游拒绝长得一模一样。现在两条路分开报，失败文案必须带线索。
 assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "describeNetworkFailure(", "启动失败必须区分「连不上上游（出网通道）」与「上游拒绝」，网络层错误码要带出来。");

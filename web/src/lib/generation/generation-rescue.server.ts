@@ -73,7 +73,7 @@ export async function salvageGenerationArtifacts(input: { userId: string; jobId:
     if (action === "claim") {
         const lateClaim = job.status !== "running";
         // 认领只改状态与成品归属，**不动钱**：这笔到底退没退照实记（quotaRefunded 原样带过来，
-        // 不按 lateClaim 反推）。2026-09-19 起失败/取消也不退款，反推会把「没退」记成「退过」——
+        // 不按 lateClaim 反推）。退款政策来回改过（09-19 关过、09-20 又开），反推会把「没退」记成「退过」——
         // 记录页就会对用户显示一句根本没发生过的「已退还 N 积分」。
         const claimed = await prisma.generationJob.updateMany({
             where: { id: job.id, userId: input.userId, status: lateClaim ? "failed" : "running" },

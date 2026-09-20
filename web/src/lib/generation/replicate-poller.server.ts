@@ -4,6 +4,7 @@ import { refundCredits } from "@/lib/credit-ledger";
 import { archiveGenerationMedia } from "./server-media-storage.server";
 import { resultMediaPath } from "./generation-result";
 import { shouldRefundGeneration } from "./generation-refund-policy";
+import { hasKeptArtifact } from "./generation-envelope";
 import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
 import { fetchSafely } from "@/lib/url-safety";
 
@@ -21,6 +22,8 @@ type ReplicateJobRow = {
     providerModel: string | null;
     externalGetUrl: string | null;
     nextPollAt?: Date | null;
+    /** 成品归档留痕：关账时用来判「这一次是不是已经把货交到用户手上了」（见 generation-refund-policy） */
+    resultData?: unknown;
 };
 
 export async function pollReplicateJobs(limit = 10) {
@@ -97,10 +100,10 @@ async function pollReplicateJob(job: ReplicateJobRow): Promise<boolean> {
                     data: { status: "succeeded", resultData: { items }, resultUrl: resultMediaPath(job.id, 0), externalStatus: prediction.status, finishedAt: new Date(), nextPollAt: null },
                 });
             } else if (prediction.status === "failed" || prediction.status === "canceled") {
-                // 失败/取消照现行退款政策办（2026-09-19 起不退，见 generation-refund-policy）；
-                // quotaRefunded 记的是「这笔退没退」，不是「是不是失败」。
+                // 失败/取消照现行退款政策办（2026-09-20 起：没拿到成品就退，见 generation-refund-policy）；
+                // 成品已归档的那一次不退。quotaRefunded 记的是「这笔退没退」，不是「是不是失败」。
                 const status = prediction.status === "canceled" ? "cancelled" : "failed";
-                const refund = shouldRefundGeneration(status) && job.creditsCost > 0;
+                const refund = shouldRefundGeneration(status, hasKeptArtifact(job.resultData)) && job.creditsCost > 0;
                 await prisma.$transaction(async (tx) => {
                     const closed = await (tx.generationJob as any).updateMany({
                         where: { id: job.id, status: "running", externalStatus: pollingStatus },
@@ -109,7 +112,7 @@ async function pollReplicateJob(job: ReplicateJobRow): Promise<boolean> {
                     if (closed.count && refund) await refundCredits(tx, job.userId, job.creditsCost, job.requestKey, "Replicate 任务失败退款");
                 });
             } else if (job.pollAttempts + 1 >= MAX_ATTEMPTS) {
-                const refund = shouldRefundGeneration("failed") && job.creditsCost > 0;
+                const refund = shouldRefundGeneration("failed", hasKeptArtifact(job.resultData)) && job.creditsCost > 0;
                 await prisma.$transaction(async (tx) => {
                     const closed = await (tx.generationJob as any).updateMany({
                         where: { id: job.id, status: "running", externalStatus: pollingStatus },

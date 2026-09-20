@@ -53,13 +53,14 @@ check("五本账都在日报里，数字与入参一致", () => {
     assert.match(markdown, /有成品却没留下 \| 0/);
 });
 
-check("2026-09-19 起失败不退款：收了钱没给图的次数必须单独成栏并显眼", () => {
+check("2026-09-20 起失败退款：收了钱没给图的次数必须单独成栏并显眼（以后只该剩「成品已归档」的那几次）", () => {
     const { markdown } = buildDailyReport({ ...base, upstreamFailedCharged: 9, upstreamFailedRefunded: 0 });
     assert.match(markdown, /上游失败 · 已收费 \| 9/);
     assert.match(markdown, /钱收了、图没给 9 次/);
-    // 老口径那一栏还得在（历史记录照实显示），只是政策改后应当恒为 0
+    assert.match(markdown, /这一栏只该剩「成品已归档所以不退」的那几次/);
+    // 退款那一栏是常态栏，数字照实显示
     assert.match(markdown, /上游失败 · 已退款 \| 0/);
-    assert.match(markdown, /只反映 2026-09-19 之前的历史/);
+    assert.match(markdown, /没拿到成品的失败\/取消一律退/);
 });
 
 check("未收费这一类要拆开：用户取消保图 vs 我们故障补认领，两者相加等于总数", () => {

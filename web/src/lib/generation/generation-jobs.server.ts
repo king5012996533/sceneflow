@@ -69,9 +69,10 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
             where: { userId, status: "running", startedAt: { lt: staleBefore } },
         });
         for (const staleJob of staleJobs) {
-            // 超时关闭也走现行退款政策（2026-09-19 起：不退，见 generation-refund-policy）。
+            // 超时关闭也走现行退款政策（2026-09-20 起：没拿到成品就退，见 generation-refund-policy）。
+            // 成品已经归档在我们手上的这一次不退——用户能取到货，钱不能连货一起还。
             // quotaRefunded 记的是「这笔到底退没退」，不是「是不是失败」，历史已退的不会被改写。
-            const refund = shouldRefundGeneration("failed") && !staleJob.quotaRefunded && staleJob.creditsCost > 0;
+            const refund = shouldRefundGeneration("failed", hasKeptArtifact(staleJob.resultData)) && !staleJob.quotaRefunded && staleJob.creditsCost > 0;
             await tx.generationJob.update({
                 where: { id: staleJob.id },
                 data: { status: "failed", error: "任务超时自动关闭", quotaRefunded: staleJob.quotaRefunded || refund, finishedAt: new Date() },
@@ -140,8 +141,9 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
         // 谁看见真相谁定论：上游出成品 → 抢救认领成功（积分照收，成品进归档）；
         // 上游确认没成品 → 代理调用结束时代为结账（settleDeferredClientFailure）。
         //
-        // 2026-09-19 起失败不再退款（见 generation-refund-policy），这段「等真相」的意义反而更重：
-        // 钱是照收的，那就更得把用户付了钱的那张图送到他手上。
+        // 2026-09-20 起失败又退积分了（见 generation-refund-policy），这段「等真相」的意义反而更重：
+        // 客户端那一句「失败」如果当场结账退款，而上游随后带着成品回来，就是钱退了、图也送了
+        // ——先问清楚再定论，才既不多收也不白送。
         //
         // 「还在飞」只是第一种情形。第二种是**补发还有机会**（hasResendPending + 调用方声明这是
         // 客户端上报的失败）：部署重启之后进程内的在飞登记簿是空的（新进程什么都没登记），
@@ -159,10 +161,11 @@ export async function finishGenerationJob(userId: string, jobId: string, status:
             return job;
         }
 
-        // 失败/取消/超时：按现行退款政策结算。2026-09-19 起政策是「一律不退」——
-        // 上游按这一次尝试收过我们钱了，成品也往往还归档在我们手上，照退就是把成本全揽过来
-        // （见 generation-refund-policy）。退款调用留着，幂等由 credit-ledger 保证。
-        const refund = shouldRefundGeneration(status) && !job.quotaRefunded && job.creditsCost > 0;
+        // 失败/取消/超时：按现行退款政策结算。2026-09-20 起政策是「没拿到成品就退」——
+        // 上游整类拒单（参数校验 400、本地预检就拦下）时一分钱没收到，我们再照收就是白收用户的钱
+        // （见 generation-refund-policy）。成品已经归档在我们手上的那一次不退。
+        // 退款调用留着，幂等由 credit-ledger 保证。
+        const refund = shouldRefundGeneration(status, hasKeptArtifact(job.resultData)) && !job.quotaRefunded && job.creditsCost > 0;
         if (refund) {
             await refundCredits(tx, userId, job.creditsCost, job.requestKey, `生成任务${status === "cancelled" ? "已取消" : "失败"}退款`);
         }
@@ -206,7 +209,7 @@ export async function settleDeferredClientFailure(userId: string, jobId: string)
     if (hasResendPendingForJob(job)) return "kept";
 
     await finishGenerationJob(userId, jobId, "failed", reason);
-    console.log(`[generation-settle] 任务 ${jobId} 上游调用已结束且未产出成品：按客户端原因结为失败并关账（退款政策：${shouldRefundGeneration("failed") ? "退" : "不退"}）（${reason.slice(0, 60)}）`);
+    console.log(`[generation-settle] 任务 ${jobId} 上游调用已结束且未产出成品：按客户端原因结为失败并关账（退款政策：${shouldRefundGeneration("failed", hasKeptArtifact(job.resultData)) ? "退" : "不退"}）（${reason.slice(0, 60)}）`);
     return "settled";
 }
 

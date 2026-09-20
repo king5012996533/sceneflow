@@ -88,7 +88,7 @@ export default function PricingPage() {
                         <p className="mt-2.5 text-[13px] leading-[1.9] text-[#47423c]">
                             充值积分<strong>长期有效</strong>，不过期。
                             <br />
-                            任务一旦开跑<strong>不退积分</strong>；上游若已产出成品，会<strong>归档到生成记录</strong>可取。
+                            生成失败或取消，<strong>积分会自动退回</strong>；只有上游已产出成品并<strong>归档到生成记录</strong>时，这一次才照常计费。
                         </p>
                     </div>
                 </section>
@@ -103,7 +103,7 @@ export default function PricingPage() {
                             <h2 className="sf-serif text-[clamp(28px,3vw,40px)] font-semibold leading-[1.32]">
                                 积分怎么<em className="italic text-[#a0713f]">扣</em>？
                             </h2>
-                            <p className="mt-3 max-w-[34ch] text-sm text-[#726d67]">每次生成开始时先锁定积分，同一任务不会重复扣费。任务一旦开跑，失败 / 取消也不退——上游按「一次尝试」计费；上游已产出的成品会归档到生成记录。</p>
+                            <p className="mt-3 max-w-[34ch] text-sm text-[#726d67]">每次生成开始时先锁定积分，同一任务不会重复扣费。生成失败或取消，积分会自动退回；只有上游已经产出成品、归档到生成记录的那一次才照常计费。</p>
                         </div>
                         <div>
                             <div className="border-t border-[#332f2a]">
@@ -123,7 +123,7 @@ export default function PricingPage() {
                             <p className="mt-4 text-[13px] leading-[1.8] text-[#726d67]">
                                 <b className="whitespace-nowrap font-medium text-[#47423c]">长期有效：</b>充值积分不过期，可在套餐与画布内持续使用。
                                 <br />
-                                <b className="whitespace-nowrap font-medium text-[#47423c]">扣费规则：</b>生成开始时预扣积分，同一任务不会重复扣费；任务一旦开跑，失败 / 取消也不退回（上游按「一次尝试」计费）。
+                                <b className="whitespace-nowrap font-medium text-[#47423c]">扣费规则：</b>生成开始时预扣积分，同一任务不会重复扣费；生成失败或取消，积分会自动退回（成品已归档到生成记录的那一次不退回——钱已经换到了成品）。
                                 <br />
                                 <b className="whitespace-nowrap font-medium text-[#47423c]">成品保留：</b>上游已产出的成品会归档到「生成记录」，任务判失败或取消也能取。
                             </p>
