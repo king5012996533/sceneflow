@@ -1,6 +1,12 @@
 # Agent 运行时接入方案（DSH 为底座）
 
-> 状态：**Phase 0 已落地**（2026-09-20，见文末「Phase 0 落地记录」）；Phase 1 起待评估。
+> ⚠️ **本方案已作废（2026-09-20 晚）**：决定**不基于 DSH 接入**，改为自研 agent 架构。
+> 决策与依据见同目录 `agent-runtime-decision-2026-09-20.md`；本文正文保留作历史记录，不再作为施工依据。
+>
+> 其中**实测数据仍然有效**，自研时照样用得上：§1.3 本机容量实测（冷启动 / 空闲内存 / 磁盘）、
+> §1.5 两条渠道的版本错位、§3.6 遥测默认值、§4.1 为何不拿它的 Web UI 当主界面。
+>
+> 状态：**Phase 0 已落地**（2026-09-20，见文末「Phase 0 落地记录」）；Phase 1 起**已停**（随本方案作废）。
 > 日期：2026-09-20
 
 ---
@@ -51,7 +57,7 @@
 
 | 事实                                                 | 来源                                                                                                       | 意义                                                                                                                                                 |
 | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **要求 Node `^22.19.0 \                              | \                                                                                                          | >=24.0.0`，pnpm 11.7.0**                                                                                                                             |
+| \*\*要求 Node `^22.19.0 \                            | \                                                                                                          | >=24.0.0`，pnpm 11.7.0\*\*                                                                                                                           |
 | 版本 `0.1.6-alpha.2`，MIT                            | 根 `package.json`                                                                                          | 真 alpha。集成面必须做薄                                                                                                                             |
 | 遥测有**两条**路径，不是一条                         | `packages/bundle/base/README.md`                                                                           | ①`session-telemetry-otel`（默认 `FEEDBACK_ONLY`，可设 `DISABLED`）②**`session-log-deepseek` 是默认开启的独立上报路径**。要"不依赖官方"必须两条都处理 |
 | 模型 key 从**环境变量**读                            | `dsh-llm-deepseek` 配置 `apiKeyEnv: DEEPSEEK_API_KEY`                                                      | key 天然在服务端，不下发浏览器。内置模型接线干净                                                                                                     |
@@ -370,16 +376,16 @@ Runner 容器（node 22/24 + pnpm 11.7）        │
 
 ### 交付物
 
-| 文件 | 作用 |
-| --- | --- |
-| `web/src/lib/credit-pricing.ts` | `ModelPricing` 增三个 token 单价（元 / 百万 token）；`textTurnCostCents` / `textTurnCredits`（成本 → 分 → × 倍率 → 向上取整积分）；`hasTextTokenPricing` |
-| `web/src/lib/generation/upstream-usage.ts` | 上游用量读取（OpenAI / DeepSeek / Anthropic / Gemini 四种报文形状）+ 流式 SSE 扫描器 + 透传用的 `teeStreamForUsage` |
-| `web/src/lib/generation/text-billing.server.ts` | `settleTextTurnUsage`：一轮文本调用结束后的结算（幂等、按余额垫付、把用量与单价快照写进任务） |
-| `web/src/app/api/proxy/route.ts` | 代理接线：拿到 usage 就按 token 结算（JSON 路径等结算完再回，流式路径边透传边收尾结算） |
-| `web/src/lib/model-capability-spec.ts` | `toCostYuanNumber` + 清洗白名单收口（保留两位小数，拒负价与 > ¥10000/百万） |
-| `web/src/app/(user)/admin/credential-pricing-editor.tsx` | 文本模型专属「按 token 计价」区块（三个成本价框 + 已启用按量结算标记） |
-| `web/src/app/(user)/admin/operation-config-tab.tsx` | 全局「文本计价倍率」（默认 2） |
-| `web/scripts/alias-hooks.mjs` | 让纯逻辑单测能 `import "@/..."`（Node 内置钩子，不引第三方 loader） |
+| 文件                                                     | 作用                                                                                                                                                     |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `web/src/lib/credit-pricing.ts`                          | `ModelPricing` 增三个 token 单价（元 / 百万 token）；`textTurnCostCents` / `textTurnCredits`（成本 → 分 → × 倍率 → 向上取整积分）；`hasTextTokenPricing` |
+| `web/src/lib/generation/upstream-usage.ts`               | 上游用量读取（OpenAI / DeepSeek / Anthropic / Gemini 四种报文形状）+ 流式 SSE 扫描器 + 透传用的 `teeStreamForUsage`                                      |
+| `web/src/lib/generation/text-billing.server.ts`          | `settleTextTurnUsage`：一轮文本调用结束后的结算（幂等、按余额垫付、把用量与单价快照写进任务）                                                            |
+| `web/src/app/api/proxy/route.ts`                         | 代理接线：拿到 usage 就按 token 结算（JSON 路径等结算完再回，流式路径边透传边收尾结算）                                                                  |
+| `web/src/lib/model-capability-spec.ts`                   | `toCostYuanNumber` + 清洗白名单收口（保留两位小数，拒负价与 > ¥10000/百万）                                                                              |
+| `web/src/app/(user)/admin/credential-pricing-editor.tsx` | 文本模型专属「按 token 计价」区块（三个成本价框 + 已启用按量结算标记）                                                                                   |
+| `web/src/app/(user)/admin/operation-config-tab.tsx`      | 全局「文本计价倍率」（默认 2）                                                                                                                           |
+| `web/scripts/alias-hooks.mjs`                            | 让纯逻辑单测能 `import "@/..."`（Node 内置钩子，不引第三方 loader）                                                                                      |
 
 ### 验收点对照
 
