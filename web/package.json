@@ -43,6 +43,7 @@
         "test:envelope": "node scripts/generation-envelope-unit-tests.mjs",
         "test:endpointpolicy": "node scripts/upstream-endpoint-policy-unit-tests.mjs",
         "test:budget": "node scripts/upstream-call-budget-unit-tests.mjs",
+        "test:textpricing": "node --import ./scripts/alias-hooks.mjs scripts/text-pricing-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

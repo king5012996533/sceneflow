@@ -19,6 +19,8 @@ type EditorSpec = {
     kind: "switch" | "number";
     /** 未配置时的展示默认值（与 server 端 getOperation* 的 fallback 保持一致） */
     defaultValue: boolean | number;
+    /** 小数位（不填 = 整数）。倍率这类可以带小数，积分/张数必须整数 */
+    precision?: number;
 };
 
 const EDITORS: EditorSpec[] = [
@@ -28,6 +30,15 @@ const EDITORS: EditorSpec[] = [
     { key: "video_credit", label: "视频生成默认积分（每条）", description: "全局默认：每条视频固定扣费，与时长无关（0 = 免费）；逐模型定价优先", kind: "number", defaultValue: 15 },
     { key: "audio_credit", label: "音频生成默认积分（每次）", description: "全局默认：未逐模型定价的模型按此扣费（0 = 免费）；逐模型定价优先", kind: "number", defaultValue: 1 },
     { key: "text_credit", label: "文本 / 工具默认积分（每次）", description: "全局默认：对话/工具类按此扣费（0 = 不扣）；逐模型定价优先", kind: "number", defaultValue: 0 },
+    {
+        key: "text_pricing_multiplier",
+        label: "文本计价倍率（按 token 计价时用）",
+        description:
+            "售价 = 平台成本 × 本倍率。只作用于「后台给该模型填了 token 成本价」的文本模型（逐模型定价里那一栏）；没填成本价的模型完全不受影响。0 = 按 1 倍（成本价卖）。例：一轮成本 ¥0.011，倍率 2 → 0.216 积分，向上取整按 1 积分收。",
+        kind: "number",
+        defaultValue: 2,
+        precision: 2,
+    },
 ];
 
 /** 运营配置（daily_credit_grant 等），保存后 ≤30s 生效（进程内缓存 TTL） */
@@ -96,7 +107,7 @@ export default function OperationConfigTab() {
                                 {spec.kind === "switch" ? (
                                     <Switch checked={currentValue(spec) === true} onChange={(checked) => void update(spec.key, checked)} />
                                 ) : (
-                                    <InputNumber min={0} max={1000000} value={currentValue(spec) as number} onChange={(value) => void update(spec.key, value ?? 0)} className="w-32" />
+                                    <InputNumber min={0} max={1000000} precision={spec.precision} value={currentValue(spec) as number} onChange={(value) => void update(spec.key, value ?? 0)} className="w-32" />
                                 )}
                             </div>
                         ))}

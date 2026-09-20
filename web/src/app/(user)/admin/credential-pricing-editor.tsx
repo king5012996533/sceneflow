@@ -4,7 +4,7 @@ import { useState } from "react";
 import { InputNumber, Switch } from "antd";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
-import type { ModelPricing } from "@/lib/credit-pricing";
+import { hasTextTokenPricing, type ModelPricing } from "@/lib/credit-pricing";
 import { IMAGE_KIND, IMAGE_QUALITY_TIER_OPTIONS, normalizeImageCapability, type ImageQuality, type ModelCapabilitySpec } from "@/lib/model-capability-spec";
 import type { ImageResolutionTier } from "@/lib/image-resolution";
 import { inferPricingKind, PRICING_KIND_LABEL, type PricingKind } from "@/lib/model-pricing-kind";
@@ -27,6 +27,19 @@ type NumericPricingKey = Exclude<keyof ModelPricing, "imageQualityCredits">;
 const PRICING_FIELDS: Array<{ key: NumericPricingKey; label: string; hint: string }> = [
     { key: "audioCredits", label: "音频生成（每次）", hint: "留空 = 内置 1 积分" },
     { key: "textCredits", label: "文本 / 工具（每次）", hint: "留空 = 内置 0 积分（不扣）" },
+];
+
+/**
+ * 文本类的按 token 计价字段（元 / 百万 token）。
+ *
+ * 与上面两组积分价的关键差别：**这里的小数不能取整**。「¥0.5 / 百万 token」向下取整就是 0，
+ * 等于白送；而且上游价目表本身就是这个单位（DeepSeek 写 ¥2、OpenAI 写 $/1M），
+ * 换算成「积分/千 token」会让倍率一动就得重填一遍。
+ */
+const TEXT_COST_FIELDS: Array<{ key: NumericPricingKey; label: string; hint: string }> = [
+    { key: "textInputCostYuanPerMillion", label: "输入成本", hint: "缓存未命中的那部分，如 2" },
+    { key: "textOutputCostYuanPerMillion", label: "输出成本", hint: "如 8" },
+    { key: "textCachedInputCostYuanPerMillion", label: "缓存命中输入成本", hint: "留空 = 按输入价计（不给默认折扣）" },
 ];
 
 /** 图片分档定价：1K 是基础价，其余档留空 = 沿用 1K 价（后台不配 = 与过去完全一致） */
@@ -143,20 +156,37 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
         if (checked) setExpanded((prev) => ({ ...prev, [model]: true }));
     };
 
-    const setField = (model: string, key: NumericPricingKey, num: number | null) => {
-        if (num === null || num === undefined) {
-            const current = value[model] ? { ...value[model] } : {};
-            delete current[key];
-            if (!Object.keys(current).length) {
-                const next = { ...value };
-                delete next[model];
-                onChange(next);
-                return;
-            }
-            onChange({ ...value, [model]: current });
+    /** 落一条逐模型定价：整条空了就把模型摘掉（留个空对象会被当成「已定价」，实际全走内置草案） */
+    const commitPricing = (model: string, next: ModelPricing) => {
+        if (!Object.keys(next).length) {
+            const rest = { ...value };
+            delete rest[model];
+            onChange(rest);
             return;
         }
-        onChange({ ...value, [model]: { ...(value[model] || {}), [key]: Math.max(0, Math.floor(num)) } });
+        onChange({ ...value, [model]: next });
+    };
+
+    /** 积分价字段：整数（积分没有小数） */
+    const setField = (model: string, key: NumericPricingKey, num: number | null) => {
+        const next = { ...(value[model] || {}) };
+        if (num === null || num === undefined) delete next[key];
+        else next[key] = Math.max(0, Math.floor(num));
+        commitPricing(model, next);
+    };
+
+    /**
+     * token 成本字段（元 / 百万 token）：保留两位小数，**不能**跟着积分价一起取整。
+     * 上限与服务端清洗保持一致（> ¥10000/百万 视为填错，宁可当场拦住也不留下一个脏价）。
+     */
+    const setCostField = (model: string, key: NumericPricingKey, num: number | null) => {
+        const next = { ...(value[model] || {}) };
+        if (num === null || num === undefined) delete next[key];
+        else {
+            if (!Number.isFinite(num) || num < 0 || num > 10_000) return; // 越界不改（服务端也会丢，别让界面显示成保存成功）
+            next[key] = Math.round(num * 100) / 100;
+        }
+        commitPricing(model, next);
     };
 
     /** 画质档位轴的逐档价：低档走基础价 imageCredits，其余写进 imageQualityCredits */
@@ -165,19 +195,13 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
             setField(model, "imageCredits", num);
             return;
         }
-        const current = { ...(value[model] || {}) };
-        const table = { ...(current.imageQualityCredits || {}) };
+        const next = { ...(value[model] || {}) };
+        const table = { ...(next.imageQualityCredits || {}) };
         if (num === null || num === undefined) delete table[quality];
         else table[quality] = Math.max(0, Math.floor(num));
-        if (Object.keys(table).length) current.imageQualityCredits = table;
-        else delete current.imageQualityCredits;
-        if (!Object.keys(current).length) {
-            const next = { ...value };
-            delete next[model];
-            onChange(next);
-            return;
-        }
-        onChange({ ...value, [model]: current });
+        if (Object.keys(table).length) next.imageQualityCredits = table;
+        else delete next.imageQualityCredits;
+        commitPricing(model, next);
     };
 
     /** 渲染一组定价字段：同组字段都写在同一个 pricing 对象上 */
@@ -199,6 +223,39 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
                         ))}
                     </div>
                     {kind === "text" ? <div className="mt-1.5 text-[11px] leading-4 text-[#726d67]">对话、画布 Agent 每轮规划都按「文本 / 工具」价扣；0 = 不扣费，留空则沿用运营配置里的全局默认。</div> : null}
+                    {kind === "text" ? (
+                        <div className="mt-2.5 rounded-md border border-dashed border-[#d9d4ce] bg-white/70 p-2.5">
+                            <div className="mb-1 flex items-center gap-2 text-xs text-[#332f2a]">
+                                按 token 计价（元 / 百万 token）
+                                {hasTextTokenPricing(pricing) ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-600">已启用按量结算</span> : null}
+                            </div>
+                            <div className="mb-1.5 text-[11px] leading-4 text-[#726d67]">
+                                这里填的是<span className="font-medium text-[#332f2a]">我们的成本</span>（照上游价目表原样填）。填了输入或输出成本，这个模型就改成「上游回报了用量才结算」，上面的「每次」价失效 ——
+                                一轮花多少不由我们猜，由上游报的 token 数决定。售价 = 成本 × 运营配置里的「文本计价倍率」。留空 = 这个模型仍然按次计价，行为与过去完全一样。
+                            </div>
+                            <div className="grid grid-cols-3 gap-3">
+                                {TEXT_COST_FIELDS.map((field) => (
+                                    <div key={field.key}>
+                                        <div className="mb-1 text-xs text-[#332f2a]">{field.label}</div>
+                                        <InputNumber
+                                            className="w-full"
+                                            min={0}
+                                            max={10000}
+                                            precision={2}
+                                            placeholder="留空 = 不按量"
+                                            value={pricing?.[field.key] ?? null}
+                                            onChange={(num) => setCostField(model, field.key, num)}
+                                        />
+                                        <div className="mt-0.5 text-[11px] text-[#726d67]">{field.hint}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-1.5 text-[11px] leading-4 text-[#a49f9a]">
+                                例：输入 ¥2 / 输出 ¥8，一轮 3,000 输入 + 600 输出成本约 ¥0.011；倍率 2 后不足 1 积分，按 1 积分收（¥0.1）。
+                                缓存命中数由上游回报，命中部分按缓存价计，不会重复按输入价再算一遍。
+                            </div>
+                        </div>
+                    ) : null}
                 </div>
             );
         }

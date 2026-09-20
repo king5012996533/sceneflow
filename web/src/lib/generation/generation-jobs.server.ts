@@ -51,7 +51,8 @@ export async function beginGenerationJob(userId: string, input: BeginGenerationI
     const configuredPricing = !isAdmin ? await resolveConfiguredPricing(generationModel(normalizedMetadata)) : null;
     const pricingDefaults = !isAdmin ? await getPricingDefaults() : undefined;
     const creditsCost = !isAdmin ? getGenerationCreditsCost(input.kind, normalizedMetadata, configuredPricing ?? undefined, pricingDefaults) : 0;
-    const costCents = estimateGenerationCostCents(input.kind, normalizedMetadata);
+    // 估算成本（分）：文本类会把后台配的 token 成本价带进去，否则那边永远只有内置草案
+    const costCents = estimateGenerationCostCents(input.kind, normalizedMetadata, configuredPricing ?? undefined);
     // 每日赠送积分在事务外读取（操作配置走进程内缓存，避免在事务内发起独立连接）
     const dailyGrant = !isAdmin ? await getOperationNumber("daily_credit_grant", 3) : 0;
     const staleBefore = new Date(Date.now() - STALE_JOB_MS);

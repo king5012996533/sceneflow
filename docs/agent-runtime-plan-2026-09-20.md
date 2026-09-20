@@ -1,6 +1,6 @@
 # Agent 运行时接入方案（DSH 为底座）
 
-> 状态：**待评估**。本文只描述方案与验收口径，尚未动工。
+> 状态：**Phase 0 已落地**（2026-09-20，见文末「Phase 0 落地记录」）；Phase 1 起待评估。
 > 日期：2026-09-20
 
 ---
@@ -363,3 +363,33 @@ Runner 容器（node 22/24 + pnpm 11.7）        │
 不新建的东西（全部复用）：`credit-ledger` 计费内核、`CreditTransaction` 幂等约束、`GenerationJob` 行模型与退款策略、`CanvasBackup` 状态模型、`tryClaimCanvasRun` run 锁、`generation-run.server` 的 run/超时/重发骨架、`generation-wait` 的等待判定、`payments/callback` 充值锚点、31 个工具的单一注册表与 schemas、后台的能力标定与定价 UI、以及门禁体系（tsc / guard / 28 套单测 / build）。
 
 新建的东西（有界）：Runner 容器与 profile、CI 镜像链路、**一台独立 runner 主机**、MCP 桥、`/api/agent/runs` 一族、token 计价、暂停续跑状态机、画布版交付物、一个对话面。
+
+---
+
+## 8. Phase 0 落地记录（2026-09-20）
+
+### 交付物
+
+| 文件 | 作用 |
+| --- | --- |
+| `web/src/lib/credit-pricing.ts` | `ModelPricing` 增三个 token 单价（元 / 百万 token）；`textTurnCostCents` / `textTurnCredits`（成本 → 分 → × 倍率 → 向上取整积分）；`hasTextTokenPricing` |
+| `web/src/lib/generation/upstream-usage.ts` | 上游用量读取（OpenAI / DeepSeek / Anthropic / Gemini 四种报文形状）+ 流式 SSE 扫描器 + 透传用的 `teeStreamForUsage` |
+| `web/src/lib/generation/text-billing.server.ts` | `settleTextTurnUsage`：一轮文本调用结束后的结算（幂等、按余额垫付、把用量与单价快照写进任务） |
+| `web/src/app/api/proxy/route.ts` | 代理接线：拿到 usage 就按 token 结算（JSON 路径等结算完再回，流式路径边透传边收尾结算） |
+| `web/src/lib/model-capability-spec.ts` | `toCostYuanNumber` + 清洗白名单收口（保留两位小数，拒负价与 > ¥10000/百万） |
+| `web/src/app/(user)/admin/credential-pricing-editor.tsx` | 文本模型专属「按 token 计价」区块（三个成本价框 + 已启用按量结算标记） |
+| `web/src/app/(user)/admin/operation-config-tab.tsx` | 全局「文本计价倍率」（默认 2） |
+| `web/scripts/alias-hooks.mjs` | 让纯逻辑单测能 `import "@/..."`（Node 内置钩子，不引第三方 loader） |
+
+### 验收点对照
+
+1. **单测 + 守卫全绿**：新增 `test:textpricing` 43 项；守卫断言单价来源单一（不得在别处硬编码）、清洗白名单、结算必被调用。门禁全程 `EXIT=0`。
+2. **后台配置往返**：API 层 A1–A10 + 真机浏览器各走一遍。界面上把输入成本改成 `21`、缓存命中改成 `0.33`、2K 档改成 `7` → 保存 → 库里读回 `{"textInputCostYuanPerMillion":21,"textCachedInputCostYuanPerMillion":0.33,"imageCredits2k":7}`，同一凭证的 `capabilities` / `enabled` / `priority` / 别的模型定价一个字节没动。全局倍率在界面上改 `2.5` → 库里读到 `2.5`（新键过了白名单，未被 400 拦），再改回 `2`。
+3. **可复算流水**：真机端到端 27/27。真实 https 出站（httpbin base64 回显端点）+ 真实代理链路，用量写死在报文里，断言是「用量 × 单价 × 倍率」复算。含幂等（同一 requestKey 第二次不再扣）、余额不足只扣到 0 且缺口记账、流式收尾结算。
+4. **成本页不再为 null**：文本任务建单即写 `costCents`；后台「对账」页从「平台成本 ¥0（文本整块被过滤）」变成能算出成本，毛利率可算。
+
+### 已知取舍
+
+- **结算不预扣**：配了 token 价的模型建单时 `creditsCost = 0`，钱在拿到上游用量后才收。上游不报用量 = 这一轮收不到钱（宁可漏收也不乱扣）。
+- **流式路径不 await 结算**：`flush()` 里 fire-and-forget，客户端不被结算拖慢一帧；代价是这一轮的钱晚几十毫秒到账。
+- **没配 token 价的模型行为完全不变**，仍按次预扣 —— 这条是回归线，套件里 C1 专门守着。

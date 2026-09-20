@@ -48,8 +48,26 @@ export type ModelPricing = {
     videoCreditsHigh?: number;
     /** 每次音频扣积分 */
     audioCredits?: number;
-    /** 每次文本/工具调用扣积分 */
+    /** 每次文本/工具调用扣积分（按次计价；配了 token 成本价时被 token 计价覆盖） */
     textCredits?: number;
+
+    // —— 文本类的按 token 计价（2026-09-20，Phase 0 计费地基）——
+    //
+    // 这里填的是**平台实际成本**，不是售价：单位「元 / 百万 token」，与上游价目表的原生单位一致
+    // （DeepSeek 写「¥2/百万输入」、OpenAI 写 $/1M）。售价由 `textTurnCredits` 按全局倍率换算成积分。
+    //
+    // 为什么不直接让人填「积分/千 token」：倍率一变就要把每个模型的价格重填一遍，
+    // 而成本是上游给的、不会因为我们改倍率而变化。分开之后倍率是一个旋钮，价格是另一份数据。
+    //
+    // ⚠️ 这三个字段一旦配置，该模型的文本轮次就改为「上游报了 usage 才结算」（见 text-billing.server.ts）：
+    // 建任务那一刻不知道 token 数，所以 beginGenerationJob 不再预扣，改成按真实用量后结算。
+    // 配了就生效、不配就维持「按次 textCredits（默认 0）」——这是 Phase 0 保持行为不变的那条线。
+    /** 输入 token 成本（元/百万；缓存未命中部分） */
+    textInputCostYuanPerMillion?: number;
+    /** 输出 token 成本（元/百万） */
+    textOutputCostYuanPerMillion?: number;
+    /** 缓存命中输入 token 成本（元/百万；留空 = 按输入价计） */
+    textCachedInputCostYuanPerMillion?: number;
 };
 
 /** 全局默认定价（后台「运营配置」读取，逐模型定价之下、内置草案之上） */
@@ -64,6 +82,34 @@ export type PricingDefaults = {
 export type CredentialPricing = Record<string, ModelPricing>;
 
 type GenerationMetadata = Record<string, unknown>;
+
+/**
+ * 积分的人民币面值：**1 积分 = 10 分 = ¥0.1**。
+ *
+ * 依据是充值档位本身：体验包 100 积分 / 1000 分（¥10）正好 10 分一个积分，
+ * 更高档位是量价折扣（创作者包约 8.2 分、工作室包约 7.0 分、企业包约 5.8 分）。
+ * 折扣是营销口径，计费必须按面值走，否则「同一句话对不同套餐用户扣不同积分」。
+ *
+ * 这是**唯一**一处积分↔人民币的换算常数：别处再写一个 0.1 或 /10 就会漂移。
+ * 回归门禁里有一条断言盯着这件事。
+ */
+export const CREDIT_VALUE_CENTS = 10;
+const CENTS_PER_YUAN = 100;
+
+/** 元 → 积分（按面值，不取整；取整规则由调用方决定） */
+export function yuanToCredits(yuan: number): number {
+    if (!Number.isFinite(yuan) || yuan <= 0) return 0;
+    return (yuan * CENTS_PER_YUAN) / CREDIT_VALUE_CENTS;
+}
+
+/** 一次上游调用的 token 用量（OpenAI 兼容口径） */
+export type TokenUsage = {
+    /** 输入（含缓存命中部分 —— 各家都是这个口径：prompt_tokens 把缓存命中的也算进去） */
+    inputTokens: number;
+    outputTokens: number;
+    /** 其中命中缓存的部分；按缓存价计费，不重复按输入价计 */
+    cachedInputTokens?: number;
+};
 
 /** 本次生成实际使用的模型名（原样保留大小写，供定价表按精确模型名匹配） */
 export function generationModel(metadata?: GenerationMetadata): string {
@@ -95,13 +141,98 @@ function isHighQuality(metadata?: GenerationMetadata): boolean {
 }
 
 /**
+ * 文本类的内置兜底成本价（元/百万 token）与「一轮对话」的假定用量。
+ *
+ * ⚠️ 这两个数字只用于**估算**：后台没为某个文本模型配 token 成本价时，
+ * 「成本 / 毛利」页拿它把账算出来（过去这一格是 null，文本花费在毛利页整个看不见）。
+ * 真实结算永远以上游回报的 usage + 后台配的成本价为准，不碰这份草案。
+ *
+ * 价格取 DeepSeek 公开价目表口径（¥2/百万输入、¥8/百万输出、缓存命中 ¥0.5），
+ * 换渠道或换模型必须在后台逐模型重配 —— 草案只是「没配也别显示 0」的那条底线。
+ * 假定用量取「中文对话一轮」的偏保守值：输入侧带上下文重发，输出侧一轮 600 token 量级。
+ */
+export const TEXT_COST_DRAFT_YUAN_PER_MILLION = { input: 2, output: 8, cached: 0.5 } as const;
+export const TEXT_TOKENS_PER_TURN_DRAFT = { input: 3000, output: 600 } as const;
+
+/** 该模型是否走按 token 计价（输入或输出成本价任一配置即生效；缓存价可选） */
+export function hasTextTokenPricing(configured?: ModelPricing): boolean {
+    if (!configured) return false;
+    return configured.textInputCostYuanPerMillion !== undefined || configured.textOutputCostYuanPerMillion !== undefined;
+}
+
+/** 取一次调用实际采用的成本价（元/百万 token）：后台配置优先，缺项回落到内置草案 */
+function textCostPrices(configured?: ModelPricing) {
+    return {
+        input: configured?.textInputCostYuanPerMillion ?? TEXT_COST_DRAFT_YUAN_PER_MILLION.input,
+        output: configured?.textOutputCostYuanPerMillion ?? TEXT_COST_DRAFT_YUAN_PER_MILLION.output,
+        // 缓存价缺省 = 按输入价计（不享受折扣，宁可高估成本，别把成本算低了去定价）
+        cached: configured?.textCachedInputCostYuanPerMillion ?? configured?.textInputCostYuanPerMillion ?? TEXT_COST_DRAFT_YUAN_PER_MILLION.cached,
+    };
+}
+
+/**
+ * 一次文本调用的平台成本（分，人民币）。
+ *
+ * 计价口径两个要点：
+ *   - **缓存命中部分不重复计**：输入 token 里已经包含命中缓存的那部分（各家 prompt_tokens 都是这个口径），
+ *     所以按输入价计的是「输入 − 缓存命中」，命中部分走缓存价。不这么减就是把这部分算了两次。
+ *   - 上游没报缓存数时按全额输入价计（高估成本，方向安全）。
+ */
+export function textTurnCostCents(configured: ModelPricing | undefined, usage: TokenUsage): number {
+    const prices = textCostPrices(configured);
+    const input = Math.max(0, Math.floor(usage.inputTokens || 0));
+    const output = Math.max(0, Math.floor(usage.outputTokens || 0));
+    // 缓存命中数不该超过输入总数（各家口径都是「输入里含命中部分」）：
+    // 上游给了个更大的数就按输入总数截断，否则会按缓存价多收一段并不存在的 token。
+    // 采集侧已经截断过一次，纯函数这里再兜一次 —— 不依赖调用方守规矩。
+    const cached = Math.min(input, Math.max(0, Math.floor(usage.cachedInputTokens || 0)));
+    const billableInput = Math.max(0, input - cached);
+    const millionths = 1_000_000;
+    const yuan = (billableInput / millionths) * prices.input + (cached / millionths) * prices.cached + (output / millionths) * prices.output;
+    return Math.round(yuan * CENTS_PER_YUAN);
+}
+
+/**
+ * 一次文本调用应当扣的积分 = 成本 × 倍率，再按积分面值换算。
+ *
+ * 向上取整（`Math.ceil`）：不足 1 积分的轮次按 1 积分收 —— 否则「一句话只花 0.2 积分」
+ * 会被取整抹成 0，长会话就变成免费。代价是小额轮次的实际倍率高于设定倍率，这一点写在面板文案里。
+ * 成本为 0（没配价、或上游没报 token）时返回 0，不制造空扣费流水。
+ */
+export function textTurnCredits(configured: ModelPricing | undefined, usage: TokenUsage, multiplier: number): number {
+    const costCents = textTurnCostCents(configured, usage);
+    if (costCents <= 0) return 0;
+    const ratio = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1;
+    return Math.max(1, Math.ceil(yuanToCredits(costCents / CENTS_PER_YUAN) * ratio));
+}
+
+/** 从任务 metadata 里取出上游回报的用量（结算与成本估算共用一份形状） */
+export function readTokenUsage(metadata?: GenerationMetadata): TokenUsage | null {
+    const raw = metadata?.usage;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const value = raw as Record<string, unknown>;
+    const input = Math.max(0, Math.floor(Number(value.inputTokens) || 0));
+    const output = Math.max(0, Math.floor(Number(value.outputTokens) || 0));
+    const cached = Math.max(0, Math.floor(Number(value.cachedInputTokens) || 0));
+    if (input <= 0 && output <= 0) return null;
+    return { inputTokens: input, outputTokens: output, cachedInputTokens: cached };
+}
+
+/**
  * 单次生成消耗积分（admin 跳过计费，调用方自行处理）。
+ *
  * 取值优先级：configured（后台逐模型定价）> defaults（后台全局默认）> 内置草案。
  * 视频按条计费：每条固定积分，与时长无关。
  * 图片两条口径：
  *   - 画质档位轴模型（配了 imageQualityCredits）：按用户选的 quality 逐档扣，未填的档位回落基础价；
  *   - 其余模型：按分辨率档位（1K/2K/4K）扣，档位由 metadata 的 size/quality 判定（见 image-resolution.ts），
  *     2K/4K 未单独定价时沿用 1K 基础价 —— 后台不配 = 行为与过去完全一致。
+ *
+ * 文本类两条口径（2026-09-20）：
+ *   - 配了 token 成本价 → 本函数返回 **0**（建任务时不预扣，轮次结束后按真实 usage 结算，
+ *     见 text-billing.server.ts）。理由：建任务那一刻根本没有 token 数，预扣只能拍脑袋，
+ *     拍了就得再退差，退差又会跟「上游没报 usage」的路径打架。
+ *   - 没配 → 沿用按次 textCredits（内置默认 0），与过去完全一致。
  */
 export function getGenerationCreditsCost(kind: GenerationKind, metadata?: GenerationMetadata, configured?: ModelPricing, defaults?: PricingDefaults): number {
     const model = modelName(metadata);
@@ -149,6 +280,8 @@ export function getGenerationCreditsCost(kind: GenerationKind, metadata?: Genera
             return 1;
         case "text":
         case "tool":
+            // 配了 token 成本价 → 不预扣，等上游回报 usage 后结算（见上方函数注释）
+            if (hasTextTokenPricing(configured)) return 0;
             // 对话/工具类默认不计积分（沿用 agent-lab 的每日配额逻辑）；后台可配
             if (configured?.textCredits !== undefined) return Math.max(0, Math.floor(configured.textCredits));
             if (defaults?.textCredits !== undefined) return Math.max(0, Math.floor(defaults.textCredits));
@@ -209,8 +342,15 @@ function arkSeedreamCostCents(model: string, metadata?: GenerationMetadata): num
     return (highBand ? 60 : 30) + Math.max(0, references - 1) * 2;
 }
 
-/** 平台单次生成的估算成本（分），供对账与定价校准（公开价粗估） */
-export function estimateGenerationCostCents(kind: GenerationKind, metadata?: GenerationMetadata): number | null {
+/**
+ * 平台单次生成的估算成本（分），供对账与定价校准（公开价粗估）。
+ *
+ * 文本/工具类（2026-09-20 修）：过去这里返回 `null`，而 `/api/admin/costs` 用
+ * `costCents: { not: null }` 过滤 —— 结果是**文本花费在毛利页静默消失**（不报错、不计 0）。
+ * agent 一上线，文本就是最大的一块变动成本，看不见等于没有毛利页。
+ * 现在固定返回一个数：有上游回报的 usage 就是实价，没有就按后台配置价（或内置草案）× 假定用量估。
+ */
+export function estimateGenerationCostCents(kind: GenerationKind, metadata?: GenerationMetadata, configured?: ModelPricing): number | null {
     const model = modelName(metadata);
     switch (kind) {
         case "image": {
@@ -239,8 +379,13 @@ export function estimateGenerationCostCents(kind: GenerationKind, metadata?: Gen
         case "audio":
             return 1;
         case "text":
-        case "tool":
-            return null;
+        case "tool": {
+            // 上游回报了用量 → 实价（结算时会把同一口径写回 job.costCents）
+            const usage = readTokenUsage(metadata);
+            if (usage) return textTurnCostCents(configured, usage);
+            // 还没跑完 / 上游没报 usage → 按假定用量估（宁可高估，别把成本算低了去定价）
+            return textTurnCostCents(configured, { inputTokens: TEXT_TOKENS_PER_TURN_DRAFT.input, outputTokens: TEXT_TOKENS_PER_TURN_DRAFT.output });
+        }
         default:
             return null;
     }

@@ -7,6 +7,8 @@ import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
 import { authorizeUpstreamRequest, pickContentType, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
 import { authorizeProxyUpstreamCall } from "@/lib/generation/proxy-access.server";
 import { readModelFromBody } from "@/lib/generation/upstream-endpoint-policy";
+import { readUsageFromPayload, teeStreamForUsage } from "@/lib/generation/upstream-usage";
+import { settleTextTurnUsage } from "@/lib/generation/text-billing.server";
 import { canRunOnServer, resolveServerRunPolicy, shouldPersistEnvelope, type UpstreamEnvelope } from "@/lib/generation/generation-envelope";
 import { findRunnableGenerationJob, startServerRun } from "@/lib/generation/generation-run.server";
 import { describeUnusableSuccess } from "@/lib/generation/upstream-error";
@@ -202,7 +204,20 @@ export async function POST(req: NextRequest) {
 
             // 流式透传（SSE / 文本流）：把上游 body 流原样转给客户端
             if (envelope.stream === true) {
-                return new NextResponse(response.body, {
+                // 顺手套一层用量扫描（字节原样透传，只读不改）：文本轮次按 token 计费时，
+                // usage 就在这条流的最后一个 chunk 里，错过后就再也拿不到。
+                // 结算在流收尾时异步进行，不阻塞、也不影响已经发出去的响应；
+                // 模型没配 token 成本价时 settleTextTurnUsage 自己会 no-op（见该模块注释）。
+                const streamBody = jobId
+                    ? teeStreamForUsage(response.body as ReadableStream<Uint8Array>, (usage) => {
+                          void settleTextTurnUsage({ userId: user.id, jobId, usage, source: "proxy-stream" })
+                              .then((outcome) => {
+                                  if (outcome.ok) console.log(`[text-billing] 任务 ${jobId} 按量结算：${outcome.settlement.credits} 积分（实扣 ${outcome.settlement.charged}）`);
+                              })
+                              .catch((error) => console.error("[text-billing] 流式结算异常", error instanceof Error ? error.message : error));
+                      })
+                    : (response.body as ReadableStream<Uint8Array>);
+                return new NextResponse(streamBody, {
                     status: response.status,
                     headers: {
                         "Content-Type": response.headers.get("Content-Type") || "text/event-stream; charset=utf-8",
@@ -248,6 +263,19 @@ export async function POST(req: NextRequest) {
                     await salvageGenerationArtifacts({ userId: user.id, jobId, payload: data, source: `proxy ${method} ${target.pathname}` });
                 } catch (error) {
                     console.error("[generation-rescue] 抢救异常", error instanceof Error ? error.message : error);
+                }
+            }
+
+            // 文本轮次按真实用量结算（Phase 0 计费地基）：上游报文里带 usage 就是这一次调用的真账。
+            // 放在返回响应之前 await，是为了让「这一次调用的钱」在客户端拿到答复时就一定已经记下 ——
+            // 否则验收要靠轮询，异常时也容易悄悄漏账。结算本身的耗时是一次本地事务。
+            const usage = jobId ? readUsageFromPayload(data) : null;
+            if (usage && jobId) {
+                try {
+                    const outcome = await settleTextTurnUsage({ userId: user.id, jobId, usage, source: `proxy ${method} ${target.pathname}` });
+                    if (outcome.ok) console.log(`[text-billing] 任务 ${jobId} 按量结算：${outcome.settlement.credits} 积分（实扣 ${outcome.settlement.charged}，成本 ${outcome.settlement.costCents} 分）`);
+                } catch (error) {
+                    console.error("[text-billing] 结算异常", error instanceof Error ? error.message : error);
                 }
             }
             return NextResponse.json(data, { status: response.status });

@@ -574,6 +574,20 @@ function toPricingNumber(value: unknown): number | undefined {
 }
 
 /**
+ * 成本价清洗（元/百万 token）——**保留两位小数**，不能沿用 toPricingNumber 的取整。
+ *
+ * 上游价目表本身就是小数：缓存命中价常见 ¥0.5/百万、中转站还有 ¥2.4 这种。
+ * 取整会把 0.5 抹成 0（缓存免费）或把 2.4 降到 2（低估计费基数），两种都是账目失真。
+ * 上限给 10000 元/百万：这是防手滑多打一个 0（真按百万 token 计价时，
+ * 四位数单价已经远超任何在售模型），而不是业务约束。
+ */
+function toCostYuanNumber(value: unknown): number | undefined {
+    const raw = Number(value);
+    if (!Number.isFinite(raw) || raw < 0 || raw > 10_000) return undefined;
+    return Math.round(raw * 100) / 100;
+}
+
+/**
  * 逐档价清洗：只留画质档位轴认识的那几档（低档不在这里 —— 它就是基础价 imageCredits）。
  * 一档都没填 = 返回 undefined，整个字段不落库（回到「全按基础价扣」的老口径）。
  */
@@ -621,6 +635,13 @@ export function sanitizePricing(input: unknown): CredentialPricing | undefined {
         if (audioCredits !== undefined) pricing.audioCredits = audioCredits;
         const textCredits = toPricingNumber(value.textCredits);
         if (textCredits !== undefined) pricing.textCredits = textCredits;
+        // 文本类的按 token 成本价（元/百万 token，两位小数）——配了它该模型就改为按真实用量结算
+        const textInputCost = toCostYuanNumber(value.textInputCostYuanPerMillion);
+        if (textInputCost !== undefined) pricing.textInputCostYuanPerMillion = textInputCost;
+        const textOutputCost = toCostYuanNumber(value.textOutputCostYuanPerMillion);
+        if (textOutputCost !== undefined) pricing.textOutputCostYuanPerMillion = textOutputCost;
+        const textCachedCost = toCostYuanNumber(value.textCachedInputCostYuanPerMillion);
+        if (textCachedCost !== undefined) pricing.textCachedInputCostYuanPerMillion = textCachedCost;
         if (Object.keys(pricing).length) result[name] = pricing;
     }
     return Object.keys(result).length ? result : undefined;

@@ -1083,6 +1083,91 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/components/image-marker-dialog.tsx", "<div className=\"min-h-4 text-xs text-amber-600\">{hint}</div>", "标注面板的提示行必须常驻且高度固定：条件渲染会导致弹窗重新居中，按下与松开落到两套坐标。");
 }
 
+// ---------- 逐 token 计费（2026-09-20，Phase 0 计费地基）----------
+// 文本类从「按次、默认 0 积分」改成按 token 计价之后，钱第一次和上游回报的数字绑在一起。
+// 这条路出错的形态都是「安静地错」：少采一次用量 = 整轮免费；清洗白名单漏一个字段 = 后台填的价
+// 被静默丢掉、退回按次 0 = 免费；比例常数多写一处 = 历史流水两套口径。
+// 所以守卫盯三件事：**单价只有一个来源**、**用量只从上游取**、**看到用量必须结算**。
+{
+    // 1) 积分 ↔ 元的换算只许有一个常数（别再出现第二处 0.1 或 /10）
+    assertIncludes("src/lib/credit-pricing.ts", "export const CREDIT_VALUE_CENTS = 10", "1 积分 = 10 分 = ¥0.1 是计费面值的唯一定义，改它等于改所有历史流水的口径。");
+    {
+        const offenders = walkFiles("src")
+            .filter((path) => /\.(tsx?)$/.test(path))
+            .filter((path) => /CREDIT_VALUE_CENTS\s*=/.test(read(path)))
+            .filter((path) => path !== "src/lib/credit-pricing.ts");
+        assert(!offenders.length, `积分面值常数只许在 src/lib/credit-pricing.ts 定义一处：${offenders.join(", ")}`);
+    }
+    assertIncludes("src/lib/credit-pricing.ts", "export function yuanToCredits(", "元→积分必须走 yuanToCredits，调用点不许自己乘 10。");
+    // 结算不许自己再算一套钱：应收/成本都必须来自 credit-pricing 的纯函数（单测钉的就是它们）
+    assertIncludes("src/lib/generation/text-billing.server.ts", "textTurnCredits(", "结算的应收积分必须来自 textTurnCredits（唯一口径），不许在事务里自己乘倍率。");
+    assertIncludes("src/lib/generation/text-billing.server.ts", "textTurnCostCents(", "结算写回的成本必须来自 textTurnCostCents，保证「毛利页」与「扣费」同一口径。");
+    assertIncludes("src/lib/generation/text-billing.server.ts", "TEXT_PRICING_MULTIPLIER_DEFAULT = 2", "全局计价倍率默认 2（成本的两倍）——改默认值等于整体改价，得有人看得见。");
+
+    // 2) 入参清洗：漏一个 token 成本字段 = 后台填了价但落不了库，模型悄悄退回按次 0 积分（免费）
+    for (const key of ["textInputCostYuanPerMillion", "textOutputCostYuanPerMillion", "textCachedInputCostYuanPerMillion"]) {
+        assertIncludes("src/lib/credit-pricing.ts", key, `ModelPricing 必须带 ${key}：它是「这个模型按量计价」的开关。`);
+        assertIncludes("src/lib/model-capability-spec.ts", key, `sanitizePricing 必须放行 ${key}，否则后台填的价会被静默丢掉。`);
+        assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", key, `后台必须能填 ${key}（能配才谈得上定价）。`);
+    }
+    assertMatchesNormalized(
+        "src/lib/model-capability-spec.ts",
+        /toCostYuanNumber\(value\.textInputCostYuanPerMillion\)/,
+        "token 成本价必须走 toCostYuanNumber：积分价那一套是向下取整的，¥0.5/百万 token 会被抹成 0 = 白送。",
+    );
+    assertMatchesNormalized(
+        "src/lib/model-capability-spec.ts",
+        /function toCostYuanNumber\(value: unknown\): number \| undefined \{[\s\S]{0,220}Math\.round\(raw \* 100\) \/ 100/,
+        "成本价清洗必须保留两位小数（上游价目表本身就是小数），不许 floor。",
+    );
+
+    // 3) 后台全局倍率：键名两处必须一致，且与结算读的键同源
+    assertIncludes("src/lib/generation/text-billing.server.ts", 'TEXT_PRICING_MULTIPLIER_KEY = "text_pricing_multiplier"', "倍率的键名在这里定义，后台两处必须照它写。");
+    assertIncludes("src/app/api/admin/operation-config/route.ts", "text_pricing_multiplier", "运营配置白名单必须放行倍率键，否则后台保存直接 400。");
+    assertIncludes("src/app/(user)/admin/operation-config-tab.tsx", "text_pricing_multiplier", "运营配置面板必须能改倍率（改价是运营动作，不该要发版）。");
+
+    // 4) 用量只从上游报文取，绝不接受客户端上报（能上报就能伪造，与 H-6 同一口径）
+    assertMatchesNormalized(
+        "src/app/api/proxy/route.ts",
+        /const usage = jobId \? readUsageFromPayload\(data\)/,
+        "结算用的用量必须从上游响应报文里读（data），不许取客户端请求体里的 usage。",
+    );
+    assertIncludes("src/app/api/proxy/route.ts", "teeStreamForUsage(", "流式响应必须套用量扫描：SSE 的 usage 在最后一个 chunk 里，错过就再也拿不到。");
+    // 结算必须发生在把响应交给客户端之前（JSON 路径）：否则得靠轮询验收，异常时还会悄悄漏账
+    assertMatchesNormalized(
+        "src/app/api/proxy/route.ts",
+        /await settleTextTurnUsage\([\s\S]{0,900}?return NextResponse\.json\(data/,
+        "JSON 路径必须在上游报文带 usage 时就结算完（返回响应之前 await），别靠轮询。",
+    );
+    // 结算只许在服务端模块里：客户端组件引用它等于把扣费逻辑发给浏览器
+    {
+        const offenders = [...walkFiles("src/components"), ...walkFiles("src/app/(user)")]
+            .filter((path) => /\.(tsx?)$/.test(path))
+            .filter((path) => /text-billing\.server/.test(read(path)));
+        assert(!offenders.length, `结算模块是服务端的，客户端组件不许引用：${offenders.join(", ")}`);
+    }
+
+    // 5) 幂等：按量结算用独立 refId（`#usage` 后缀），不与建任务时的预扣挤同一条流水
+    assertIncludes("src/lib/generation/text-billing.server.ts", "`${job.requestKey}#usage`", "按量结算的幂等键必须是 requestKey + #usage：复用预扣的 refId 会让补发/重放互相挤掉。");
+    assertIncludes("src/lib/generation/text-billing.server.ts", 'refType: "generation_job"', "流水必须挂 generation_job + refId，账才追得回是哪一轮。");
+
+    // 6) 配了 token 价才不预扣；没配的模型行为必须与过去完全一致（Phase 0 能安全上线的全部理由）
+    assertMatchesNormalized(
+        "src/lib/credit-pricing.ts",
+        /case "text":\s*\n\s*case "tool":[\s\S]{0,400}?if \(hasTextTokenPricing\(configured\)\) return 0;/,
+        "按量计价的模型建任务时预扣 0（那一刻还没有 token 数），没配 token 价的模型仍走按次 textCredits。",
+    );
+
+    // 7) 文本成本估算不得再返回 null：/api/admin/costs 用 `costCents: { not: null }` 过滤，
+    //    返回 null 等于整块文本花费在毛利页消失（过去就是这个问题）。
+    assertMatchesNormalized(
+        "src/lib/credit-pricing.ts",
+        /case "text":\s*\n\s*case "tool": \{[\s\S]{0,700}?return textTurnCostCents\(configured, \{ inputTokens: TEXT_TOKENS_PER_TURN_DRAFT\.input/,
+        "文本/工具的成本估算必须永远给一个数（没 usage 就按草案用量估），不许再返回 null。",
+    );
+    assertIncludes("src/app/api/admin/costs/route.ts", "costCents: { not: null }", "成本页仍按「有成本」过滤：所以估算侧不许留 null。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);
