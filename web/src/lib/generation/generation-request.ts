@@ -2,6 +2,7 @@ import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audi
 import { requestEdit, requestGeneration, requestImageQuestion, requestToolResponse, type AiTextMessage, type ResponseFunctionTool, type ResponseInputMessage, type ResponseToolCall, type ToolResponseResult } from "@/services/api/image";
 import { createVideoGenerationTask, pollVideoGenerationTask, requestVideoGeneration, storeGeneratedVideo, type VideoGenerationTask, type VideoGenerationTaskState } from "@/services/api/video";
 import { normalizeImageOutputFormat } from "@/lib/model-capability-spec";
+import { boolConfig } from "@/lib/seedance-video";
 import type { AiConfig } from "@/stores/use-config-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -148,6 +149,9 @@ function generationMetadata(config: AiConfig, prompt: string, referenceCount: nu
         outputFormat: normalizeImageOutputFormat(config.outputFormat),
         videoSeconds: config.videoSeconds,
         vquality: config.vquality,
+        // 草稿模式要落进任务元数据：视频按秒计价的档位靠它区分（草稿档成本是标准档的 1/4）。
+        // 过去只在上游请求体里用了一下，任务记录里没有，导致「这条按哪档收」事后无从核对。
+        videoDraft: String(boolConfig(config.videoDraft, false)),
         referenceCount,
         promptLength: prompt.length,
     };

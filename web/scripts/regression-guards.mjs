@@ -25,6 +25,13 @@ function assertMatchesNormalized(path, pattern, message) {
     assert(pattern.test(read(path).replace(/\r\n/g, "\n")), message || `${path} should match ${pattern}`);
 }
 
+/** 出现次数断言（同样先归一到 LF）：同一处写法要求在多处都存在时用 */
+function assertAtLeast(path, pattern, count, message) {
+    const global = new RegExp(pattern.source, pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`);
+    const hits = read(path).replace(/\r\n/g, "\n").match(global) || [];
+    assert(hits.length >= count, message || `${path} should match ${pattern} at least ${count} times (got ${hits.length})`);
+}
+
 function assertNotExists(path, message) {
     assert(!existsSync(join(root, path)), message || `${path} should not exist`);
 }
@@ -1294,6 +1301,68 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/lib/model-capability-spec.ts", "seconds: [6, 10, 12, 16, 20]", "通用视频模型的默认秒数保持不变（5s 只按标定开）。");
     assertIncludes("src/lib/model-capability-spec.ts", "if (isPrunaVideoModel(model)) return prunaVideoCapability();", "后台给 pruna 预填的标定必须是它的真实枚举，不然又会被标错一次。");
     assertIncludes("src/lib/model-capability-spec.ts", "VIDEO_CLARITY_VALUES: readonly VideoClarity[] = VIDEO_CLARITY_OPTIONS.map", "通用视频白名单从选项清单派生：手抄那份漏了 1080p，后台标定会被静默砍掉。");
+}
+
+// 视频「按秒计价」——上游按输出秒数收费，按条一口价会在长片/高清档上赔钱。
+{
+    // 1) 数据口径：四档成本字段 + 清洗白名单（漏一档 = 后台填了也不落库）
+    for (const key of ["videoCostYuanPerSecondStandard", "videoCostYuanPerSecondStandardDraft", "videoCostYuanPerSecondHigh", "videoCostYuanPerSecondHighDraft"]) {
+        assertIncludes("src/lib/credit-pricing.ts", key, `ModelPricing 必须带每档每秒成本字段（${key}）。`);
+    }
+    const sanitizeBody = read("src/lib/model-capability-spec.ts").split("export function sanitizePricing")[1]?.split("\nexport function")[0] || "";
+    for (const key of ["videoCostYuanPerSecondStandard", "videoCostYuanPerSecondStandardDraft", "videoCostYuanPerSecondHigh", "videoCostYuanPerSecondHighDraft"]) {
+        assert(sanitizeBody.includes(key), `sanitizePricing 的字段白名单漏了 ${key}：后台填的价会在保存时被静默丢掉。`);
+    }
+    assertMatchesNormalized("src/lib/model-capability-spec.ts", /function toPerSecondCostNumber[\s\S]{0,400}10_000/, "每秒成本必须保留到四位小数：两位会把 ¥0.0355（草稿档）抹成 ¥0.04。");
+
+    // 2) 计价口径：按秒优先于按条，成本估算与扣费同源
+    assertIncludes("src/lib/credit-pricing.ts", "export function hasVideoCostPricing", "必须能判定某模型是否走按秒计价。");
+    assertMatchesNormalized(
+        "src/lib/credit-pricing.ts",
+        /case "video": \{\n[\s\S]{0,600}hasVideoCostPricing\(configured\)[\s\S]{0,300}videoTurnCredits\(/,
+        "视频扣费必须先判按秒计价（配了每秒成本价就不能再按条收）。",
+    );
+    assertMatchesNormalized("src/lib/credit-pricing.ts", /case "video": \{\n[\s\S]{0,400}videoCostCents\(configured, metadata\)/, "成本估算必须走同一份按秒成本（否则后台毛利页会把 20 秒 1080p 记成 50 分）。");
+    assertIncludes("src/lib/credit-pricing.ts", "export const VIDEO_PRICING_MULTIPLIER_DEFAULT = 3", "视频计价倍率的内置默认值必须显式写明（缺了会按 1 倍 = 成本价卖）。");
+    assertMatchesNormalized("src/lib/credit-pricing.ts", /Math\.max\(1, Math\.round\(rate\.yuanPerSecond/, "有正成本就不许算成 0 分：否则这笔花费会从成本账上消失、售价还会退回按条价多收用户钱。");
+    assertMatchesNormalized("src/lib/credit-pricing.ts", /if \(!seconds\) return null/, "认不出秒数要返回 null（退回按条价），不能当 0 秒算成免费。");
+
+    // 3) 倍率旋钮：服务端读取 → 后台可改 → 目录下发给客户端（三处任一断开，售价就会掉回 1 倍或与实扣不一致）
+    assertIncludes("src/lib/operation-config.ts", "video_pricing_multiplier", "服务端必须读运营配置里的视频倍率。");
+    assertMatchesNormalized("src/lib/operation-config.ts", /videoMultiplier: await pickMultiplier\("video_pricing_multiplier", VIDEO_PRICING_MULTIPLIER_DEFAULT\)/, "全局默认定价必须把视频倍率一起下发（客户端预检与实扣要同一口径）。");
+    assertIncludes("src/app/api/admin/operation-config/route.ts", "video_pricing_multiplier", "运营配置的 KNOWN_KEYS 里没有这个键，后台保存会被 400 拒掉。");
+    assertIncludes("src/app/(user)/admin/operation-config-tab.tsx", "video_pricing_multiplier", "后台必须能改视频倍率（只在代码里留常数等于无法调价）。");
+
+    // 4) 后台面：四档成本输入框（用四位小数 setter）
+    assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "VIDEO_COST_FIELDS", "后台逐模型定价必须能填按秒成本四档。");
+    assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "setPerSecondCostField", "按秒成本必须用四位小数 setter（跟着积分价取整会把 ¥0.0355 变成 ¥0）。");
+    assertIncludes("src/app/(user)/admin/credential-pricing-editor.tsx", "hasVideoCostPricing(pricing)", "配了按秒价的模型要在后台标出来，否则看不出这条已改口径。");
+
+    // 5) 草稿档要落进 metadata 并归一 —— 没有它，四档只能认出两档
+    assertIncludes("src/lib/generation/generation-request.ts", "videoDraft: String(boolConfig(config.videoDraft, false))", "任务元数据必须带草稿标记，否则事后分不出这条按哪档收的费。");
+    assertMatchesNormalized("src/lib/generation/generation-config.ts", /videoDraft = isVideoDraftMetadata\(out\) \? "true" : "false"/, "服务端确权要把草稿标记归一（计费与落库认同一份写法）。");
+
+    // 6) 用户端预检：面板/工作台的估价必须带齐三个轴，否则显示价与实扣价是两回事
+    assertIncludes("src/constant/credits.tsx", "videoDraft?: string | boolean", "估价入口必须接受草稿档。");
+    assertIncludes("src/app/(user)/canvas/components/canvas-node-prompt-panel.tsx", 'videoDraft: mode === "video" ? config.videoDraft : undefined', "画布节点面板的估价必须带上草稿档。");
+    assertIncludes("src/app/(user)/canvas/components/canvas-config-node-panel.tsx", 'videoDraft: mode === "video" ? config.videoDraft : undefined', "画布节点设置面板的估价必须带上草稿档。");
+    assert(splitCallsiteHasDraft("src/app/(user)/studio/page.tsx"), "工作台的估价与提交前预检都要带草稿档（少一处，用户看到的价就与实际扣的不一致）。");
+
+    // 7) 定价页价目表：按秒模型必须带示例时长，否则会显示成按条价（比实扣低一大截）
+    assertIncludes("src/app/api/billing/packages/route.ts", "hasVideoCostPricing(configured ?? undefined)", "定价页价目表要单独处理按秒计价的模型。");
+    assertIncludes("src/app/api/billing/packages/route.ts", "sampleVideoSeconds", "按秒模型要给出示例时长，不然算不出价、退回按条价。");
+
+    // 8) 草稿档是节点级参数：面板写进 node.metadata.videoDraft，读不回来这个开关就是摆设
+    //    （价签不动 + 请求不带草稿 = 用户开了草稿仍按标准档扣费）。三处读取缺一不可。
+    assertAtLeast("src/app/(user)/canvas/components/canvas-node-prompt-panel.tsx", /videoDraft: node\.metadata\?\.videoDraft \|\| globalConfig\.videoDraft/g, 1, "画布节点面板必须从节点元数据读回草稿档，否则价签不跟着开关动。");
+    assertAtLeast("src/app/(user)/canvas/components/canvas-config-node-panel.tsx", /videoDraft: node\.metadata\?\.videoDraft \|\| globalConfig\.videoDraft/g, 1, "画布节点设置面板同样要从节点元数据读回草稿档。");
+    assertMatchesNormalized("src/lib/generation/generation-config.ts", /videoDraft: node\?\.metadata\?\.videoDraft \|\| config\.videoDraft \|\| defaultConfig\.videoDraft/, "请求路径必须把节点上的草稿档带进计费（缺了它，用户开草稿会被按标准档扣费）。");
+}
+
+/** 工作台有两处估价（面板上的预计消耗 + 提交前的余额预检），两处都要带草稿档 */
+function splitCallsiteHasDraft(path) {
+    const hits = read(path).match(/videoDraft: (?:kind|effectiveKind) === "video" \? effectiveConfig\.videoDraft : undefined/g) || [];
+    return hits.length >= 2;
 }
 
 if (failures.length) {

@@ -42,6 +42,7 @@ export function CanvasConfigNodePanel({ node, isRunning, inputSummary, onConfigC
         quality: mode === "image" ? config.quality : undefined,
         videoSeconds: mode === "video" ? config.videoSeconds : undefined,
         vquality: mode === "video" ? config.vquality : undefined,
+        videoDraft: mode === "video" ? config.videoDraft : undefined,
     });
     const chipStyle = { background: theme.node.fill, borderColor: theme.node.stroke, color: theme.node.text };
     const hasAnyInput = Boolean(inputSummary.textCount || inputSummary.imageCount || inputSummary.videoCount || inputSummary.audioCount);
@@ -201,6 +202,9 @@ function buildNodeConfig(globalConfig: AiConfig, node: CanvasNodeData, mode: Can
         vquality: node.metadata?.vquality || globalConfig.vquality || defaultConfig.vquality,
         videoGenerateAudio: node.metadata?.generateAudio || globalConfig.videoGenerateAudio || defaultConfig.videoGenerateAudio,
         videoWatermark: node.metadata?.watermark || globalConfig.videoWatermark || defaultConfig.videoWatermark,
+        // 草稿模式是节点级参数（面板写进 node.metadata.videoDraft），不读回来面板就永远显示全局那个值：
+        // 用户开了草稿、价签不动，请求也不会带草稿 —— 开关看起来能用，其实两边都没生效。
+        videoDraft: node.metadata?.videoDraft || globalConfig.videoDraft || defaultConfig.videoDraft,
         audioVoice: node.metadata?.audioVoice || globalConfig.audioVoice || defaultConfig.audioVoice,
         audioFormat: node.metadata?.audioFormat || globalConfig.audioFormat || defaultConfig.audioFormat,
         audioSpeed: node.metadata?.audioSpeed || globalConfig.audioSpeed || defaultConfig.audioSpeed,

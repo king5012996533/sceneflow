@@ -1,5 +1,6 @@
 import { boolConfig, isSeedanceVideoConfig, normalizeSeedanceRatio, normalizeSeedanceResolution } from "@/lib/seedance-video";
 import { normalizeImageOutputFormat } from "@/lib/model-capability-spec";
+import { isVideoDraftMetadata } from "@/lib/credit-pricing";
 import { defaultConfig, type AiConfig } from "@/stores/use-config-store";
 
 export type GenerationMode = "text" | "image" | "video" | "audio";
@@ -15,6 +16,7 @@ type GenerationConfigNode = {
         vquality?: string;
         generateAudio?: string;
         watermark?: string;
+        videoDraft?: string;
         audioVoice?: string;
         audioFormat?: string;
         audioSpeed?: string;
@@ -39,6 +41,9 @@ export function buildNodeGenerationConfig(config: AiConfig, node: GenerationConf
         vquality: node?.metadata?.vquality || config.vquality || defaultConfig.vquality,
         videoGenerateAudio: node?.metadata?.generateAudio || config.videoGenerateAudio || defaultConfig.videoGenerateAudio,
         videoWatermark: node?.metadata?.watermark || config.videoWatermark || defaultConfig.videoWatermark,
+        // 草稿档决定按秒计价用哪一档每秒价（标准 vs 草稿差 4 倍）。节点上这个开关写的是
+        // node.metadata.videoDraft，请求路径必须把它读回来，否则用户开着草稿被按标准档扣费。
+        videoDraft: node?.metadata?.videoDraft || config.videoDraft || defaultConfig.videoDraft,
         audioVoice: node?.metadata?.audioVoice || config.audioVoice || defaultConfig.audioVoice,
         audioFormat: node?.metadata?.audioFormat || config.audioFormat || defaultConfig.audioFormat,
         audioSpeed: node?.metadata?.audioSpeed || config.audioSpeed || defaultConfig.audioSpeed,
@@ -82,6 +87,7 @@ export function normalizeVideoResolution(value: string) {
 /**
  * 服务端确权（H-6）：扣费前把客户端传入的生成 metadata 按服务端口径规范化。
  * - 视频时长 clamp 到 1–20 秒（-1 自动时长保留），与上游实际生成的时长范围一致；
+ * - 视频草稿标记归一成 "true"/"false"（按秒计价的档位靠它判定，客户端可能发布尔或字符串）；
  * - 模型名去除首尾空白；
  * 规范化结果同时用于计费与落库，客户端无法通过篡改时长/模型名影响扣费口径。
  */
@@ -90,6 +96,11 @@ export function normalizeGenerationMetadata(metadata: Record<string, unknown> | 
     const out: Record<string, unknown> = { ...metadata };
     if (out.videoSeconds !== undefined && out.videoSeconds !== null) {
         out.videoSeconds = normalizeVideoSeconds(String(out.videoSeconds));
+    }
+    if (out.videoDraft !== undefined && out.videoDraft !== null) {
+        // 认得出是「开」就是 true，其余一律 false —— 与认价函数同一口径（isVideoDraftMetadata），
+        // 免得计费认一种写法、落库写另一种，事后对不上账。
+        out.videoDraft = isVideoDraftMetadata(out) ? "true" : "false";
     }
     for (const key of ["model", "imageModel", "videoModel", "textModel"] as const) {
         if (typeof out[key] === "string") {

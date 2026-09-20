@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/ic-prisma";
-import type { PricingDefaults } from "@/lib/credit-pricing";
+import { VIDEO_PRICING_MULTIPLIER_DEFAULT, type PricingDefaults } from "@/lib/credit-pricing";
 
 /**
  * OperationConfig 读取方（admin 写入，服务端读取）。
@@ -55,7 +55,22 @@ export async function getPricingDefaults(): Promise<PricingDefaults> {
         videoCredits: await pick("video_credit"),
         audioCredits: await pick("audio_credit"),
         textCredits: await pick("text_credit"),
+        videoMultiplier: await pickMultiplier("video_pricing_multiplier", VIDEO_PRICING_MULTIPLIER_DEFAULT),
     };
+}
+
+/**
+ * 倍率类配置：与积分价不同，**未配置时要给出内置默认值而不是 undefined**。
+ *
+ * 为什么不能像 pick() 那样留空：倍率是「成本 → 售价」的乘数，缺了它售价会掉到成本价以下
+ * （折算成 1 倍），等于按成本卖；客户端旧缓存里也没有这个字段，必须两侧都落回同一个常数。
+ * 0 或负数视为填错（会算出免费或负价），同样落回默认值。
+ */
+async function pickMultiplier(key: string, fallback: number): Promise<number> {
+    const value = await getOperationConfigValue(key);
+    if (value === null || value === undefined || value === "") return fallback;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 export function invalidateOperationConfigCache(key?: string) {

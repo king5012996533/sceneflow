@@ -422,11 +422,12 @@ export default function StudioPage() {
                     quality: effectiveKind === "image" ? effectiveConfig.quality : undefined,
                     videoSeconds: effectiveConfig.videoSeconds,
                     vquality: effectiveKind === "video" ? effectiveConfig.vquality : undefined,
+                    videoDraft: effectiveKind === "video" ? effectiveConfig.videoDraft : undefined,
                 },
                 getPlatformPricing(activeModel),
                 getPricingDefaults(),
             ),
-        [activeModel, effectiveConfig.size, effectiveConfig.quality, effectiveConfig.videoSeconds, effectiveConfig.vquality, effectiveKind],
+        [activeModel, effectiveConfig.size, effectiveConfig.quality, effectiveConfig.videoSeconds, effectiveConfig.vquality, effectiveConfig.videoDraft, effectiveKind],
     );
 
     const buildInstructionConfig = useCallback(
@@ -485,6 +486,7 @@ export default function StudioPage() {
                 quality: kind === "image" ? effectiveConfig.quality : undefined,
                 videoSeconds: effectiveConfig.videoSeconds,
                 vquality: kind === "video" ? effectiveConfig.vquality : undefined,
+                videoDraft: kind === "video" ? effectiveConfig.videoDraft : undefined,
             },
             getPlatformPricing(model),
             getPricingDefaults(),

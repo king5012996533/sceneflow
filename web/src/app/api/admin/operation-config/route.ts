@@ -15,6 +15,7 @@ const KNOWN_KEYS: Record<string, { description: string }> = {
     audio_credit: { description: "音频生成全局默认积分（每次；未逐模型定价时按此扣费）" },
     text_credit: { description: "文本/工具全局默认积分（每次；未逐模型定价时按此扣费）" },
     text_pricing_multiplier: { description: "文本按 token 计价的倍率（售价 = 平台成本 × 本倍率；默认 2）" },
+    video_pricing_multiplier: { description: "视频按秒计价的倍率（售价 = 平台成本 × 本倍率；默认 3）" },
 };
 
 export async function GET(req: NextRequest) {

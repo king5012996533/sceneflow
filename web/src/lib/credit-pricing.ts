@@ -46,6 +46,25 @@ export type ModelPricing = {
     videoCreditsStandard?: number;
     /** 每条高清视频扣积分（2K/1080p 等，按 vquality 判定），优先于 videoCredits */
     videoCreditsHigh?: number;
+
+    // —— 视频的按秒成本价（2026-09-21，Replicate 系模型）——
+    //
+    // 与上面三个「每条多少积分」的根本差别：**这里填的是平台成本，不是售价**，而且计费维度是秒。
+    // 上游（Replicate 的 prunaai/p-video）按输出秒数收：720p $0.02/秒、720p 草稿 $0.005/秒、
+    // 1080p $0.04/秒、1080p 草稿 $0.01/秒。按条卖一口价，5 秒和 20 秒同价 ——
+    // 20 秒 1080p 的成本是 ¥5.68，按当时的 20 积分（¥2）卖，每出一条赔 ¥3.68。
+    //
+    // 口径与文本的 token 成本价一致：填上游价目表上的数（这里按 1 美元 ≈ 7.1 元折成元/秒），
+    // 售价 = 成本 × 运营配置里的「视频计价倍率」。倍率是个旋钮，改倍率不用把每个模型的价重填一遍。
+    // 四档里任意一档填了，该模型整条就走按秒计价（没填的档按「同清晰度标准档 → 标准档」回落）。
+    /** 720p 等标准清晰度的每秒成本（元/秒），如 0.142 */
+    videoCostYuanPerSecondStandard?: number;
+    /** 720p 草稿模式（draft）的每秒成本（元/秒），如 0.0355 */
+    videoCostYuanPerSecondStandardDraft?: number;
+    /** 1080p/2K 等高清档的每秒成本（元/秒），如 0.284 */
+    videoCostYuanPerSecondHigh?: number;
+    /** 1080p/2K 草稿模式的每秒成本（元/秒），如 0.071 */
+    videoCostYuanPerSecondHighDraft?: number;
     /** 每次音频扣积分 */
     audioCredits?: number;
     /** 每次文本/工具调用扣积分（按次计价；配了 token 成本价时被 token 计价覆盖） */
@@ -76,6 +95,12 @@ export type PricingDefaults = {
     videoCredits?: number;
     audioCredits?: number;
     textCredits?: number;
+    /**
+     * 视频按秒计价的全局倍率（售价 = 平台成本 × 本倍率）。
+     * 只作用于「后台给该模型填了每秒成本价」的视频模型；按条计价的模型完全不受影响。
+     * 未配置时用 VIDEO_PRICING_MULTIPLIER_DEFAULT（客户端旧缓存里没有这个字段，同样落回默认值）。
+     */
+    videoMultiplier?: number;
 };
 
 /** 逐模型定价表（ProviderCredential.pricing，key = 模型名，与 capabilities 一致） */
@@ -219,10 +244,116 @@ export function readTokenUsage(metadata?: GenerationMetadata): TokenUsage | null
 }
 
 /**
+ * 视频按秒计价的四档（清晰度 × 是否草稿），与上游价目表一一对应。
+ * 键名只用在这条链路的内部标识（成本档位日志/单测），不落库、不面向用户。
+ */
+export type VideoCostTier = "standard" | "standardDraft" | "high" | "highDraft";
+
+/** 全局视频计价倍率（运营配置键；默认 3 = 按平台实际成本的三倍定价） */
+export const VIDEO_PRICING_MULTIPLIER_KEY = "video_pricing_multiplier";
+export const VIDEO_PRICING_MULTIPLIER_DEFAULT = 3;
+
+/** 该模型是否走「按秒 + 成本价」计价（四档里任意一档填了即生效） */
+export function hasVideoCostPricing(configured?: ModelPricing): boolean {
+    if (!configured) return false;
+    return configured.videoCostYuanPerSecondStandard !== undefined || configured.videoCostYuanPerSecondStandardDraft !== undefined || configured.videoCostYuanPerSecondHigh !== undefined || configured.videoCostYuanPerSecondHighDraft !== undefined;
+}
+
+/**
+ * 这条视频是不是草稿模式（上游 draft）。
+ *
+ * metadata 里的取值形态不唯一：客户端发来的是 "true"/"false" 字符串，服务端规范化后也是字符串，
+ * 但历史任务、脚本写入的 metadata 可能是布尔。这里三种都认，认不出就是 false（上游 draft 默认关）。
+ */
+export function isVideoDraftMetadata(metadata?: GenerationMetadata): boolean {
+    const raw = metadata?.videoDraft;
+    if (typeof raw === "boolean") return raw;
+    const text = String(raw ?? "")
+        .trim()
+        .toLowerCase();
+    return text === "true" || text === "1";
+}
+
+/**
+ * 这条视频请求的秒数。认不出来返回 0（调用方据此退回按条计价，不制造免费单）。
+ *
+ * "-1" 是「自动时长」的哨兵值（面板里由上游自己决定片长），按秒算不准 —— 同样返回 0。
+ */
+export function videoSecondsFromMetadata(metadata?: GenerationMetadata): number {
+    const raw = metadata?.videoSeconds;
+    if (String(raw ?? "").trim() === "-1") return 0;
+    const seconds = Math.floor(Number(raw));
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+}
+
+/**
+ * 本次用哪一档每秒成本。回落顺序：精确档 → 同清晰度的标准档 → 标准档。
+ * 一档都没填（或填的不是正数）→ null，调用方退回按条计价。
+ *
+ * 为什么要回落而不是报错：后台可能只填了标准档就想全模型先跑起来。
+ * 高清晰度会因此低估成本（1080p 被按 720p 的价算），所以后台那一栏写了「建议四档填全」。
+ */
+export function videoCostRate(configured: ModelPricing | undefined, metadata?: GenerationMetadata): { tier: VideoCostTier; yuanPerSecond: number } | null {
+    if (!configured) return null;
+    const high = isHighQuality(metadata);
+    const draft = isVideoDraftMetadata(metadata);
+    const candidates: Array<[VideoCostTier, number | undefined]> = draft
+        ? high
+            ? [
+                  ["highDraft", configured.videoCostYuanPerSecondHighDraft],
+                  ["high", configured.videoCostYuanPerSecondHigh],
+                  ["standard", configured.videoCostYuanPerSecondStandard],
+              ]
+            : [
+                  ["standardDraft", configured.videoCostYuanPerSecondStandardDraft],
+                  ["standard", configured.videoCostYuanPerSecondStandard],
+              ]
+        : high
+          ? [
+                ["high", configured.videoCostYuanPerSecondHigh],
+                ["standard", configured.videoCostYuanPerSecondStandard],
+            ]
+          : [["standard", configured.videoCostYuanPerSecondStandard]];
+    const hit = candidates.find(([, value]) => typeof value === "number" && Number.isFinite(value) && (value as number) > 0);
+    return hit ? { tier: hit[0], yuanPerSecond: hit[1] as number } : null;
+}
+
+/**
+ * 本次视频的平台成本（分，人民币）= 每秒成本 × 秒数。
+ * 认不出秒数或没配按秒价时返回 null（调用方回落到内置草案的粗估）。
+ */
+export function videoCostCents(configured: ModelPricing | undefined, metadata?: GenerationMetadata): number | null {
+    const seconds = videoSecondsFromMetadata(metadata);
+    if (!seconds) return null;
+    const rate = videoCostRate(configured, metadata);
+    if (!rate) return null;
+    // 下限 1 分：只要后台填了正的每秒价，这条就不许算成 0。
+    // 算成 0 会同时坏两件事 —— 成本账上这笔花费消失，售价那边以为「按秒算不出来」而退回按条价
+    // （按条价往往比真实成本高），用户会莫名其妙多付。真实模型没有低到 0.005 元/秒以下的价，
+    // 这条只会挡后台手滑填成 0.0001 那种数。
+    return Math.max(1, Math.round(rate.yuanPerSecond * seconds * CENTS_PER_YUAN));
+}
+
+/**
+ * 按秒计价的应收积分 = 平台成本 × 全局倍率，向上取整。
+ *
+ * 与文本同一条口径（`Math.max(1, ceil(...))`）：宁可多收几分，也不把零头抹成免费 ——
+ * 草稿档 5 秒成本约 ¥0.18，倍率 3 后 5.3 积分，向下取整会让所有短片都少收。
+ */
+export function videoTurnCredits(configured: ModelPricing | undefined, metadata: GenerationMetadata | undefined, multiplier: number): number {
+    const costCents = videoCostCents(configured, metadata);
+    if (!costCents || costCents <= 0) return 0;
+    const ratio = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : VIDEO_PRICING_MULTIPLIER_DEFAULT;
+    return Math.max(1, Math.ceil(yuanToCredits(costCents / CENTS_PER_YUAN) * ratio));
+}
+
+/**
  * 单次生成消耗积分（admin 跳过计费，调用方自行处理）。
  *
  * 取值优先级：configured（后台逐模型定价）> defaults（后台全局默认）> 内置草案。
- * 视频按条计费：每条固定积分，与时长无关。
+ * 视频两条口径：
+ *   - 配了每秒成本价（videoCostYuanPerSecond*）→ 按「秒数 × 每秒成本 × 全局倍率」扣，与时长挂钩；
+ *   - 没配 → 按条计费（标准档/高清档/统一档），与时长无关，行为与过去完全一致。
  * 图片两条口径：
  *   - 画质档位轴模型（配了 imageQualityCredits）：按用户选的 quality 逐档扣，未填的档位回落基础价；
  *   - 其余模型：按分辨率档位（1K/2K/4K）扣，档位由 metadata 的 size/quality 判定（见 image-resolution.ts），
@@ -259,6 +390,12 @@ export function getGenerationCreditsCost(kind: GenerationKind, metadata?: Genera
             return applyImageResolutionPricing(tier, configured, baseCredits);
         }
         case "video": {
+            // 按秒计价优先（配了每秒成本价的模型）：售价 = 成本 × 全局倍率，与时长/清晰度/草稿档挂钩。
+            // 秒数认不出（自动时长）时落到下面的按条口径 —— 宁可少收这一条，也不要把它算成 0 积分。
+            if (hasVideoCostPricing(configured)) {
+                const perSecond = videoTurnCredits(configured, metadata, defaults?.videoMultiplier ?? VIDEO_PRICING_MULTIPLIER_DEFAULT);
+                if (perSecond > 0) return perSecond;
+            }
             if (configured?.videoCredits !== undefined || configured?.videoCreditsStandard !== undefined || configured?.videoCreditsHigh !== undefined) {
                 // 逐模型分档定价：高清档（2K/1080p）/ 标准档（768P/720p 等）优先，统一档兜底
                 if (isHighQuality(metadata) && configured.videoCreditsHigh !== undefined) return Math.max(0, Math.floor(configured.videoCreditsHigh));
@@ -370,6 +507,9 @@ export function estimateGenerationCostCents(kind: GenerationKind, metadata?: Gen
             return 10;
         }
         case "video": {
+            // 配了每秒成本价的模型（Replicate pruna 这类按输出秒数收费的）→ 秒数 × 每秒成本（认清晰度与草稿档）
+            const perSecondCost = videoCostCents(configured, metadata);
+            if (perSecondCost !== null) return perSecondCost;
             if (model.includes("genvideo")) return 30;
             if (model.includes("seedance") || model.includes("doubao")) return isHighQuality(metadata) ? 80 : 40;
             if (model.includes("replicate")) return 100;

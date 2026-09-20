@@ -624,6 +624,18 @@ export function sanitizeQualityCredits(input: unknown): Partial<Record<ImageQual
     return Object.keys(result).length ? result : undefined;
 }
 
+/**
+ * 视频每秒成本价清洗（元/秒）。与 token 成本价的差别就在**小数位**：
+ * 上游每秒价低到 $0.005（≈¥0.0355），只留两位小数会把 0.0355 抹成 0.04（差 13%），
+ * 草稿档这类低价档正好全在这个精度上，四档加起来一年就是一笔钱。所以给到四位小数。
+ * 上界 1000 元/秒：只为挡住手滑多打几个 0（真实在售的视频模型没有超过几元的）。
+ */
+function toPerSecondCostNumber(value: unknown): number | undefined {
+    const raw = Number(value);
+    if (!Number.isFinite(raw) || raw < 0 || raw > 1000) return undefined;
+    return Math.round(raw * 10_000) / 10_000;
+}
+
 export function sanitizePricing(input: unknown): CredentialPricing | undefined {
     if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
     const result: CredentialPricing = {};
@@ -652,6 +664,15 @@ export function sanitizePricing(input: unknown): CredentialPricing | undefined {
         if (videoCreditsStandard !== undefined) pricing.videoCreditsStandard = videoCreditsStandard;
         const videoCreditsHigh = toPricingNumber(value.videoCreditsHigh);
         if (videoCreditsHigh !== undefined) pricing.videoCreditsHigh = videoCreditsHigh;
+        // 视频按秒成本价（元/秒，四位小数）——填了就改走「成本 × 倍率」的按秒计价
+        const videoCostStandard = toPerSecondCostNumber(value.videoCostYuanPerSecondStandard);
+        if (videoCostStandard !== undefined) pricing.videoCostYuanPerSecondStandard = videoCostStandard;
+        const videoCostStandardDraft = toPerSecondCostNumber(value.videoCostYuanPerSecondStandardDraft);
+        if (videoCostStandardDraft !== undefined) pricing.videoCostYuanPerSecondStandardDraft = videoCostStandardDraft;
+        const videoCostHigh = toPerSecondCostNumber(value.videoCostYuanPerSecondHigh);
+        if (videoCostHigh !== undefined) pricing.videoCostYuanPerSecondHigh = videoCostHigh;
+        const videoCostHighDraft = toPerSecondCostNumber(value.videoCostYuanPerSecondHighDraft);
+        if (videoCostHighDraft !== undefined) pricing.videoCostYuanPerSecondHighDraft = videoCostHighDraft;
         const audioCredits = toPricingNumber(value.audioCredits);
         if (audioCredits !== undefined) pricing.audioCredits = audioCredits;
         const textCredits = toPricingNumber(value.textCredits);

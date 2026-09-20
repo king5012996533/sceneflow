@@ -81,6 +81,8 @@ export type CanvasNodeMetadata = {
     vquality?: string;
     generateAudio?: string;
     watermark?: string;
+    /** 草稿档（prunaai/p-video 的 draft）：更快更省，但按秒计价走草稿那一档价 */
+    videoDraft?: string;
     audioVoice?: string;
     audioFormat?: string;
     audioSpeed?: string;

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { InputNumber, Switch } from "antd";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
-import { hasTextTokenPricing, type ModelPricing } from "@/lib/credit-pricing";
+import { hasTextTokenPricing, hasVideoCostPricing, type ModelPricing } from "@/lib/credit-pricing";
 import { IMAGE_KIND, IMAGE_QUALITY_TIER_OPTIONS, normalizeImageCapability, type ImageQuality, type ModelCapabilitySpec } from "@/lib/model-capability-spec";
 import type { ImageResolutionTier } from "@/lib/image-resolution";
 import { inferPricingKind, PRICING_KIND_LABEL, type PricingKind } from "@/lib/model-pricing-kind";
@@ -84,6 +84,20 @@ const VIDEO_TIERS: Array<{ key: NumericPricingKey; label: string; hint: string }
 ];
 
 /**
+ * 视频的按秒成本价（元/秒），四档 = 清晰度 × 是否草稿，与上游价目表一一对应。
+ *
+ * 为什么需要它（2026-09-21 老板反馈「价格不对」）：Replicate 系的模型（prunaai/p-video）按
+ * **输出秒数**收费，而按条一口价与时长无关 —— 20 秒 1080p 成本 ¥5.68、按 20 积分（¥2）卖，
+ * 每出一条赔 ¥3.68。这里填上游的每秒价，售价由运营配置里的「视频计价倍率」换算。
+ */
+const VIDEO_COST_FIELDS: Array<{ key: NumericPricingKey; label: string; hint: string }> = [
+    { key: "videoCostYuanPerSecondStandard", label: "720p 标准（元/秒）", hint: "上游 $0.02/秒 ≈ ¥0.142" },
+    { key: "videoCostYuanPerSecondStandardDraft", label: "720p 草稿（元/秒）", hint: "上游 $0.005/秒 ≈ ¥0.0355" },
+    { key: "videoCostYuanPerSecondHigh", label: "1080p 标准（元/秒）", hint: "上游 $0.04/秒 ≈ ¥0.284" },
+    { key: "videoCostYuanPerSecondHighDraft", label: "1080p 草稿（元/秒）", hint: "上游 $0.01/秒 ≈ ¥0.071" },
+];
+
+/**
  * 字段分组：每个模型默认只铺开自己那一组，其余折叠在「显示全部字段」后面。
  * 起因（2026-09-19 老板反馈「文本模型还不能定义价格」）：文本价过去被夹在图片 3 档 + 视频 2 档中间，
  * 能配但看不见 —— 所以文本模型现在第一眼看到的就是「文本 / 工具（每次）」这个价框。
@@ -117,7 +131,7 @@ const KIND_BADGE_CLASS: Record<PricingKind, string> = {
 const DISABLED_HINT: Record<PricingKind, string> = {
     text: "未启用：该模型的对话 / Agent 调用按「全局默认（运营配置）→ 内置 0 积分（不扣费）」计价。打开开关即可给文本调用单独定价。",
     image: "未启用：该模型出图按「全局默认（运营配置）→ 内置草案（大多 2 积分/张）」扣，2K/4K 未单独定价时沿用 1K 价。打开开关可按分辨率分档定价。",
-    video: "未启用：该模型出片按「全局默认（运营配置）→ 内置草案（每条 15–30 积分）」扣。打开开关可按标准档 / 高清档定价。",
+    video: "未启用：该模型出片按「全局默认（运营配置）→ 内置草案（每条 15–30 积分）」扣。打开开关可按条分档定价，或按上游的每秒成本价改成按秒计价。",
     audio: "未启用：该模型音频生成按「全局默认（运营配置）→ 内置 1 积分」扣。打开开关可单独定价。",
 };
 
@@ -189,6 +203,22 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
         commitPricing(model, next);
     };
 
+    /**
+     * 视频每秒成本字段（元/秒）：保留**四位**小数。
+     * 与 token 成本价的两位不同，这里的数小一个量级（草稿档 ¥0.0355），
+     * 两位小数会把它抹成 ¥0.04（差 13%），而草稿档恰好全在这个精度上。
+     * 上限与服务端清洗一致（> 1000 元/秒 视为填错，宁可当场不改也不留下脏价）。
+     */
+    const setPerSecondCostField = (model: string, key: NumericPricingKey, num: number | null) => {
+        const next = { ...(value[model] || {}) };
+        if (num === null || num === undefined) delete next[key];
+        else {
+            if (!Number.isFinite(num) || num < 0 || num > 1000) return;
+            next[key] = Math.round(num * 10_000) / 10_000;
+        }
+        commitPricing(model, next);
+    };
+
     /** 画质档位轴的逐档价：低档走基础价 imageCredits，其余写进 imageQualityCredits */
     const setQualityTierPrice = (model: string, quality: ImageQuality, num: number | null) => {
         if (quality === "low") {
@@ -230,29 +260,20 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
                                 {hasTextTokenPricing(pricing) ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-600">已启用按量结算</span> : null}
                             </div>
                             <div className="mb-1.5 text-[11px] leading-4 text-[#726d67]">
-                                这里填的是<span className="font-medium text-[#332f2a]">我们的成本</span>（照上游价目表原样填）。填了输入或输出成本，这个模型就改成「上游回报了用量才结算」，上面的「每次」价失效 ——
-                                一轮花多少不由我们猜，由上游报的 token 数决定。售价 = 成本 × 运营配置里的「文本计价倍率」。留空 = 这个模型仍然按次计价，行为与过去完全一样。
+                                这里填的是<span className="font-medium text-[#332f2a]">我们的成本</span>（照上游价目表原样填）。填了输入或输出成本，这个模型就改成「上游回报了用量才结算」，上面的「每次」价失效 —— 一轮花多少不由我们猜，由上游报的 token
+                                数决定。售价 = 成本 × 运营配置里的「文本计价倍率」。留空 = 这个模型仍然按次计价，行为与过去完全一样。
                             </div>
                             <div className="grid grid-cols-3 gap-3">
                                 {TEXT_COST_FIELDS.map((field) => (
                                     <div key={field.key}>
                                         <div className="mb-1 text-xs text-[#332f2a]">{field.label}</div>
-                                        <InputNumber
-                                            className="w-full"
-                                            min={0}
-                                            max={10000}
-                                            precision={2}
-                                            placeholder="留空 = 不按量"
-                                            value={pricing?.[field.key] ?? null}
-                                            onChange={(num) => setCostField(model, field.key, num)}
-                                        />
+                                        <InputNumber className="w-full" min={0} max={10000} precision={2} placeholder="留空 = 不按量" value={pricing?.[field.key] ?? null} onChange={(num) => setCostField(model, field.key, num)} />
                                         <div className="mt-0.5 text-[11px] text-[#726d67]">{field.hint}</div>
                                     </div>
                                 ))}
                             </div>
                             <div className="mt-1.5 text-[11px] leading-4 text-[#a49f9a]">
-                                例：输入 ¥2 / 输出 ¥8，一轮 3,000 输入 + 600 输出成本约 ¥0.011；倍率 2 后不足 1 积分，按 1 积分收（¥0.1）。
-                                缓存命中数由上游回报，命中部分按缓存价计，不会重复按输入价再算一遍。
+                                例：输入 ¥2 / 输出 ¥8，一轮 3,000 输入 + 600 输出成本约 ¥0.011；倍率 2 后不足 1 积分，按 1 积分收（¥0.1）。 缓存命中数由上游回报，命中部分按缓存价计，不会重复按输入价再算一遍。
                             </div>
                         </div>
                     ) : null}
@@ -327,6 +348,40 @@ export function CredentialPricingEditor({ models, value, onChange, capabilities 
                             </div>
                         </div>
                     ))}
+                </div>
+                <div className="mt-2.5 rounded-md border border-dashed border-[#d9d4ce] bg-white/70 p-2.5">
+                    <div className="mb-1 flex items-center gap-2 text-xs text-[#332f2a]">
+                        按秒计价（元/秒，四档）
+                        {hasVideoCostPricing(pricing) ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-600">已启用按秒计价</span> : null}
+                    </div>
+                    <div className="mb-1.5 text-[11px] leading-4 text-[#726d67]">
+                        这里填的是<span className="font-medium text-[#332f2a]">我们的成本</span>（照上游价目表的每秒价填，美元按 1 美元 ≈ 7.1 元折成元）。
+                        四档里任意一档填了，这个模型就改成「秒数 × 每秒成本 × 运营配置里的视频计价倍率」计价，上面那两栏「每条」价失效 ——
+                        上游是按**输出秒数**收的，按条一口价卖的话 20 秒 1080p 会比成本还低。
+                        只填标准档也能跑，但高清档会按标准档算（成本会被低估），建议四档填全。留空 = 保持按条计价，行为与过去完全一样。
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        {VIDEO_COST_FIELDS.map((field) => (
+                            <div key={field.key}>
+                                <div className="mb-1 text-xs text-[#332f2a]">{field.label}</div>
+                                <InputNumber
+                                    className="w-full"
+                                    min={0}
+                                    max={1000}
+                                    step={0.001}
+                                    precision={4}
+                                    placeholder="留空 = 按条计价"
+                                    value={pricing?.[field.key] ?? null}
+                                    onChange={(num) => setPerSecondCostField(model, field.key, num)}
+                                />
+                                <div className="mt-0.5 text-[11px] text-[#726d67]">{field.hint}</div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-1.5 text-[11px] leading-4 text-[#a49f9a]">
+                        例：720p 标准 ¥0.142/秒，20 秒成本 ¥2.84；倍率 3 后 85.2 积分，向上取整按 86 积分收（1 积分 = ¥0.1）。
+                        草稿档成本是标准档的 1/4，别照抄标准档的价。
+                    </div>
                 </div>
             </div>
         );

@@ -9,7 +9,7 @@ import { useCreditBalance } from "@/hooks/use-credit-balance";
 import { apiPath } from "@/lib/app-paths";
 import { getGenerationCreditsCost, type GenerationKind } from "@/lib/credit-pricing";
 
-type RateCardRow = { model: string; mode: string; kind: GenerationKind; credits: number };
+type RateCardRow = { model: string; mode: string; kind: GenerationKind; credits: number; /** 量词（按秒计价的视频是「约」，秒数写在 mode 里）；缺省按 kind 兜底 */ unit?: string };
 
 /** 接口不可用时的兜底行（与扣费同款内置草案计算，避免再次硬编码） */
 const FALLBACK_RATE_CARD: RateCardRow[] = [
@@ -78,7 +78,7 @@ export default function PricingPage() {
                         <div className="mt-2.5 text-[13px] leading-[1.9] text-[#47423c]">
                             {rateCard.map((row) => (
                                 <p key={`${row.model}-${row.mode}`}>
-                                    {row.model} {row.mode !== "标准" ? row.mode : ""} {unitWord(row.kind)} <b className="font-semibold text-[#332f2a]">{row.credits} 积分</b>
+                                    {row.model} {row.mode !== "标准" ? row.mode : ""} {row.unit || unitWord(row.kind)} <b className="font-semibold text-[#332f2a]">{row.credits} 积分</b>
                                 </p>
                             ))}
                         </div>
