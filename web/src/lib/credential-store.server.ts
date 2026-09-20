@@ -168,8 +168,10 @@ export async function resolveConfiguredImageMaxCount(model: string): Promise<num
 
 /**
  * 按目标地址匹配平台凭证。
- * 匹配策略：先按 host 匹配；多个候选时用 provider 提示消歧，再用 model 过滤；
- * 都不满足时回退到 host 匹配的最高优先级凭证。找不到返回 null。
+ * 匹配策略：给了 targetUrl 就先按 host 匹配（hard 约束：跨 host 的凭证拿不到放行），
+ * 多个候选时用 provider 提示消歧，再用 model 过滤（model 是软约束：同 host 的凭证可以兜底）；
+ * 没给 targetUrl 时按 provider 匹配（Replicate 一类只按 provider+model 解析的调用方）。
+ * 找不到返回 null。
  *
  * 2026-09-20 起：熔断窗口内的凭证不参与匹配（见 credential-health.ts）。要区分
  * 「没有这个渠道」和「渠道正在维护」的调用方用 resolvePlatformCredentialDetailed ——
@@ -195,9 +197,13 @@ export async function resolvePlatformCredentialDetailed(options: { targetUrl?: s
     const down = all.filter((credential) => isCredentialCircuitOpen(credential));
 
     const pick = (credentials: CredentialRow[]): CredentialRow | null => {
-        const hostMatched = targetUrl ? credentials.filter((credential) => hostMatches(credential.baseUrl, targetUrl)) : [];
-        const providerMatched = !hostMatched.length && provider ? credentials.filter((credential) => credential.provider === provider) : [];
-        const matched = hostMatched.length ? hostMatched : providerMatched;
+        // 给了目标地址时，host 就是硬约束：凭证必须与该目标同源，才可能被上游鉴权那一步放行
+        // （最终判据是 isCredentialTargetAllowed 的 origin 相等，见 upstream-auth.server.ts）。
+        // 2026-09-20 修：以前 host 无匹配时会退回「按 provider 找」，而那份候选**不限 host** ——
+        // A 渠道的钥匙被拿去匹配 B host 的请求，白名单再把它拒掉，于是用户看到的是
+        // 「目标地址不在已注册渠道白名单内」这种内部话术，真实原因（该渠道熔断中）被整段盖住。
+        // 只有「没有任何目标地址、纯按 provider+model 解析」的调用方（如 Replicate 建单）才走 provider 回退。
+        const matched = targetUrl ? credentials.filter((credential) => hostMatches(credential.baseUrl, targetUrl)) : provider ? credentials.filter((credential) => credential.provider === provider) : [];
         if (!matched.length) return null;
 
         // provider 提示消歧（提示与凭证标签不一致时忽略提示，不硬过滤）

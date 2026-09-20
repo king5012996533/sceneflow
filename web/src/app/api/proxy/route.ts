@@ -6,6 +6,7 @@ import { settleDeferredClientFailure } from "@/lib/generation/generation-jobs.se
 import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
 import { authorizeUpstreamRequest, explainUpstreamAuthorizationFailure, pickContentType, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
 import { recordCredentialUpstreamStatus } from "@/lib/credential-health.server";
+import { channelMaintenanceMessage, isCredentialAuthStatus } from "@/lib/credential-health";
 import { authorizeProxyUpstreamCall } from "@/lib/generation/proxy-access.server";
 import { readModelFromBody } from "@/lib/generation/upstream-endpoint-policy";
 import { readUsageFromPayload, teeStreamForUsage } from "@/lib/generation/upstream-usage";
@@ -210,6 +211,20 @@ export async function POST(req: NextRequest) {
             // 渠道健康：401/403 记一次凭证类失败、2xx 记成功（其余状态码不参与判定，见 credential-health.ts）。
             // 旁路统计，永不抛 —— 它坏掉不该影响正常请求。
             void recordCredentialUpstreamStatus(authorization.credential?.id, response.status, sfModel);
+
+            // 平台 Key 被上游判 401/403：这把钥匙用户看不到也改不了 —— 客户端拿到 401/403 后一律翻成
+            // 「鉴权失败，请检查 API Key 或模型权限」，等于把人支去查他动不了的东西（2026-09-20 线上真实反馈）。
+            // 所以必须在流式/blob 两条透传分支之前拦下，换成面向用户的话术；上游原话仍留在日志里排障。
+            // 状态码用 503：与「熔断拒绝」同一口径（401/403 在别的链路会被当成登录过期）。
+            if (isCredentialAuthStatus(response.status)) {
+                const raw = await response.text().catch(() => "");
+                const maintenance = channelMaintenanceMessage(sfModel);
+                console.error(`[proxy] 上游 ${response.status} 鉴权失败，改用渠道维护话术 ${method} ${target}${requestModel}：${raw.slice(0, 400)}`);
+                // error / message / msg 三个键都带上：客户端各条链路取字段的优先级不一样
+                // （信封链路认 error、axios 链路认 msg 再认 error.message），少带一个就会出现
+                // 「同一件事在不同入口说不同的话」。
+                return NextResponse.json({ error: maintenance, message: maintenance, msg: maintenance }, { status: 503 });
+            }
 
             // 流式透传（SSE / 文本流）：把上游 body 流原样转给客户端
             if (envelope.stream === true) {

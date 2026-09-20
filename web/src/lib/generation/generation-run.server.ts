@@ -11,6 +11,8 @@ import { dropUpstreamEnvelope, loadUpstreamEnvelope, readEnvelopeBody, recordRes
 import { salvageGenerationArtifacts } from "./generation-rescue.server";
 import { beginUpstreamCall, inflightJobCount, isUpstreamCallInFlight } from "./upstream-inflight";
 import { authorizeUpstreamRequest, explainUpstreamAuthorizationFailure } from "./upstream-auth.server";
+import { recordCredentialUpstreamStatus } from "@/lib/credential-health.server";
+import { channelMaintenanceMessage, isCredentialAuthStatus } from "@/lib/credential-health";
 
 /**
  * 上游信封的执行引擎（服务端）。
@@ -81,7 +83,7 @@ export async function executeStoredEnvelope(input: { job: RunnableJob; envelope:
     return settleAttempt({ job, envelope, attempt, source });
 }
 
-type Attempt = { kind: "ok"; payload: unknown; status: number; counted: { claimed: boolean; taskId: string } } | { kind: "rejected"; status: number; message: string; snippet: string } | { kind: "network-error"; message: string };
+type Attempt = { kind: "ok"; payload: unknown; status: number; counted: { claimed: boolean; taskId: string } } | { kind: "rejected"; status: number; message: string; snippet: string; maintenance?: boolean } | { kind: "network-error"; message: string };
 
 /** 发一次上游请求并解析报文，不做任何结账（结账统一在 settleAttempt 里） */
 async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; source: string; body?: Buffer }): Promise<Attempt> {
@@ -102,7 +104,7 @@ async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; so
             console.warn(`[generation-run] 任务 ${job.id} 的渠道在熔断窗口内，放弃执行（${envelope.url}）`);
             // 结账时写进任务失败原因的是 snippet（见 settleAttempt → upstreamErrorMessage），
             // 所以这句话必须同时落在 snippet 上，否则用户端看到的还是「上游返回 503：无说明」。
-            return { kind: "rejected", status: 503, message: maintenance, snippet: maintenance };
+            return { kind: "rejected", status: 503, message: maintenance, snippet: maintenance, maintenance: true };
         }
         console.warn(`[generation-run] 任务 ${job.id} 的信封指向未注册渠道或缺少凭证，放弃执行（${envelope.url}）`);
         return { kind: "network-error", message: "未注册渠道或缺少凭证" };
@@ -153,9 +155,16 @@ async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; so
         /* 非 JSON 报文：原样交给抢救逻辑（它只认已知字段名，认不出就是没成品） */
     }
 
+    // 渠道健康：与服务端执行之外的三条路径同一口径 —— 401/403 记一次凭证类失败、2xx 记成功。
+    // 这条路径在线上是主力（参考图生图走 deferred 执行，SERVER_RUN_GENERATION=1 + www.ggwk1.online），
+    // 漏了它就等于「渠道钥匙坏了但永远不熔断、模型永远不置灰」，连半开恢复也永远等不到那次成功。
+    void recordCredentialUpstreamStatus(authorization.credential?.id, response.status, envelope.model);
+
     if (!response.ok) {
         const snippet = typeof payload === "object" && payload !== null ? JSON.stringify(payload).slice(0, 300) : String(payload).slice(0, 300);
         console.error(`[generation-run] 任务 ${job.id} 上游 ${response.status}（${input.source}）：${snippet}`);
+        // 这里刻意保留上游原话：紧接着的 planRetry 要靠它认「编辑端点不吃这个模型」这类改道信号，
+        // 换成用户话术就把改道机会一起吞掉了。平台 401/403 的话术替换放在结账时做（settleAttempt）。
         return { kind: "rejected", status: response.status, message: upstreamFailureText(payload) || snippet, snippet };
     }
 
@@ -174,7 +183,13 @@ async function settleAttempt(input: { job: RunnableJob; envelope: UpstreamEnvelo
     const { job, envelope, attempt } = input;
     if (attempt.kind === "network-error") return "network-error";
     if (attempt.kind === "rejected") {
-        await finishGenerationJob(job.userId, job.id, "failed", upstreamErrorMessage(attempt.status, attempt.snippet)).catch((error) => console.error("[generation-run] 结账失败", job.id, error instanceof Error ? error.message : error));
+        // 写进任务失败原因的文案，用户看得到，所以两条口径都要在这里收口：
+        //   1) 渠道维护类（熔断窗口内 + 平台的 401/403）：直接给那句面向用户的话，不要再套
+        //      「上游返回 401（服务端执行）：…」——套了反而把「请检查 API Key」的判据（401 字样）带回来了，
+        //      正是线上反馈里最刺眼的一条；
+        //   2) 其余失败照旧带上状态码与上游原话（排障要的）。
+        const reason = attempt.maintenance ? attempt.message : isCredentialAuthStatus(attempt.status) ? channelMaintenanceMessage(envelope.model) : upstreamErrorMessage(attempt.status, attempt.snippet);
+        await finishGenerationJob(job.userId, job.id, "failed", reason).catch((error) => console.error("[generation-run] 结账失败", job.id, error instanceof Error ? error.message : error));
         await dropUpstreamEnvelope(job.id);
         return "upstream-error";
     }

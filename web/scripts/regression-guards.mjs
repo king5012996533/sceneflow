@@ -1189,6 +1189,14 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
         /const usable = all\.filter\(\(credential\) => !isCredentialCircuitOpen\(credential\)\)/,
         "熔断窗口内的凭证不得参与解析（否则熔断只是一行装饰）。",
     );
+    // 3b) 给了目标地址时 host 是硬约束：退回「按 provider 找」的候选**不限 host**，
+    //     那份候选必然被上游白名单拒掉（origin 不等），结果是真实原因（渠道维护中）
+    //     被「目标地址不在已注册渠道白名单内」盖住 —— 2026-09-20 复查时实测到过。
+    assertMatchesNormalized(
+        "src/lib/credential-store.server.ts",
+        /const matched = targetUrl \? credentials\.filter\(\(credential\) => hostMatches\(credential\.baseUrl, targetUrl\)\)/,
+        "解析凭证时，给了 targetUrl 就必须按 host 过滤（不许退回不限 host 的 provider 候选）。",
+    );
     // 4) 三条拿到上游响应的路径都要记成败：漏掉哪条，那条渠道就永远不会熔断
     assertIncludes("src/app/api/proxy/route.ts", "recordCredentialUpstreamStatus", "JSON 代理路径要记渠道成败。");
     assertIncludes("src/app/api/proxy/form-data/route.ts", "recordCredentialUpstreamStatus", "form-data 代理路径要记渠道成败。");
@@ -1211,6 +1219,29 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
         /kind: "rejected", status: 503, message: maintenance, snippet: maintenance/,
         "熔断时失败原因写进任务记录的是 snippet（settleAttempt → upstreamErrorMessage），两处都要带上那句话。",
     );
+    // 5c) 上游直接回 401/403（钥匙被吊销，不是「没配渠道」）时，透传路径也必须换成用户话术。
+    //     客户端拿到 401/403 会按状态码翻成「鉴权失败，请检查 API Key 或模型权限」（见
+    //     services/api/proxy-client.ts 与 lib/generation/upstream-error.ts 的 statusMessage），
+    //     而用户既看不到那把钥匙也改不了它 —— 2026-09-20 线上反馈的原话就是这条。
+    assertIncludes("src/app/api/proxy/route.ts", "isCredentialAuthStatus(response.status)", "JSON 代理要按上游状态码认出「钥匙的问题」。");
+    assertIncludes("src/app/api/proxy/route.ts", "channelMaintenanceMessage", "JSON 代理：上游 401/403 要换成渠道维护话术。");
+    assertIncludes("src/app/api/proxy/form-data/route.ts", "isCredentialAuthStatus(response.status)", "form-data 代理要按上游状态码认出「钥匙的问题」。");
+    assertIncludes("src/app/api/proxy/form-data/route.ts", "channelMaintenanceMessage", "form-data 代理：上游 401/403 要换成渠道维护话术。");
+    assertIncludes("src/lib/generation/generation-run.server.ts", "recordCredentialUpstreamStatus", "服务端执行路径也要记渠道成败（线上参考图生图的主力路径，漏了渠道永远不熔断、模型永远不置灰）。");
+    assertIncludes("src/lib/generation/generation-run.server.ts", "isCredentialAuthStatus(attempt.status)", "服务端执行路径的失败原因也要按 401/403 换成用户话术。");
+    assertIncludes("src/lib/generation/generation-run.server.ts", "attempt.maintenance ?", "熔断拒绝的任务失败原因要直接用那句话，不要再套「上游返回 401（服务端执行）」。");
+    // 话术替换的位置有两处讲究，挪了就会退化，所以用顺序断言钉住：
+    //   a) JSON 代理：必须排在流式/blob 两条透传分支之前 —— 那两条把上游报文原样送给客户端
+    //   b) 服务端执行：必须排在 planRetry 之后（即结账处）—— 改道信号只能从上游原话里认
+    const proxyJsonRoute = read("src/app/api/proxy/route.ts");
+    assert(
+        proxyJsonRoute.indexOf("isCredentialAuthStatus(response.status)") < proxyJsonRoute.indexOf("if (envelope.stream === true)"),
+        "JSON 代理的鉴权话术要在流式/blob 透传之前拦下，否则客户端照样按 401 翻成「请检查 API Key」。",
+    );
+    const runModule = read("src/lib/generation/generation-run.server.ts");
+    const settleAt = runModule.indexOf("async function settleAttempt");
+    const swapAt = runModule.indexOf("channelMaintenanceMessage(envelope.model)");
+    assert(settleAt > 0 && swapAt > settleAt, "服务端执行路径的话术替换要放在结账（settleAttempt）里，否则会把 planRetry 需要的上游原话吞掉。");
     // 6) 用户端模型目录要标出不可用，且只在这张模型「全部渠道都熔断」时才标
     assertIncludes("src/app/api/platform/catalog/route.ts", "computeModelAvailability", "目录要按「是否还有一张没熔断的凭证认领这个模型」判定可用性（规则收在 credential-health.ts，路由与核对共用一份）。");
     assertIncludes("src/components/model-picker.tsx", "disabled={!availability.available}", "模型选择器要把熔断渠道上的模型置灰。");

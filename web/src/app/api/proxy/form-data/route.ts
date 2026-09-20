@@ -6,6 +6,7 @@ import { settleDeferredClientFailure } from "@/lib/generation/generation-jobs.se
 import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
 import { authorizeUpstreamRequest, explainUpstreamAuthorizationFailure, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
 import { recordCredentialUpstreamStatus } from "@/lib/credential-health.server";
+import { channelMaintenanceMessage, isCredentialAuthStatus } from "@/lib/credential-health";
 import { authorizeProxyUpstreamCall } from "@/lib/generation/proxy-access.server";
 import { canRunOnServer, resolveServerRunPolicy, shouldPersistEnvelope, type UpstreamEnvelope } from "@/lib/generation/generation-envelope";
 import { findRunnableGenerationJob, startServerRun } from "@/lib/generation/generation-run.server";
@@ -190,6 +191,18 @@ export async function POST(req: NextRequest) {
                 const raw = bearer || (typeof safeHeaders.apikey === "string" ? safeHeaders.apikey : "");
                 const masked = raw ? raw.replace(/^(.{6}).*(.{4})$/, "$1****$2") : "none";
                 console.error(`[proxy/form-data] 上游 ${response.status} ${method} ${target} key=${masked}: ${snippet}`);
+            }
+            // 平台 Key 被上游判 401/403：与 JSON 代理同一口径 —— 客户端拿到 401/403 会翻成
+            // 「鉴权失败，请检查 API Key 或模型权限」，而用户既看不到这把钥匙也改不了它
+            // （参考图生图是画布主路径，这条以前正是线上反馈里最刺眼的一处）。换成面向用户的话术，
+            // 上游原话留在上面那行日志里。状态码 503：与「熔断拒绝」同口径，401/403 会被当成登录过期。
+            if (isCredentialAuthStatus(response.status)) {
+                const maintenance = channelMaintenanceMessage(String(incoming.get("model") || "") || undefined);
+                const snippet = typeof data === "object" && data !== null ? JSON.stringify(data).slice(0, 400) : String(data).slice(0, 400);
+                console.error(`[proxy/form-data] 上游 ${response.status} 鉴权失败，改用渠道维护话术 ${method} ${target}：${snippet}`);
+                // 三个键都带上：客户端不同链路取的字段不同（信封链路认 error、axios 链路认 msg），
+                // 少带一个就会出现「同一件事在不同入口说不同的话」。
+                return NextResponse.json({ error: maintenance, message: maintenance, msg: maintenance }, { status: 503 });
             }
             // 上游产出即抢救（与 JSON 代理同一套）：图生图的成品也在这里就地留给服务端
             if (response.ok && jobId) {
