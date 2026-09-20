@@ -82,6 +82,55 @@ assertIncludes("src/lib/generation/generation-jobs.server.ts", "quotaRefunded", 
 assertIncludes("src/app/api/proxy/route.ts", "requireCurrentUser", "the upstream proxy must reject anonymous callers.");
 assertIncludes("prisma/schema.prisma", "model GenerationJob", "generation lifecycle logs must remain persisted.");
 
+// —— 代理门闸（2026-09-20 安全审计 H1）：端点形态白名单 + 用户级限速 + 生成类必须挂本人 running 的任务 ——
+// 背景：积分扣减只发生在建任务那一刻（beginGenerationJob），代理层全程不碰积分；
+// 而代理原先只校验「目标与平台凭证同源」、jobId 还是可选的 ——
+// 于是「不建任务、直接拿登录 Cookie 打 /api/proxy」是一条 0 积分、不受并发上限约束、且完全无限速的免费出图通道。
+{
+    const gate = "src/lib/generation/proxy-access.server.ts";
+    assertIncludes(gate, "resolveUpstreamEndpointClass", "上游端点必须先过形态白名单：未登记的路径一律拒绝。");
+    assertIncludes(gate, "checkRateLimit", "代理调用必须按用户限速（生成类与读取类分开给额度）。");
+    assertIncludes(gate, "findRunnableGenerationJob", "生成类调用必须挂本人 running 的任务号 —— 这是把上游调用与「付过费的任务」重新绑在一起的那一环。");
+    assertIncludes(gate, "consumeUpstreamCallBudget", "同一条任务的上游调用次数必须受预算约束，否则付一次钱能打 N 次。");
+    // 两条代理路由吃的是同一把平台密钥，必须走同一道门闸：各写一份必然漂移，而漂移的代价是其中一条变成后门
+    for (const route of ["src/app/api/proxy/route.ts", "src/app/api/proxy/form-data/route.ts"]) {
+        assertIncludes(route, "authorizeProxyUpstreamCall(", `${route} 必须走共用门闸（proxy-access.server.ts），不得只做同源校验。`);
+    }
+    // 端点形态只能来自白名单表：路由里不得就地写路径判断（当年 H3 就是前缀校验误伤合法请求）
+    assertNotMatches("src/app/api/proxy/route.ts", /pathname\.(startsWith|includes)\(/, "端点判断只能来自 upstream-endpoint-policy 的形态表，不得在路由里就地写路径规则。");
+}
+
+// —— 任务号必须一路传到上游调用（2026-09-20）：门闸要求生成类调用挂任务号，
+// 少传一处，那条链路在线上就是整条 403。视频五条渠道与文本/工具/音频的传参此前全部缺失。——
+{
+    const video = "src/services/api/video.ts";
+    for (const [fn, why] of [
+        ["createOpenAIVideoTask", "OpenAI 视频任务创建"],
+        ["createSeedanceTask", "Seedance 任务创建"],
+        ["createMiniMaxVideoTask", "MiniMax 任务创建"],
+        ["createGenvideoVideoTask", "GenVideo 任务创建"],
+        ["createAigcccVideoTask", "Aigccc 任务创建"],
+        ["createReplicateVideoTask", "Replicate 任务创建"],
+    ]) {
+        assertMatchesNormalized(video, new RegExp(`function ${fn}\\([\\s\\S]{0,400}?serverJobId`), `${fn}（${why}）必须接收任务号并带给上游，否则门闸之下这条视频链路整条 403。`);
+    }
+    assert(read(video).includes('formData.set("_proxy_job", serverJobId)'), "OpenAI 视频走 form-data 代理，任务号必须放进 _proxy_job（form-data 通道的唯一传参方式）。");
+    // 五条渠道里只有四条走 JSON 代理：Replicate 由服务端自己执行（startServerReplicateJob），根本不经过 /api/proxy，
+    // 所以它不需要（也不该）在这里带 jobId —— 需要钉住的是「它确实走的是服务端执行」。
+    const videoJobIds = (read(video).match(/jobId: serverJobId/g) || []).length;
+    assert(videoJobIds >= 4, `video.ts 里带任务号的 JSON 代理调用只有 ${videoJobIds} 处：Seedance/MiniMax/GenVideo/Aigccc 四条渠道都要带上。`);
+    assertIncludes(video, "startServerReplicateJob(serverJobId", "Replicate 视频必须由服务端执行（不经过代理门闸），不得退化成浏览器侧直发。");
+    assertIncludes("src/services/api/audio.ts", "jobId: serverJobId", "语音合成是按次计费的上游调用，必须带任务号。");
+    const image = "src/services/api/image.ts";
+    assertMatchesNormalized(image, /export async function requestImageQuestion\([\s\S]{0,300}?serverJobId/, "requestImageQuestion 必须接收任务号：文本轮次同样是走上游的计费调用。");
+    assertMatchesNormalized(image, /export async function requestToolResponse\([\s\S]{0,400}?serverJobId/, "requestToolResponse 必须接收任务号：工具轮次同样是走上游的计费调用。");
+    assert(read("src/services/api/image.ts").includes('formData.set("_proxy_job", serverJobId)'), "参考图生图（form-data 主路径）必须把任务号放进 _proxy_job。");
+    const request = "src/lib/generation/generation-request.ts";
+    assertIncludes(request, "requestImageQuestion(config, messages, onDelta, options, job.id)", "文本入口必须把任务号传下去。");
+    assertIncludes(request, "requestToolResponse(config, messages, tools, toolChoice, onDelta, options, job.id)", "工具入口必须把任务号传下去。");
+    assertIncludes(request, "requestAudioGeneration(config, prompt, options, job.id)", "音频入口必须把任务号传下去。");
+}
+
 // —— 素材代理（2026-09-16 线上事故）：字节系 CDN（v3-dy-o.zjcdn.com / v16-dola.dola.com）按 Referer 防盗链，
 // 浏览器带本站 Referer 直连一律 403（下载不到、<video> 也放不出来），服务端不带 Referer 请求同一地址才是 200。
 // 铁律：浏览器不得直连第三方素材地址，视频/音频的下载与播放都必须经同源素材代理。

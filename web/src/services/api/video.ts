@@ -189,26 +189,26 @@ export async function createVideoGenerationTask(
     assertVideoConfig(requestConfig, requestConfig.model);
     if (requestConfig.apiFormat === "aigccc") {
         // Aigccc（Seedance 2.0 第三方网关）必须优先于 isSeedanceVideoConfig 判断（模型能力标定为 seedance-video 时会命中 seedance 分支）
-        return createAigcccVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
+        return createAigcccVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options, serverJobId);
     }
     if (requestConfig.apiFormat === "replicate") {
         // Replicate 先于 seedance 启发式：凭证格式是权威依据，模型名含 seedance 也必须走 /v1/predictions
         return createReplicateVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options, serverJobId);
     }
     if (requestConfig.apiFormat === "minimax") {
-        return createMiniMaxVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
+        return createMiniMaxVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options, serverJobId);
     }
     if (requestConfig.apiFormat === "genvideo" || isGenvideoVideoConfig(requestConfig)) {
         // GenVideo（ai-genvideo.com）先于 seedance 启发式：模型名含 "video" 也不能落进通用/Seedance 分支
-        return createGenvideoVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
+        return createGenvideoVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options, serverJobId);
     }
     if (isSeedanceVideoConfig(requestConfig)) {
-        return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
+        return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options, serverJobId);
     }
     if (videoReferences.length || audioReferences.length) {
         throw new Error("当前视频接口不支持参考视频或参考音频，请切换到 Seedance 2.0 / 火山 Agent Plan 模型，或移除参考素材");
     }
-    return createOpenAIVideoTask(requestConfig, selectedModel, prompt, references, options);
+    return createOpenAIVideoTask(requestConfig, selectedModel, prompt, references, options, serverJobId);
 }
 
 export async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
@@ -228,7 +228,7 @@ export async function storeGeneratedVideo(result: VideoGenerationResult): Promis
     throw new Error("视频接口没有返回可播放的视频");
 }
 
-async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<VideoGenerationTask> {
+async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: RequestOptions, serverJobId?: string): Promise<VideoGenerationTask> {
     const formData = new FormData();
     formData.set("model", modelOptionName(model));
     formData.set("prompt", prompt);
@@ -243,6 +243,8 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
         formData.set("_proxy_url", aiApiUrl(config, "/videos"));
         formData.set("_proxy_method", "POST");
         formData.set("_proxy_headers", JSON.stringify(aiHeaders(config)));
+        // 任务号随表单一起走：上游一旦出片，服务端就地归档；代理门闸也靠它把这次调用与已付费的任务对上
+        if (serverJobId) formData.set("_proxy_job", serverJobId);
         const response = await fetch("/canvas/api/proxy/form-data", {
             method: "POST",
             body: formData,
@@ -277,7 +279,16 @@ async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, 
     }
 }
 
-async function createSeedanceTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+async function createSeedanceTask(
+    config: AiConfig,
+    model: string,
+    prompt: string,
+    references: ReferenceImage[],
+    videoReferences: ReferenceVideo[],
+    audioReferences: ReferenceAudio[],
+    options?: RequestOptions,
+    serverJobId?: string,
+): Promise<VideoGenerationTask> {
     if (audioReferences.length && !references.length && !videoReferences.length) {
         throw new Error("Seedance 参考音频不能单独使用，请同时添加参考图或参考视频");
     }
@@ -300,6 +311,7 @@ async function createSeedanceTask(config: AiConfig, model: string, prompt: strin
             url: seedanceApiUrl(config),
             method: "POST",
             headers: aiHeaders(config, "application/json"),
+            jobId: serverJobId,
             body: payload,
         });
         const created = unwrapSeedanceTask(data);
@@ -392,7 +404,16 @@ async function resolveMiniMaxAudioUrl(audio: ReferenceAudio) {
     return blobToDataUrl(blob!);
 }
 
-async function createMiniMaxVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+async function createMiniMaxVideoTask(
+    config: AiConfig,
+    model: string,
+    prompt: string,
+    references: ReferenceImage[],
+    videoReferences: ReferenceVideo[],
+    audioReferences: ReferenceAudio[],
+    options?: RequestOptions,
+    serverJobId?: string,
+): Promise<VideoGenerationTask> {
     const content: Array<Record<string, unknown>> = [{ type: "text", text: prompt }];
     const images = references.slice(0, 9);
     // 单张参考图当作首帧(I2V), 多张则全部作为分镜参考图; H3 不允许首帧与参考输入混用
@@ -418,6 +439,7 @@ async function createMiniMaxVideoTask(config: AiConfig, model: string, prompt: s
             url: minimaxApiUrl(config, "/v2/video_generation"),
             method: "POST",
             headers: aiHeaders(config, "application/json"),
+            jobId: serverJobId,
             body: payload,
         });
         const baseError = readMiniMaxBaseResp(data);
@@ -504,7 +526,16 @@ function readGenvideoError(error: unknown, fallback: string) {
     return readAxiosError(error, fallback);
 }
 
-async function createGenvideoVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+async function createGenvideoVideoTask(
+    config: AiConfig,
+    model: string,
+    prompt: string,
+    references: ReferenceImage[],
+    videoReferences: ReferenceVideo[],
+    audioReferences: ReferenceAudio[],
+    options?: RequestOptions,
+    serverJobId?: string,
+): Promise<VideoGenerationTask> {
     if (videoReferences.length || audioReferences.length) {
         throw new Error("GenVideo 视频接口暂不支持参考视频/参考音频，请移除相关参考素材或改用 Seedance 模型");
     }
@@ -523,6 +554,7 @@ async function createGenvideoVideoTask(config: AiConfig, model: string, prompt: 
             url: genvideoApiUrl(config, "/videos/generations"),
             method: "POST",
             headers: aiHeaders(config, "application/json"),
+            jobId: serverJobId,
             body: payload,
         });
         // 上游 id 是长整型（JSON 以字符串返回），必须保持字符串避免精度丢失
@@ -614,7 +646,16 @@ function unwrapAigccc<T>(payload: AigcccEnvelope<T>): T {
     return payload.data;
 }
 
-async function createAigcccVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+async function createAigcccVideoTask(
+    config: AiConfig,
+    model: string,
+    prompt: string,
+    references: ReferenceImage[],
+    videoReferences: ReferenceVideo[],
+    audioReferences: ReferenceAudio[],
+    options?: RequestOptions,
+    serverJobId?: string,
+): Promise<VideoGenerationTask> {
     if (!prompt.trim() && !references.length && !videoReferences.length && !audioReferences.length) {
         throw new Error("请输入视频提示词，或连接参考图片/视频/音频");
     }
@@ -642,6 +683,7 @@ async function createAigcccVideoTask(config: AiConfig, model: string, prompt: st
             url: aigcccApiUrl(config, "/api/external/v1/video/task/create"),
             method: "POST",
             headers: aigcccHeaders(config),
+            jobId: serverJobId,
             body: payload,
         });
         const created = unwrapAigccc(data);

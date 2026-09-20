@@ -28,7 +28,7 @@ function aiHeaders(config: AiConfig) {
     };
 }
 
-export async function requestAudioGeneration(config: AiConfig, prompt: string, options?: RequestOptions): Promise<Blob> {
+export async function requestAudioGeneration(config: AiConfig, prompt: string, options?: RequestOptions, serverJobId?: string): Promise<Blob> {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.audioModel);
     const model = requestConfig.model.trim();
     assertAudioConfig(requestConfig, model);
@@ -41,6 +41,8 @@ export async function requestAudioGeneration(config: AiConfig, prompt: string, o
             url: aiApiUrl(requestConfig, "/audio/speech"),
             method: "POST",
             headers: aiHeaders(requestConfig),
+            // 语音是按次计费的上游调用：任务号既是归档归属，也是代理门闸认「这一单付过钱」的凭据
+            jobId: serverJobId,
             body: {
                 model,
                 input: prompt,

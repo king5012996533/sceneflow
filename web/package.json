@@ -41,6 +41,8 @@
         "test:inflight": "node scripts/upstream-inflight-unit-tests.mjs",
         "test:report": "node scripts/generation-report-unit-tests.mjs",
         "test:envelope": "node scripts/generation-envelope-unit-tests.mjs",
+        "test:endpointpolicy": "node scripts/upstream-endpoint-policy-unit-tests.mjs",
+        "test:budget": "node scripts/upstream-call-budget-unit-tests.mjs",
         "start": "next start",
         "format": "prettier --write .",
         "format:check": "prettier --check .",

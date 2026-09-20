@@ -5,6 +5,8 @@ import { salvageGenerationArtifacts } from "@/lib/generation/generation-rescue.s
 import { settleDeferredClientFailure } from "@/lib/generation/generation-jobs.server";
 import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
 import { authorizeUpstreamRequest, pickContentType, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
+import { authorizeProxyUpstreamCall } from "@/lib/generation/proxy-access.server";
+import { readModelFromBody } from "@/lib/generation/upstream-endpoint-policy";
 import { canRunOnServer, resolveServerRunPolicy, shouldPersistEnvelope, type UpstreamEnvelope } from "@/lib/generation/generation-envelope";
 import { findRunnableGenerationJob, startServerRun } from "@/lib/generation/generation-run.server";
 import { describeUnusableSuccess } from "@/lib/generation/upstream-error";
@@ -81,11 +83,31 @@ export async function POST(req: NextRequest) {
         if (!authorization) {
             return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
         }
+
+        // method / jobId 提前到这里：下面那道门闸要按「端点形态 + 任务归属」判，缺一个都判不了
+        const method = sanitizeMethod(envelope.method);
+        const jobId = typeof envelope.jobId === "string" && envelope.jobId ? envelope.jobId : "";
+
+        // 上游访问门闸（审计 H1）：端点形态白名单 + 用户级限速 + 生成类必须挂本人 running 的任务号。
+        // 扣费只发生在建任务那一刻（beginGenerationJob），代理层全程不碰积分 ——
+        // 所以「不挂任务」就等于这次上游调用没人付钱：一次性的免费出图通道就是这么来的。
+        const access = await authorizeProxyUpstreamCall({
+            userId: user.id,
+            method,
+            pathname: target.pathname,
+            jobId,
+            requestModel: readModelFromBody(envelope.body),
+        });
+        if (!access.ok) {
+            console.warn(`[proxy] 拒绝上游调用：${access.log}`);
+            return NextResponse.json({ error: access.error }, { status: access.status });
+        }
+
         const keySource: KeySource = "platform";
         // 模型名要先取出来：下面为了省内存会把 envelope.body 置空（见 90 行附近的注释），
         // 等拿到上游响应再读就已经是 undefined 了 —— 2026-09-19 线上实测踩到，日志里只有 target 没有 model。
         requestModel = describeRequestModel(envelope.body);
-        console.log(`[proxy] key-source=${keySource} target=${target.hostname}${target.pathname}${requestModel}`);
+        console.log(`[proxy] key-source=${keySource} endpoint=${access.endpoint} target=${target.hostname}${target.pathname}${requestModel}`);
 
         const upstreamBody = buildUpstreamBody(envelope.body, envelope.bodyBase64, safeHeaders);
         const isRawUpload = typeof envelope.bodyBase64 === "string" && (envelope.bodyBase64 as string).length > 0;
@@ -111,9 +133,6 @@ export async function POST(req: NextRequest) {
                       timedOut = true;
                       controller.abort();
                   }, PROXY_TIMEOUT_MS);
-
-        const method = sanitizeMethod(envelope.method);
-        const jobId = typeof envelope.jobId === "string" && envelope.jobId ? envelope.jobId : "";
 
         // —— 阶段 2：把这次调用交给服务端执行，浏览器不再等长连接 ——
         // 客户端在信封里声明「我能接受延后取结果」（deferrable），是否真的延后由服务端按环境开关决定：

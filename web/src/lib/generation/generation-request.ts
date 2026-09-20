@@ -122,7 +122,7 @@ export async function persistGeneratedVideo(result: Awaited<ReturnType<typeof re
 }
 
 export async function requestGeneratedAudio({ config, prompt, options }: AudioGenerationRequest) {
-    return runGuardedGeneration("audio", 1, generationMetadata(config, prompt, 0), () => requestAudioGeneration(config, prompt, options));
+    return runGuardedGeneration("audio", 1, generationMetadata(config, prompt, 0), (job) => requestAudioGeneration(config, prompt, options, job.id));
 }
 
 export async function persistGeneratedAudio(blob: Awaited<ReturnType<typeof requestGeneratedAudio>>, format = "mp3") {
@@ -130,11 +130,11 @@ export async function persistGeneratedAudio(blob: Awaited<ReturnType<typeof requ
 }
 
 export async function requestGeneratedText({ config, messages, onDelta, options }: TextGenerationRequest) {
-    return runGuardedGeneration("text", 1, generationMetadata(config, "", 0), () => requestImageQuestion(config, messages, onDelta, options));
+    return runGuardedGeneration("text", 1, generationMetadata(config, "", 0), (job) => requestImageQuestion(config, messages, onDelta, options, job.id));
 }
 
 export async function requestGeneratedToolResponse({ config, messages, tools, toolChoice = "auto", onDelta, options }: ToolGenerationRequest): Promise<ToolResponseResult> {
-    return runGuardedGeneration("tool", 1, generationMetadata(config, "", 0), () => requestToolResponse(config, messages, tools, toolChoice, onDelta, options));
+    return runGuardedGeneration("tool", 1, generationMetadata(config, "", 0), (job) => requestToolResponse(config, messages, tools, toolChoice, onDelta, options, job.id));
 }
 
 function generationMetadata(config: AiConfig, prompt: string, referenceCount: number) {

@@ -5,6 +5,7 @@ import { salvageGenerationArtifacts } from "@/lib/generation/generation-rescue.s
 import { settleDeferredClientFailure } from "@/lib/generation/generation-jobs.server";
 import { beginUpstreamCall } from "@/lib/generation/upstream-inflight";
 import { authorizeUpstreamRequest, stripCredentialHeaders } from "@/lib/generation/upstream-auth.server";
+import { authorizeProxyUpstreamCall } from "@/lib/generation/proxy-access.server";
 import { canRunOnServer, resolveServerRunPolicy, shouldPersistEnvelope, type UpstreamEnvelope } from "@/lib/generation/generation-envelope";
 import { findRunnableGenerationJob, startServerRun } from "@/lib/generation/generation-run.server";
 import { saveUpstreamEnvelope } from "@/lib/generation/generation-spool.server";
@@ -55,7 +56,21 @@ export async function POST(req: NextRequest) {
         if (!authorization) {
             return NextResponse.json({ error: "目标地址不在已注册渠道白名单内" }, { status: 403 });
         }
-        console.log(`[proxy/form-data] key-source=platform target=${target.hostname}`);
+
+        // 上游访问门闸（审计 H1）：端点形态白名单 + 用户级限速 + 生成类必须挂本人 running 的任务号。
+        // 与 JSON 代理共用同一份实现（proxy-access.server.ts），免得两条吃同一把平台 Key 的路由各写一份、日后漂移。
+        const access = await authorizeProxyUpstreamCall({
+            userId: user.id,
+            method,
+            pathname: target.pathname,
+            jobId,
+            requestModel: String(incoming.get("model") || ""),
+        });
+        if (!access.ok) {
+            console.warn(`[proxy/form-data] 拒绝上游调用：${access.log}`);
+            return NextResponse.json({ error: access.error }, { status: access.status });
+        }
+        console.log(`[proxy/form-data] key-source=platform endpoint=${access.endpoint} target=${target.hostname}${target.pathname}`);
 
         // 使用 form-data 包构建 multipart body
         const form = new FormDataPackage();

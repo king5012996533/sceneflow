@@ -42,13 +42,15 @@ export type RunnableJob = {
     kind: string;
     metadata?: unknown;
     startedAt?: Date | null;
+    /** 这条任务允许发起几次生成类上游调用（预算随张数走，见 upstream-endpoint-policy） */
+    count?: number;
 };
 
 export async function findRunnableGenerationJob(userId: string, jobId: string): Promise<RunnableJob | null> {
     if (!prisma || !jobId) return null;
     const job = await prisma.generationJob.findFirst({
         where: { id: jobId, userId, status: "running" },
-        select: { id: true, userId: true, kind: true, metadata: true, startedAt: true },
+        select: { id: true, userId: true, kind: true, metadata: true, startedAt: true, count: true },
     });
     return job ?? null;
 }

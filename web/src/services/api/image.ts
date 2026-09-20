@@ -874,13 +874,14 @@ function toChatCompletionBody(config: AiConfig, body: Record<string, unknown>) {
     return chatBody;
 }
 
-async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
+async function requestStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions, serverJobId?: string): Promise<ToolResponseResult> {
     const chatBody = { ...toChatCompletionBody(config, body), stream: true };
     // 平台 Key 化后所有上游 egress 走代理：流式对话由代理透传 + 服务端注入 Key
     const response = await proxyFetchStream({
         url: aiApiUrl(config, "/chat/completions"),
         method: "POST",
         headers: { ...aiHeaders(config, "application/json"), Accept: "text/event-stream" },
+        jobId: serverJobId,
         body: chatBody,
     });
     if (!response.ok) throw new Error(await readFetchError(response, "请求失败"));
@@ -1064,11 +1065,12 @@ type ChatCompletionPayload = {
  * 于是在画布上表现为「模型没有返回内容，请换一种说法再试」。
  * 代价是工具轮的正文不再逐字流式显示，换来的是这轮能真的出结果。
  */
-async function requestChatCompletionResponse(config: AiConfig, body: Record<string, unknown>): Promise<ToolResponseResult> {
+async function requestChatCompletionResponse(config: AiConfig, body: Record<string, unknown>, serverJobId?: string): Promise<ToolResponseResult> {
     const payload = await proxyFetch<ChatCompletionPayload>({
         url: aiApiUrl(config, "/chat/completions"),
         method: "POST",
         headers: aiHeaders(config, "application/json"),
+        jobId: serverJobId,
         body: toChatCompletionBody(config, body),
     });
     const message = payload.choices?.[0]?.message;
@@ -1090,11 +1092,12 @@ async function requestChatCompletionResponse(config: AiConfig, body: Record<stri
     };
 }
 
-async function requestGeminiStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
+async function requestGeminiStreamingResponse(config: AiConfig, body: Record<string, unknown>, onDelta?: (text: string) => void, options?: RequestOptions, serverJobId?: string): Promise<ToolResponseResult> {
     const response = await proxyFetchStream({
         url: `${geminiApiUrl(config, "streamGenerateContent")}?alt=sse`,
         method: "POST",
         headers: geminiHeaders(config),
+        jobId: serverJobId,
         body,
     });
     if (!response.ok) throw new Error(await readFetchError(response, "请求失败"));
@@ -1436,11 +1439,11 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     }
 }
 
-export async function requestImageQuestion(config: AiConfig, messages: AiTextMessage[], onDelta: (text: string) => void, options?: RequestOptions) {
+export async function requestImageQuestion(config: AiConfig, messages: AiTextMessage[], onDelta: (text: string) => void, options?: RequestOptions, serverJobId?: string) {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
     try {
         if (requestConfig.apiFormat === "gemini") {
-            const answer = (await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages), onDelta, options)).content || "没有返回内容";
+            const answer = (await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages), onDelta, options, serverJobId)).content || "没有返回内容";
             if (answer === "没有返回内容") onDelta(answer);
             return answer;
         }
@@ -1454,6 +1457,7 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
                     },
                     onDelta,
                     options,
+                    serverJobId,
                 )
             ).content || "没有返回内容";
         if (answer === "没有返回内容") onDelta(answer);
@@ -1463,11 +1467,19 @@ export async function requestImageQuestion(config: AiConfig, messages: AiTextMes
     }
 }
 
-export async function requestToolResponse(config: AiConfig, messages: ResponseInputMessage[], tools: ResponseFunctionTool[], toolChoice: ToolChoice = "auto", onDelta?: (text: string) => void, options?: RequestOptions): Promise<ToolResponseResult> {
+export async function requestToolResponse(
+    config: AiConfig,
+    messages: ResponseInputMessage[],
+    tools: ResponseFunctionTool[],
+    toolChoice: ToolChoice = "auto",
+    onDelta?: (text: string) => void,
+    options?: RequestOptions,
+    serverJobId?: string,
+): Promise<ToolResponseResult> {
     const requestConfig = resolveModelRequestConfig(config, config.model || config.textModel);
     try {
         if (requestConfig.apiFormat === "gemini") {
-            return await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, tools.length ? toGeminiToolOptions(tools, toolChoice) : undefined), onDelta, options);
+            return await requestGeminiStreamingResponse(requestConfig, toGeminiBody(requestConfig, messages, tools.length ? toGeminiToolOptions(tools, toolChoice) : undefined), onDelta, options, serverJobId);
         }
         const requestBody = {
             model: requestConfig.model,
@@ -1481,8 +1493,8 @@ export async function requestToolResponse(config: AiConfig, messages: ResponseIn
                 : {}),
         };
         // 带 tools 的轮次走非流式：见 requestChatCompletionResponse 的实测注释
-        if (tools.length) return await requestChatCompletionResponse(requestConfig, requestBody);
-        return await requestStreamingResponse(requestConfig, requestBody, onDelta, options);
+        if (tools.length) return await requestChatCompletionResponse(requestConfig, requestBody, serverJobId);
+        return await requestStreamingResponse(requestConfig, requestBody, onDelta, options, serverJobId);
     } catch (error) {
         throw new Error(readAxiosError(error, "请求失败"));
     }
