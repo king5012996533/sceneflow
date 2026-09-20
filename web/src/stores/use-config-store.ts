@@ -93,7 +93,11 @@ export const defaultConfig: AiConfig = {
     vquality: "720",
     videoGenerateAudio: "true",
     videoWatermark: "false",
-    videoDraft: "true",
+    // 草稿模式默认关：上游 prunaai/p-video 的 draft 默认就是 false（完整推理），
+    // 以前我们默认发 true，等于每次生成都悄悄用低画质预览换同样多的积分。
+    // ⚠️ 这个字段只认本机：服务端存档（hydrateFromServer）与 studio 会话（applySessionConfig）
+    //    里的旧值一律忽略，见那两处的注释 —— 它们存的都是「我们自己的旧默认」。
+    videoDraft: "false",
     systemPrompt: "",
     models: [],
     imageModels: [],
@@ -319,7 +323,10 @@ export const useConfigStore = create<ConfigStore>()(
             hydrateFromServer: async () => {
                 const serverData = await loadConfigFromServer();
                 if (!serverData?.config) return;
-                const serverConfig = serverData.config as Partial<AiConfig>;
+                // 草稿模式只认本机：服务端那份存档里只可能是我们自己的旧默认（"true"），
+                // 拉回来会把刚做过迁移的新默认又盖回去（线上实测：本地清了、登录后又变回 true）。
+                // 这个开关本来就是「这台设备上要不要低画质预览」的本地偏好，不进服务端回填。
+                const { videoDraft: _ignoredServerDraft, ...serverConfig } = serverData.config as Partial<AiConfig>;
                 const serverWebdav = serverData.webdav as Partial<WebdavSyncConfig>;
                 set((state) => {
                     const mergedConfig = { ...state.config, ...serverConfig };
@@ -347,6 +354,20 @@ export const useConfigStore = create<ConfigStore>()(
         {
             name: CONFIG_STORE_KEY,
             storage: createJSONStorage(() => configStorage),
+            // v2：videoDraft 的默认从 "true" 改成 "false"（跟上游 prunaai/p-video 的 draft 默认一致）。
+            // 这个开关只在 pruna 的视频面板里出现，而该模型此前一次都没真正出过片 ——
+            // 存档里那个 "true" 只可能是我们自己的旧默认，不可能是用户看过开关后的选择，
+            // 所以一次性清掉，让新默认落到老用户身上（否则改了默认也轮不到他们）。
+            version: 2,
+            migrate: (persisted, version) => {
+                const state = (persisted || {}) as { config?: AiConfig; webdav?: WebdavSyncConfig };
+                const from = Number(version) || 0;
+                if (from < 2 && state.config) {
+                    const { videoDraft: _legacyDraft, ...rest } = state.config;
+                    state.config = rest as AiConfig;
+                }
+                return { config: state.config || defaultConfig, webdav: state.webdav || defaultWebdavSyncConfig };
+            },
             partialize: (state) => ({ config: state.config, webdav: sanitizePersistedWebdavConfig(state.webdav) }),
             merge: (persisted, current) => {
                 const persistedState = (persisted || {}) as Partial<ConfigStore>;
@@ -377,7 +398,7 @@ export const useConfigStore = create<ConfigStore>()(
                         vquality: config.vquality || "720",
                         videoGenerateAudio: config.videoGenerateAudio || "true",
                         videoWatermark: config.videoWatermark || "false",
-                        videoDraft: config.videoDraft || "true",
+                        videoDraft: config.videoDraft || "false",
                         outputFormat: normalizeImageOutputFormat(config.outputFormat),
                         canvasImageCount: config.canvasImageCount || "3",
                         imageModels: Array.isArray(persistedConfig.imageModels) ? normalizeModelList(config.imageModels, channels) : filterModelsByCapability(models, "image"),

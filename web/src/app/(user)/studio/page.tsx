@@ -167,7 +167,10 @@ export default function StudioPage() {
             if (config.videoSeconds) updateConfig("videoSeconds", config.videoSeconds);
             if (config.videoGenerateAudio) updateConfig("videoGenerateAudio", config.videoGenerateAudio);
             if (config.videoWatermark) updateConfig("videoWatermark", config.videoWatermark);
-            if (config.videoDraft) updateConfig("videoDraft", config.videoDraft);
+            // 草稿模式不跟着会话走：会话里存的是「那次生成用的配置」，而 2026-09-20 之前
+            // 这个字段的默认值是 true（我们自己的默认，与上游 prunaai/p-video 的 draft=false 相反），
+            // 老会话一律带着它 —— 回填就等于把刚清掉的旧默认又装回来。
+            // 它现在是本机偏好：默认关，用户在视频面板里手动开。
         },
         [updateConfig],
     );

@@ -1269,6 +1269,33 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(maintenanceHint.includes("不会扣积分"), "渠道维护提示要明确这次不扣分（用户最关心的就是这个）。");
 }
 
+// ---------- prunaai/p-video 入参口径（2026-09-20，跟上游 API 对齐）----------
+// 这个模型此前被标成了一套 Seedance 的词汇表：面板因此放出上游不认的尺寸（1792x1024 → 约分成 "7:4"，
+// 不在 aspect_ratio 枚举里 → 上游 422 掉整条请求），draft 的默认值还跟上游相反（每次生成都在偷偷降画质）。
+// 纯逻辑由 npm run test:pruna 钉住，这里守「接线」：面板选项真的从词汇表取了吗、请求真的走枚举归一化了吗、
+// 老用户的存档迁移做了吗 —— 这几处任一断开，修好的默认值和标定都落不到用户身上。
+{
+    assertIncludes("src/lib/pruna-video.ts", 'PRUNA_VIDEO_ASPECT_RATIOS = ["16:9", "9:16", "4:3", "3:4", "3:2", "2:3", "1:1"]', "pruna 的 aspect_ratio 枚举要跟上游一致：改这里就等于改「哪些尺寸发得出去」。");
+    assertIncludes("src/lib/pruna-video.ts", "PRUNA_VIDEO_DEFAULT_DRAFT = false", "草稿模式默认值必须跟上游 draft 默认一致（false = 完整推理）。");
+    assertIncludes("src/services/api/video.ts", "isPruna ? normalizePrunaAspectRatio(config.size) : normalizeReplicateAspectRatio(config.size)", "pruna 的 aspect_ratio 必须走枚举内归一化，走通用约分会把 7:4 发出去打成 422。");
+    assertNotMatches("src/services/api/video.ts", /includes\("prunaai\/p-video"\)/, "video.ts 不许再自己拼 pruna 模型名，改用 lib/pruna-video 的 isPrunaVideoModel（模型名判断只许有一处）。");
+    assertNotMatches("src/components/video-settings-panel.tsx", /includes\("prunaai\/p-video"\)/, "视频面板不许再自己拼 pruna 模型名，改用 lib/pruna-video 的 isPrunaVideoModel。");
+    assertIncludes("src/components/video-settings-panel.tsx", "VIDEO_CLARITY_OPTIONS.filter", "面板清晰度选项要从能力词汇表派生：另抄一份常量，标定里的 1080p 就会被静默滤掉。");
+    assertIncludes("src/components/video-settings-panel.tsx", "calibratedOptions(spec.clarity", "标定是白名单：列了的一定出现（1080p）、没列的一定不出现。");
+    assertIncludes("src/components/video-settings-panel.tsx", "boolConfig(config.videoDraft, false)", "面板的草稿开关默认必须关，与上游 draft 默认一致。");
+    assertIncludes("src/services/api/video.ts", "boolConfig(config.videoDraft, PRUNA_VIDEO_DEFAULT_DRAFT)", "请求里的 draft 兜底取上游默认（false），不能自己写死 true。");
+    assertIncludes("src/stores/use-config-store.ts", 'videoDraft: "false"', "草稿模式默认值改成 false：旧默认 true 等于每次生成都用低画质预览换同样多的积分。");
+    assertIncludes("src/stores/use-config-store.ts", "version: 2", "改了 videoDraft 默认值就得有存档版本迁移，否则老用户永远留在旧默认上。");
+    assertIncludes("src/stores/use-config-store.ts", "videoDraft: _legacyDraft", "v2 迁移要把旧的 videoDraft 摘掉（那个 true 是我们自己的旧默认，不是用户的选择）。");
+    // 旧默认还有两个回流口：服务端存档与 studio 会话。任何一处没堵住，迁移做完等于白做。
+    assertIncludes("src/stores/use-config-store.ts", "videoDraft: _ignoredServerDraft", "服务端存档里的 videoDraft 不许回填（那份存的也是旧默认，会把迁移结果盖回去）。");
+    assertNotMatches("src/app/(user)/studio/page.tsx", /updateConfig\("videoDraft"/, "studio 会话回填不许带 videoDraft：老会话存的都是旧默认 true。");
+    assertIncludes("src/lib/model-capability-spec.ts", 'clarity: ["720", "480"]', "通用视频模型的默认清晰度保持 720/480：1080p 只给确认支持的模型按标定开。");
+    assertIncludes("src/lib/model-capability-spec.ts", "seconds: [6, 10, 12, 16, 20]", "通用视频模型的默认秒数保持不变（5s 只按标定开）。");
+    assertIncludes("src/lib/model-capability-spec.ts", "if (isPrunaVideoModel(model)) return prunaVideoCapability();", "后台给 pruna 预填的标定必须是它的真实枚举，不然又会被标错一次。");
+    assertIncludes("src/lib/model-capability-spec.ts", "VIDEO_CLARITY_VALUES: readonly VideoClarity[] = VIDEO_CLARITY_OPTIONS.map", "通用视频白名单从选项清单派生：手抄那份漏了 1080p，后台标定会被静默砍掉。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

@@ -34,6 +34,7 @@
         "test:credentialhealth": "node scripts/credential-health-unit-tests.mjs",
         "test:resolution": "node scripts/image-resolution-unit-tests.mjs",
         "test:pricingkind": "node scripts/model-pricing-kind-unit-tests.mjs",
+        "test:pruna": "node --import ./scripts/alias-hooks.mjs scripts/pruna-video-unit-tests.mjs",
         "test:refsupport": "node scripts/model-reference-support-unit-tests.mjs",
         "test:ark": "node scripts/ark-image-unit-tests.mjs",
         "test:marker": "node scripts/image-marker-unit-tests.mjs",

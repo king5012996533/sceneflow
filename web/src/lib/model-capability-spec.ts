@@ -9,11 +9,16 @@
 // 数据流：后台逐模型配置 → /api/platform/catalog 下发 → stores/platform-catalog-store
 //         → 图片/视频设置面板按能力过滤选项；未配置能力的模型退回内置默认（与现状一致）。
 //
+// 词汇表 = 上游参数的取值范围。某个上游模型的枚举是已知且比通用词汇表更窄/更宽时
+// （Replicate 的 prunaai/p-video 只有 720p/1080p + 7 个比例），按模型单独登记在
+// lib/pruna-video.ts 一类的小模块里，面板与请求构造都从那里取值，别在这里放宽通用档位。
+//
 // 本模块不依赖任何业务库，可同时在服务端（admin 清洗）与客户端（面板过滤）使用。
 
 import type { CredentialPricing, ModelPricing } from "@/lib/credit-pricing";
 import { IMAGE_BASE_ASPECTS, IMAGE_RESOLUTION_TIERS, deriveResolutionTiers, normalizeResolutionTiers, stripAspectSuffixes, type ImageResolutionTier } from "@/lib/image-resolution";
 import { modelNameSupportsReferences } from "@/lib/model-reference-support";
+import { isPrunaVideoModel, prunaVideoCapability } from "@/lib/pruna-video";
 
 // ---------- 图片 ----------
 /** 出图保真度档（上游 quality 参数）。low/medium/high 是三档老词汇，xhigh/max 是顶档（Replicate gpt-image-2.5-flare 有六档） */
@@ -121,9 +126,15 @@ export type SeedanceVideoCapabilitySpec = {
 };
 
 // ---------- 视频 · 通用 ----------
-export type VideoClarity = "720" | "480";
+/**
+ * 清晰度档。1080 不是「通用视频模型的默认档」，而是给确实支持 1080p 的模型按模型标定用的
+ * （Replicate 的 prunaai/p-video 只有 720p/1080p 两档）——所以它进了词汇表与后台勾选清单，
+ * 但没进 DEFAULT_GENERIC_VIDEO_CAPABILITY：没标定的模型照旧只给 720p/480p，不会凭空多出 1080p。
+ */
+export type VideoClarity = "1080" | "720" | "480";
 export type VideoSize = "1280x720" | "720x1280" | "1024x1024" | "1792x1024" | "1024x1792" | "auto";
-export type VideoSeconds = 6 | 10 | 12 | 16 | 20;
+/** 秒数档。5 同理：上游默认就是 5 秒的模型（prunaai/p-video）要能选到，但不改其它模型的默认档位 */
+export type VideoSeconds = 5 | 6 | 10 | 12 | 16 | 20;
 
 export type GenericVideoCapabilitySpec = {
     kind: "video";
@@ -236,6 +247,7 @@ export const SEEDANCE_DURATION_OPTIONS: ReadonlyArray<{ value: SeedanceDuration;
 export const VIDEO_CLARITY_OPTIONS: ReadonlyArray<{ value: VideoClarity; label: string }> = [
     { value: "720", label: "720p" },
     { value: "480", label: "480p" },
+    { value: "1080", label: "1080p" },
 ];
 
 export const VIDEO_SIZE_OPTIONS: ReadonlyArray<{ value: VideoSize; label: string }> = [
@@ -253,6 +265,7 @@ export const VIDEO_SECONDS_OPTIONS: ReadonlyArray<{ value: VideoSeconds; label: 
     { value: 12, label: "12s" },
     { value: 16, label: "16s" },
     { value: 20, label: "20s" },
+    { value: 5, label: "5s" },
 ];
 
 export const MINIMAX_RESOLUTION_OPTIONS: ReadonlyArray<{ value: MiniMaxResolution; label: string }> = [
@@ -318,9 +331,12 @@ export const DEFAULT_SEEDANCE_VIDEO_CAPABILITY: SeedanceVideoCapabilitySpec = {
 
 export const DEFAULT_GENERIC_VIDEO_CAPABILITY: GenericVideoCapabilitySpec = {
     kind: "video",
-    clarity: VIDEO_CLARITY_OPTIONS.map((item) => item.value),
+    // 预填默认保持 720p/480p 与 6/10/12/16/20：词汇表里新加的 1080p / 5s 是给
+    // 「确认支持这两档」的模型按模型标定用的（见 lib/pruna-video.ts），
+    // 不能顺手把默认抬高 —— 那会让所有通用视频模型的用户面板凭空多出上游不认的档位。
+    clarity: ["720", "480"],
     sizes: VIDEO_SIZE_OPTIONS.map((item) => item.value),
-    seconds: VIDEO_SECONDS_OPTIONS.map((item) => item.value),
+    seconds: [6, 10, 12, 16, 20],
 };
 
 export const DEFAULT_MINIMAX_VIDEO_CAPABILITY: MiniMaxVideoCapabilitySpec = {
@@ -391,6 +407,9 @@ export function defaultCapabilityForModel(model: string): ModelCapabilitySpec | 
         };
     }
     if (kind === GENERIC_VIDEO_KIND) {
+        // prunaai/p-video：上游枚举是已知的（且面板曾因标错词汇表放出 422 的档位），
+        // 预填直接给它的真实白名单，管理员不用记，也就不会再标错一次
+        if (isPrunaVideoModel(model)) return prunaVideoCapability();
         return { kind, clarity: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.clarity], sizes: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.sizes], seconds: [...DEFAULT_GENERIC_VIDEO_CAPABILITY.seconds] };
     }
     if (kind === MINIMAX_VIDEO_KIND) {
@@ -410,9 +429,11 @@ const IMAGE_ASPECT_VALUES: readonly ImageAspect[] = ["1:1", "3:2", "2:3", "4:3",
 const SEEDANCE_RESOLUTION_VALUES: readonly SeedanceResolution[] = ["480p", "720p", "1080p"];
 const SEEDANCE_RATIO_VALUES: readonly SeedanceRatio[] = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9", "adaptive"];
 const SEEDANCE_DURATION_VALUES: readonly SeedanceDuration[] = [-1, 4, 5, 6, 8, 10, 12, 15];
-const VIDEO_CLARITY_VALUES: readonly VideoClarity[] = ["720", "480"];
-const VIDEO_SIZE_VALUES: readonly VideoSize[] = ["1280x720", "720x1280", "1024x1024", "1792x1024", "1024x1792", "auto"];
-const VIDEO_SECONDS_VALUES: readonly VideoSeconds[] = [6, 10, 12, 16, 20];
+// 通用视频的白名单直接从上面的选项清单派生，不再手抄一份：
+// 手抄的那份一旦漏了新档位（比如 1080p），后台标定就会被静默砍掉，用户面板也随之选不到。
+const VIDEO_CLARITY_VALUES: readonly VideoClarity[] = VIDEO_CLARITY_OPTIONS.map((item) => item.value);
+const VIDEO_SIZE_VALUES: readonly VideoSize[] = VIDEO_SIZE_OPTIONS.map((item) => item.value);
+const VIDEO_SECONDS_VALUES: readonly VideoSeconds[] = VIDEO_SECONDS_OPTIONS.map((item) => item.value);
 const MINIMAX_RESOLUTION_VALUES: readonly MiniMaxResolution[] = ["768P", "2K"];
 const MINIMAX_RATIO_VALUES: readonly MiniMaxRatio[] = ["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"];
 const MINIMAX_DURATION_VALUES: readonly MiniMaxDuration[] = [4, 5, 6, 8, 10, 12, 15];

@@ -8,6 +8,7 @@ import { imageToDataUrl } from "@/services/image-storage";
 import { boolConfig, buildSeedancePromptText, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceVideoReferenceError, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
 import { normalizeMiniMaxResolution } from "@/lib/minimax-video";
 import { upgradeInsecureMediaUrl } from "@/lib/media-url";
+import { isPrunaVideoModel, normalizePrunaAspectRatio, normalizePrunaResolution, normalizePrunaSeconds, PRUNA_VIDEO_DEFAULT_DRAFT } from "@/lib/pruna-video";
 import { GENVIDEO_REFERENCE_LIMITS, genvideoModeForDuration, isGenvideoVideoConfig, normalizeGenvideoDuration, normalizeGenvideoRatio } from "@/lib/genvideo";
 import { buildApiUrl, inferProviderHint, modelOptionName, resolveModelRequestConfig, type AiConfig } from "@/stores/use-config-store";
 import { apiPath } from "@/lib/app-paths";
@@ -811,10 +812,15 @@ async function pollReplicateVideoTask(config: AiConfig, task: VideoGenerationTas
 async function buildReplicateVideoInput(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[]) {
     const input: Record<string, unknown> = { prompt };
     const modelName = modelOptionName(model).toLowerCase();
-    const aspectRatio = normalizeReplicateAspectRatio(config.size);
+    const isPruna = isPrunaVideoModel(modelName);
+    // prunaai/p-video 的 aspect_ratio 是严格枚举（16:9/9:16/4:3/3:4/3:2/2:3/1:1），
+    // 约分后落在枚举外（1792x1024 → "7:4"）会被上游 422 掉整条请求 —— 认不出就不发这个字段，
+    // 由上游用它自己的默认 16:9（面板也按 lib/pruna-video.ts 的标定只放合法档位）。
+    const aspectRatio = isPruna ? normalizePrunaAspectRatio(config.size) : normalizeReplicateAspectRatio(config.size);
     if (aspectRatio) input.aspect_ratio = aspectRatio;
 
-    const seconds = Number(normalizeVideoSeconds(config.videoSeconds));
+    // 时长：pruna 的上游区间是 1–20、默认 5，就用它自己的口径；其它模型沿用通用 clamp（1–20）
+    const seconds = isPruna ? normalizePrunaSeconds(config.videoSeconds) : Number(normalizeVideoSeconds(config.videoSeconds));
     if (Number.isFinite(seconds)) input.duration = seconds;
 
     const resolution = normalizeReplicateResolution(config.vquality, modelName);
@@ -849,9 +855,11 @@ async function buildReplicateVideoInput(config: AiConfig, model: string, prompt:
         throw new Error("当前 Replicate 视频模型只支持提示词和参考图，参考视频/音频仅 bytedance/seedance-2.0 支持");
     }
 
-    if (modelName.includes("prunaai/p-video")) {
-        // draft=true（默认）走低质量预览：更快更便宜；关掉后走完整推理，质量更好
-        input.draft = boolConfig(config.videoDraft, true);
+    if (isPruna) {
+        // 上游默认值：draft=false（完整推理）、fps=24、prompt_upsampling=true、save_audio=true。
+        // draft 开关默认跟着上游走（见 stores/use-config-store 的 videoDraft 默认），
+        // 用户主动打开才是「低画质预览、更快更省」。
+        input.draft = boolConfig(config.videoDraft, PRUNA_VIDEO_DEFAULT_DRAFT);
         input.fps = 24;
         input.prompt_upsampling = true;
         input.save_audio = boolConfig(config.videoGenerateAudio, true);
@@ -906,7 +914,8 @@ async function uploadReplicateFile(config: AiConfig, blob: Blob) {
 
 function normalizeReplicateResolution(value: string, model: string) {
     const resolution = normalizeVideoResolution(value);
-    if (model.includes("prunaai/p-video")) return resolution === "1080p" ? "1080p" : "720p";
+    // prunaai/p-video 只有 720p/1080p 两档（上游默认 720p），别的值一律落到 720p
+    if (isPrunaVideoModel(model)) return normalizePrunaResolution(resolution);
     return resolution;
 }
 

@@ -89,7 +89,7 @@ export function StudioSettingsDrawer({ open, onClose, kind, config, stylePreset,
                         {kind === "image" ? (
                             <ImageSettingsPanel config={config} model={model} onConfigChange={handleImageConfigChange} theme={canvasThemes.warm} showTitle={false} className="w-full space-y-4" />
                         ) : (
-                            <VideoSettingsPanel config={config} onConfigChange={handleVideoConfigChange} theme={canvasThemes.warm} showTitle={false} className="w-full space-y-4" />
+                            <VideoSettingsPanel config={config} model={model} onConfigChange={handleVideoConfigChange} theme={canvasThemes.warm} showTitle={false} className="w-full space-y-4" />
                         )}
                     </section>
                 </div>

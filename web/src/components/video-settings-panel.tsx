@@ -19,58 +19,85 @@ import {
 import { isMiniMaxVideoConfig, normalizeMiniMaxDuration, normalizeMiniMaxRatio, normalizeMiniMaxResolution, MINIMAX_DURATION_OPTIONS, MINIMAX_RATIO_OPTIONS, MINIMAX_RESOLUTION_OPTIONS } from "@/lib/minimax-video";
 import { GENVIDEO_DURATION_OPTIONS, GENVIDEO_RATIO_OPTIONS, isGenvideoVideoConfig, normalizeGenvideoDuration, normalizeGenvideoRatio } from "@/lib/genvideo";
 import { type CanvasTheme } from "@/lib/canvas-theme";
+import { VIDEO_CLARITY_OPTIONS, VIDEO_SIZE_OPTIONS, type VideoClarity, type VideoSize, type VideoSeconds } from "@/lib/model-capability-spec";
+import { isPrunaVideoModel } from "@/lib/pruna-video";
 import { usePlatformCapability } from "@/stores/platform-catalog-store";
 import { modelOptionName, type AiConfig } from "@/stores/use-config-store";
 
-const resolutionOptions = [
-    { value: "720", label: "720p" },
-    { value: "480", label: "480p" },
-];
+// 面板选项一律从能力词汇表派生（单一出处）：以前这里另抄了一份常量，
+// 于是词汇表放出来的档位只要这里没抄，标定过滤就会把它整个滤掉 ——
+// 线上 prunaai/p-video 的 1080p / 5s 就是这么「标了也选不到」的。
+const defaultResolutionOptions: ReadonlyArray<{ value: VideoClarity; label: string }> = VIDEO_CLARITY_OPTIONS.filter((item) => item.value !== "1080");
 
-const sizeOptions = [
-    { value: "1280x720", label: "横屏", width: 1280, height: 720 },
-    { value: "720x1280", label: "竖屏", width: 720, height: 1280 },
-    { value: "1024x1024", label: "方形", width: 1024, height: 1024 },
-    { value: "1792x1024", label: "宽屏", width: 1792, height: 1024 },
-    { value: "1024x1792", label: "长图", width: 1024, height: 1792 },
-    { value: "auto", label: "auto", width: 0, height: 0 },
-];
+const sizeOptions: ReadonlyArray<{ value: VideoSize; label: string; width: number; height: number }> = VIDEO_SIZE_OPTIONS.map((item) => {
+    const [width, height] = item.value === "auto" ? [0, 0] : item.value.split("x").map(Number);
+    return { ...item, width, height };
+});
 
-const secondOptions = [6, 10, 12, 16, 20];
+const defaultSecondOptions: readonly VideoSeconds[] = [6, 10, 12, 16, 20];
+
+/**
+ * 标定 → 面板选项。标定是白名单而不是建议：列了的一定出现（哪怕不在默认清单里，例如 pruna 的 1080p），
+ * 没列的一定不出现。顺序与写法沿用词汇表，认不出的值原样铺出来，免得后台标了却一个都选不到。
+ */
+function calibratedOptions<T extends string>(values: readonly T[], catalogue: ReadonlyArray<{ value: T; label: string }>) {
+    const allowed = new Set<string>(values);
+    const known = new Set<string>(catalogue.map((item) => item.value));
+    const ordered: Array<{ value: T; label: string }> = catalogue.filter((item) => allowed.has(item.value));
+    for (const value of values) {
+        if (!known.has(value)) ordered.push({ value, label: String(value) });
+    }
+    return ordered;
+}
+
+/** 标定秒数 → 面板选项：按秒数升序（面板只显示数字，标签就地拼） */
+function calibratedSeconds(values: readonly VideoSeconds[]) {
+    return Array.from(new Set(values)).sort((a, b) => a - b);
+}
 
 type VideoSettingsPanelProps = {
     config: AiConfig;
     onConfigChange: (key: "vquality" | "size" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark" | "videoDraft", value: string) => void;
     theme: CanvasTheme;
+    /**
+     * 本次请求真正会用的视频模型（调用方最清楚：画布节点用 config.model，studio 用 config.videoModel）。
+     * 不传时按 config.videoModel → config.model 兜底。
+     *
+     * 为什么必须由调用方说清楚：面板按模型的能力标定决定「给用户哪些档位」，
+     * 认错模型就会把上游不认的档位放出来（studio 里 config.model 常常是上一次用的图像模型，
+     * 结果视频面板拿图像模型的标定去过滤，prunaai/p-video 的 1080p 没了、1792x1024 反而还在）。
+     */
+    model?: string;
     showTitle?: boolean;
     className?: string;
 };
 
-export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = true, className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5" }: VideoSettingsPanelProps) {
+export function VideoSettingsPanel({ config, onConfigChange, theme, model: modelProp, showTitle = true, className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5" }: VideoSettingsPanelProps) {
     if (isMiniMaxVideoConfig(config)) {
-        return <MiniMaxVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} />;
+        return <MiniMaxVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} model={modelProp} showTitle={showTitle} className={className} />;
     }
     if (isGenvideoVideoConfig(config)) {
         // GenVideo 分支须在 seedance 之前：与任务创建分发顺序保持一致
-        return <GenVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} />;
+        return <GenVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} model={modelProp} showTitle={showTitle} className={className} />;
     }
     if (isSeedanceVideoConfig(config)) {
-        return <SeedanceVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} showTitle={showTitle} className={className} />;
+        return <SeedanceVideoSettingsPanel config={config} onConfigChange={onConfigChange} theme={theme} model={modelProp} showTitle={showTitle} className={className} />;
     }
 
     const seconds = config.videoSeconds || "6";
     const size = normalizeVideoSizeValue(config.size);
     const dimensions = readSizeDimensions(size);
     const resolution = normalizeVideoResolutionValue(config.vquality);
-    const model = modelOptionName(config.model || config.videoModel);
+    const model = modelOptionName(modelProp || config.videoModel || config.model);
     const spec = usePlatformCapability(model);
-    // 平台能力标定：有标定则按标定过滤选项；无标定（或标定为空）退回内置默认
-    const clarityOptionsShown = spec?.kind === "video" && (spec.clarity as string[]).length ? resolutionOptions.filter((item) => (spec.clarity as string[]).includes(item.value)) : resolutionOptions;
+    // 平台能力标定 = 上游真的认哪些值。有标定就按标定铺选项（标定里列了的一定出现、
+    // 没列的一定不出现）；没标定才退回内置默认，行为与过去完全一致。
+    const clarityOptionsShown = spec?.kind === "video" && (spec.clarity as string[]).length ? calibratedOptions(spec.clarity as VideoClarity[], VIDEO_CLARITY_OPTIONS) : defaultResolutionOptions;
     const sizeOptionsShown = spec?.kind === "video" && (spec.sizes as string[]).length ? sizeOptions.filter((item) => (spec.sizes as string[]).includes(item.value)) : sizeOptions;
-    const secondsOptionsShown = spec?.kind === "video" && (spec.seconds as number[]).length ? secondOptions.filter((value) => (spec.seconds as number[]).includes(value)) : secondOptions;
-    // prunaai/p-video 支持草稿模式：开启更快更省但画质较低，关闭走完整推理
-    const isPrunaVideo = model.toLowerCase().includes("prunaai/p-video");
-    const draftMode = boolConfig(config.videoDraft, true);
+    const secondsOptionsShown = spec?.kind === "video" && (spec.seconds as number[]).length ? calibratedSeconds(spec.seconds as VideoSeconds[]) : defaultSecondOptions;
+    // prunaai/p-video 支持草稿模式：开启更快更省但画质较低，关闭走完整推理（上游默认关，我们跟着关）
+    const isPrunaVideo = isPrunaVideoModel(model);
+    const draftMode = boolConfig(config.videoDraft, false);
     // 收敛：当前值不在平台标定范围内时自动切到第一个允许值（避免把不允许的参数发往上游）
     useEffect(() => {
         if (spec?.kind !== "video") return;
@@ -159,8 +186,8 @@ export function VideoSettingsPanel({ config, onConfigChange, theme, showTitle = 
     );
 }
 
-function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, showTitle, className }: VideoSettingsPanelProps) {
-    const model = modelOptionName(config.model || config.videoModel);
+function SeedanceVideoSettingsPanel({ config, onConfigChange, theme, model: modelProp, showTitle, className }: VideoSettingsPanelProps) {
+    const model = modelOptionName(modelProp || config.videoModel || config.model);
     const spec = usePlatformCapability(model);
     const resolution = normalizeSeedanceResolution(config.vquality, model);
     const ratio = normalizeSeedanceRatio(config.size);
@@ -265,8 +292,8 @@ export function videoResolutionLabel(value: string) {
     return `${normalizeVideoResolutionValue(value)}p`;
 }
 
-function MiniMaxVideoSettingsPanel({ config, onConfigChange, theme, showTitle, className }: VideoSettingsPanelProps) {
-    const model = modelOptionName(config.model || config.videoModel);
+function MiniMaxVideoSettingsPanel({ config, onConfigChange, theme, model: modelProp, showTitle, className }: VideoSettingsPanelProps) {
+    const model = modelOptionName(modelProp || config.videoModel || config.model);
     const spec = usePlatformCapability(model);
     const resolution = normalizeMiniMaxResolution(config.vquality);
     const ratio = normalizeMiniMaxRatio(config.size) ?? "16:9";
@@ -362,8 +389,8 @@ function MiniMaxVideoSettingsPanel({ config, onConfigChange, theme, showTitle, c
     );
 }
 
-function GenVideoSettingsPanel({ config, onConfigChange, theme, showTitle, className }: VideoSettingsPanelProps) {
-    const model = modelOptionName(config.model || config.videoModel);
+function GenVideoSettingsPanel({ config, onConfigChange, theme, model: modelProp, showTitle, className }: VideoSettingsPanelProps) {
+    const model = modelOptionName(modelProp || config.videoModel || config.model);
     const spec = usePlatformCapability(model);
     const ratio = normalizeGenvideoRatio(config.size) ?? "16:9";
     const duration = normalizeGenvideoDuration(config.videoSeconds);
