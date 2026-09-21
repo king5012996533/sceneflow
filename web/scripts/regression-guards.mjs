@@ -948,6 +948,21 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assert(cloudSync.includes('type: "projects"'), "备份信封要带 type=projects。");
 }
 
+// —— 备份体积配额：别再把带图的画布库拦在门外 ——
+// 2026-09-21 线上实况：用户画布里生成了一张图，画布库页和项目页都在推云端备份，两条都 413。
+// 原因是这里曾经写死「整体 10MB + 单个字符串 20 万字符」，而没上传成功的图片是以 data URL
+// 整段存在节点里的，一张图就几十万到几百万字符 —— 于是备份永远推不上去，客户端还是静默失败。
+// 断言：按字节算（中文一字符三字节，用 length 会低估），且单个字符串的上限必须远大于一张图。
+{
+    const syncRoute = read("src/app/api/sync/route.ts");
+    assertIncludes("src/app/api/sync/route.ts", "Buffer.byteLength(json)", "同步体积必须按 UTF-8 字节算，不能用 JS 字符数（中文会低估三倍）。");
+    const maxBytes = syncRoute.match(/SYNC_MAX_BYTES = (\d+) \* 1024 \* 1024/);
+    assert(Boolean(maxBytes) && Number(maxBytes[1]) >= 32, "整份备份的体积上限不得低于 32MB：内联图片的画布库随便就到十几 MB。");
+    const maxString = syncRoute.match(/SYNC_MAX_STRING_LENGTH = (\d+) \* 1024 \* 1024/);
+    assert(Boolean(maxString) && Number(maxString[1]) >= 8, "单个字符串的上限不得低于 8MB：一张 6MB 的图转 base64 就有 8 百万字符。");
+    assertIncludes("src/app/api/sync/route.ts", "describeSyncShape(data)", "配额拒绝必须留下可查的痕迹（体积、最长字符串、节点数），客户端是静默失败的。");
+}
+
 // —— 不吃参考图的模型（Replicate recraft 系）：入口、上下文、报文三层都要收口 ——
 // 2026-09-19 实测：recraft-ai/recraft-v4-pro 的入参只有 prompt / aspect_ratio / size，没有图像字段。
 // 上游对多余的输入字段是**静默忽略**而不是报错，所以旧行为是「照发 input_images、任务照常成功、
