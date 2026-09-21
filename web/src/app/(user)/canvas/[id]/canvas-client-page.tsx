@@ -54,6 +54,7 @@ import { CanvasRefreshShell } from "../components/canvas-refresh-shell";
 import { ConnectionCreateMenu } from "../components/connection-create-menu";
 import { CanvasTopBar } from "../components/canvas-top-bar";
 import { useCanvasHistory } from "../hooks/use-canvas-history";
+import { useCanvasCloudBackup } from "../hooks/use-canvas-cloud-backup";
 import { useCanvasKeyboardShortcuts } from "../hooks/use-canvas-keyboard-shortcuts";
 import { useDirectorShotBridge } from "../hooks/use-director-shot-bridge";
 import { useCanvasFileImport } from "../hooks/use-canvas-file-import";
@@ -382,6 +383,10 @@ function InfiniteCanvasPage() {
         if (!projectLoaded || historyPausedRef.current) return;
         updateProject(projectId, { nodes, connections, chatSessions, activeChatId, backgroundMode, showImageInfo });
     }, [activeChatId, backgroundMode, chatSessions, connections, nodes, projectId, projectLoaded, showImageInfo, updateProject]);
+
+    // 云端同步：画布内容改动后自动备份。挂在项目页这一处，从书签直接进画布干活的人云端才有备份
+    //（只挂画布库页会漏，见 hooks/use-canvas-cloud-backup.ts 的说明）。
+    useCanvasCloudBackup(Boolean(hydrated && user && projectLoaded));
 
     useEffect(() => {
         if (!dialogNodeId) setNodeImageSettingsOpen(false);

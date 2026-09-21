@@ -1365,6 +1365,15 @@ function splitCallsiteHasDraft(path) {
     return hits.length >= 2;
 }
 
+// 云端备份的触发点：画布库页与项目页两处都要挂。
+// 只挂画布库页时，从书签直接进某块画布干活、从不回画布库的人，云端那份备份永远是旧的甚至空的。
+{
+    assertIncludes("src/app/(user)/canvas/hooks/use-canvas-cloud-backup.ts", "export function useCanvasCloudBackup", "云端备份要有单一实现，两页共用一份防抖逻辑，别再各写一套。");
+    assertIncludes("src/app/(user)/canvas/hooks/use-canvas-cloud-backup.ts", "if (!projects.length) return", "空列表一律不许推云端：本地还没水合完就推空列表，等于把云端那份备份删了。");
+    assertIncludes("src/app/(user)/canvas/page.tsx", "useCanvasCloudBackup(", "画布库页要挂云端备份。");
+    assertIncludes("src/app/(user)/canvas/[id]/canvas-client-page.tsx", "useCanvasCloudBackup(", "项目页也要挂云端备份，否则在画布里改了半天，云端那份备份一点没动。");
+}
+
 if (failures.length) {
     console.error("Regression guards failed:");
     for (const failure of failures) console.error(`- ${failure}`);

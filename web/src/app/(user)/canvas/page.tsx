@@ -14,10 +14,10 @@ import { useUserStore } from "@/stores/use-user-store";
 import { CanvasDeleteProjectsDialog } from "./components/canvas-delete-projects-dialog";
 import { CanvasProjectCard } from "./components/canvas-project-card";
 import type { CanvasExportFile } from "./export-types";
+import { useCanvasCloudBackup } from "./hooks/use-canvas-cloud-backup";
 import { useCanvasStore, type CanvasProject } from "./stores/use-canvas-store";
 import { useCanvasUiStore } from "./stores/use-canvas-ui-store";
 import { exportCanvasProjects } from "./utils/canvas-export";
-import { pushProjectsBackup } from "./utils/cloud-sync";
 
 export default function CanvasPage() {
     return (
@@ -94,12 +94,8 @@ function CanvasPageInner() {
         enterProject(mode === "new" ? createProject(`无限画布 ${projects.length + 1}`) : projects[0]?.id || createProject(`无限画布 ${projects.length + 1}`));
     }, [createProject, hydrated, mode, projects, router]);
 
-    // 云端同步：项目变更后自动备份（空列表不在此处推，见 utils/cloud-sync.ts 的说明）
-    useEffect(() => {
-        if (!hydrated || !user || !projects.length) return;
-        const timer = setTimeout(() => void pushProjectsBackup(projects), 5000);
-        return () => clearTimeout(timer);
-    }, [hydrated, user, projects]);
+    // 云端同步：项目变更后自动备份（空列表不推，见 hooks/use-canvas-cloud-backup.ts 的说明）
+    useCanvasCloudBackup(Boolean(hydrated && user));
 
     // 从云端恢复
     const restoreFromCloud = async () => {
