@@ -5,6 +5,7 @@ import { requireCurrentUser } from "@/lib/current-user";
 import { isArchivedResultItem, normalizeResultUrls, type ResultItem } from "@/lib/generation/generation-result";
 import { archiveGenerationResults, storeGenerationResults } from "@/lib/generation/generation-result.server";
 import { prisma } from "@/lib/ic-prisma";
+import { logGenerationTiming, sinceMs } from "@/lib/generation/generation-timing.server";
 
 export const runtime = "nodejs";
 
@@ -29,8 +30,12 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     const urls = normalizeResultUrls(body.urls);
     if (!urls.length) return NextResponse.json({ error: "缺少成品地址" }, { status: 400 });
 
-    const job = await prisma.generationJob.findFirst({ where: { id, userId: user.id }, select: { id: true, status: true, resultData: true } });
+    const job = await prisma.generationJob.findFirst({ where: { id, userId: user.id }, select: { id: true, status: true, resultData: true, startedAt: true } });
     if (!job) return NextResponse.json({ ok: false, archived: 0, reason: "任务不存在" });
+    // 这条上报发生在浏览器**已经**把成品下载完、并且传进我们存储之后（视频链路就是这么走的），
+    // 所以「距任务开始多久」+ 接下来的归档耗时，合起来就是用户在上游出片之后还多等的那一段。
+    const sinceStart = sinceMs(job.startedAt);
+    logGenerationTiming(job.id, "客户端上报成品", [sinceStart === null ? null : `距任务开始 ${sinceStart}ms`, `成品 ${urls.length} 份`]);
     // 已经关成失败/取消的任务不翻案：退款已经出手，再改状态只会让账目更乱（上游没产出的情形归清扫兜底）
     if (job.status !== "running" && job.status !== "succeeded") {
         console.log(`[generation-result] 任务 ${job.id} 已是 ${job.status}，忽略上报`);

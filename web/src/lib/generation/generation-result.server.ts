@@ -1,6 +1,7 @@
 import { archiveGenerationMedia } from "./server-media-storage.server";
 import { MAX_RESULT_BYTES, RESULT_FETCH_TIMEOUT_MS, detectMediaMime, guessMimeType, isArchivedResultItem, mergeResultItems, resultMediaPath, type ResultItem, type ResultSource } from "./generation-result";
 import { fetchSafely } from "@/lib/url-safety";
+import { elapsedMs, formatBytes, logGenerationTiming } from "./generation-timing.server";
 import { prisma } from "@/lib/ic-prisma";
 
 /**
@@ -39,8 +40,11 @@ export async function archiveGenerationResults(jobId: string, urls: string[]): P
  */
 export async function archiveResultSources(jobId: string, sources: ResultSource[]): Promise<ResultItem[]> {
     const items: ResultItem[] = [];
+    const perItem: string[] = [];
+    const archiveStartedAt = Date.now();
     for (const source of sources) {
         const index = items.length;
+        const itemStartedAt = Date.now();
         try {
             if (source.kind === "inline") {
                 const body = Buffer.from(source.base64, "base64");
@@ -51,6 +55,7 @@ export async function archiveResultSources(jobId: string, sources: ResultSource[
                 const archiveKey = `${jobId}/${index}`;
                 await archiveGenerationMedia(archiveKey, toArrayBuffer(body));
                 items.push({ archiveKey, mimeType, bytes: body.byteLength });
+                perItem.push(`#${index} 内联 ${formatBytes(body.byteLength)} ${elapsedMs(itemStartedAt)}ms`);
                 continue;
             }
             const response = await fetchSafely(source.url, { signal: AbortSignal.timeout(RESULT_FETCH_TIMEOUT_MS) });
@@ -62,11 +67,15 @@ export async function archiveResultSources(jobId: string, sources: ResultSource[
             const archiveKey = `${jobId}/${index}`;
             await archiveGenerationMedia(archiveKey, body);
             items.push({ archiveKey, mimeType: response.headers.get("content-type") || guessMimeType(source.url), bytes: body.byteLength });
+            perItem.push(`#${index} 下载 ${formatBytes(body.byteLength)} ${elapsedMs(itemStartedAt)}ms`);
         } catch (error) {
             console.error("[generation-result] 归档失败", jobId, source.kind === "url" ? source.url : `${source.mimeType || "inline"} ${source.base64.length} 字符`, error instanceof Error ? error.message : error);
+            perItem.push(`#${index} 失败 ${elapsedMs(itemStartedAt)}ms`);
             if (source.kind === "url") items.push({ url: source.url });
         }
     }
+    // 取件是我们自己这一侧的时间：归档慢 1 秒，用户就多等 1 秒（尤其是几十 MB 的视频）
+    if (sources.length) logGenerationTiming(jobId, "归档成品", [`共 ${sources.length} 份`, `用时 ${elapsedMs(archiveStartedAt)}ms`, ...perItem]);
     return items;
 }
 

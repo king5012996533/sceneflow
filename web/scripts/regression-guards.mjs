@@ -963,6 +963,15 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/app/api/sync/route.ts", "describeSyncShape(data)", "配额拒绝必须留下可查的痕迹（体积、最长字符串、节点数），客户端是静默失败的。");
 }
 
+// —— 生成链路的耗时埋点：成功路径必须留下时间，否则「上游早就好了、画布还在等」这类问题无从定位 ——
+// 2026-09-21 排查时全仓成功路径零耗时日志，只有超时分支有，只能靠回查上游接口拼时间线。
+{
+    assertIncludes("src/lib/generation/generation-timing.server.ts", "export const GENERATION_TIMING_PREFIX", "耗时埋点要有固定前缀，才 grep 得到、统计得了。");
+    assertIncludes("src/lib/generation/replicate-poller.server.ts", "上游完成→我们发现", "Replicate 取件必须记「上游完成到我们结账」这一段：它是轮询发现，天生有延迟。");
+    assertIncludes("src/lib/generation/generation-result.server.ts", "归档成品", "归档（下载 + 落盘）要单独记耗时：几十 MB 的视频全耗在这里。");
+    assertIncludes("src/lib/generation/generation-run.server.ts", "上游响应 ${upstreamMs}ms", "服务端执行要记上游同步响应耗时（含排队与生成），这是用户实际等的那一段。");
+}
+
 // —— 不吃参考图的模型（Replicate recraft 系）：入口、上下文、报文三层都要收口 ——
 // 2026-09-19 实测：recraft-ai/recraft-v4-pro 的入参只有 prompt / aspect_ratio / size，没有图像字段。
 // 上游对多余的输入字段是**静默忽略**而不是报错，所以旧行为是「照发 input_images、任务照常成功、

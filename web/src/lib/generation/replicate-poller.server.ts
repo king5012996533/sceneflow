@@ -7,6 +7,7 @@ import { shouldRefundGeneration } from "./generation-refund-policy";
 import { hasKeptArtifact } from "./generation-envelope";
 import { isCredentialTargetAllowed, resolvePlatformCredential } from "@/lib/credential-store.server";
 import { fetchSafely } from "@/lib/url-safety";
+import { elapsedMs, formatBytes, logGenerationTiming, sinceMs } from "./generation-timing.server";
 
 const MAX_ATTEMPTS = 240;
 const MAX_ARCHIVE_BYTES = 100 * 1024 * 1024;
@@ -72,12 +73,17 @@ async function pollReplicateJob(job: ReplicateJobRow): Promise<boolean> {
             const credential = await resolvePlatformCredential({ targetUrl: job.externalGetUrl!, provider: "replicate", model: job.providerModel || undefined });
             if (!credential) throw new Error("Replicate 平台凭证不可用");
             if (!isCredentialTargetAllowed(credential.baseUrl, job.externalGetUrl!)) throw new Error("Replicate 轮询地址不在白名单内");
+            const fetchStartedAt = Date.now();
             const response = await fetchSafely(job.externalGetUrl!, { headers: { Authorization: `Bearer ${credential.apiKey}` }, signal: AbortSignal.timeout(30_000) });
             if (!response.ok) throw new Error(`Replicate polling failed: ${response.status}`);
-            const prediction = (await response.json()) as { status?: string; output?: unknown; error?: unknown };
+            const prediction = (await response.json()) as { status?: string; output?: unknown; error?: unknown; completed_at?: unknown; metrics?: { predict_time?: unknown } };
+            // 「上游完成 → 我们发现」只有这里量得到：上游给了 completed_at，我们直到这一拍才知道
+            const learnedAt = Date.now();
             if (prediction.status === "succeeded") {
                 const urls = extractUrls(prediction.output);
                 const items = [];
+                const archiveStartedAt = Date.now();
+                let archivedBytes = 0;
                 for (let index = 0; index < urls.length; index += 1) {
                     const mediaUrl = new URL(urls[index]);
                     if (mediaUrl.protocol !== "https:" || mediaUrl.username || mediaUrl.password) throw new Error("Replicate 输出地址不安全");
@@ -90,15 +96,27 @@ async function pollReplicateJob(job: ReplicateJobRow): Promise<boolean> {
                     const mimeType = media.headers.get("content-type") || "application/octet-stream";
                     const archiveKey = `replicate/${job.id}/${index}`;
                     await archiveGenerationMedia(archiveKey, body);
+                    archivedBytes += body.byteLength;
                     items.push({ archiveKey, mimeType, bytes: body.byteLength });
                 }
                 if (!items.length) throw new Error("Replicate 没有返回可归档结果");
                 // 取件地址与其它通道共用同一份构造（resultMediaPath）：别再手写带 /canvas 前缀的字符串，
                 // 那个前缀早就不存在了，写错了只有后台预览会破图
+                const archiveMs = elapsedMs(archiveStartedAt);
+                const settleStartedAt = Date.now();
                 await (prisma.generationJob as any).updateMany({
                     where: { id: job.id, status: "running", externalStatus: pollingStatus },
                     data: { status: "succeeded", resultData: { items }, resultUrl: resultMediaPath(job.id, 0), externalStatus: prediction.status, finishedAt: new Date(), nextPollAt: null },
                 });
+                const discoverMs = sinceMs(prediction.completed_at, learnedAt);
+                logGenerationTiming(job.id, "Replicate 出件", [
+                    discoverMs === null ? "上游没给 completed_at" : `上游完成→我们发现 ${discoverMs}ms`,
+                    `取件归档 ${archiveMs}ms（${items.length} 份 ${formatBytes(archivedBytes)}）`,
+                    `结账 ${elapsedMs(settleStartedAt)}ms`,
+                    typeof prediction.metrics?.predict_time === "number" ? `上游生成 ${Math.round(prediction.metrics.predict_time * 1000)}ms` : null,
+                    `我们发现那一拍查上游用了 ${elapsedMs(fetchStartedAt)}ms`,
+                    `第 ${job.pollAttempts + 1} 次轮询`,
+                ]);
             } else if (prediction.status === "failed" || prediction.status === "canceled") {
                 // 失败/取消照现行退款政策办（2026-09-20 起：没拿到成品就退，见 generation-refund-policy）；
                 // 成品已归档的那一次不退。quotaRefunded 记的是「这笔退没退」，不是「是不是失败」。

@@ -10,6 +10,7 @@ import { TERMINAL_SKIP_REASONS, hasKeptArtifact, decideResend, isEnvelopeReplaya
 import { dropUpstreamEnvelope, loadUpstreamEnvelope, readEnvelopeBody, recordResendAttempt } from "./generation-spool.server";
 import { salvageGenerationArtifacts } from "./generation-rescue.server";
 import { beginUpstreamCall, inflightJobCount, isUpstreamCallInFlight } from "./upstream-inflight";
+import { elapsedMs, logGenerationTiming } from "./generation-timing.server";
 import { authorizeUpstreamRequest, explainUpstreamAuthorizationFailure } from "./upstream-auth.server";
 import { recordCredentialUpstreamStatus } from "@/lib/credential-health.server";
 import { channelMaintenanceMessage, isCredentialAuthStatus } from "@/lib/credential-health";
@@ -119,6 +120,8 @@ async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; so
     }
 
     const release = beginUpstreamCall(job.id);
+    // 这一段就是用户实际在等的东西：上游排队 + 生成 + 报文传输（上游是同步接口，中途我们看不到进度）
+    const upstreamStartedAt = Date.now();
     let response: Response;
     try {
         response = await fetchSafely(envelope.url, {
@@ -147,6 +150,7 @@ async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; so
     } finally {
         release();
     }
+    const upstreamMs = elapsedMs(upstreamStartedAt);
 
     let payload: unknown = text;
     try {
@@ -163,6 +167,7 @@ async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; so
     if (!response.ok) {
         const snippet = typeof payload === "object" && payload !== null ? JSON.stringify(payload).slice(0, 300) : String(payload).slice(0, 300);
         console.error(`[generation-run] 任务 ${job.id} 上游 ${response.status}（${input.source}）：${snippet}`);
+        logGenerationTiming(job.id, "服务端执行", [`上游响应 ${upstreamMs}ms`, `上游 HTTP ${response.status}`, "无成品"]);
         // 这里刻意保留上游原话：紧接着的 planRetry 要靠它认「编辑端点不吃这个模型」这类改道信号，
         // 换成用户话术就把改道机会一起吞掉了。平台 401/403 的话术替换放在结账时做（settleAttempt）。
         return { kind: "rejected", status: response.status, message: upstreamFailureText(payload) || snippet, snippet };
@@ -170,11 +175,13 @@ async function runOnce(input: { job: RunnableJob; envelope: UpstreamEnvelope; so
 
     // 与代理路径同一套抢救：有成品就认领（照常收费）并归档
     let claimed = false;
+    const claimStartedAt = Date.now();
     try {
         claimed = await salvageGenerationArtifacts({ userId: job.userId, jobId: job.id, payload, source: input.source });
     } catch (error) {
         console.error("[generation-run] 抢救异常", job.id, error instanceof Error ? error.message : error);
     }
+    logGenerationTiming(job.id, "服务端执行", [`上游响应 ${upstreamMs}ms（含排队与生成）`, `认领 ${elapsedMs(claimStartedAt)}ms`, claimed ? "有成品" : "无成品", `来源 ${input.source}`]);
     return { kind: "ok", payload, status: response.status, counted: { claimed, taskId: claimed ? "" : pickSubmittedTaskId(payload) } };
 }
 
