@@ -985,6 +985,15 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/lib/generation/replicate-poller.server.ts", "export async function applyReplicatePrediction(", "共用的结账函数要留在轮询模块里，webhook 直接引它。");
 }
 
+// —— 公开路径白名单：路由自己鉴权的入口必须放行，否则永远轮不到它 ——
+// 2026-09-18 踩过一次（/api/internal/generation/poll 被会话中间件挡成 401「请先登录」，
+// 密钥校验根本没机会跑），2026-09-22 加 Replicate 回调时又差点再踩一次：签名校验写好了、
+// 请求却先被中间件挡掉。所以白名单本身要有断言钉住。
+{
+    assertIncludes("src/middleware.ts", '"/api/internal"', "内部定时任务入口必须在公开白名单里：它自带 worker 密钥校验。");
+    assertIncludes("src/middleware.ts", '"/api/generation/webhooks"', "上游回调入口必须在公开白名单里：它自带签名校验，不放行就永远 401「请先登录」。");
+}
+
 // —— 不吃参考图的模型（Replicate recraft 系）：入口、上下文、报文三层都要收口 ——
 // 2026-09-19 实测：recraft-ai/recraft-v4-pro 的入参只有 prompt / aspect_ratio / size，没有图像字段。
 // 上游对多余的输入字段是**静默忽略**而不是报错，所以旧行为是「照发 input_images、任务照常成功、

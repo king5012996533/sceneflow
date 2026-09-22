@@ -20,6 +20,11 @@ const PUBLIC_PATHS = [
     // 2026-09-18 实测发现：不在这里放行的话，请求会先被会话中间件挡成 401「请先登录」，
     // 路由自己的密钥校验根本轮不到执行 —— internal/generation/poll 因此从来没被调通过。
     "/api/internal",
+    // 上游出件回调（Replicate prediction 一进终态就 POST 过来）：对方没有我们的 Cookie，
+    // 鉴权只能靠地址里那份 per-job HMAC 签名（见 api/generation/webhooks/replicate 与
+    // lib/generation/replicate-webhook.server.ts）。这里跟 /api/internal 是同一个坑 ——
+    // 不放行的话请求先被会话中间件挡成 401「请先登录」，路由自己的签名校验根本轮不到执行。
+    "/api/generation/webhooks",
 ];
 
 const STATIC_PREFIXES = [
