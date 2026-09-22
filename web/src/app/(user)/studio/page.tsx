@@ -160,7 +160,9 @@ export default function StudioPage() {
         (config: AiConfig) => {
             if (config.imageModel) updateConfig("imageModel", config.imageModel);
             if (config.videoModel) updateConfig("videoModel", config.videoModel);
-            if (config.quality) updateConfig("quality", config.quality);
+            // 老会话里存的 "auto" 是我们的旧默认（那时画质默认就写 auto），别拿它盖掉「没选过」：
+            // 现在「没选过」= 空串，由模型标定的默认档说话（见 resolveImageQuality）。
+            if (config.quality && config.quality !== "auto") updateConfig("quality", config.quality);
             if (config.size) updateConfig("size", config.size);
             if (config.count) updateConfig("count", config.count);
             if (config.vquality) updateConfig("vquality", config.vquality);

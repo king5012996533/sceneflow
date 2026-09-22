@@ -1364,6 +1364,10 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/components/image-settings-panel.tsx", "resolveImageQuality(config.quality, imageCapability)", "面板画质必须走统一解析，否则价格按 auto 算。");
     assertIncludes("src/app/(user)/canvas/hooks/use-canvas-generation-context.ts", "resolveImageQuality(built.quality, getPlatformCapability(", "画布发请求前要把画质落定：只在面板上显示低、请求体发 auto 是最坏情况。");
     assertIncludes("src/lib/studio/execute.ts", "resolveImageQuality(instruction.config.quality", "工作台与画布同一条画质口径。");
+    // 旧默认还有两个回流口，任何一处没堵住，迁移做完等于白做（线上实测踩过）
+    assertIncludes("src/stores/use-config-store.ts", '_serverCount !== "3"', "服务端存档里的旧默认张数 3 不许回填，否则迁移结果被盖回去。");
+    assertIncludes("src/stores/use-config-store.ts", '_serverQuality !== "auto"', "服务端存档里的旧默认画质 auto 不许回填。");
+    assertIncludes("src/app/(user)/studio/page.tsx", 'config.quality !== "auto"', "工作台会话回填不许把旧的 auto 带回来。");
 }
 
 // 视频「按秒计价」——上游按输出秒数收费，按条一口价会在长片/高清档上赔钱。

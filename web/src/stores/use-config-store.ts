@@ -330,7 +330,13 @@ export const useConfigStore = create<ConfigStore>()(
                 // 草稿模式只认本机：服务端那份存档里只可能是我们自己的旧默认（"true"），
                 // 拉回来会把刚做过迁移的新默认又盖回去（线上实测：本地清了、登录后又变回 true）。
                 // 这个开关本来就是「这台设备上要不要低画质预览」的本地偏好，不进服务端回填。
-                const { videoDraft: _ignoredServerDraft, ...serverConfig } = serverData.config as Partial<AiConfig>;
+                // 同一类坑还有两个默认值（2026-09-23 实测踩到）：服务端存档里存着我们的旧默认
+                // 「张数 3」「画质 auto」，回填会把刚做过的 v3 迁移原样盖回去 —— 本地清了存储、
+                // 登录后又变回 3 张 + auto。判定口径与迁移一致：等于旧默认的当「用户没选过」，不参与回填；
+                // 用户在别的设备上真正选过的其它值（比如 2 张、high）照旧带过来。
+                const { videoDraft: _ignoredServerDraft, canvasImageCount: _serverCount, quality: _serverQuality, ...serverConfig } = serverData.config as Partial<AiConfig>;
+                if (_serverCount && _serverCount !== "3") (serverConfig as Record<string, unknown>).canvasImageCount = _serverCount;
+                if (_serverQuality && _serverQuality !== "auto") (serverConfig as Record<string, unknown>).quality = _serverQuality;
                 const serverWebdav = serverData.webdav as Partial<WebdavSyncConfig>;
                 set((state) => {
                     const mergedConfig = { ...state.config, ...serverConfig };
