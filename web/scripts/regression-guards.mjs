@@ -967,9 +967,22 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
 // 2026-09-21 排查时全仓成功路径零耗时日志，只有超时分支有，只能靠回查上游接口拼时间线。
 {
     assertIncludes("src/lib/generation/generation-timing.server.ts", "export const GENERATION_TIMING_PREFIX", "耗时埋点要有固定前缀，才 grep 得到、统计得了。");
-    assertIncludes("src/lib/generation/replicate-poller.server.ts", "上游完成→我们发现", "Replicate 取件必须记「上游完成到我们结账」这一段：它是轮询发现，天生有延迟。");
+    assertIncludes("src/lib/generation/replicate-poller.server.ts", "上游完成→我们结账", "Replicate 取件必须记「上游完成到我们结账」这一段：它是轮询发现，天生有延迟。");
     assertIncludes("src/lib/generation/generation-result.server.ts", "归档成品", "归档（下载 + 落盘）要单独记耗时：几十 MB 的视频全耗在这里。");
     assertIncludes("src/lib/generation/generation-run.server.ts", "上游响应 ${upstreamMs}ms", "服务端执行要记上游同步响应耗时（含排队与生成），这是用户实际等的那一段。");
+}
+
+// —— Replicate 出件：上游主动推 + 我们轮询兜底，两条入口必须共用同一段落库 ——
+// 2026-09-22 实测：上游 completed_at 到我们结账平均 7.5 秒、最坏 32.8 秒，因为一直是我们轮询问出来的。
+// 现在上游一进终态就推我们；轮询保留兜底。两条入口各写一套结账逻辑的话，「谁先到」就会决定任务
+// 状态长什么样 —— 而这条链路上钱是按状态结的，所以断言它们必须共用 applyReplicatePrediction。
+{
+    assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "webhook_events_filter", "建单时必须把回调交给上游，否则「上游完成→我们结账」还得靠轮询的 7.5 秒。");
+    assertIncludes("src/app/api/generation/jobs/[id]/replicate/route.ts", "replicateWebhookUrl(", "回调地址要走签名函数拼，别手写字符串。");
+    assertIncludes("src/app/api/generation/webhooks/replicate/route.ts", "verifyReplicateWebhookSignature(", "回调入口是公开地址，必须校验签名。");
+    assertIncludes("src/app/api/generation/webhooks/replicate/route.ts", "job.externalId !== bodyId", "报文里的预测号必须与建单时记下的一致，否则错配的报文能结掉别的任务。");
+    assertIncludes("src/app/api/generation/webhooks/replicate/route.ts", "applyReplicatePrediction(", "回调必须复用轮询那份结账逻辑，不能另写一套。");
+    assertIncludes("src/lib/generation/replicate-poller.server.ts", "export async function applyReplicatePrediction(", "共用的结账函数要留在轮询模块里，webhook 直接引它。");
 }
 
 // —— 不吃参考图的模型（Replicate recraft 系）：入口、上下文、报文三层都要收口 ——

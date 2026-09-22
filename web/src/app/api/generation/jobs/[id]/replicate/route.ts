@@ -8,6 +8,7 @@ import { composeUpstreamFailure, describeHttpStatus, describeNetworkFailure, ups
 import { channelMaintenanceMessage, isCredentialAuthStatus } from "@/lib/credential-health";
 import { recordCredentialUpstreamStatus } from "@/lib/credential-health.server";
 import { fetchSafely } from "@/lib/url-safety";
+import { replicateWebhookUrl } from "@/lib/generation/replicate-webhook.server";
 
 export const runtime = "nodejs";
 
@@ -43,7 +44,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     const model = typeof body.model === "string" ? body.model.trim().replace(/^replicate:/i, "") : "";
     const input = body.input;
     if (!model || !/^[^/]+\/[^/]+$/.test(model) || !input || typeof input !== "object" || Array.isArray(input)) return NextResponse.json({ error: "Replicate 模型或输入无效" }, { status: 400 });
-    const payload = JSON.stringify({ input });
+    // 让上游一进终态就推我们（见 api/generation/webhooks/replicate）：实测我们主动轮询要
+    // 平均 7.5 秒、最坏 32.8 秒才发现「上游已经出结果」。拿不到公网地址（本地开发）就不挂，
+    // 轮询照旧兜底。webhook_events_filter 只订 completed —— 中间的 starting/processing 对我们没用。
+    const webhookUrl = replicateWebhookUrl(job.id, req.headers);
+    const payload = JSON.stringify({ input, ...(webhookUrl ? { webhook: webhookUrl, webhook_events_filter: ["completed"] } : {}) });
     // 按字节算：中文字符串按 .length 是少算的，prompt 一长就会漏过上面的 header 闸
     const payloadBytes = Buffer.byteLength(payload, "utf8");
     if (payloadBytes > MAX_REPLICATE_INPUT_BYTES) {
@@ -91,5 +96,6 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     if (!isCredentialTargetAllowed(credential.baseUrl, prediction.urls.get)) return NextResponse.json({ error: "Replicate 轮询地址不在白名单内" }, { status: 502 });
     const claimed = await bindExternalGenerationJob(user.id, job.id, { provider: "replicate", model, externalId: prediction.id, externalGetUrl: prediction.urls.get, externalStatus: prediction.status });
     if (!claimed.count) return NextResponse.json({ error: "任务已被其他请求启动" }, { status: 409 });
+    if (webhookUrl) console.log(`[generation/replicate] 任务 ${job.id} 已把回调交给上游（${webhookUrl.replace(/sig=[^&]+/, "sig=***")}）`);
     return NextResponse.json({ jobId: job.id, externalId: prediction.id, status: prediction.status || "starting" });
 }
