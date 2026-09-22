@@ -134,6 +134,12 @@ export function isHostOrSubdomain(hostname: string, baseDomain: string): boolean
  *   OUTBOUND_PROXY_URL=http://127.0.0.1:18080
  *   OUTBOUND_PROXY_HOSTS=api.apimart.ai,other.example.com
  *
+ * ⚠️ 只有**确实直连不通**的域名才该进这份名单，而且名单本身就是单点：代理（现在是一条靠人拉起来的
+ * 隧道）一挂，名单里的通道全站 502。2026-09-22 线上实测：api.replicate.com 与 replicate.delivery
+ * 被一起塞进了名单，而它们直连是通的（Cloudflare IPv4，抢连 0.6 秒；本机只有 v6 路由，抢连会自己
+ * 走 v4），隧道一停这两个域名就整条链路 502 了两天 —— 用户点一次错一次，本机因为自己开着隧道却
+ * 一切正常。判断某个域名该走代理前，先 `curl -4` 直连试一次。
+ *
  * 安全边界（与直连路径同等严格）：
  *   1. 只有白名单内的主机才走代理，且必须是「精确相等或其子域」（复用 isHostOrSubdomain，禁止子串匹配）；
  *   2. 白名单命中时不做本地 DNS——本地那份解析在当前网络下就是被污染的结果，真正的解析发生在代理侧；
