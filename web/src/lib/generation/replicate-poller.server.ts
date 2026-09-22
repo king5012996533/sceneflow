@@ -78,10 +78,24 @@ export type ReplicatePrediction = {
  * 认领用乐观锁（guard.externalStatus = 自己那次的租约值），两个入口同时跑也不会重复取件。
  * 返回 processing 时不落任何结论：那是轮询自己的节奏问题（次数上限、下次什么时候再问）。
  */
-export async function applyReplicatePrediction(job: ReplicateJobRow, prediction: ReplicatePrediction, guard: { externalStatus?: string } = {}): Promise<"succeeded" | "failed" | "cancelled" | "processing"> {
+export async function applyReplicatePrediction(job: ReplicateJobRow, prediction: ReplicatePrediction, guard: { externalStatus?: string } = {}): Promise<"succeeded" | "failed" | "cancelled" | "processing" | "duplicate"> {
     if (!prisma) return "processing";
     const claim = { id: job.id, status: "running", ...(guard.externalStatus ? { externalStatus: guard.externalStatus } : {}) };
     if (prediction.status === "succeeded") {
+        // 取件之前先确认这单还挂在自己手上。
+        //
+        // 为什么需要：webhook 与轮询会**同时**拿到「上游完成」——上游推送到达的那一瞬间，事件流
+        // 那一拍可能已经取到了 prediction 并在下载媒体。两边的租约不同，最终结账只有一个能赢
+        // （乐观锁兜住了状态），但**下载会各做一遍**：2026-09-22 线上实测到同一条任务打了
+        // 两条「Replicate 出件」埋点（webhook 与 polling 各一条），也就是同一份视频下了两次。
+        // 视频几十 MB，一次就是十几秒和一份带宽，白跑。
+        if (guard.externalStatus) {
+            const fresh = await prisma.generationJob.findFirst({ where: { id: job.id }, select: { status: true, externalStatus: true } });
+            if (!fresh || fresh.status !== "running" || fresh.externalStatus !== guard.externalStatus) {
+                logGenerationTiming(job.id, "Replicate 出件", [`已有别的入口先结账，跳过取件（状态 ${fresh?.status || "已删除"}）`, `本入口 ${guard.externalStatus.split(":")[0]}`]);
+                return "duplicate";
+            }
+        }
         const urls = extractUrls(prediction.output);
         const items = [];
         const archiveStartedAt = Date.now();

@@ -983,6 +983,8 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/app/api/generation/webhooks/replicate/route.ts", "job.externalId !== bodyId", "报文里的预测号必须与建单时记下的一致，否则错配的报文能结掉别的任务。");
     assertIncludes("src/app/api/generation/webhooks/replicate/route.ts", "applyReplicatePrediction(", "回调必须复用轮询那份结账逻辑，不能另写一套。");
     assertIncludes("src/lib/generation/replicate-poller.server.ts", "export async function applyReplicatePrediction(", "共用的结账函数要留在轮询模块里，webhook 直接引它。");
+    // 取件前必须复核租约：webhook 与轮询会同时看到「上游完成」，不复核就各下载一遍（线上实测到同一单两条埋点）
+    assertMatchesNormalized("src/lib/generation/replicate-poller.server.ts", /fresh\.externalStatus !== guard\.externalStatus/, "取件前要复核租约，别让两个入口把同一份成品各下载一次。");
 }
 
 // —— 公开路径白名单：路由自己鉴权的入口必须放行，否则永远轮不到它 ——
