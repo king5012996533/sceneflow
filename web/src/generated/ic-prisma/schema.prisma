@@ -267,11 +267,33 @@ model CanvasBackup {
   type      String // "projects" | "assets" | "image-workbench" | "video-workbench"
   data      Json?
   version   Int      @default(1)
+  /// 内容指纹（sha256）：判断这次写入是否真的换了内容 —— 没换就不必留快照，换了才留
+  signature String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([userId, type])
   @@index([userId])
+}
+
+/// 云端备份的历史快照。
+///
+/// 为什么需要（2026-09-23）：备份是「整份覆盖式」写入 —— 谁最后推谁赢。所以本机库为空或过旧的设备
+/// （换电脑、清缓存、刚装的浏览器）一开画布页，5 秒后就会把云端那份真实备份覆盖成它本地的样子；
+/// 用户删错画布也一样。线上真出过事：测试画布覆盖掉用户 11 块画布，靠事先手工拍的快照才救回来。
+/// 有了这张表，每次「内容真的变了」的覆盖都先留一份上一版，可回滚。
+model CanvasBackupSnapshot {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  data      Json?
+  /// 被快照的那一版是第几版（CanvasBackup.version）
+  version   Int
+  /// 字节数，列表与清理都用它，不必把 data 取出来
+  bytes     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId, type, createdAt])
 }
 
 model RateLimitEntry {

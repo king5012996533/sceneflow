@@ -961,6 +961,11 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     const maxString = syncRoute.match(/SYNC_MAX_STRING_LENGTH = (\d+) \* 1024 \* 1024/);
     assert(Boolean(maxString) && Number(maxString[1]) >= 8, "单个字符串的上限不得低于 8MB：一张 6MB 的图转 base64 就有 8 百万字符。");
     assertIncludes("src/app/api/sync/route.ts", "describeSyncShape(data)", "配额拒绝必须留下可查的痕迹（体积、最长字符串、节点数），客户端是静默失败的。");
+    // 备份是整份覆盖式写入：覆盖前必须留一份上一版，否则本机库为空/过旧的设备一开页面就把云端洗掉
+    assertIncludes("src/app/api/sync/route.ts", "canvasBackupSnapshot.create", "覆盖云端备份前必须留快照（见 CanvasBackupSnapshot）。");
+    assertIncludes("src/app/api/sync/route.ts", "pruneSnapshots(", "快照要按份数 + 天数清理，不然几 MB 的 jsonb 会越堆越多。");
+    assertIncludes("src/app/api/internal/canvas-backup/route.ts", "x-generation-worker-secret", "内部回滚入口必须自带密钥校验（公开白名单里放过 /api/internal）。");
+    assertIncludes("src/app/api/internal/canvas-backup/route.ts", "回滚前先把「当前这一份」也留一份", "回滚本身也要可逆：先给当前版本留一份再写回去。");
 }
 
 // —— 生成链路的耗时埋点：成功路径必须留下时间，否则「上游早就好了、画布还在等」这类问题无从定位 ——

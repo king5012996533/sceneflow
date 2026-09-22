@@ -318,8 +318,19 @@ exports.Prisma.CanvasBackupScalarFieldEnum = {
   type: 'type',
   data: 'data',
   version: 'version',
+  signature: 'signature',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
+};
+
+exports.Prisma.CanvasBackupSnapshotScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  type: 'type',
+  data: 'data',
+  version: 'version',
+  bytes: 'bytes',
+  createdAt: 'createdAt'
 };
 
 exports.Prisma.RateLimitEntryScalarFieldEnum = {
@@ -377,6 +388,7 @@ exports.Prisma.ModelName = {
   OperationConfig: 'OperationConfig',
   VerificationCode: 'VerificationCode',
   CanvasBackup: 'CanvasBackup',
+  CanvasBackupSnapshot: 'CanvasBackupSnapshot',
   RateLimitEntry: 'RateLimitEntry'
 };
 

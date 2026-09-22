@@ -89,6 +89,16 @@ export type VerificationCode = $Result.DefaultSelection<Prisma.$VerificationCode
  */
 export type CanvasBackup = $Result.DefaultSelection<Prisma.$CanvasBackupPayload>
 /**
+ * Model CanvasBackupSnapshot
+ * 云端备份的历史快照。
+ * 
+ * 为什么需要（2026-09-23）：备份是「整份覆盖式」写入 —— 谁最后推谁赢。所以本机库为空或过旧的设备
+ * （换电脑、清缓存、刚装的浏览器）一开画布页，5 秒后就会把云端那份真实备份覆盖成它本地的样子；
+ * 用户删错画布也一样。线上真出过事：测试画布覆盖掉用户 11 块画布，靠事先手工拍的快照才救回来。
+ * 有了这张表，每次「内容真的变了」的覆盖都先留一份上一版，可回滚。
+ */
+export type CanvasBackupSnapshot = $Result.DefaultSelection<Prisma.$CanvasBackupSnapshotPayload>
+/**
  * Model RateLimitEntry
  * 
  */
@@ -364,6 +374,16 @@ export class PrismaClient<
     * ```
     */
   get canvasBackup(): Prisma.CanvasBackupDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.canvasBackupSnapshot`: Exposes CRUD operations for the **CanvasBackupSnapshot** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more CanvasBackupSnapshots
+    * const canvasBackupSnapshots = await prisma.canvasBackupSnapshot.findMany()
+    * ```
+    */
+  get canvasBackupSnapshot(): Prisma.CanvasBackupSnapshotDelegate<ExtArgs, ClientOptions>;
 
   /**
    * `prisma.rateLimitEntry`: Exposes CRUD operations for the **RateLimitEntry** model.
@@ -823,6 +843,7 @@ export namespace Prisma {
     OperationConfig: 'OperationConfig',
     VerificationCode: 'VerificationCode',
     CanvasBackup: 'CanvasBackup',
+    CanvasBackupSnapshot: 'CanvasBackupSnapshot',
     RateLimitEntry: 'RateLimitEntry'
   };
 
@@ -839,7 +860,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "user" | "userConfig" | "usageRecord" | "generationJob" | "creditPackage" | "creditBalance" | "creditTransaction" | "order" | "paymentEvent" | "adminAuditLog" | "modelConfig" | "providerCredential" | "operationConfig" | "verificationCode" | "canvasBackup" | "rateLimitEntry"
+      modelProps: "user" | "userConfig" | "usageRecord" | "generationJob" | "creditPackage" | "creditBalance" | "creditTransaction" | "order" | "paymentEvent" | "adminAuditLog" | "modelConfig" | "providerCredential" | "operationConfig" | "verificationCode" | "canvasBackup" | "canvasBackupSnapshot" | "rateLimitEntry"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -1953,6 +1974,80 @@ export namespace Prisma {
           }
         }
       }
+      CanvasBackupSnapshot: {
+        payload: Prisma.$CanvasBackupSnapshotPayload<ExtArgs>
+        fields: Prisma.CanvasBackupSnapshotFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.CanvasBackupSnapshotFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.CanvasBackupSnapshotFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload>
+          }
+          findFirst: {
+            args: Prisma.CanvasBackupSnapshotFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.CanvasBackupSnapshotFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload>
+          }
+          findMany: {
+            args: Prisma.CanvasBackupSnapshotFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload>[]
+          }
+          create: {
+            args: Prisma.CanvasBackupSnapshotCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload>
+          }
+          createMany: {
+            args: Prisma.CanvasBackupSnapshotCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.CanvasBackupSnapshotCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload>[]
+          }
+          delete: {
+            args: Prisma.CanvasBackupSnapshotDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload>
+          }
+          update: {
+            args: Prisma.CanvasBackupSnapshotUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload>
+          }
+          deleteMany: {
+            args: Prisma.CanvasBackupSnapshotDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.CanvasBackupSnapshotUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.CanvasBackupSnapshotUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload>[]
+          }
+          upsert: {
+            args: Prisma.CanvasBackupSnapshotUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$CanvasBackupSnapshotPayload>
+          }
+          aggregate: {
+            args: Prisma.CanvasBackupSnapshotAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateCanvasBackupSnapshot>
+          }
+          groupBy: {
+            args: Prisma.CanvasBackupSnapshotGroupByArgs<ExtArgs>
+            result: $Utils.Optional<CanvasBackupSnapshotGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.CanvasBackupSnapshotCountArgs<ExtArgs>
+            result: $Utils.Optional<CanvasBackupSnapshotCountAggregateOutputType> | number
+          }
+        }
+      }
       RateLimitEntry: {
         payload: Prisma.$RateLimitEntryPayload<ExtArgs>
         fields: Prisma.RateLimitEntryFieldRefs
@@ -2150,6 +2245,7 @@ export namespace Prisma {
     operationConfig?: OperationConfigOmit
     verificationCode?: VerificationCodeOmit
     canvasBackup?: CanvasBackupOmit
+    canvasBackupSnapshot?: CanvasBackupSnapshotOmit
     rateLimitEntry?: RateLimitEntryOmit
   }
 
@@ -18628,6 +18724,7 @@ export namespace Prisma {
     userId: string | null
     type: string | null
     version: number | null
+    signature: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -18637,6 +18734,7 @@ export namespace Prisma {
     userId: string | null
     type: string | null
     version: number | null
+    signature: string | null
     createdAt: Date | null
     updatedAt: Date | null
   }
@@ -18647,6 +18745,7 @@ export namespace Prisma {
     type: number
     data: number
     version: number
+    signature: number
     createdAt: number
     updatedAt: number
     _all: number
@@ -18666,6 +18765,7 @@ export namespace Prisma {
     userId?: true
     type?: true
     version?: true
+    signature?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -18675,6 +18775,7 @@ export namespace Prisma {
     userId?: true
     type?: true
     version?: true
+    signature?: true
     createdAt?: true
     updatedAt?: true
   }
@@ -18685,6 +18786,7 @@ export namespace Prisma {
     type?: true
     data?: true
     version?: true
+    signature?: true
     createdAt?: true
     updatedAt?: true
     _all?: true
@@ -18782,6 +18884,7 @@ export namespace Prisma {
     type: string
     data: JsonValue | null
     version: number
+    signature: string | null
     createdAt: Date
     updatedAt: Date
     _count: CanvasBackupCountAggregateOutputType | null
@@ -18811,6 +18914,7 @@ export namespace Prisma {
     type?: boolean
     data?: boolean
     version?: boolean
+    signature?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["canvasBackup"]>
@@ -18821,6 +18925,7 @@ export namespace Prisma {
     type?: boolean
     data?: boolean
     version?: boolean
+    signature?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["canvasBackup"]>
@@ -18831,6 +18936,7 @@ export namespace Prisma {
     type?: boolean
     data?: boolean
     version?: boolean
+    signature?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }, ExtArgs["result"]["canvasBackup"]>
@@ -18841,11 +18947,12 @@ export namespace Prisma {
     type?: boolean
     data?: boolean
     version?: boolean
+    signature?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type CanvasBackupOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "type" | "data" | "version" | "createdAt" | "updatedAt", ExtArgs["result"]["canvasBackup"]>
+  export type CanvasBackupOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "type" | "data" | "version" | "signature" | "createdAt" | "updatedAt", ExtArgs["result"]["canvasBackup"]>
 
   export type $CanvasBackupPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "CanvasBackup"
@@ -18856,6 +18963,10 @@ export namespace Prisma {
       type: string
       data: Prisma.JsonValue | null
       version: number
+      /**
+       * 内容指纹（sha256）：判断这次写入是否真的换了内容 —— 没换就不必留快照，换了才留
+       */
+      signature: string | null
       createdAt: Date
       updatedAt: Date
     }, ExtArgs["result"]["canvasBackup"]>
@@ -19286,6 +19397,7 @@ export namespace Prisma {
     readonly type: FieldRef<"CanvasBackup", 'String'>
     readonly data: FieldRef<"CanvasBackup", 'Json'>
     readonly version: FieldRef<"CanvasBackup", 'Int'>
+    readonly signature: FieldRef<"CanvasBackup", 'String'>
     readonly createdAt: FieldRef<"CanvasBackup", 'DateTime'>
     readonly updatedAt: FieldRef<"CanvasBackup", 'DateTime'>
   }
@@ -19656,6 +19768,1072 @@ export namespace Prisma {
      * Omit specific fields from the CanvasBackup
      */
     omit?: CanvasBackupOmit<ExtArgs> | null
+  }
+
+
+  /**
+   * Model CanvasBackupSnapshot
+   */
+
+  export type AggregateCanvasBackupSnapshot = {
+    _count: CanvasBackupSnapshotCountAggregateOutputType | null
+    _avg: CanvasBackupSnapshotAvgAggregateOutputType | null
+    _sum: CanvasBackupSnapshotSumAggregateOutputType | null
+    _min: CanvasBackupSnapshotMinAggregateOutputType | null
+    _max: CanvasBackupSnapshotMaxAggregateOutputType | null
+  }
+
+  export type CanvasBackupSnapshotAvgAggregateOutputType = {
+    version: number | null
+    bytes: number | null
+  }
+
+  export type CanvasBackupSnapshotSumAggregateOutputType = {
+    version: number | null
+    bytes: number | null
+  }
+
+  export type CanvasBackupSnapshotMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    type: string | null
+    version: number | null
+    bytes: number | null
+    createdAt: Date | null
+  }
+
+  export type CanvasBackupSnapshotMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    type: string | null
+    version: number | null
+    bytes: number | null
+    createdAt: Date | null
+  }
+
+  export type CanvasBackupSnapshotCountAggregateOutputType = {
+    id: number
+    userId: number
+    type: number
+    data: number
+    version: number
+    bytes: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type CanvasBackupSnapshotAvgAggregateInputType = {
+    version?: true
+    bytes?: true
+  }
+
+  export type CanvasBackupSnapshotSumAggregateInputType = {
+    version?: true
+    bytes?: true
+  }
+
+  export type CanvasBackupSnapshotMinAggregateInputType = {
+    id?: true
+    userId?: true
+    type?: true
+    version?: true
+    bytes?: true
+    createdAt?: true
+  }
+
+  export type CanvasBackupSnapshotMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    type?: true
+    version?: true
+    bytes?: true
+    createdAt?: true
+  }
+
+  export type CanvasBackupSnapshotCountAggregateInputType = {
+    id?: true
+    userId?: true
+    type?: true
+    data?: true
+    version?: true
+    bytes?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type CanvasBackupSnapshotAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CanvasBackupSnapshot to aggregate.
+     */
+    where?: CanvasBackupSnapshotWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CanvasBackupSnapshots to fetch.
+     */
+    orderBy?: CanvasBackupSnapshotOrderByWithRelationInput | CanvasBackupSnapshotOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: CanvasBackupSnapshotWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CanvasBackupSnapshots from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CanvasBackupSnapshots.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned CanvasBackupSnapshots
+    **/
+    _count?: true | CanvasBackupSnapshotCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: CanvasBackupSnapshotAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: CanvasBackupSnapshotSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: CanvasBackupSnapshotMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: CanvasBackupSnapshotMaxAggregateInputType
+  }
+
+  export type GetCanvasBackupSnapshotAggregateType<T extends CanvasBackupSnapshotAggregateArgs> = {
+        [P in keyof T & keyof AggregateCanvasBackupSnapshot]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateCanvasBackupSnapshot[P]>
+      : GetScalarType<T[P], AggregateCanvasBackupSnapshot[P]>
+  }
+
+
+
+
+  export type CanvasBackupSnapshotGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: CanvasBackupSnapshotWhereInput
+    orderBy?: CanvasBackupSnapshotOrderByWithAggregationInput | CanvasBackupSnapshotOrderByWithAggregationInput[]
+    by: CanvasBackupSnapshotScalarFieldEnum[] | CanvasBackupSnapshotScalarFieldEnum
+    having?: CanvasBackupSnapshotScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: CanvasBackupSnapshotCountAggregateInputType | true
+    _avg?: CanvasBackupSnapshotAvgAggregateInputType
+    _sum?: CanvasBackupSnapshotSumAggregateInputType
+    _min?: CanvasBackupSnapshotMinAggregateInputType
+    _max?: CanvasBackupSnapshotMaxAggregateInputType
+  }
+
+  export type CanvasBackupSnapshotGroupByOutputType = {
+    id: string
+    userId: string
+    type: string
+    data: JsonValue | null
+    version: number
+    bytes: number
+    createdAt: Date
+    _count: CanvasBackupSnapshotCountAggregateOutputType | null
+    _avg: CanvasBackupSnapshotAvgAggregateOutputType | null
+    _sum: CanvasBackupSnapshotSumAggregateOutputType | null
+    _min: CanvasBackupSnapshotMinAggregateOutputType | null
+    _max: CanvasBackupSnapshotMaxAggregateOutputType | null
+  }
+
+  type GetCanvasBackupSnapshotGroupByPayload<T extends CanvasBackupSnapshotGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<CanvasBackupSnapshotGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof CanvasBackupSnapshotGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], CanvasBackupSnapshotGroupByOutputType[P]>
+            : GetScalarType<T[P], CanvasBackupSnapshotGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type CanvasBackupSnapshotSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    type?: boolean
+    data?: boolean
+    version?: boolean
+    bytes?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["canvasBackupSnapshot"]>
+
+  export type CanvasBackupSnapshotSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    type?: boolean
+    data?: boolean
+    version?: boolean
+    bytes?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["canvasBackupSnapshot"]>
+
+  export type CanvasBackupSnapshotSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    type?: boolean
+    data?: boolean
+    version?: boolean
+    bytes?: boolean
+    createdAt?: boolean
+  }, ExtArgs["result"]["canvasBackupSnapshot"]>
+
+  export type CanvasBackupSnapshotSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    type?: boolean
+    data?: boolean
+    version?: boolean
+    bytes?: boolean
+    createdAt?: boolean
+  }
+
+  export type CanvasBackupSnapshotOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "type" | "data" | "version" | "bytes" | "createdAt", ExtArgs["result"]["canvasBackupSnapshot"]>
+
+  export type $CanvasBackupSnapshotPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "CanvasBackupSnapshot"
+    objects: {}
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      type: string
+      data: Prisma.JsonValue | null
+      /**
+       * 被快照的那一版是第几版（CanvasBackup.version）
+       */
+      version: number
+      /**
+       * 字节数，列表与清理都用它，不必把 data 取出来
+       */
+      bytes: number
+      createdAt: Date
+    }, ExtArgs["result"]["canvasBackupSnapshot"]>
+    composites: {}
+  }
+
+  type CanvasBackupSnapshotGetPayload<S extends boolean | null | undefined | CanvasBackupSnapshotDefaultArgs> = $Result.GetResult<Prisma.$CanvasBackupSnapshotPayload, S>
+
+  type CanvasBackupSnapshotCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<CanvasBackupSnapshotFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: CanvasBackupSnapshotCountAggregateInputType | true
+    }
+
+  export interface CanvasBackupSnapshotDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['CanvasBackupSnapshot'], meta: { name: 'CanvasBackupSnapshot' } }
+    /**
+     * Find zero or one CanvasBackupSnapshot that matches the filter.
+     * @param {CanvasBackupSnapshotFindUniqueArgs} args - Arguments to find a CanvasBackupSnapshot
+     * @example
+     * // Get one CanvasBackupSnapshot
+     * const canvasBackupSnapshot = await prisma.canvasBackupSnapshot.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends CanvasBackupSnapshotFindUniqueArgs>(args: SelectSubset<T, CanvasBackupSnapshotFindUniqueArgs<ExtArgs>>): Prisma__CanvasBackupSnapshotClient<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one CanvasBackupSnapshot that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {CanvasBackupSnapshotFindUniqueOrThrowArgs} args - Arguments to find a CanvasBackupSnapshot
+     * @example
+     * // Get one CanvasBackupSnapshot
+     * const canvasBackupSnapshot = await prisma.canvasBackupSnapshot.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends CanvasBackupSnapshotFindUniqueOrThrowArgs>(args: SelectSubset<T, CanvasBackupSnapshotFindUniqueOrThrowArgs<ExtArgs>>): Prisma__CanvasBackupSnapshotClient<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CanvasBackupSnapshot that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CanvasBackupSnapshotFindFirstArgs} args - Arguments to find a CanvasBackupSnapshot
+     * @example
+     * // Get one CanvasBackupSnapshot
+     * const canvasBackupSnapshot = await prisma.canvasBackupSnapshot.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends CanvasBackupSnapshotFindFirstArgs>(args?: SelectSubset<T, CanvasBackupSnapshotFindFirstArgs<ExtArgs>>): Prisma__CanvasBackupSnapshotClient<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first CanvasBackupSnapshot that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CanvasBackupSnapshotFindFirstOrThrowArgs} args - Arguments to find a CanvasBackupSnapshot
+     * @example
+     * // Get one CanvasBackupSnapshot
+     * const canvasBackupSnapshot = await prisma.canvasBackupSnapshot.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends CanvasBackupSnapshotFindFirstOrThrowArgs>(args?: SelectSubset<T, CanvasBackupSnapshotFindFirstOrThrowArgs<ExtArgs>>): Prisma__CanvasBackupSnapshotClient<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more CanvasBackupSnapshots that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CanvasBackupSnapshotFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all CanvasBackupSnapshots
+     * const canvasBackupSnapshots = await prisma.canvasBackupSnapshot.findMany()
+     * 
+     * // Get first 10 CanvasBackupSnapshots
+     * const canvasBackupSnapshots = await prisma.canvasBackupSnapshot.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const canvasBackupSnapshotWithIdOnly = await prisma.canvasBackupSnapshot.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends CanvasBackupSnapshotFindManyArgs>(args?: SelectSubset<T, CanvasBackupSnapshotFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a CanvasBackupSnapshot.
+     * @param {CanvasBackupSnapshotCreateArgs} args - Arguments to create a CanvasBackupSnapshot.
+     * @example
+     * // Create one CanvasBackupSnapshot
+     * const CanvasBackupSnapshot = await prisma.canvasBackupSnapshot.create({
+     *   data: {
+     *     // ... data to create a CanvasBackupSnapshot
+     *   }
+     * })
+     * 
+     */
+    create<T extends CanvasBackupSnapshotCreateArgs>(args: SelectSubset<T, CanvasBackupSnapshotCreateArgs<ExtArgs>>): Prisma__CanvasBackupSnapshotClient<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many CanvasBackupSnapshots.
+     * @param {CanvasBackupSnapshotCreateManyArgs} args - Arguments to create many CanvasBackupSnapshots.
+     * @example
+     * // Create many CanvasBackupSnapshots
+     * const canvasBackupSnapshot = await prisma.canvasBackupSnapshot.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends CanvasBackupSnapshotCreateManyArgs>(args?: SelectSubset<T, CanvasBackupSnapshotCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many CanvasBackupSnapshots and returns the data saved in the database.
+     * @param {CanvasBackupSnapshotCreateManyAndReturnArgs} args - Arguments to create many CanvasBackupSnapshots.
+     * @example
+     * // Create many CanvasBackupSnapshots
+     * const canvasBackupSnapshot = await prisma.canvasBackupSnapshot.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many CanvasBackupSnapshots and only return the `id`
+     * const canvasBackupSnapshotWithIdOnly = await prisma.canvasBackupSnapshot.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends CanvasBackupSnapshotCreateManyAndReturnArgs>(args?: SelectSubset<T, CanvasBackupSnapshotCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a CanvasBackupSnapshot.
+     * @param {CanvasBackupSnapshotDeleteArgs} args - Arguments to delete one CanvasBackupSnapshot.
+     * @example
+     * // Delete one CanvasBackupSnapshot
+     * const CanvasBackupSnapshot = await prisma.canvasBackupSnapshot.delete({
+     *   where: {
+     *     // ... filter to delete one CanvasBackupSnapshot
+     *   }
+     * })
+     * 
+     */
+    delete<T extends CanvasBackupSnapshotDeleteArgs>(args: SelectSubset<T, CanvasBackupSnapshotDeleteArgs<ExtArgs>>): Prisma__CanvasBackupSnapshotClient<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one CanvasBackupSnapshot.
+     * @param {CanvasBackupSnapshotUpdateArgs} args - Arguments to update one CanvasBackupSnapshot.
+     * @example
+     * // Update one CanvasBackupSnapshot
+     * const canvasBackupSnapshot = await prisma.canvasBackupSnapshot.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends CanvasBackupSnapshotUpdateArgs>(args: SelectSubset<T, CanvasBackupSnapshotUpdateArgs<ExtArgs>>): Prisma__CanvasBackupSnapshotClient<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more CanvasBackupSnapshots.
+     * @param {CanvasBackupSnapshotDeleteManyArgs} args - Arguments to filter CanvasBackupSnapshots to delete.
+     * @example
+     * // Delete a few CanvasBackupSnapshots
+     * const { count } = await prisma.canvasBackupSnapshot.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends CanvasBackupSnapshotDeleteManyArgs>(args?: SelectSubset<T, CanvasBackupSnapshotDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CanvasBackupSnapshots.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CanvasBackupSnapshotUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many CanvasBackupSnapshots
+     * const canvasBackupSnapshot = await prisma.canvasBackupSnapshot.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends CanvasBackupSnapshotUpdateManyArgs>(args: SelectSubset<T, CanvasBackupSnapshotUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more CanvasBackupSnapshots and returns the data updated in the database.
+     * @param {CanvasBackupSnapshotUpdateManyAndReturnArgs} args - Arguments to update many CanvasBackupSnapshots.
+     * @example
+     * // Update many CanvasBackupSnapshots
+     * const canvasBackupSnapshot = await prisma.canvasBackupSnapshot.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more CanvasBackupSnapshots and only return the `id`
+     * const canvasBackupSnapshotWithIdOnly = await prisma.canvasBackupSnapshot.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends CanvasBackupSnapshotUpdateManyAndReturnArgs>(args: SelectSubset<T, CanvasBackupSnapshotUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one CanvasBackupSnapshot.
+     * @param {CanvasBackupSnapshotUpsertArgs} args - Arguments to update or create a CanvasBackupSnapshot.
+     * @example
+     * // Update or create a CanvasBackupSnapshot
+     * const canvasBackupSnapshot = await prisma.canvasBackupSnapshot.upsert({
+     *   create: {
+     *     // ... data to create a CanvasBackupSnapshot
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the CanvasBackupSnapshot we want to update
+     *   }
+     * })
+     */
+    upsert<T extends CanvasBackupSnapshotUpsertArgs>(args: SelectSubset<T, CanvasBackupSnapshotUpsertArgs<ExtArgs>>): Prisma__CanvasBackupSnapshotClient<$Result.GetResult<Prisma.$CanvasBackupSnapshotPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of CanvasBackupSnapshots.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CanvasBackupSnapshotCountArgs} args - Arguments to filter CanvasBackupSnapshots to count.
+     * @example
+     * // Count the number of CanvasBackupSnapshots
+     * const count = await prisma.canvasBackupSnapshot.count({
+     *   where: {
+     *     // ... the filter for the CanvasBackupSnapshots we want to count
+     *   }
+     * })
+    **/
+    count<T extends CanvasBackupSnapshotCountArgs>(
+      args?: Subset<T, CanvasBackupSnapshotCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], CanvasBackupSnapshotCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a CanvasBackupSnapshot.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CanvasBackupSnapshotAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends CanvasBackupSnapshotAggregateArgs>(args: Subset<T, CanvasBackupSnapshotAggregateArgs>): Prisma.PrismaPromise<GetCanvasBackupSnapshotAggregateType<T>>
+
+    /**
+     * Group by CanvasBackupSnapshot.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {CanvasBackupSnapshotGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends CanvasBackupSnapshotGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: CanvasBackupSnapshotGroupByArgs['orderBy'] }
+        : { orderBy?: CanvasBackupSnapshotGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, CanvasBackupSnapshotGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetCanvasBackupSnapshotGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the CanvasBackupSnapshot model
+   */
+  readonly fields: CanvasBackupSnapshotFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for CanvasBackupSnapshot.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__CanvasBackupSnapshotClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the CanvasBackupSnapshot model
+   */
+  interface CanvasBackupSnapshotFieldRefs {
+    readonly id: FieldRef<"CanvasBackupSnapshot", 'String'>
+    readonly userId: FieldRef<"CanvasBackupSnapshot", 'String'>
+    readonly type: FieldRef<"CanvasBackupSnapshot", 'String'>
+    readonly data: FieldRef<"CanvasBackupSnapshot", 'Json'>
+    readonly version: FieldRef<"CanvasBackupSnapshot", 'Int'>
+    readonly bytes: FieldRef<"CanvasBackupSnapshot", 'Int'>
+    readonly createdAt: FieldRef<"CanvasBackupSnapshot", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * CanvasBackupSnapshot findUnique
+   */
+  export type CanvasBackupSnapshotFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * Filter, which CanvasBackupSnapshot to fetch.
+     */
+    where: CanvasBackupSnapshotWhereUniqueInput
+  }
+
+  /**
+   * CanvasBackupSnapshot findUniqueOrThrow
+   */
+  export type CanvasBackupSnapshotFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * Filter, which CanvasBackupSnapshot to fetch.
+     */
+    where: CanvasBackupSnapshotWhereUniqueInput
+  }
+
+  /**
+   * CanvasBackupSnapshot findFirst
+   */
+  export type CanvasBackupSnapshotFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * Filter, which CanvasBackupSnapshot to fetch.
+     */
+    where?: CanvasBackupSnapshotWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CanvasBackupSnapshots to fetch.
+     */
+    orderBy?: CanvasBackupSnapshotOrderByWithRelationInput | CanvasBackupSnapshotOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CanvasBackupSnapshots.
+     */
+    cursor?: CanvasBackupSnapshotWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CanvasBackupSnapshots from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CanvasBackupSnapshots.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CanvasBackupSnapshots.
+     */
+    distinct?: CanvasBackupSnapshotScalarFieldEnum | CanvasBackupSnapshotScalarFieldEnum[]
+  }
+
+  /**
+   * CanvasBackupSnapshot findFirstOrThrow
+   */
+  export type CanvasBackupSnapshotFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * Filter, which CanvasBackupSnapshot to fetch.
+     */
+    where?: CanvasBackupSnapshotWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CanvasBackupSnapshots to fetch.
+     */
+    orderBy?: CanvasBackupSnapshotOrderByWithRelationInput | CanvasBackupSnapshotOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for CanvasBackupSnapshots.
+     */
+    cursor?: CanvasBackupSnapshotWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CanvasBackupSnapshots from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CanvasBackupSnapshots.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CanvasBackupSnapshots.
+     */
+    distinct?: CanvasBackupSnapshotScalarFieldEnum | CanvasBackupSnapshotScalarFieldEnum[]
+  }
+
+  /**
+   * CanvasBackupSnapshot findMany
+   */
+  export type CanvasBackupSnapshotFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * Filter, which CanvasBackupSnapshots to fetch.
+     */
+    where?: CanvasBackupSnapshotWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of CanvasBackupSnapshots to fetch.
+     */
+    orderBy?: CanvasBackupSnapshotOrderByWithRelationInput | CanvasBackupSnapshotOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing CanvasBackupSnapshots.
+     */
+    cursor?: CanvasBackupSnapshotWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` CanvasBackupSnapshots from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` CanvasBackupSnapshots.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of CanvasBackupSnapshots.
+     */
+    distinct?: CanvasBackupSnapshotScalarFieldEnum | CanvasBackupSnapshotScalarFieldEnum[]
+  }
+
+  /**
+   * CanvasBackupSnapshot create
+   */
+  export type CanvasBackupSnapshotCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * The data needed to create a CanvasBackupSnapshot.
+     */
+    data: XOR<CanvasBackupSnapshotCreateInput, CanvasBackupSnapshotUncheckedCreateInput>
+  }
+
+  /**
+   * CanvasBackupSnapshot createMany
+   */
+  export type CanvasBackupSnapshotCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many CanvasBackupSnapshots.
+     */
+    data: CanvasBackupSnapshotCreateManyInput | CanvasBackupSnapshotCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CanvasBackupSnapshot createManyAndReturn
+   */
+  export type CanvasBackupSnapshotCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * The data used to create many CanvasBackupSnapshots.
+     */
+    data: CanvasBackupSnapshotCreateManyInput | CanvasBackupSnapshotCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * CanvasBackupSnapshot update
+   */
+  export type CanvasBackupSnapshotUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * The data needed to update a CanvasBackupSnapshot.
+     */
+    data: XOR<CanvasBackupSnapshotUpdateInput, CanvasBackupSnapshotUncheckedUpdateInput>
+    /**
+     * Choose, which CanvasBackupSnapshot to update.
+     */
+    where: CanvasBackupSnapshotWhereUniqueInput
+  }
+
+  /**
+   * CanvasBackupSnapshot updateMany
+   */
+  export type CanvasBackupSnapshotUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update CanvasBackupSnapshots.
+     */
+    data: XOR<CanvasBackupSnapshotUpdateManyMutationInput, CanvasBackupSnapshotUncheckedUpdateManyInput>
+    /**
+     * Filter which CanvasBackupSnapshots to update
+     */
+    where?: CanvasBackupSnapshotWhereInput
+    /**
+     * Limit how many CanvasBackupSnapshots to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CanvasBackupSnapshot updateManyAndReturn
+   */
+  export type CanvasBackupSnapshotUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * The data used to update CanvasBackupSnapshots.
+     */
+    data: XOR<CanvasBackupSnapshotUpdateManyMutationInput, CanvasBackupSnapshotUncheckedUpdateManyInput>
+    /**
+     * Filter which CanvasBackupSnapshots to update
+     */
+    where?: CanvasBackupSnapshotWhereInput
+    /**
+     * Limit how many CanvasBackupSnapshots to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * CanvasBackupSnapshot upsert
+   */
+  export type CanvasBackupSnapshotUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * The filter to search for the CanvasBackupSnapshot to update in case it exists.
+     */
+    where: CanvasBackupSnapshotWhereUniqueInput
+    /**
+     * In case the CanvasBackupSnapshot found by the `where` argument doesn't exist, create a new CanvasBackupSnapshot with this data.
+     */
+    create: XOR<CanvasBackupSnapshotCreateInput, CanvasBackupSnapshotUncheckedCreateInput>
+    /**
+     * In case the CanvasBackupSnapshot was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<CanvasBackupSnapshotUpdateInput, CanvasBackupSnapshotUncheckedUpdateInput>
+  }
+
+  /**
+   * CanvasBackupSnapshot delete
+   */
+  export type CanvasBackupSnapshotDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
+    /**
+     * Filter which CanvasBackupSnapshot to delete.
+     */
+    where: CanvasBackupSnapshotWhereUniqueInput
+  }
+
+  /**
+   * CanvasBackupSnapshot deleteMany
+   */
+  export type CanvasBackupSnapshotDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which CanvasBackupSnapshots to delete
+     */
+    where?: CanvasBackupSnapshotWhereInput
+    /**
+     * Limit how many CanvasBackupSnapshots to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * CanvasBackupSnapshot without action
+   */
+  export type CanvasBackupSnapshotDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the CanvasBackupSnapshot
+     */
+    select?: CanvasBackupSnapshotSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the CanvasBackupSnapshot
+     */
+    omit?: CanvasBackupSnapshotOmit<ExtArgs> | null
   }
 
 
@@ -20947,11 +22125,25 @@ export namespace Prisma {
     type: 'type',
     data: 'data',
     version: 'version',
+    signature: 'signature',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt'
   };
 
   export type CanvasBackupScalarFieldEnum = (typeof CanvasBackupScalarFieldEnum)[keyof typeof CanvasBackupScalarFieldEnum]
+
+
+  export const CanvasBackupSnapshotScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    type: 'type',
+    data: 'data',
+    version: 'version',
+    bytes: 'bytes',
+    createdAt: 'createdAt'
+  };
+
+  export type CanvasBackupSnapshotScalarFieldEnum = (typeof CanvasBackupSnapshotScalarFieldEnum)[keyof typeof CanvasBackupSnapshotScalarFieldEnum]
 
 
   export const RateLimitEntryScalarFieldEnum: {
@@ -22314,6 +23506,7 @@ export namespace Prisma {
     type?: StringFilter<"CanvasBackup"> | string
     data?: JsonNullableFilter<"CanvasBackup">
     version?: IntFilter<"CanvasBackup"> | number
+    signature?: StringNullableFilter<"CanvasBackup"> | string | null
     createdAt?: DateTimeFilter<"CanvasBackup"> | Date | string
     updatedAt?: DateTimeFilter<"CanvasBackup"> | Date | string
   }
@@ -22324,6 +23517,7 @@ export namespace Prisma {
     type?: SortOrder
     data?: SortOrderInput | SortOrder
     version?: SortOrder
+    signature?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -22338,6 +23532,7 @@ export namespace Prisma {
     type?: StringFilter<"CanvasBackup"> | string
     data?: JsonNullableFilter<"CanvasBackup">
     version?: IntFilter<"CanvasBackup"> | number
+    signature?: StringNullableFilter<"CanvasBackup"> | string | null
     createdAt?: DateTimeFilter<"CanvasBackup"> | Date | string
     updatedAt?: DateTimeFilter<"CanvasBackup"> | Date | string
   }, "id" | "userId_type">
@@ -22348,6 +23543,7 @@ export namespace Prisma {
     type?: SortOrder
     data?: SortOrderInput | SortOrder
     version?: SortOrder
+    signature?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     _count?: CanvasBackupCountOrderByAggregateInput
@@ -22366,8 +23562,73 @@ export namespace Prisma {
     type?: StringWithAggregatesFilter<"CanvasBackup"> | string
     data?: JsonNullableWithAggregatesFilter<"CanvasBackup">
     version?: IntWithAggregatesFilter<"CanvasBackup"> | number
+    signature?: StringNullableWithAggregatesFilter<"CanvasBackup"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"CanvasBackup"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"CanvasBackup"> | Date | string
+  }
+
+  export type CanvasBackupSnapshotWhereInput = {
+    AND?: CanvasBackupSnapshotWhereInput | CanvasBackupSnapshotWhereInput[]
+    OR?: CanvasBackupSnapshotWhereInput[]
+    NOT?: CanvasBackupSnapshotWhereInput | CanvasBackupSnapshotWhereInput[]
+    id?: StringFilter<"CanvasBackupSnapshot"> | string
+    userId?: StringFilter<"CanvasBackupSnapshot"> | string
+    type?: StringFilter<"CanvasBackupSnapshot"> | string
+    data?: JsonNullableFilter<"CanvasBackupSnapshot">
+    version?: IntFilter<"CanvasBackupSnapshot"> | number
+    bytes?: IntFilter<"CanvasBackupSnapshot"> | number
+    createdAt?: DateTimeFilter<"CanvasBackupSnapshot"> | Date | string
+  }
+
+  export type CanvasBackupSnapshotOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    type?: SortOrder
+    data?: SortOrderInput | SortOrder
+    version?: SortOrder
+    bytes?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CanvasBackupSnapshotWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: CanvasBackupSnapshotWhereInput | CanvasBackupSnapshotWhereInput[]
+    OR?: CanvasBackupSnapshotWhereInput[]
+    NOT?: CanvasBackupSnapshotWhereInput | CanvasBackupSnapshotWhereInput[]
+    userId?: StringFilter<"CanvasBackupSnapshot"> | string
+    type?: StringFilter<"CanvasBackupSnapshot"> | string
+    data?: JsonNullableFilter<"CanvasBackupSnapshot">
+    version?: IntFilter<"CanvasBackupSnapshot"> | number
+    bytes?: IntFilter<"CanvasBackupSnapshot"> | number
+    createdAt?: DateTimeFilter<"CanvasBackupSnapshot"> | Date | string
+  }, "id">
+
+  export type CanvasBackupSnapshotOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    type?: SortOrder
+    data?: SortOrderInput | SortOrder
+    version?: SortOrder
+    bytes?: SortOrder
+    createdAt?: SortOrder
+    _count?: CanvasBackupSnapshotCountOrderByAggregateInput
+    _avg?: CanvasBackupSnapshotAvgOrderByAggregateInput
+    _max?: CanvasBackupSnapshotMaxOrderByAggregateInput
+    _min?: CanvasBackupSnapshotMinOrderByAggregateInput
+    _sum?: CanvasBackupSnapshotSumOrderByAggregateInput
+  }
+
+  export type CanvasBackupSnapshotScalarWhereWithAggregatesInput = {
+    AND?: CanvasBackupSnapshotScalarWhereWithAggregatesInput | CanvasBackupSnapshotScalarWhereWithAggregatesInput[]
+    OR?: CanvasBackupSnapshotScalarWhereWithAggregatesInput[]
+    NOT?: CanvasBackupSnapshotScalarWhereWithAggregatesInput | CanvasBackupSnapshotScalarWhereWithAggregatesInput[]
+    id?: StringWithAggregatesFilter<"CanvasBackupSnapshot"> | string
+    userId?: StringWithAggregatesFilter<"CanvasBackupSnapshot"> | string
+    type?: StringWithAggregatesFilter<"CanvasBackupSnapshot"> | string
+    data?: JsonNullableWithAggregatesFilter<"CanvasBackupSnapshot">
+    version?: IntWithAggregatesFilter<"CanvasBackupSnapshot"> | number
+    bytes?: IntWithAggregatesFilter<"CanvasBackupSnapshot"> | number
+    createdAt?: DateTimeWithAggregatesFilter<"CanvasBackupSnapshot"> | Date | string
   }
 
   export type RateLimitEntryWhereInput = {
@@ -23804,6 +25065,7 @@ export namespace Prisma {
     type: string
     data?: NullableJsonNullValueInput | InputJsonValue
     version?: number
+    signature?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -23814,6 +25076,7 @@ export namespace Prisma {
     type: string
     data?: NullableJsonNullValueInput | InputJsonValue
     version?: number
+    signature?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -23824,6 +25087,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     data?: NullableJsonNullValueInput | InputJsonValue
     version?: IntFieldUpdateOperationsInput | number
+    signature?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -23834,6 +25098,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     data?: NullableJsonNullValueInput | InputJsonValue
     version?: IntFieldUpdateOperationsInput | number
+    signature?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -23844,6 +25109,7 @@ export namespace Prisma {
     type: string
     data?: NullableJsonNullValueInput | InputJsonValue
     version?: number
+    signature?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
   }
@@ -23854,6 +25120,7 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     data?: NullableJsonNullValueInput | InputJsonValue
     version?: IntFieldUpdateOperationsInput | number
+    signature?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -23864,8 +25131,79 @@ export namespace Prisma {
     type?: StringFieldUpdateOperationsInput | string
     data?: NullableJsonNullValueInput | InputJsonValue
     version?: IntFieldUpdateOperationsInput | number
+    signature?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CanvasBackupSnapshotCreateInput = {
+    id?: string
+    userId: string
+    type: string
+    data?: NullableJsonNullValueInput | InputJsonValue
+    version: number
+    bytes?: number
+    createdAt?: Date | string
+  }
+
+  export type CanvasBackupSnapshotUncheckedCreateInput = {
+    id?: string
+    userId: string
+    type: string
+    data?: NullableJsonNullValueInput | InputJsonValue
+    version: number
+    bytes?: number
+    createdAt?: Date | string
+  }
+
+  export type CanvasBackupSnapshotUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    data?: NullableJsonNullValueInput | InputJsonValue
+    version?: IntFieldUpdateOperationsInput | number
+    bytes?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CanvasBackupSnapshotUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    data?: NullableJsonNullValueInput | InputJsonValue
+    version?: IntFieldUpdateOperationsInput | number
+    bytes?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CanvasBackupSnapshotCreateManyInput = {
+    id?: string
+    userId: string
+    type: string
+    data?: NullableJsonNullValueInput | InputJsonValue
+    version: number
+    bytes?: number
+    createdAt?: Date | string
+  }
+
+  export type CanvasBackupSnapshotUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    data?: NullableJsonNullValueInput | InputJsonValue
+    version?: IntFieldUpdateOperationsInput | number
+    bytes?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type CanvasBackupSnapshotUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    type?: StringFieldUpdateOperationsInput | string
+    data?: NullableJsonNullValueInput | InputJsonValue
+    version?: IntFieldUpdateOperationsInput | number
+    bytes?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type RateLimitEntryCreateInput = {
@@ -24992,6 +26330,7 @@ export namespace Prisma {
     type?: SortOrder
     data?: SortOrder
     version?: SortOrder
+    signature?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -25005,6 +26344,7 @@ export namespace Prisma {
     userId?: SortOrder
     type?: SortOrder
     version?: SortOrder
+    signature?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
@@ -25014,12 +26354,51 @@ export namespace Prisma {
     userId?: SortOrder
     type?: SortOrder
     version?: SortOrder
+    signature?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
   }
 
   export type CanvasBackupSumOrderByAggregateInput = {
     version?: SortOrder
+  }
+
+  export type CanvasBackupSnapshotCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    type?: SortOrder
+    data?: SortOrder
+    version?: SortOrder
+    bytes?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CanvasBackupSnapshotAvgOrderByAggregateInput = {
+    version?: SortOrder
+    bytes?: SortOrder
+  }
+
+  export type CanvasBackupSnapshotMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    type?: SortOrder
+    version?: SortOrder
+    bytes?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CanvasBackupSnapshotMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    type?: SortOrder
+    version?: SortOrder
+    bytes?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type CanvasBackupSnapshotSumOrderByAggregateInput = {
+    version?: SortOrder
+    bytes?: SortOrder
   }
 
   export type RateLimitEntryCountOrderByAggregateInput = {

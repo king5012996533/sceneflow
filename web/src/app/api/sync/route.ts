@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/current-user";
 import { isSameOriginRequest } from "@/lib/auth";
 import { prisma } from "@/lib/ic-prisma";
+import { SNAPSHOT_MAX_AGE_DAYS, SNAPSHOT_MAX_KEEP, backupSignature, payloadBytes, snapshotPrunePlan } from "@/lib/canvas-backup-snapshot";
 
 // 同步体积上限（2026-09-21 调大）。
 //
@@ -49,12 +50,34 @@ export async function POST(req: NextRequest) {
             console.error(`[sync:post] 拒绝同步 type=${type} userId=${user.id} 字节=${bytes} 最长字符串=${shape.maxStringLength} 画布数=${shape.projects} 节点数=${shape.nodes} 连线数=${shape.connections}`);
             return privateJson({ error: "同步数据结构超出配额" }, { status: 413 });
         }
-        const record = await prisma.canvasBackup.upsert({ where: { userId_type: { userId: user.id, type } }, update: { data, version: { increment: 1 } }, create: { userId: user.id, type, data } });
+        const signature = backupSignature(json);
+        // 覆盖之前先留一份上一版（见 lib/canvas-backup-snapshot.ts 的注释：备份是整份覆盖式的，
+        // 本机库为空/过旧的设备一开画布页就会把云端覆盖掉，用户删错画布也一样）。
+        // 只有「内容真的变了」才留：签名相同说明这次写入不改动任何东西，留了只是白占空间。
+        const previous = await prisma.canvasBackup.findUnique({ where: { userId_type: { userId: user.id, type } }, select: { data: true, version: true, signature: true } });
+        if (previous && previous.data !== null && previous.signature !== signature) {
+            await prisma.canvasBackupSnapshot.create({ data: { userId: user.id, type, data: previous.data, version: previous.version, bytes: payloadBytes(JSON.stringify(previous.data) ?? "null") } });
+        }
+        const record = await prisma.canvasBackup.upsert({
+            where: { userId_type: { userId: user.id, type } },
+            update: { data, version: { increment: 1 }, signature },
+            create: { userId: user.id, type, data, signature },
+        });
+        // 清理旧快照（按份数 + 按天数），失败不影响这次保存
+        void pruneSnapshots(user.id, type).catch((error) => console.error("[sync:post] 快照清理失败", user.id, error instanceof Error ? error.message : error));
         return privateJson({ ok: true, version: record.version });
     } catch (err: any) {
         console.error("[sync:post]", err?.message);
         return privateJson({ error: "保存失败" }, { status: 500 });
     }
+}
+
+/** 只保留最近几份、且不过期的快照。列表按时间倒序，交给纯函数决定删哪些。 */
+async function pruneSnapshots(userId: string, type: string) {
+    if (!prisma) return;
+    const rows = await prisma.canvasBackupSnapshot.findMany({ where: { userId, type }, orderBy: { createdAt: "desc" }, select: { id: true, createdAt: true } });
+    const doomed = snapshotPrunePlan(rows, new Date(), { maxKeep: SNAPSHOT_MAX_KEEP, maxAgeDays: SNAPSHOT_MAX_AGE_DAYS });
+    if (doomed.length) await prisma.canvasBackupSnapshot.deleteMany({ where: { id: { in: doomed }, userId, type } });
 }
 
 export async function GET(req: NextRequest) {
