@@ -368,7 +368,11 @@ export const useConfigStore = create<ConfigStore>()(
             // 这个开关只在 pruna 的视频面板里出现，而该模型此前一次都没真正出过片 ——
             // 存档里那个 "true" 只可能是我们自己的旧默认，不可能是用户看过开关后的选择，
             // 所以一次性清掉，让新默认落到老用户身上（否则改了默认也轮不到他们）。
-            version: 3,
+            // v4：v3 的那次清洗**被并发的回填吃掉了** —— 迁移把画质改成空、紧接着 hydrateFromServer
+            // 又把服务端存档里的旧默认 "auto" 合并回来，然后以 version 3 存盘。之后版本号已经是 3，
+            // 迁移再也不会跑，这个设备就永远卡在 auto 上（2026-09-23 真机复验时抓到的：存档 version=3
+            // 但 quality 仍是 "auto"）。所以把回填口子堵上之后再升一版，让清洗重新落一次。
+            version: 4,
             migrate: (persisted, version) => {
                 const state = (persisted || {}) as { config?: AiConfig; webdav?: WebdavSyncConfig };
                 const from = Number(version) || 0;
@@ -381,7 +385,8 @@ export const useConfigStore = create<ConfigStore>()(
                 //   canvasImageCount "3" —— 画布图片默认张数 3 → 1（一按就是三张、三次上游调用、三倍成本）
                 //   quality "auto"       —— 画质默认自动 → 留空（交给模型标定的默认档，见 resolveImageQuality）
                 // 一次性迁移：之后用户自己再选 3 张 / 自动，都会照存照用，不会再被覆盖。
-                if (from < 3 && state.config) {
+                // from < 4：v3 与 v4 跑的是同一段清洗（v3 那次被回填吃掉，v4 重来一遍）
+                if (from < 4 && state.config) {
                     const rest = { ...(state.config as Record<string, unknown>) };
                     if (rest.canvasImageCount === "3") rest.canvasImageCount = "1";
                     if (rest.quality === "auto") rest.quality = "";
