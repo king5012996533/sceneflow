@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Checkbox, InputNumber, Radio, Switch } from "antd";
+import { Button, Checkbox, InputNumber, Radio, Switch, Select } from "antd";
 
 import { IMAGE_RESOLUTION_OPTIONS, type ImageResolutionTier } from "@/lib/image-resolution";
 import {
@@ -197,6 +197,30 @@ function ImageFields({ spec, onChange }: { spec: ImageCapabilitySpec; onChange: 
                     </div>
                 </div>
             )}
+            {(() => {
+                // 默认画质：用户没主动选过画质时用哪一档。上游不同档位价差很大（实测同模型
+                // 自动 ¥1.78/张 vs 低 ¥0.09/张），默认落在贵档上等于每次随手一点都按最贵结账。
+                const available = usesQualityAxis ? qualityTiers : view.qualities || [];
+                if (!available.length) return null;
+                return (
+                    <div>
+                        <FieldLabel>默认画质（用户没选过时用哪一档）</FieldLabel>
+                        <Select
+                            size="small"
+                            className="min-w-[200px]"
+                            value={view.defaultQuality ?? ""}
+                            onChange={(value) => onChange({ ...view, defaultQuality: value ? (value as ImageQuality) : undefined })}
+                            options={[
+                                { label: "跟随默认（auto，价格最高）", value: "" },
+                                ...IMAGE_QUALITY_OPTIONS.filter((item) => item.value !== "auto" && available.includes(item.value)).map((item) => ({ label: item.label, value: item.value })),
+                            ]}
+                        />
+                        <div className="mt-1 text-[11px] leading-4 text-[#726d67]">
+                            用户手动选过的画质永远优先；这里只决定「没选过」时的档位。选「低」通常最省（同模型实测差 20 倍），画质差一些。
+                        </div>
+                    </div>
+                );
+            })()}
             {usesQualityAxis || usesAspectOnly ? null : (
                 <div>
                     <FieldLabel>分辨率（不勾的档位用户面板上不会出现）</FieldLabel>

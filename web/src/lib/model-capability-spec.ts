@@ -104,6 +104,15 @@ export type ImageCapabilitySpec = {
      * 缺字段一律当不支持 —— 没有任何"按名字兜底"的名单可回落。
      */
     interactiveEdit?: boolean;
+    /**
+     * 这个模型的默认画质档（可选）。用户没主动选过画质时用哪一档。
+     *
+     * 为什么需要按模型给默认值（2026-09-23）：上游不同档位的价格差得很远 —— 实测同一个模型
+     * 「自动」是 ¥1.78/张、「低」是 ¥0.09/张（差 20 倍）。默认落在贵的档上，等于用户每次
+     * 随手点一下就按最贵那档结账。这里是运营可控的兜底：标了就用它，没标一律还是 auto
+     * （与改动前完全一致）；用户在面板里手动选过的值永远优先。
+     */
+    defaultQuality?: ImageQuality;
     /** 最大生成张数 1-15 */
     maxCount: number;
 };
@@ -505,6 +514,36 @@ export function normalizeImageOutputFormat(input: unknown, fallback: ImageOutput
  * 「没标」与「标了但一个都没勾」必须区分开：前者走分辨率档位，后者是后台配置写坏了 ——
  * 这里统一按「没用这条轴」处理，不让面板出现一行空档位。
  */
+/**
+ * 抠出合法的默认画质：必须在这个模型标定过的档位里（标定是运营给的「上游认这些值」的白名单）。
+ * 标了但不在白名单里 → 当没标。返回 undefined 时调用方退回 auto。
+ */
+function defaultQualityOf(input: unknown, allowed: readonly string[]): ImageQuality | undefined {
+    if (typeof input !== "string") return undefined;
+    const value = input.trim().toLowerCase();
+    if (!IMAGE_QUALITY_VALUES.includes(value as ImageQuality)) return undefined;
+    return allowed.includes(value) ? (value as ImageQuality) : undefined;
+}
+
+/**
+ * 这次生图用哪一档画质：用户在面板里选过的值 > 模型标定的默认档 > auto。
+ *
+ * 收口成一个纯函数，是因为「面板显示的价格」和「真正发给上游的档位」必须是同一个值 ——
+ * 两边各写一套 `x || "auto"` 正是过去价格与实扣对不上的老毛病。面板、请求体组装、积分预检
+ * 都调这里。
+ *
+ * 传进来的 configured 是空串（配置里「没选过」的表示）时会走到模型默认档。
+ */
+export function resolveImageQuality(configured: unknown, capability?: ModelCapabilitySpec | null): ImageQuality {
+    const raw = typeof configured === "string" ? configured.trim().toLowerCase() : "";
+    if (IMAGE_QUALITY_VALUES.includes(raw as ImageQuality)) return raw as ImageQuality;
+    if (capability && capability.kind === IMAGE_KIND) {
+        const allowed = capability.qualities || [];
+        return defaultQualityOf(capability.defaultQuality, allowed) || "auto";
+    }
+    return "auto";
+}
+
 export function normalizeQualityTiers(input: unknown): ImageQuality[] | undefined {
     if (!Array.isArray(input)) return undefined;
     const picked = new Set(input.map((item) => String(item).trim()));
@@ -536,9 +575,11 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
         const resolutions = Array.isArray(value.resolutions) && value.resolutions.length ? normalizeResolutionTiers(value.resolutions) : deriveResolutionTiers(pickedAspects);
         const qualityTiers = normalizeQualityTiers(value.qualityTiers);
         const outputFormats = normalizeOutputFormats(value.outputFormats);
+        const qualities = pickStrings(value.qualities, IMAGE_QUALITY_VALUES);
+        const defaultQuality = defaultQualityOf(value.defaultQuality, qualities);
         return {
             kind,
-            qualities: pickStrings(value.qualities, IMAGE_QUALITY_VALUES),
+            qualities,
             aspects: stripAspectSuffixes(pickedAspects) as ImageAspect[],
             resolutions,
             // 没标就整个字段不落库：留一个空数组会让「标了但没勾」和「没标」分不清
@@ -549,6 +590,8 @@ function sanitizeSingleCapability(raw: unknown): ModelCapabilitySpec | null {
             ...(typeof value.references === "boolean" ? { references: value.references } : {}),
             // 两态：只有勾了才落库（缺字段 = 不支持），别存 false 占位
             ...(value.interactiveEdit === true ? { interactiveEdit: true } : {}),
+            // 默认画质：必须是这个模型标定过的档位之一，否则不落库（免得标了低、模型却不认低）
+            ...(defaultQuality ? { defaultQuality } : {}),
             maxCount: Math.max(1, Math.min(IMAGE_MAX_COUNT_LIMIT, Math.floor(Number(value.maxCount)) || DEFAULT_IMAGE_CAPABILITY.maxCount)),
         };
     }

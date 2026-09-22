@@ -1340,7 +1340,7 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/components/video-settings-panel.tsx", "boolConfig(config.videoDraft, false)", "面板的草稿开关默认必须关，与上游 draft 默认一致。");
     assertIncludes("src/services/api/video.ts", "boolConfig(config.videoDraft, PRUNA_VIDEO_DEFAULT_DRAFT)", "请求里的 draft 兜底取上游默认（false），不能自己写死 true。");
     assertIncludes("src/stores/use-config-store.ts", 'videoDraft: "false"', "草稿模式默认值改成 false：旧默认 true 等于每次生成都用低画质预览换同样多的积分。");
-    assertIncludes("src/stores/use-config-store.ts", "version: 2", "改了 videoDraft 默认值就得有存档版本迁移，否则老用户永远留在旧默认上。");
+    assertMatchesNormalized("src/stores/use-config-store.ts", /version: [3-9]/, "改了默认值就得有存档版本迁移并升版本号，否则老用户永远留在旧默认上（现为 v3：张数默认 1、画质默认跟随模型标定）。");
     assertIncludes("src/stores/use-config-store.ts", "videoDraft: _legacyDraft", "v2 迁移要把旧的 videoDraft 摘掉（那个 true 是我们自己的旧默认，不是用户的选择）。");
     // 旧默认还有两个回流口：服务端存档与 studio 会话。任何一处没堵住，迁移做完等于白做。
     assertIncludes("src/stores/use-config-store.ts", "videoDraft: _ignoredServerDraft", "服务端存档里的 videoDraft 不许回填（那份存的也是旧默认，会把迁移结果盖回去）。");
@@ -1349,6 +1349,21 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/lib/model-capability-spec.ts", "seconds: [6, 10, 12, 16, 20]", "通用视频模型的默认秒数保持不变（5s 只按标定开）。");
     assertIncludes("src/lib/model-capability-spec.ts", "if (isPrunaVideoModel(model)) return prunaVideoCapability();", "后台给 pruna 预填的标定必须是它的真实枚举，不然又会被标错一次。");
     assertIncludes("src/lib/model-capability-spec.ts", "VIDEO_CLARITY_VALUES: readonly VideoClarity[] = VIDEO_CLARITY_OPTIONS.map", "通用视频白名单从选项清单派生：手抄那份漏了 1080p，后台标定会被静默砍掉。");
+}
+
+// —— 默认值不许再落在最贵的那一档（2026-09-23）——
+// 线上实测：同一个模型「自动」¥1.78/张、「低」¥0.09/张（20 倍）。以前默认张数 3 + 默认画质自动，
+// 用户随手点一下就是 3 张 × 最贵档。这里钉住三件事：默认 1 张、默认画质跟随模型标定、三处读取口径统一。
+{
+    assertIncludes("src/stores/use-config-store.ts", 'canvasImageCount: "1"', "画布图片默认张数必须是 1：默认 3 等于用户随手一点就付三倍成本。");
+    assertIncludes("src/stores/use-config-store.ts", 'rest.canvasImageCount === "3"', "老存档里的张数 3 要一次性迁到 1（那是我们的旧默认，不是用户的选择）。");
+    assertIncludes("src/stores/use-config-store.ts", 'rest.quality === "auto"', "老存档里的画质 auto 要一次性清空，交给模型标定的默认档。");
+    assertNotMatches("src/stores/use-config-store.ts", /quality: "auto"/, "配置默认值不许再写死 auto：那会让模型标定的默认档永远轮不到。");
+    assertIncludes("src/lib/model-capability-spec.ts", "export function resolveImageQuality(", "画质解析要收口成一个纯函数：面板显示的价格与发出去的档位必须是同一个值。");
+    assertIncludes("src/lib/model-capability-spec.ts", "defaultQuality", "能力标定要支持逐模型的默认画质：上游不同档位价差 20 倍，得由运营按模型指定。");
+    assertIncludes("src/components/image-settings-panel.tsx", "resolveImageQuality(config.quality, imageCapability)", "面板画质必须走统一解析，否则价格按 auto 算。");
+    assertIncludes("src/app/(user)/canvas/hooks/use-canvas-generation-context.ts", "resolveImageQuality(built.quality, getPlatformCapability(", "画布发请求前要把画质落定：只在面板上显示低、请求体发 auto 是最坏情况。");
+    assertIncludes("src/lib/studio/execute.ts", "resolveImageQuality(instruction.config.quality", "工作台与画布同一条画质口径。");
 }
 
 // 视频「按秒计价」——上游按输出秒数收费，按条一口价会在长片/高清档上赔钱。

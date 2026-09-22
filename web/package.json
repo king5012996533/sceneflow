@@ -36,6 +36,7 @@
         "test:pricingkind": "node scripts/model-pricing-kind-unit-tests.mjs",
         "test:pruna": "node --import ./scripts/alias-hooks.mjs scripts/pruna-video-unit-tests.mjs",
         "test:webhook": "node scripts/replicate-webhook-unit-tests.mjs",
+        "test:imgquality": "node --import ./scripts/alias-hooks.mjs scripts/image-quality-default-unit-tests.mjs",
         "test:refsupport": "node scripts/model-reference-support-unit-tests.mjs",
         "test:ark": "node scripts/ark-image-unit-tests.mjs",
         "test:marker": "node scripts/image-marker-unit-tests.mjs",

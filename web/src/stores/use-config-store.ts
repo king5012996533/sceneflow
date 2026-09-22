@@ -104,11 +104,15 @@ export const defaultConfig: AiConfig = {
     videoModels: [],
     textModels: [],
     audioModels: [],
-    quality: "auto",
+    // 画质留空 = 「没选过」，由模型的能力标定决定默认档（见 resolveImageQuality）。
+    // 空串被所有读取处当成 auto 兜底，所以没标默认档的模型行为与改动前一致。
+    quality: "",
     size: "1:1",
     count: "1",
     outputFormat: "webp",
-    canvasImageCount: "3",
+    // 画布里的图片张数默认 1（2026-09-23 改）：以前默认 3，用户随手点一下就是三张、
+    // 三次上游调用、三倍成本；要一次出多张仍然可以在节点面板里选。
+    canvasImageCount: "1",
 };
 
 export const defaultWebdavSyncConfig: WebdavSyncConfig = {
@@ -358,13 +362,24 @@ export const useConfigStore = create<ConfigStore>()(
             // 这个开关只在 pruna 的视频面板里出现，而该模型此前一次都没真正出过片 ——
             // 存档里那个 "true" 只可能是我们自己的旧默认，不可能是用户看过开关后的选择，
             // 所以一次性清掉，让新默认落到老用户身上（否则改了默认也轮不到他们）。
-            version: 2,
+            version: 3,
             migrate: (persisted, version) => {
                 const state = (persisted || {}) as { config?: AiConfig; webdav?: WebdavSyncConfig };
                 const from = Number(version) || 0;
                 if (from < 2 && state.config) {
                     const { videoDraft: _legacyDraft, ...rest } = state.config;
                     state.config = rest as AiConfig;
+                }
+                // v3：几个「默认值本身就是最贵选项」的默认值换掉（2026-09-23）。
+                // 老存档里那几个值如果正好等于旧默认，就当成「用户没选过」而不是「用户特意选的」：
+                //   canvasImageCount "3" —— 画布图片默认张数 3 → 1（一按就是三张、三次上游调用、三倍成本）
+                //   quality "auto"       —— 画质默认自动 → 留空（交给模型标定的默认档，见 resolveImageQuality）
+                // 一次性迁移：之后用户自己再选 3 张 / 自动，都会照存照用，不会再被覆盖。
+                if (from < 3 && state.config) {
+                    const rest = { ...(state.config as Record<string, unknown>) };
+                    if (rest.canvasImageCount === "3") rest.canvasImageCount = "1";
+                    if (rest.quality === "auto") rest.quality = "";
+                    state.config = rest as unknown as AiConfig;
                 }
                 return { config: state.config || defaultConfig, webdav: state.webdav || defaultWebdavSyncConfig };
             },

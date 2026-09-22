@@ -1,3 +1,5 @@
+import { resolveImageQuality } from "@/lib/model-capability-spec";
+import { getPlatformCapability } from "@/stores/platform-catalog-store";
 import { createGeneratedVideoTask, persistGeneratedVideo, pollGeneratedVideoTask, requestGeneratedImages, type GuardedVideoGenerationTask } from "@/lib/generation/generation-request";
 import { getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { seedanceVideoReferenceError, seedanceVideoReferenceHint } from "@/lib/seedance-video";
@@ -23,7 +25,9 @@ export async function executeStudioInstruction(instruction: StudioInstruction, o
 
 async function runImageGeneration(instruction: StudioInstruction, onUpdate: (update: StudioMessageUpdate) => void) {
     const startedAt = performance.now();
-    const result = await requestGeneratedImages({ config: instruction.config, prompt: instruction.prompt, references: instruction.references });
+    // 与画布同一条口径：没选过画质就用模型标定的默认档（价格与请求体必须一致）
+    const imageConfig = { ...instruction.config, quality: resolveImageQuality(instruction.config.quality, getPlatformCapability(instruction.config.imageModel || instruction.config.model)) };
+    const result = await requestGeneratedImages({ config: imageConfig, prompt: instruction.prompt, references: instruction.references });
     const image = result[0];
     if (!image) throw new Error("接口没有返回图片");
     // 持久化到存储（与参考图同一套）：会话只留 storageKey，避免每次保存把全部 base64 重写进 IndexedDB。

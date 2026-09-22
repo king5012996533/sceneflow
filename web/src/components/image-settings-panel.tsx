@@ -6,7 +6,7 @@ import { ConfigProvider, Switch } from "antd";
 import { type CanvasTheme } from "@/lib/canvas-theme";
 import { getGenerationCreditsCost } from "@/lib/credit-pricing";
 import { CUSTOM_IMAGE_RATIO, IMAGE_RESOLUTION_OPTIONS, imageRatioOf, imageResolutionTier, imageSizeForRatio, nearestAllowedTier, parseImagePixelSize, synthesizeImagePixelSize, type ImageResolutionTier } from "@/lib/image-resolution";
-import { normalizeImageCapability, normalizeImageOutputFormat, IMAGE_OUTPUT_FORMAT_OPTIONS, IMAGE_QUALITY_OPTIONS, IMAGE_QUALITY_TIER_OPTIONS, type ImageAspect, type ImageCapabilityView, type ImageQuality } from "@/lib/model-capability-spec";
+import { normalizeImageCapability, normalizeImageOutputFormat, IMAGE_OUTPUT_FORMAT_OPTIONS, IMAGE_QUALITY_OPTIONS, IMAGE_QUALITY_TIER_OPTIONS, type ImageAspect, type ImageCapabilityView, type ImageQuality, resolveImageQuality } from "@/lib/model-capability-spec";
 import { getPlatformPricing, getPricingDefaults, usePlatformCapability } from "@/stores/platform-catalog-store";
 import { modelOptionName, type AiConfig } from "@/stores/use-config-store";
 
@@ -75,7 +75,9 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, model: model
     const outputFormat = normalizeImageOutputFormat(config.outputFormat);
     const allowedTiers = effectiveResolutions.map((item) => item.value);
     const effectiveMaxCount = imageCapability ? Math.max(1, Math.min(maxCount, imageCapability.maxCount)) : maxCount;
-    const quality = config.quality || "auto";
+    // 画质走统一解析：用户选过的值 > 模型标定的默认档 > auto。
+    // 别在这里写 `config.quality || "auto"` —— 那样模型默认档永远轮不到，价格也会跟着算错档。
+    const quality = resolveImageQuality(config.quality, imageCapability);
     const count = Math.max(1, Math.min(effectiveMaxCount, Math.floor(Math.abs(Number(config.count)) || 1)));
     const activeSize = config.size || "auto";
     // 当前选择落在哪个比例 / 哪一档分辨率（比例由像素值或比例串反推，自定义像素单独归一档）
