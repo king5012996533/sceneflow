@@ -345,6 +345,7 @@ assertIncludes("src/lib/credit-pricing.ts", "auto: 178", "成本估算表必须�
 assertIncludes("src/lib/credit-pricing.ts", "FLARE_QUALITY_COST_CENTS", "成本估算必须按画质档给（原先所有图片一律 30 分，后台毛利页两种方向都是错的）。");
 assertIncludes("src/lib/credit-pricing.ts", "FLAT_IMAGE_COST_CENTS", "一口价模型（如 recraft-v4-pro）必须单独登记成本，漏了会按默认 10 分估，对账低估 2 倍以上。");
 assertIncludes("src/lib/credit-pricing.ts", "recraft-v4-pro", "recraft-v4-pro 的单张成本必须是 $0.25（178 分）。");
+assertIncludes("src/lib/credit-pricing.ts", "GPT_IMAGE_2_QUALITY_COST_CENTS", "openai/gpt-image-2 的成本也要按画质档给：low 9 分与 high/auto 91 分差 10 倍，一刀切 30 分会两头失真。");
 // —— 出图格式（2026-09-19：上游 output_format 是显式字段，用户可选 webp/png）——
 assertIncludes("src/lib/model-capability-spec.ts", "outputFormats?: ImageOutputFormat[]", "能力标定必须能标「这个模型支持哪些出图格式」，标了面板才出现格式行。");
 assertIncludes("src/lib/model-capability-spec.ts", "normalizeImageOutputFormat", "格式取值必须归一化：发一个上游不认的值就是 422，认不出来一律回 webp。");
@@ -1373,6 +1374,13 @@ assertIncludes("src/lib/credential-store.server.ts", "export function platformAu
     assertIncludes("src/stores/use-config-store.ts", '_serverCount !== "3"', "服务端存档里的旧默认张数 3 不许回填，否则迁移结果被盖回去。");
     assertIncludes("src/stores/use-config-store.ts", '_serverQuality !== "auto"', "服务端存档里的旧默认画质 auto 不许回填。");
     assertIncludes("src/app/(user)/studio/page.tsx", 'config.quality !== "auto"', "工作台会话回填不许把旧的 auto 带回来。");
+}
+
+// Replicate 出图请求的画幅必须过收口函数 —— 上游只认 8 个比例，而我们自己的带后缀画幅档
+// （16:9-2k）与用户历史存档里的像素尺寸（1760x2352）都会被 422 拒单（2026-10-15 实测 26 次）。
+{
+    assertIncludes("src/services/api/image.ts", "aspect_ratio: replicateAspectRatio(config.size, requestSize)", "发给 Replicate 的画幅必须走 replicateAspectRatio 收口。");
+    assertNotMatches("src/services/api/image.ts", /aspect_ratio: resolveRequestAspect/, "不许把未收口的画幅直接发给 Replicate：16:9-2k 与 1760x2352 这类值上游会 422。");
 }
 
 // 视频「按秒计价」——上游按输出秒数收费，按条一口价会在长片/高清档上赔钱。

@@ -201,6 +201,48 @@ function resolveRequestAspect(size: string, requestSize?: string) {
     return `${Math.round(dimensions.width / divisor)}:${Math.round(dimensions.height / divisor)}`;
 }
 
+/**
+ * Replicate 认的画幅枚举（2026-10-15 取自上游 422 原文里的白名单）。
+ *
+ * 上游除这几个比例外只认它自己列出的固定像素值，其它一律 422 拒单。而我们会把两种
+ * 不认的值发过去：带分辨率后缀的画幅档（16:9-2k 这类，resolveRequestAspect 见到冒号
+ * 会原样返回）、以及用户历史存档里存着的算好像素尺寸（1760x2352 这类，约分后是
+ * 110:147 这种怪比例）。所以发给 Replicate 之前统一收口：剥掉后缀，认不出的比例
+ * 按对数距离夹到最接近的一档。
+ */
+const REPLICATE_ACCEPTED_ASPECTS: readonly string[] = ["1:1", "3:2", "2:3", "4:3", "3:4", "16:9", "9:16"];
+
+function nearestReplicateAspect(ratio: number): string {
+    if (!Number.isFinite(ratio) || ratio <= 0) return "1:1";
+    let best = "1:1";
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const value of REPLICATE_ACCEPTED_ASPECTS) {
+        const [width, height] = value.split(":").map(Number);
+        // 按对数距离比：2:3 与 3:4 谁更接近，要看比例而不是差值
+        const distance = Math.abs(Math.log(ratio) - Math.log(width / height));
+        if (distance < bestDistance) {
+            bestDistance = distance;
+            best = value;
+        }
+    }
+    return best;
+}
+
+function replicateAspectRatio(size: string, requestSize?: string): string {
+    const raw = String(size ?? "")
+        .trim()
+        .toLowerCase();
+    if (!raw) return "1:1";
+    if (raw === "auto") return "auto";
+    const base = raw.replace(/-(1\.5k|2k|3k|4k)$/, "");
+    if (REPLICATE_ACCEPTED_ASPECTS.includes(base)) return base;
+    const parts = base.includes(":") ? base.split(":").map((part) => Number(part.trim())) : [];
+    if (parts.length === 2 && parts[0] > 0 && parts[1] > 0) return nearestReplicateAspect(parts[0] / parts[1]);
+    const dimensions = parseImageDimensions(requestSize || base);
+    if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) return "1:1";
+    return nearestReplicateAspect(dimensions.width / dimensions.height);
+}
+
 function withImageSizeInstruction(prompt: string, size: string, requestSize?: string) {
     const aspect = resolveRequestAspect(size, requestSize);
     if (!aspect && !requestSize) return prompt;
@@ -1235,7 +1277,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                     quality: quality || "auto",
                     background: "auto",
                     moderation: "auto",
-                    aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
+                    aspect_ratio: replicateAspectRatio(config.size, requestSize),
                     ...replicateOutputFormatPayload(config.outputFormat),
                     number_of_images: n,
                 },
@@ -1318,7 +1360,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
                     quality: quality || "auto",
                     background: "auto",
                     moderation: "auto",
-                    aspect_ratio: resolveRequestAspect(config.size, requestSize) || "1:1",
+                    aspect_ratio: replicateAspectRatio(config.size, requestSize),
                     ...(await replicateInputImagesPayload(requestConfig.model, references)),
                     ...replicateOutputFormatPayload(config.outputFormat),
                     number_of_images: n,

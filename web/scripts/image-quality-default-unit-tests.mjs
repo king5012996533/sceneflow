@@ -4,7 +4,9 @@
  * 起因（2026-09-23）：上游不同画质档价格差 20 倍（实测同模型：auto ¥1.78/张、low ¥0.09/张）。
  * 以前默认写死 auto —— 用户随手点一下就是最贵那档；而面板显示的价格与发出去的档位必须是同一个值，
  * 所以解析收口成一个函数。这里钉住三件事：
- *   1. 用户选过的值永远优先（包括显式选 auto）；
+ *   1. 用户选过的值优先，但必须在模型标定的白名单内（2026-10-15 收紧：已被摘掉的档位，
+ *      例如 flare 的 auto，不再接受 —— 老页面的本地存档会把它带回来，而上游把 auto 按
+ *      xhigh 计费（$0.25/张），只改标定拦不住）；白名单外的值落回模型默认档；
  *   2. 没选过（空串）才用模型标定的默认档；
  *   3. 标定的默认档必须在标定允许的档位里，否则当没标（免得标了低、上游却不认低）。
  *
@@ -33,6 +35,8 @@ console.log("== 用户选过的值优先 ==");
 check("选了 high 就是 high", () => assert.equal(resolveImageQuality("high", imageCapability({ defaultQuality: "low" })), "high"));
 check("显式选了 auto 也是 auto（不被默认档顶掉）", () => assert.equal(resolveImageQuality("auto", imageCapability({ defaultQuality: "low" })), "auto"));
 check("大小写与空格无关", () => assert.equal(resolveImageQuality("  LOW  ", imageCapability()), "low"));
+check("显式选了白名单外的档 → 落回默认档（2026-10-15 收紧）", () => assert.equal(resolveImageQuality("auto", imageCapability({ qualities: ["low", "medium", "high"], defaultQuality: "low" })), "low"));
+check("标定没写档位时，显式选值照旧放行", () => assert.equal(resolveImageQuality("xhigh", imageCapability({ qualities: undefined })), "xhigh"));
 
 console.log("== 没选过时用模型标定的默认档 ==");
 check("空串 + 标了低 → low", () => assert.equal(resolveImageQuality("", imageCapability({ defaultQuality: "low" })), "low"));

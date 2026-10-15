@@ -536,7 +536,15 @@ function defaultQualityOf(input: unknown, allowed: readonly string[]): ImageQual
  */
 export function resolveImageQuality(configured: unknown, capability?: ModelCapabilitySpec | null): ImageQuality {
     const raw = typeof configured === "string" ? configured.trim().toLowerCase() : "";
-    if (IMAGE_QUALITY_VALUES.includes(raw as ImageQuality)) return raw as ImageQuality;
+    const explicit = IMAGE_QUALITY_VALUES.includes(raw as ImageQuality) ? (raw as ImageQuality) : undefined;
+    // 显式选过的值优先，但必须在模型标定的白名单里（2026-10-15 收紧）。
+    // 标定是运营给的「上游认这些值」的白名单，也是「哪些档被摘掉了」的唯一权威；浏览器的本地存档
+    // 里可能还留着已摘掉的档 —— flare 摘掉 auto 之后老页面继续提交 auto，上游把 auto 按 xhigh 计费
+    // （$0.25/张）而我们按兜底价扣分，只改标定拦不住。白名单外的值一律落回模型默认档。
+    if (explicit) {
+        const allowed = capability && capability.kind === IMAGE_KIND ? capability.qualities || [] : [];
+        if (!allowed.length || allowed.includes(explicit)) return explicit;
+    }
     if (capability && capability.kind === IMAGE_KIND) {
         const allowed = capability.qualities || [];
         return defaultQualityOf(capability.defaultQuality, allowed) || "auto";

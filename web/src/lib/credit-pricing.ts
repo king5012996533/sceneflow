@@ -446,6 +446,21 @@ const FLARE_QUALITY_COST_CENTS: Partial<Record<ImageQuality, number>> = {
 };
 
 /**
+ * openai/gpt-image-2（Replicate 官方）的单张成本，单位：分（人民币）。
+ *
+ * 来源：模型页 billingConfig（2026-10-15 抓取），按 1 美元 ≈ 7.1 元折算 ——
+ * low $0.012 / medium $0.047 / high $0.128，而 **auto 与 high 同价（$0.128）**。
+ * 与 flare 的两点差别：这个模型没有 xhigh / max 档；auto 落在 high 上，不像 flare 那样落在最贵档。
+ * 只按名字匹配 openai/ 前缀的那一个 —— 中转站的同名 gpt-image-2 是另一条上游，价目表不通用。
+ */
+const GPT_IMAGE_2_QUALITY_COST_CENTS: Partial<Record<ImageQuality, number>> = {
+    low: 9,
+    medium: 33,
+    high: 91,
+    auto: 91,
+};
+
+/**
  * 不做画质档、一口价按张卖的模型（Replicate 上的固定价模型）单张成本，单位：分（人民币）。
  *
  * 来源：模型页公开价目表（per output image / 打包价），按 1 美元 ≈ 7.1 元折算：
@@ -498,6 +513,13 @@ export function estimateGenerationCostCents(kind: GenerationKind, metadata?: Gen
                     .trim()
                     .toLowerCase();
                 const cost = FLARE_QUALITY_COST_CENTS[quality as ImageQuality];
+                if (typeof cost === "number") return cost;
+            }
+            if (/^openai\/gpt-image-2$/i.test(model)) {
+                const quality = String(metadata?.quality ?? "")
+                    .trim()
+                    .toLowerCase();
+                const cost = GPT_IMAGE_2_QUALITY_COST_CENTS[quality as ImageQuality];
                 if (typeof cost === "number") return cost;
             }
             const flat = FLAT_IMAGE_COST_CENTS.find((item) => item.pattern.test(model));
